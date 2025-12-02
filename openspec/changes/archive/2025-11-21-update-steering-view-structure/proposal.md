@@ -32,4 +32,4 @@ The `SteeringExplorerProvider` will be updated to check for these files.
 
 ### Commands
 - `createGlobalRule`: Creates `~/.github/copilot-instructions.md`
-- `createProjectRule`: Creates `openspec/AGENTS.md` (Default) or prompts user? -> Let's default to `openspec/AGENTS.md` as this is "OpenSpec for Copilot".
+- `createProjectRule`: Creates `openspec/AGENTS.md` (Default) or prompts user? -> Let's default to `openspec/AGENTS.md` as this is "Spec UI for Copilot".

@@ -32,10 +32,10 @@ const invalidFileNamePattern = /[\\/:*?"<>|]/;
 type TreeEventPayload = PromptItem | undefined | null | void;
 
 export class PromptsExplorerProvider implements TreeDataProvider<PromptItem> {
-	static readonly viewId = "openspec-for-copilot.views.promptsExplorer";
-	static readonly createPromptCommandId = "openspec-for-copilot.prompts.create";
-	static readonly refreshCommandId = "openspec-for-copilot.prompts.refresh";
-	static readonly runPromptCommandId = "openspec-for-copilot.prompts.run";
+	static readonly viewId = "spec-ui-for-copilot.views.promptsExplorer";
+	static readonly createPromptCommandId = "spec-ui-for-copilot.prompts.create";
+	static readonly refreshCommandId = "spec-ui-for-copilot.prompts.refresh";
+	static readonly runPromptCommandId = "spec-ui-for-copilot.prompts.run";
 
 	private readonly changeEmitter = new EventEmitter<TreeEventPayload>();
 	readonly onDidChangeTreeData: Event<TreeEventPayload> =

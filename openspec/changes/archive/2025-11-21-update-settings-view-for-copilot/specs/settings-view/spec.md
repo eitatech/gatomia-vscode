@@ -3,12 +3,12 @@
 ## ADDED Requirements
 
 ### Requirement: Settings View Branding
-The Settings view MUST reflect the new "OpenSpec for Copilot" branding.
+The Settings view MUST reflect the new "Spec UI for Copilot" branding.
 
 #### Scenario: View Title
 - **GIVEN** the extension is active
 - **WHEN** the user opens the Settings view
-- **THEN** the view welcome content should display "Configure OpenSpec for Copilot"
+- **THEN** the view welcome content should display "Configure Spec UI for Copilot"
 
 ### Requirement: MCP Configuration Access
 Users MUST be able to easily access the MCP configuration file.

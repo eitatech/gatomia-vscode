@@ -35,7 +35,7 @@ export let outputChannel: OutputChannel;
 
 export async function activate(context: ExtensionContext) {
 	// Create output channel for debugging
-	outputChannel = window.createOutputChannel("OpenSpec for Copilot - Debug");
+	outputChannel = window.createOutputChannel("Spec UI for Copilot - Debug");
 
 	// Initialize PromptLoader
 	try {
@@ -79,21 +79,21 @@ export async function activate(context: ExtensionContext) {
 
 	context.subscriptions.push(
 		window.registerTreeDataProvider(
-			"openspec-for-copilot.views.overview",
+			"spec-ui-for-copilot.views.overview",
 			overviewProvider
 		),
 		window.registerTreeDataProvider(
-			"openspec-for-copilot.views.specExplorer",
+			"spec-ui-for-copilot.views.specExplorer",
 			specExplorer
 		),
 		window.registerTreeDataProvider(
-			"openspec-for-copilot.views.steeringExplorer",
+			"spec-ui-for-copilot.views.steeringExplorer",
 			steeringExplorer
 		)
 	);
 	context.subscriptions.push(
 		window.registerTreeDataProvider(
-			"openspec-for-copilot.views.promptsExplorer",
+			"spec-ui-for-copilot.views.promptsExplorer",
 			promptsExplorer
 		)
 	);
@@ -183,7 +183,7 @@ function registerCommands(
 	promptsExplorer: PromptsExplorerProvider
 ) {
 	const createSpecCommand = commands.registerCommand(
-		"openspec-for-copilot.spec.create",
+		"spec-ui-for-copilot.spec.create",
 		async () => {
 			outputChannel.appendLine(
 				`[Spec] create command triggered at ${new Date().toISOString()}`
@@ -200,49 +200,49 @@ function registerCommands(
 	);
 
 	context.subscriptions.push(
-		commands.registerCommand("openspec-for-copilot.noop", () => {
+		commands.registerCommand("spec-ui-for-copilot.noop", () => {
 			// noop
 		}),
 		createSpecCommand,
 		commands.registerCommand(
-			"openspec-for-copilot.spec.navigate.requirements",
+			"spec-ui-for-copilot.spec.navigate.requirements",
 			async (specName: string) => {
 				await specManager.navigateToDocument(specName, "requirements");
 			}
 		),
 
 		commands.registerCommand(
-			"openspec-for-copilot.spec.navigate.design",
+			"spec-ui-for-copilot.spec.navigate.design",
 			async (specName: string) => {
 				await specManager.navigateToDocument(specName, "design");
 			}
 		),
 
 		commands.registerCommand(
-			"openspec-for-copilot.spec.navigate.tasks",
+			"spec-ui-for-copilot.spec.navigate.tasks",
 			async (specName: string) => {
 				await specManager.navigateToDocument(specName, "tasks");
 			}
 		),
 
 		commands.registerCommand(
-			"openspec-for-copilot.spec.implTask",
+			"spec-ui-for-copilot.spec.implTask",
 			async (documentUri: Uri) => {
 				outputChannel.appendLine(
-					`[Task Execute] Generating OpenSpec apply prompt for: ${documentUri.fsPath}`
+					`[Task Execute] Generating SpecUI apply prompt for: ${documentUri.fsPath}`
 				);
 				await specManager.runOpenSpecApply(documentUri);
 			}
 		),
 
 		commands.registerCommand(
-			"openspec-for-copilot.spec.open",
+			"spec-ui-for-copilot.spec.open",
 			async (relativePath: string, type: string) => {
 				await specManager.openDocument(relativePath, type);
 			}
 		),
 		// biome-ignore lint/suspicious/useAwait: ignore
-		commands.registerCommand("openspec-for-copilot.spec.refresh", async () => {
+		commands.registerCommand("spec-ui-for-copilot.spec.refresh", async () => {
 			outputChannel.appendLine("[Manual Refresh] Refreshing spec explorer...");
 			specExplorer.refresh();
 		})
@@ -254,20 +254,20 @@ function registerCommands(
 	context.subscriptions.push(
 		// Configuration commands
 		commands.registerCommand(
-			"openspec-for-copilot.steering.createUserRule",
+			"spec-ui-for-copilot.steering.createUserRule",
 			async () => {
 				await steeringManager.createUserConfiguration();
 			}
 		),
 
 		commands.registerCommand(
-			"openspec-for-copilot.steering.createProjectRule",
+			"spec-ui-for-copilot.steering.createProjectRule",
 			async () => {
 				await steeringManager.createProjectDocumentation();
 			}
 		),
 
-		commands.registerCommand("openspec-for-copilot.steering.refresh", () => {
+		commands.registerCommand("spec-ui-for-copilot.steering.refresh", () => {
 			outputChannel.appendLine(
 				"[Manual Refresh] Refreshing steering explorer..."
 			);
@@ -303,13 +303,13 @@ function registerCommands(
 	// Spec delete command
 	context.subscriptions.push(
 		commands.registerCommand(
-			"openspec-for-copilot.spec.delete",
+			"spec-ui-for-copilot.spec.delete",
 			async (item: any) => {
 				await specManager.delete(item.label);
 			}
 		),
 		commands.registerCommand(
-			"openspec-for-copilot.spec.archiveChange",
+			"spec-ui-for-copilot.spec.archiveChange",
 			async (item: any) => {
 				// item is SpecItem, item.specName is the ID
 				const changeId = item.specName;
@@ -352,26 +352,26 @@ function registerCommands(
 
 	// Prompts commands
 	context.subscriptions.push(
-		commands.registerCommand("openspec-for-copilot.prompts.refresh", () => {
+		commands.registerCommand("spec-ui-for-copilot.prompts.refresh", () => {
 			outputChannel.appendLine(
 				"[Manual Refresh] Refreshing prompts explorer..."
 			);
 			promptsExplorer.refresh();
 		}),
 		commands.registerCommand(
-			"openspec-for-copilot.prompts.createInstructions",
+			"spec-ui-for-copilot.prompts.createInstructions",
 			async () => {
 				await commands.executeCommand("workbench.command.new.instructions");
 			}
 		),
 		commands.registerCommand(
-			"openspec-for-copilot.prompts.createCopilotPrompt",
+			"spec-ui-for-copilot.prompts.createCopilotPrompt",
 			async () => {
 				await commands.executeCommand("workbench.command.new.prompt");
 			}
 		),
 		commands.registerCommand(
-			"openspec-for-copilot.prompts.create",
+			"spec-ui-for-copilot.prompts.create",
 			async (item?: any) => {
 				const ws = workspace.workspaceFolders?.[0];
 				if (!ws) {
@@ -426,7 +426,7 @@ function registerCommands(
 			}
 		),
 		commands.registerCommand(
-			"openspec-for-copilot.prompts.run",
+			"spec-ui-for-copilot.prompts.run",
 			// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ignore
 			async (filePathOrItem?: any) => {
 				try {
@@ -466,13 +466,13 @@ function registerCommands(
 			}
 		),
 		commands.registerCommand(
-			"openspec-for-copilot.prompts.rename",
+			"spec-ui-for-copilot.prompts.rename",
 			async (item?: any) => {
 				await promptsExplorer.renamePrompt(item);
 			}
 		),
 		commands.registerCommand(
-			"openspec-for-copilot.prompts.delete",
+			"spec-ui-for-copilot.prompts.delete",
 			async (item: any) => {
 				if (!item?.resourceUri) {
 					return;
@@ -495,9 +495,44 @@ function registerCommands(
 			}
 		),
 		commands.registerCommand(
-			"openspec-for-copilot.prompts.createAgentFile",
+			"spec-ui-for-copilot.prompts.createAgentFile",
 			async () => {
 				await commands.executeCommand("workbench.command.new.agent");
+			}
+		),
+
+		// SpecKit commands
+		commands.registerCommand(
+			"spec-ui-for-copilot.speckit.constitution",
+			async () => {
+				await sendPromptToChat("/speckit.constitution");
+			}
+		),
+		commands.registerCommand(
+			"spec-ui-for-copilot.speckit.specify",
+			async () => {
+				await sendPromptToChat("/speckit.specify");
+			}
+		),
+		commands.registerCommand("spec-ui-for-copilot.speckit.plan", async () => {
+			await sendPromptToChat("/speckit.plan");
+		}),
+		commands.registerCommand(
+			"spec-ui-for-copilot.speckit.unit-test",
+			async () => {
+				await sendPromptToChat("/speckit.unit-test");
+			}
+		),
+		commands.registerCommand(
+			"spec-ui-for-copilot.speckit.integration-test",
+			async () => {
+				await sendPromptToChat("/speckit.integration-test");
+			}
+		),
+		commands.registerCommand(
+			"spec-ui-for-copilot.speckit.implementation",
+			async () => {
+				await sendPromptToChat("/speckit.implementation");
 			}
 		)
 	);
@@ -507,15 +542,15 @@ function registerCommands(
 	// Group the following commands in a single subscriptions push
 	context.subscriptions.push(
 		// Overview and settings commands
-		commands.registerCommand("openspec-for-copilot.settings.open", async () => {
-			outputChannel.appendLine("Opening OpenSpec settings...");
+		commands.registerCommand("spec-ui-for-copilot.settings.open", async () => {
+			outputChannel.appendLine("Opening SpecUI settings...");
 			await commands.executeCommand(
 				"workbench.action.openSettings",
 				VSC_CONFIG_NAMESPACE
 			);
 		}),
 		commands.registerCommand(
-			"openspec-for-copilot.settings.openGlobalConfig",
+			"spec-ui-for-copilot.settings.openGlobalConfig",
 			async () => {
 				outputChannel.appendLine("Opening MCP config...");
 
@@ -543,21 +578,21 @@ function registerCommands(
 		),
 
 		// biome-ignore lint/suspicious/useAwait: ignore
-		commands.registerCommand("openspec-for-copilot.help.open", async () => {
-			outputChannel.appendLine("Opening OpenSpec help...");
-			const helpUrl = "https://github.com/atman-33/openspec-for-copilot#readme";
+		commands.registerCommand("spec-ui-for-copilot.help.open", async () => {
+			outputChannel.appendLine("Opening SpecUI help...");
+			const helpUrl = "https://github.com/italoag/spec-ui-for-copilot#readme";
 			env.openExternal(Uri.parse(helpUrl));
 		}),
 
 		// biome-ignore lint/suspicious/useAwait: ignore
-		commands.registerCommand("openspec-for-copilot.help.install", async () => {
-			outputChannel.appendLine("Opening OpenSpec installation guide...");
+		commands.registerCommand("spec-ui-for-copilot.help.install", async () => {
+			outputChannel.appendLine("Opening SpecUI installation guide...");
 			const installUrl = "https://github.com/Fission-AI/OpenSpec#readme";
 			env.openExternal(Uri.parse(installUrl));
 		}),
 
-		commands.registerCommand("openspec-for-copilot.menu.open", async () => {
-			outputChannel.appendLine("Opening OpenSpec menu...");
+		commands.registerCommand("spec-ui-for-copilot.menu.open", async () => {
+			outputChannel.appendLine("Opening SpecUI menu...");
 			await toggleViews();
 		})
 	);
