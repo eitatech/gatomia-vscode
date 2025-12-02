@@ -10,7 +10,6 @@ import {
 } from "vscode";
 import type { PromptLoader } from "../../services/prompt-loader";
 import type { ConfigManager } from "../../utils/config-manager";
-import { sendPromptToChat } from "../../utils/chat-prompt-runner";
 import { getWebviewContent } from "../../utils/get-webview-content";
 import type {
 	CreateSpecDraftState,
@@ -18,12 +17,15 @@ import type {
 	CreateSpecWebviewMessage,
 	CreateSpecExtensionMessage,
 } from "./types";
+import { SpecSubmissionStrategyFactory } from "./spec-submission-strategy";
+import type { SpecSystemMode } from "../../constants";
 
 interface CreateSpecInputControllerDependencies {
 	context: ExtensionContext;
 	configManager: ConfigManager;
 	promptLoader: PromptLoader;
 	outputChannel: OutputChannel;
+	activeSystem: SpecSystemMode;
 }
 
 const CREATE_SPEC_DRAFT_STATE_KEY = "createSpecDraftState";
@@ -45,33 +47,12 @@ const normalizeFormData = (data: CreateSpecFormData): CreateSpecFormData => ({
 	openQuestions: data.openQuestions ?? "",
 });
 
-const formatDescription = (data: CreateSpecFormData): string => {
-	const sections = [
-		data.productContext.trim()
-			? `Product Context / Goal:\n${data.productContext.trim()}`
-			: undefined,
-		data.keyScenarios.trim()
-			? `Key Scenarios / Acceptance Criteria:\n${data.keyScenarios.trim()}`
-			: undefined,
-		data.technicalConstraints.trim()
-			? `Technical Constraints:\n${data.technicalConstraints.trim()}`
-			: undefined,
-		data.relatedFiles.trim()
-			? `Related Files / Impact:\n${data.relatedFiles.trim()}`
-			: undefined,
-		data.openQuestions.trim()
-			? `Open Questions:\n${data.openQuestions.trim()}`
-			: undefined,
-	].filter(Boolean);
-
-	return sections.join("\n\n");
-};
-
 export class CreateSpecInputController {
 	private readonly context: ExtensionContext;
 	private readonly configManager: ConfigManager;
 	private readonly promptLoader: PromptLoader;
 	private readonly outputChannel: OutputChannel;
+	private readonly activeSystem: SpecSystemMode;
 	private draft: CreateSpecDraftState | undefined;
 	private panel: WebviewPanel | undefined;
 
@@ -80,11 +61,13 @@ export class CreateSpecInputController {
 		configManager,
 		promptLoader,
 		outputChannel,
+		activeSystem,
 	}: CreateSpecInputControllerDependencies) {
 		this.context = context;
 		this.configManager = configManager;
 		this.promptLoader = promptLoader;
 		this.outputChannel = outputChannel;
+		this.activeSystem = activeSystem;
 	}
 
 	async open(): Promise<void> {
@@ -223,12 +206,6 @@ export class CreateSpecInputController {
 			return;
 		}
 
-		const workspaceFolder = workspace.workspaceFolders?.[0];
-		if (!workspaceFolder) {
-			window.showErrorMessage("No workspace folder open");
-			return;
-		}
-
 		const sanitizedContext = data.productContext?.trim();
 		if (!sanitizedContext) {
 			await this.panel.webview.postMessage({
@@ -243,28 +220,9 @@ export class CreateSpecInputController {
 			productContext: sanitizedContext,
 		});
 
-		const payload = formatDescription(normalized);
-
 		try {
-			const promptUri = Uri.joinPath(
-				workspaceFolder.uri,
-				".github",
-				"prompts",
-				"openspec-proposal.prompt.md"
-			);
-			let promptTemplate = "";
-			try {
-				const fileData = await workspace.fs.readFile(promptUri);
-				promptTemplate = new TextDecoder().decode(fileData);
-			} catch (error) {
-				throw new Error(
-					"Required prompt file not found: .github/prompts/openspec-proposal.prompt.md"
-				);
-			}
-
-			const prompt = `${promptTemplate}\n\nThe following sections describe the specification and context for this change request.\n\n${payload}\n\nIMPORTANT:\nAfter generating the proposal documents, you MUST STOP and ask the user for confirmation.\nDo NOT proceed with any implementation steps until the user has explicitly approved the proposal.`;
-
-			await sendPromptToChat(prompt, { instructionType: "createSpec" });
+			const strategy = SpecSubmissionStrategyFactory.create(this.activeSystem);
+			await strategy.submit(normalized);
 
 			await this.clearDraftState();
 

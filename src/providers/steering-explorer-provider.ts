@@ -23,11 +23,11 @@ const { joinPath } = Uri;
 export class SteeringExplorerProvider
 	implements TreeDataProvider<SteeringItem>
 {
-	static readonly viewId = "openspec-for-copilot.views.steeringExplorer";
+	static readonly viewId = "spec-ui-for-copilot.views.steeringExplorer";
 	static readonly createUserRuleCommandId =
-		"openspec-for-copilot.steering.createUserRule";
+		"spec-ui-for-copilot.steering.createUserRule";
 	static readonly createProjectRuleCommandId =
-		"openspec-for-copilot.steering.createProjectRule";
+		"spec-ui-for-copilot.steering.createProjectRule";
 	private readonly _onDidChangeTreeData: EventEmitter<
 		SteeringItem | undefined | null | void
 	> = new EventEmitter<SteeringItem | undefined | null | void>();

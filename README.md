@@ -1,11 +1,11 @@
-# OpenSpec for Copilot
+# Spec UI for Copilot
 
 [![Visual Studio Marketplace](https://img.shields.io/vscode-marketplace/v/atman-dev.openspec-for-copilot.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=atman-dev.openspec-for-copilot)
 [![Downloads](https://img.shields.io/vscode-marketplace/d/atman-dev.openspec-for-copilot.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=atman-dev.openspec-for-copilot)
 [![GitHub stars](https://img.shields.io/github/stars/atman-33/openspec-for-copilot.svg?style=flat-square)](https://github.com/atman-33/openspec-for-copilot/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/atman-33/openspec-for-copilot.svg?style=flat-square)](https://github.com/atman-33/openspec-for-copilot/issues)
 
-OpenSpec for Copilot is a VS Code extension that brings Spec-Driven Development (SDD) to your workflow, leveraging [OpenSpec](https://github.com/Fission-AI/OpenSpec) prompts and **GitHub Copilot**.
+Spec UI for Copilot is a VS Code extension that brings Spec-Driven Development (SDD) to your workflow, leveraging [OpenSpec](https://github.com/Fission-AI/OpenSpec) prompts and **GitHub Copilot**.
 
 It allows you to visually manage Specs, Steering documents (AGENTS.md), and custom prompts, seamlessly integrating with GitHub Copilot Chat to generate high-quality documentation and code.
 
@@ -15,7 +15,7 @@ It allows you to visually manage Specs, Steering documents (AGENTS.md), and cust
 
 ### 📝 Spec Management
 
-- **Create Specs**: Run `OpenSpec for Copilot: Create New Spec` (`openspec-for-copilot.spec.create`) to open the creation dialog. Define your summary, product context, and constraints.
+- **Create Specs**: Run `Spec UI for Copilot: Create New Spec` (`openspec-for-copilot.spec.create`) to open the creation dialog. Define your summary, product context, and constraints.
 - **Generate with Copilot**: The extension compiles your input into an optimized OpenSpec prompt and sends it to **GitHub Copilot Chat** to generate the full specification (Requirements, Design, Tasks).
 - **Manage Specs**: Browse generated specs in the **Specs** view.
 - **Execute Tasks**: Open `tasks.md` and use the "Start Task" CodeLens to send task context to GitHub Copilot Chat for implementation.
@@ -62,7 +62,7 @@ openspec init
 ```
 
 ### Marketplace
-Search for "OpenSpec for Copilot" in the VS Code Marketplace and install the extension.
+Search for "Spec UI for Copilot" in the VS Code Marketplace and install the extension.
 
 ### From Local VSIX
 1. Build the package with `npm run package` (produces `openspec-for-copilot-<version>.vsix`).

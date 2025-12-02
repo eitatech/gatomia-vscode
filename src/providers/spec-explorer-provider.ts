@@ -10,16 +10,17 @@ import {
 	workspace,
 } from "vscode";
 import type { SpecManager } from "../features/spec/spec-manager";
+import type { SpecSystemMode } from "../constants";
 
 export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
-	static readonly viewId = "openspec-for-copilot.views.specExplorer";
+	static readonly viewId = "spec-ui-for-copilot.views.specExplorer";
 	static readonly navigateRequirementsCommandId =
-		"openspec-for-copilot.spec.navigate.requirements";
+		"spec-ui-for-copilot.spec.navigate.requirements";
 	static readonly navigateDesignCommandId =
-		"openspec-for-copilot.spec.navigate.design";
+		"spec-ui-for-copilot.spec.navigate.design";
 	static readonly navigateTasksCommandId =
-		"openspec-for-copilot.spec.navigate.tasks";
-	static readonly openSpecCommandId = "openspec-for-copilot.spec.open";
+		"spec-ui-for-copilot.spec.navigate.tasks";
+	static readonly openSpecCommandId = "spec-ui-for-copilot.spec.open";
 
 	private readonly _onDidChangeTreeData: EventEmitter<
 		SpecItem | undefined | null | void
@@ -69,15 +70,20 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 		}
 
 		if (element.contextValue === "group-specs") {
-			const specs = await this.specManager.getSpecs();
-			return specs.map(
-				(name) =>
+			const unifiedSpecs = await this.specManager.getAllSpecsUnified();
+			return unifiedSpecs.map(
+				(spec) =>
 					new SpecItem(
-						name,
+						spec.name,
 						TreeItemCollapsibleState.Collapsed,
 						"spec",
 						this.context,
-						name
+						spec.id,
+						undefined,
+						undefined,
+						spec.path,
+						undefined,
+						spec.system
 					)
 			);
 		}
@@ -226,6 +232,7 @@ class SpecItem extends TreeItem {
 	readonly command?: Command;
 	private readonly filePath?: string;
 	readonly parentName?: string;
+	readonly system?: SpecSystemMode;
 
 	// biome-ignore lint/nursery/useMaxParams: ignore
 	constructor(
@@ -237,7 +244,8 @@ class SpecItem extends TreeItem {
 		documentType?: string,
 		command?: Command,
 		filePath?: string,
-		parentName?: string
+		parentName?: string,
+		system?: SpecSystemMode
 	) {
 		super(label, collapsibleState);
 		this.label = label;
@@ -249,6 +257,7 @@ class SpecItem extends TreeItem {
 		this.command = command;
 		this.filePath = filePath;
 		this.parentName = parentName;
+		this.system = system;
 
 		this.updateIconAndTooltip();
 	}
@@ -260,7 +269,8 @@ class SpecItem extends TreeItem {
 			this.contextValue === "change-spec"
 		) {
 			this.iconPath = new ThemeIcon("package");
-			this.tooltip = `${this.contextValue}: ${this.label}`;
+			const systemLabel = this.system ? ` (${this.system})` : "";
+			this.tooltip = `${this.contextValue}${systemLabel}: ${this.label}`;
 			return;
 		}
 

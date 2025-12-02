@@ -12,6 +12,12 @@ import { PromptLoader } from "../../services/prompt-loader";
 import { ConfigManager } from "../../utils/config-manager";
 import { NotificationUtils } from "../../utils/notification-utils";
 import { sendPromptToChat } from "../../utils/chat-prompt-runner";
+import {
+	initializeSpecSystemAdapter,
+	type SpecSystemAdapter,
+} from "../../utils/spec-kit-adapter";
+import { detectAvailableSpecSystems } from "../../utils/spec-kit-utilities";
+import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../../constants";
 import { CreateSpecInputController } from "./create-spec-input-controller";
 
 export type SpecDocumentType = "requirements" | "design" | "tasks";
@@ -20,19 +26,104 @@ export class SpecManager {
 	private readonly configManager: ConfigManager;
 	private readonly promptLoader: PromptLoader;
 	private readonly outputChannel: OutputChannel;
-	private readonly createSpecInputController: CreateSpecInputController;
+	private createSpecInputController: CreateSpecInputController;
+	private specAdapter: SpecSystemAdapter | null = null;
+	private activeSystem: SpecSystemMode = SPEC_SYSTEM_MODE.AUTO;
 
 	constructor(context: ExtensionContext, outputChannel: OutputChannel) {
 		this.configManager = ConfigManager.getInstance();
 		this.configManager.loadSettings();
 		this.promptLoader = PromptLoader.getInstance();
 		this.outputChannel = outputChannel;
+		// Initialize with default, will be updated after adapter init
 		this.createSpecInputController = new CreateSpecInputController({
 			context,
 			configManager: this.configManager,
 			promptLoader: this.promptLoader,
 			outputChannel: this.outputChannel,
+			activeSystem: this.activeSystem,
 		});
+		this.initializeAdapter(context);
+	}
+
+	private async initializeAdapter(context: ExtensionContext): Promise<void> {
+		try {
+			this.specAdapter = await initializeSpecSystemAdapter();
+
+			const workspaceFolder = workspace.workspaceFolders?.[0];
+			if (workspaceFolder) {
+				const availableSystems = detectAvailableSpecSystems(
+					workspaceFolder.uri.fsPath
+				);
+				if (availableSystems.length > 1) {
+					const selection = await window.showQuickPick(
+						[
+							{
+								label: "Spec-Kit",
+								description: "Use Spec-Kit agent",
+								mode: SPEC_SYSTEM_MODE.SPECKIT,
+							},
+							{
+								label: "OpenSpec",
+								description: "Use OpenSpec agent",
+								mode: SPEC_SYSTEM_MODE.OPENSPEC,
+							},
+						],
+						{
+							placeHolder:
+								"Multiple spec systems detected. Which agent do you want to use?",
+							ignoreFocusOut: true,
+						}
+					);
+
+					if (selection) {
+						this.activeSystem = selection.mode;
+					} else {
+						// Default to SpecKit if user cancels
+						this.activeSystem = SPEC_SYSTEM_MODE.SPECKIT;
+					}
+				} else {
+					this.activeSystem = this.specAdapter.getActiveSystem();
+				}
+			} else {
+				this.activeSystem = this.specAdapter.getActiveSystem();
+			}
+
+			this.outputChannel.appendLine(
+				`[SpecManager] Initialized with active spec system: ${this.activeSystem}`
+			);
+
+			// Re-initialize controller with correct system
+			this.createSpecInputController = new CreateSpecInputController({
+				context,
+				configManager: this.configManager,
+				promptLoader: this.promptLoader,
+				outputChannel: this.outputChannel,
+				activeSystem: this.activeSystem,
+			});
+		} catch (error) {
+			this.outputChannel.appendLine(
+				`[SpecManager] Warning: Failed to initialize spec-kit adapter: ${error}`
+			);
+			// Fall back to OpenSpec mode
+			this.activeSystem = SPEC_SYSTEM_MODE.OPENSPEC;
+
+			// Re-initialize controller with fallback system
+			this.createSpecInputController = new CreateSpecInputController({
+				context,
+				configManager: this.configManager,
+				promptLoader: this.promptLoader,
+				outputChannel: this.outputChannel,
+				activeSystem: this.activeSystem,
+			});
+		}
+	}
+
+	/**
+	 * Gets the active spec system (OpenSpec, Spec-Kit, or Auto)
+	 */
+	getActiveSystem(): SpecSystemMode {
+		return this.activeSystem;
 	}
 
 	getSpecBasePath(): string {
@@ -185,6 +276,11 @@ This document has not been created yet.`;
 	}
 
 	async runOpenSpecApply(documentUri: Uri) {
+		if (this.activeSystem === SPEC_SYSTEM_MODE.SPECKIT) {
+			await sendPromptToChat("/speckit.implementation");
+			return;
+		}
+
 		const workspaceFolder = workspace.workspaceFolders?.[0];
 		if (!workspaceFolder) {
 			window.showErrorMessage("No workspace folder open");
@@ -222,5 +318,74 @@ This document has not been created yet.`;
 
 	async getChangeSpecs(changeName: string): Promise<string[]> {
 		return await this.getDirectories(`changes/${changeName}/specs`);
+	}
+
+	/**
+	 * Gets all available specs from both OpenSpec and Spec-Kit systems
+	 * This method unifies spec discovery across both systems
+	 */
+	async getAllSpecsUnified(): Promise<
+		Array<{ id: string; name: string; system: SpecSystemMode }>
+	> {
+		if (!this.specAdapter) {
+			// Fallback to OpenSpec-only if adapter failed
+			const specs = await this.getSpecs();
+			return specs.map((spec) => ({
+				id: spec,
+				name: spec,
+				system: SPEC_SYSTEM_MODE.OPENSPEC,
+			}));
+		}
+
+		try {
+			const unifiedSpecs = await this.specAdapter.listSpecs();
+			return unifiedSpecs.map((spec) => ({
+				id: spec.id,
+				name: spec.name,
+				system: spec.system,
+			}));
+		} catch (error) {
+			this.outputChannel.appendLine(
+				`[SpecManager] Warning: Failed to list unified specs: ${error}`
+			);
+			// Fallback to OpenSpec
+			const specs = await this.getSpecs();
+			return specs.map((spec) => ({
+				id: spec,
+				name: spec,
+				system: SPEC_SYSTEM_MODE.OPENSPEC,
+			}));
+		}
+	}
+
+	/**
+	 * Creates a new spec using the appropriate system (OpenSpec or Spec-Kit)
+	 */
+	async createUnified(specName: string): Promise<boolean> {
+		try {
+			if (this.specAdapter && this.activeSystem === SPEC_SYSTEM_MODE.SPECKIT) {
+				await this.specAdapter.createSpec(specName);
+				this.outputChannel.appendLine(
+					`[SpecManager] Created Spec-Kit feature: ${specName}`
+				);
+				return true;
+			}
+			// Use existing OpenSpec creation (via dialog)
+			await this.create();
+			return true;
+		} catch (error) {
+			this.outputChannel.appendLine(
+				`[SpecManager] Failed to create spec: ${error}`
+			);
+			window.showErrorMessage(`Failed to create spec: ${error}`);
+			return false;
+		}
+	}
+
+	/**
+	 * Gets the adapter instance (for testing/debugging purposes)
+	 */
+	getAdapter(): SpecSystemAdapter | null {
+		return this.specAdapter;
 	}
 }

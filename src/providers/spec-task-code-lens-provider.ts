@@ -50,7 +50,7 @@ export class SpecTaskCodeLensProvider implements CodeLensProvider {
 				new CodeLens(range, {
 					title: "$(play) Start All Tasks",
 					tooltip: "Click to generate OpenSpec apply prompt",
-					command: "openspec-for-copilot.spec.implTask",
+					command: "spec-ui-for-copilot.spec.implTask",
 					arguments: [document.uri],
 				}),
 			];
@@ -61,7 +61,7 @@ export class SpecTaskCodeLensProvider implements CodeLensProvider {
 				new CodeLens(range, {
 					title: "$(check) All Tasks Completed",
 					tooltip: "All tasks are completed",
-					command: "openspec-for-copilot.noop",
+					command: "spec-ui-for-copilot.noop",
 				}),
 			];
 		}

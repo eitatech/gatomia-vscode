@@ -8,7 +8,7 @@ import type {
 import { getWebviewContent } from "../utils/get-webview-content";
 
 export class InteractiveViewProvider implements WebviewViewProvider {
-	static readonly viewId = "openspec-for-copilot.interactiveView";
+	static readonly viewId = "spec-ui-for-copilot.interactiveView";
 
 	private _view?: WebviewView;
 	private readonly _extensionUri: Uri;

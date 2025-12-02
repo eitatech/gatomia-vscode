@@ -4,7 +4,7 @@
 Update the default paths for project and global prompts to align with GitHub Copilot conventions, replacing `.codex` references with `.github`.
 
 ## Motivation
-The extension is being adapted for "OpenSpec for Copilot". The current implementation uses `.codex/prompts` for project prompts and `~/.codex/prompts` for global prompts. To better integrate with the GitHub Copilot ecosystem, these should be changed to `.github/prompts` and `~/.github/prompts` respectively.
+The extension is being adapted for "Spec UI for Copilot". The current implementation uses `.codex/prompts` for project prompts and `~/.codex/prompts` for global prompts. To better integrate with the GitHub Copilot ecosystem, these should be changed to `.github/prompts` and `~/.github/prompts` respectively.
 
 ## Proposed Changes
 
