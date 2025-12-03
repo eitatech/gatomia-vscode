@@ -44,17 +44,18 @@ It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.
 - Visual Studio Code 1.84.0 or newer.
 - **[GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat)** extension must be installed.
 
-### Spec-Kit (Recommended)
+### SpecKit
 
 ALMA works best with [Spec-Kit](https://github.com/github/spec-kit).
 
 1. Initialize Spec-Kit in your project:
 
    ```shell
-   npx spec-kit init
+   uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+   specify init --here
    ```
 
-### OpenSpec (Legacy)
+### OpenSpec
 
 If you prefer OpenSpec:
 
