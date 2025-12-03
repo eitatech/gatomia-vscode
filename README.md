@@ -9,14 +9,12 @@ ALMA is a VS Code extension that brings Agentic Lifecycle Management Automation 
 
 It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.md), and custom prompts, seamlessly integrating with GitHub Copilot Chat to generate high-quality documentation and code.
 
-![Create new Spec](./screenshots/image.png)
-
 ## Features
 
 ### Spec Management
 
 - **Create Specs**: Run `ALMA: Create New Spec` (`alma.spec.create`) to open the creation dialog. Define your summary, product context, and constraints.
-- **Support for Multiple Systems**: Choose between **Spec-Kit** (Recommended) or **OpenSpec** (Legacy) for your Spec-Driven Development workflow.
+- **Support for Multiple Systems**: Choose between **Spec Kit** or **OpenSpec** for your AI Spec-Driven Development workflow.
 - **Generate with Copilot**: The extension compiles your input into an optimized prompt and sends it to **GitHub Copilot Chat** to generate the full specification.
 - **Manage Specs**: Browse generated specs in the **Specs** view.
 - **Execute Tasks**: Open `tasks.md` and use the "Start Task" CodeLens to send task context to GitHub Copilot Chat for implementation.
@@ -30,7 +28,7 @@ It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.
 
 ### Steering
 
-- **Constitution / Agents**: Manage your project's "Constitution" (Spec-Kit) or "AGENTS.md" (OpenSpec) to steer Copilot's behavior.
+- **Constitution / Agents**: Manage your project's "Constitution" (Spec Kit) or "AGENTS.md" (OpenSpec) to steer Copilot's behavior.
 - **Global Instructions**: Configure global instructions for Copilot across all your projects.
 
 ### Migration
@@ -44,9 +42,7 @@ It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.
 - Visual Studio Code 1.84.0 or newer.
 - **[GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat)** extension must be installed.
 
-### SpecKit
-
-ALMA works best with [Spec-Kit](https://github.com/github/spec-kit).
+### [Spec Kit](https://github.com/github/spec-kit)
 
 1. Install the CLI globaly:
 
@@ -60,7 +56,7 @@ ALMA works best with [Spec-Kit](https://github.com/github/spec-kit).
    specify init --here
    ```
 
-### OpenSpec
+### [OpenSpec](https://github.com/fission-ai/openspec)
 
 If you prefer OpenSpec:
 
@@ -170,5 +166,5 @@ MIT License. See [`LICENSE`](LICENSE).
 
 ## Credits
 
-- [Spec-Kit](https://github.com/github/spec-kit)
+- [Spec Kit](https://github.com/github/spec-kit)
 - [OpenSpec](https://github.com/Fission-AI/OpenSpec)
