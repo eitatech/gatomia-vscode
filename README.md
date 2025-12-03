@@ -48,10 +48,15 @@ It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.
 
 ALMA works best with [Spec-Kit](https://github.com/github/spec-kit).
 
-1. Initialize Spec-Kit in your project:
+1. Install the CLI globaly:
 
    ```shell
    uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+   ```
+
+2. Initialize in your project:
+
+   ```shell
    specify init --here
    ```
 
