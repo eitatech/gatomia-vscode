@@ -1,6 +1,7 @@
-import { Uri, workspace } from "vscode";
+import { Uri, workspace, window } from "vscode";
 import { sendPromptToChat } from "../../utils/chat-prompt-runner";
 import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../../constants";
+import { SpecKitManager } from "./spec-kit-manager";
 
 export interface SpecSubmissionContext {
 	productContext: string;
@@ -69,9 +70,31 @@ export class OpenSpecSubmissionStrategy implements SpecSubmissionStrategy {
 
 export class SpecKitSubmissionStrategy implements SpecSubmissionStrategy {
 	async submit(context: SpecSubmissionContext): Promise<void> {
-		// For SpecKit, we use the slash command /speckit.specify
-		// We can pass the context as part of the prompt
+		// 1. Ask for feature name since it's required for Spec-Kit directory structure
+		const name = await window.showInputBox({
+			prompt: "Enter a name for the new feature (e.g., user-auth)",
+			placeHolder: "feature-name",
+			validateInput: (value) => (value ? null : "Name is required"),
+		});
 
+		if (!name) {
+			return;
+		}
+
+		// 2. Create feature scaffolding
+		const manager = SpecKitManager.getInstance();
+		const featurePath = await manager.createFeature(name, context);
+
+		// 3. Open the spec.md file
+		const specUri = Uri.file(`${featurePath}/spec.md`);
+		try {
+			const doc = await workspace.openTextDocument(specUri);
+			await window.showTextDocument(doc);
+		} catch (error) {
+			console.error("Failed to open spec file:", error);
+		}
+
+		// 4. Send prompt to Copilot to fill in the details
 		const payload = this.formatDescription(context);
 		const prompt = `/speckit.specify ${payload}`;
 

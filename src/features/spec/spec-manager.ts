@@ -18,6 +18,7 @@ import {
 } from "../../utils/spec-kit-adapter";
 import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../../constants";
 import { CreateSpecInputController } from "./create-spec-input-controller";
+import { SpecKitManager } from "./spec-kit-manager";
 
 export type SpecDocumentType = "requirements" | "design" | "tasks";
 
@@ -326,7 +327,10 @@ This document has not been created yet.`;
 	async createUnified(specName: string): Promise<boolean> {
 		try {
 			if (this.specAdapter && this.activeSystem === SPEC_SYSTEM_MODE.SPECKIT) {
-				await this.specAdapter.createSpec(specName);
+				// Use SpecKitManager to create feature with files
+				const manager = SpecKitManager.getInstance();
+				await manager.createFeature(specName);
+
 				this.outputChannel.appendLine(
 					`[SpecManager] Created Spec-Kit feature: ${specName}`
 				);

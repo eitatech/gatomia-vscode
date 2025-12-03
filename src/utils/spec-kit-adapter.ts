@@ -1,5 +1,5 @@
-import { join } from "path";
-import { existsSync } from "fs";
+import { join } from "node:path";
+import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { workspace, window } from "vscode";
 import {
 	DEFAULT_CONFIG,
@@ -269,11 +269,11 @@ export class SpecSystemAdapter {
 		const specs: UnifiedSpec[] = [];
 
 		try {
-			const entries = require("fs").readdirSync(specsPath);
+			const entries = readdirSync(specsPath);
 
 			for (const entry of entries) {
 				const fullPath = join(specsPath, entry);
-				const stat = require("fs").statSync(fullPath);
+				const stat = statSync(fullPath);
 
 				if (stat.isDirectory()) {
 					specs.push({
@@ -354,13 +354,13 @@ export class SpecSystemAdapter {
 		const config = this.getConfig();
 
 		try {
-			require("fs").mkdirSync(config.specsPath, { recursive: true });
+			mkdirSync(config.specsPath, { recursive: true });
 
 			const nextNumber = generateNextFeatureNumber(config.specsPath);
 			const dirName = createFeatureDirectoryName(nextNumber, name);
 			const featurePath = join(config.specsPath, dirName);
 
-			require("fs").mkdirSync(featurePath, { recursive: true });
+			mkdirSync(featurePath, { recursive: true });
 
 			return Promise.resolve({
 				id: dirName,
@@ -386,10 +386,10 @@ export class SpecSystemAdapter {
 		const specsPath = join(config.specsPath, "specs");
 
 		try {
-			require("fs").mkdirSync(specsPath, { recursive: true });
+			mkdirSync(specsPath, { recursive: true });
 
 			const specPath = join(specsPath, name);
-			require("fs").mkdirSync(specPath, { recursive: true });
+			mkdirSync(specPath, { recursive: true });
 
 			return Promise.resolve({
 				id: name,

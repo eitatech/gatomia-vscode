@@ -1,4 +1,4 @@
-import { homedir } from "os";
+import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type { FileSystemWatcher } from "vscode";
 import {
@@ -67,6 +67,11 @@ export async function activate(context: ExtensionContext) {
 		outputChannel.appendLine(
 			`Spec System Adapter initialized. Active system: ${adapter.getActiveSystem()}`
 		);
+
+		// Load prompts from active system
+		const promptsPath = adapter.getPromptsBasePath();
+		PromptLoader.getInstance().loadPromptsFromDirectory(promptsPath);
+		outputChannel.appendLine(`Loaded prompts from: ${promptsPath}`);
 	} catch (error) {
 		outputChannel.appendLine(
 			`Failed to initialize Spec System Adapter: ${error}`
