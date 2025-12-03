@@ -4,6 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const matter = require("gray-matter");
 
+const SEPARATOR_REGEX = /[-.]/;
+
 // Recursively find all .md files
 function findMarkdownFiles(dir) {
 	const files = [];
@@ -97,14 +99,19 @@ function generateIndex(outputDir) {
 	const files = walk(outputDir);
 
 	// Create export lines with stable camelCase aliases
-	const toCamel = (filePath) =>
-		path
-			.basename(filePath, ".ts")
-			.split("-")
+	const toCamel = (filePath) => {
+		let name = path.basename(filePath, ".ts");
+		// Remove .prompt suffix if present to avoid "Prompt" in the alias
+		if (name.endsWith(".prompt")) {
+			name = name.slice(0, -7);
+		}
+		return name
+			.split(SEPARATOR_REGEX)
 			.map((seg, i) =>
 				i === 0 ? seg : seg.charAt(0).toUpperCase() + seg.slice(1)
 			)
 			.join("");
+	};
 
 	const relFromOutput = (absPath) => {
 		const rel = path.relative(outputDir, absPath).split(path.sep).join("/");

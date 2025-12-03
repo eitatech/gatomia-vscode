@@ -1,10 +1,15 @@
 import { compile } from "handlebars";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, basename } from "node:path";
+import matter from "gray-matter";
 import type {
 	PromptFrontmatter,
 	PromptMetadata,
 	PromptTemplate,
 	ValidationResult,
 } from "../types/prompt.types";
+
+const PROMPT_FILE_EXTENSION_REGEX = /\.(prompt\.)?md$/;
 
 // Import all prompts from index
 // biome-ignore lint/performance/noNamespaceImport: ignore
@@ -41,7 +46,7 @@ export class PromptLoader {
 		this.prompts.clear();
 		this.compiledTemplates.clear();
 
-		// Load all prompts
+		// Load all built-in prompts
 		const promptModules = Object.values(prompts);
 
 		// Register each prompt
@@ -49,6 +54,69 @@ export class PromptLoader {
 			if (module.frontmatter && module.content) {
 				this.registerPrompt(module as PromptTemplate);
 			}
+		}
+	}
+
+	/**
+	 * Load prompts from a directory
+	 * @param directoryPath Absolute path to the directory containing .md prompt files
+	 */
+	loadPromptsFromDirectory(directoryPath: string): void {
+		try {
+			const files = readdirSync(directoryPath);
+
+			for (const file of files) {
+				if (file.endsWith(".md") || file.endsWith(".prompt.md")) {
+					const fullPath = join(directoryPath, file);
+					const stat = statSync(fullPath);
+
+					if (stat.isFile()) {
+						this.loadPromptFromFile(fullPath);
+					}
+				}
+			}
+		} catch (error) {
+			// Directory might not exist, which is fine
+			console.warn(
+				`[PromptLoader] Failed to load prompts from ${directoryPath}: ${error}`
+			);
+		}
+	}
+
+	/**
+	 * Load a single prompt from a file
+	 */
+	private loadPromptFromFile(filePath: string): void {
+		try {
+			const content = readFileSync(filePath, "utf8");
+			const { data, content: body } = matter(content);
+
+			// Generate ID from filename if not provided in frontmatter
+			// Remove extension
+			const fileName = basename(filePath).replace(
+				PROMPT_FILE_EXTENSION_REGEX,
+				""
+			);
+			const id = (data.id as string) || fileName;
+
+			const template: PromptTemplate = {
+				frontmatter: {
+					id,
+					name: (data.name as string) || id,
+					description: (data.description as string) || "",
+					version: (data.version as string) || "1.0.0",
+					variables: (data.variables as Record<string, any>) || {},
+					...data,
+				},
+				content: body,
+			};
+
+			this.registerPrompt(template);
+		} catch (error) {
+			console.error(
+				`[PromptLoader] Failed to load prompt from ${filePath}:`,
+				error
+			);
 		}
 	}
 

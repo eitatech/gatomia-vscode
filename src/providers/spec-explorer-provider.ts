@@ -10,7 +10,9 @@ import {
 	workspace,
 } from "vscode";
 import type { SpecManager } from "../features/spec/spec-manager";
-import type { SpecSystemMode } from "../constants";
+import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../constants";
+import { getSpecSystemAdapter } from "../utils/spec-kit-adapter";
+import { basename } from "node:path";
 
 export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 	static readonly viewId = "alma.views.specExplorer";
@@ -101,6 +103,58 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 		}
 
 		if (element.contextValue === "spec") {
+			// Handle Spec-Kit System
+			if (element.system === SPEC_SYSTEM_MODE.SPECKIT) {
+				const adapter = getSpecSystemAdapter();
+				// Get files for this spec (returns absolute paths)
+				const files = await adapter.getSpecFiles(element.specName!);
+
+				const items: SpecItem[] = [];
+
+				// Map of filenames to display labels and types
+				const fileMap: Record<string, { label: string; type: string }> = {
+					"spec.md": { label: "Spec", type: "spec" },
+					"plan.md": { label: "Plan", type: "plan" },
+					"tasks.md": { label: "Tasks", type: "tasks" },
+					"design.md": { label: "Design", type: "design" },
+					"requirements.md": { label: "Requirements", type: "requirements" },
+					"research.md": { label: "Research", type: "research" },
+					"data-model.md": { label: "Data Model", type: "data-model" },
+					"quickstart.md": { label: "Quickstart", type: "quickstart" },
+				};
+
+				for (const [docType, absolutePath] of Object.entries(files)) {
+					const fileName = basename(absolutePath);
+					const fileInfo = fileMap[fileName] || {
+						label: fileName,
+						type: "file",
+					};
+
+					// Convert absolute path to relative path for the command
+					const relativePath = workspace.asRelativePath(absolutePath);
+
+					items.push(
+						new SpecItem(
+							fileInfo.label,
+							TreeItemCollapsibleState.None,
+							"spec-document",
+							this.context,
+							element.specName,
+							fileInfo.type,
+							{
+								command: SpecExplorerProvider.openSpecCommandId,
+								title: `Open ${fileInfo.label}`,
+								arguments: [relativePath, fileInfo.type],
+							},
+							relativePath
+						)
+					);
+				}
+
+				return items;
+			}
+
+			// Handle OpenSpec System (Legacy)
 			const specPath = `openspec/specs/${element.specName}/spec.md`;
 			return [
 				new SpecItem(
@@ -295,6 +349,14 @@ class SpecItem extends TreeItem {
 			this.iconPath = new ThemeIcon("tasklist");
 		} else if (this.documentType === "proposal") {
 			this.iconPath = new ThemeIcon("lightbulb");
+		} else if (this.documentType === "plan") {
+			this.iconPath = new ThemeIcon("calendar");
+		} else if (this.documentType === "research") {
+			this.iconPath = new ThemeIcon("search");
+		} else if (this.documentType === "data-model") {
+			this.iconPath = new ThemeIcon("database");
+		} else if (this.documentType === "quickstart") {
+			this.iconPath = new ThemeIcon("rocket");
 		} else {
 			this.iconPath = new ThemeIcon("file");
 		}
