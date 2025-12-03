@@ -35,6 +35,7 @@ export const window = {
 	showWarningMessage: vi.fn(),
 	showInformationMessage: vi.fn(),
 	showInputBox: vi.fn(),
+	showQuickPick: vi.fn(),
 	createTerminal: vi.fn(),
 	onDidEndTerminalShellExecution: vi.fn(),
 };

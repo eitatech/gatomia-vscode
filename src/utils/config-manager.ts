@@ -4,12 +4,21 @@ import {
 	DEFAULT_CONFIG,
 	DEFAULT_PATHS,
 	DEFAULT_VIEW_VISIBILITY,
+	SPECKIT_CONFIG,
 	VSC_CONFIG_NAMESPACE,
 } from "../constants";
 export interface OpenSpecSettings {
 	paths: {
 		specs: string;
 		prompts: string;
+	};
+	speckit: {
+		paths: {
+			specs: string;
+			memory: string;
+			templates: string;
+			scripts: string;
+		};
 	};
 	views: {
 		specs: { visible: boolean };
@@ -97,6 +106,22 @@ export class ConfigManager {
 		return configuredPaths;
 	}
 
+	private getSpecKitPaths(): OpenSpecSettings["speckit"]["paths"] {
+		const config = workspace.getConfiguration(VSC_CONFIG_NAMESPACE);
+		return {
+			specs:
+				config.get<string>("speckit.specsPath") ?? SPECKIT_CONFIG.paths.specs,
+			memory:
+				config.get<string>("speckit.memoryPath") ?? SPECKIT_CONFIG.paths.memory,
+			templates:
+				config.get<string>("speckit.templatesPath") ??
+				SPECKIT_CONFIG.paths.templates,
+			scripts:
+				config.get<string>("speckit.scriptsPath") ??
+				SPECKIT_CONFIG.paths.scripts,
+		};
+	}
+
 	private getChatLanguage(): string {
 		const config = workspace.getConfiguration(VSC_CONFIG_NAMESPACE);
 		return config.get<string>("chatLanguage") ?? DEFAULT_CONFIG.chatLanguage;
@@ -124,6 +149,11 @@ export class ConfigManager {
 		const mergedPaths = {
 			...defaults.paths,
 			...(overrides.paths ?? {}),
+		};
+
+		const mergedSpecKitPaths = {
+			...defaults.speckit.paths,
+			...(overrides.speckit?.paths ?? {}),
 		};
 
 		const mergedViews = {
@@ -162,6 +192,9 @@ export class ConfigManager {
 
 		return {
 			paths: mergedPaths,
+			speckit: {
+				paths: mergedSpecKitPaths,
+			},
 			views: mergedViews,
 			chatLanguage: overrides.chatLanguage ?? defaults.chatLanguage,
 			customInstructions: mergedCustomInstructions,
@@ -171,12 +204,16 @@ export class ConfigManager {
 
 	private getDefaultSettings(): OpenSpecSettings {
 		const configuredPaths = this.getConfiguredPaths();
+		const specKitPaths = this.getSpecKitPaths();
 		const chatLanguage = this.getChatLanguage();
 		const customInstructions = this.getCustomInstructions();
 		const specSystem = this.getSpecSystem();
 
 		return {
 			paths: { ...DEFAULT_PATHS, ...configuredPaths },
+			speckit: {
+				paths: specKitPaths,
+			},
 			views: {
 				specs: { visible: DEFAULT_VIEW_VISIBILITY.specs },
 				steering: { visible: DEFAULT_VIEW_VISIBILITY.steering },

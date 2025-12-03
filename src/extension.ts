@@ -28,6 +28,7 @@ import { sendPromptToChat } from "./utils/chat-prompt-runner";
 import { ConfigManager } from "./utils/config-manager";
 import { getVSCodeUserDataPath } from "./utils/platform-utils";
 import { getSpecSystemAdapter } from "./utils/spec-kit-adapter";
+import { SpecKitMigration } from "./utils/spec-kit-migration";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -559,6 +560,46 @@ function registerCommands(
 		commands.registerCommand("alma.menu.open", async () => {
 			outputChannel.appendLine("Opening ALMA menu...");
 			await toggleViews();
+		}),
+
+		commands.registerCommand("alma.migration.start", async () => {
+			const ws = workspace.workspaceFolders?.[0];
+			if (!ws) {
+				window.showErrorMessage("No workspace folder found");
+				return;
+			}
+			const migration = new SpecKitMigration(ws.uri.fsPath);
+			await migration.migrateAllSpecs();
+		}),
+
+		commands.registerCommand(
+			"alma.migration.generateConstitution",
+			async () => {
+				const ws = workspace.workspaceFolders?.[0];
+				if (!ws) {
+					window.showErrorMessage("No workspace folder found");
+					return;
+				}
+				const migration = new SpecKitMigration(ws.uri.fsPath);
+				await migration.generateConstitution();
+			}
+		),
+
+		commands.registerCommand("alma.migration.createBackup", () => {
+			const ws = workspace.workspaceFolders?.[0];
+			if (!ws) {
+				window.showErrorMessage("No workspace folder found");
+				return;
+			}
+			const migration = new SpecKitMigration(ws.uri.fsPath);
+			const backupPath = migration.createBackup();
+			if (backupPath) {
+				window.showInformationMessage(`Backup created at: ${backupPath}`);
+			} else {
+				window.showWarningMessage(
+					"No OpenSpec directory found to backup, or backup failed."
+				);
+			}
 		})
 	);
 }
@@ -612,9 +653,13 @@ function setupFileWatchers(
 				.replace(/\/+$/, "");
 
 		const configManager = ConfigManager.getInstance();
+		const settings = configManager.getSettings();
 		const configuredPaths = [
-			configManager.getPath("prompts"),
-			configManager.getPath("specs"),
+			settings.paths.prompts,
+			settings.paths.specs,
+			settings.speckit.paths.specs,
+			settings.speckit.paths.templates,
+			settings.speckit.paths.memory,
 		];
 
 		const extraPatterns = new Set<string>();
