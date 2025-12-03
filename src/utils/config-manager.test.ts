@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { workspace } from "vscode";
-import { DEFAULT_PATHS, DEFAULT_VIEW_VISIBILITY } from "../constants";
+import {
+	DEFAULT_PATHS,
+	DEFAULT_VIEW_VISIBILITY,
+	SPECKIT_CONFIG,
+} from "../constants";
 import { ConfigManager } from "./config-manager";
 
 describe("ConfigManager", () => {
@@ -41,6 +45,14 @@ describe("ConfigManager", () => {
 		const settings = configManager.getSettings();
 		expect(settings).toEqual({
 			paths: DEFAULT_PATHS,
+			speckit: {
+				paths: {
+					specs: SPECKIT_CONFIG.paths.specs,
+					memory: SPECKIT_CONFIG.paths.memory,
+					templates: SPECKIT_CONFIG.paths.templates,
+					scripts: SPECKIT_CONFIG.paths.scripts,
+				},
+			},
 			views: {
 				specs: { visible: DEFAULT_VIEW_VISIBILITY.specs },
 				steering: { visible: DEFAULT_VIEW_VISIBILITY.steering },
@@ -54,6 +66,7 @@ describe("ConfigManager", () => {
 				startAllTask: "",
 				runPrompt: "",
 			},
+			specSystem: "auto",
 		});
 	});
 });
