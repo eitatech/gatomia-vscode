@@ -13,7 +13,7 @@ It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.
 
 ## Features
 
-### 📝 Spec Management
+### Spec Management
 
 - **Create Specs**: Run `ALMA: Create New Spec` (`alma.spec.create`) to open the creation dialog. Define your summary, product context, and constraints.
 - **Support for Multiple Systems**: Choose between **Spec-Kit** (Recommended) or **OpenSpec** (Legacy) for your Spec-Driven Development workflow.
@@ -21,17 +21,21 @@ It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.
 - **Manage Specs**: Browse generated specs in the **Specs** view.
 - **Execute Tasks**: Open `tasks.md` and use the "Start Task" CodeLens to send task context to GitHub Copilot Chat for implementation.
 
-### 🧩 Prompt Management
+### Prompt Management
 
 - **Custom Prompts**: Manage Markdown prompts under `.github/prompts` (configurable) alongside instructions and agents to keep all project guidance in one place.
 - **Project Instructions & Agents**: The Prompts explorer shows `Project Instructions` and `Project Agents` groups, surfacing `.github/instructions` and `.github/agents` files.
 - **Run Prompts**: Execute prompts directly from the tree view, passing the context to GitHub Copilot Chat.
 - **Rename or Delete**: Use the item context menu to rename or delete prompts.
 
-### 🧭 Steering
+### Steering
 
 - **Constitution / Agents**: Manage your project's "Constitution" (Spec-Kit) or "AGENTS.md" (OpenSpec) to steer Copilot's behavior.
 - **Global Instructions**: Configure global instructions for Copilot across all your projects.
+
+### Migration
+
+- **Migrate to Spec-Kit**: Easily migrate existing OpenSpec projects to the modern Spec-Kit structure using the `ALMA: Migrate to Spec-Kit` command.
 
 ## Installation
 
@@ -107,8 +111,11 @@ All settings live under the `alma` namespace.
 | --- | --- | --- | --- |
 | `alma.chatLanguage` | string | `English` | The language GitHub Copilot should use for responses. |
 | `alma.specSystem` | string | `auto` | The Spec System to use (`auto`, `speckit`, `openspec`). |
-| `alma.copilot.specsPath` | string | `speckit` | Workspace-relative path for generated specs. |
-| `alma.copilot.promptsPath` | string | `.github/prompts` | Workspace-relative path for Markdown prompts. |
+| `alma.speckit.specsPath` | string | `specs` | Path for Spec-Kit specs. |
+| `alma.speckit.memoryPath` | string | `.specify/memory` | Path for Spec-Kit memory. |
+| `alma.speckit.templatesPath` | string | `.specify/templates` | Path for Spec-Kit templates. |
+| `alma.copilot.specsPath` | string | `openspec` | Path for OpenSpec specs. |
+| `alma.copilot.promptsPath` | string | `.github/prompts` | Path for Markdown prompts. |
 | `alma.views.specs.visible` | boolean | `true` | Show or hide the Specs explorer. |
 | `alma.views.prompts.visible` | boolean | `true` | Toggle the Prompts explorer. |
 | `alma.views.steering.visible` | boolean | `true` | Toggle the Steering explorer. |
@@ -120,13 +127,13 @@ All settings live under the `alma` namespace.
 
 ```text
 .specify/
-├── memory/                 # Project memory (constitution.md)
+├── constitution.md         # Global steering rules
+├── memory/                 # Project memory
 ├── templates/              # Spec templates
 specs/                      # Feature specifications
 ├── 001-feature-name/
 │   ├── spec.md
-│   ├── plan.md
-│   └── tasks.md
+│   └── 001-task-name.md
 ```
 
 ### OpenSpec Structure

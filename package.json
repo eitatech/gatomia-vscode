@@ -44,7 +44,6 @@
     "test:watch": "vitest --pool threads --watch",
     "test:coverage": "vitest --pool threads --coverage",
     "prepare": "husky",
-    "--- WEBVIEW ---": "--- --- --- --- ---",
     "build:webview": "npm --prefix webview-ui run build",
     "watch:webview": "npm --prefix webview-ui run dev"
   },
@@ -141,6 +140,30 @@
           "editPresentation": "multilineText",
           "description": "Custom instructions appended when running a prompt.",
           "order": 7
+        },
+        "alma.speckit.specsPath": {
+          "type": "string",
+          "default": "specs",
+          "description": "Path where Spec-Kit specification files are stored.",
+          "order": 8
+        },
+        "alma.speckit.memoryPath": {
+          "type": "string",
+          "default": ".specify/memory",
+          "description": "Path where Spec-Kit memory files are stored.",
+          "order": 9
+        },
+        "alma.speckit.templatesPath": {
+          "type": "string",
+          "default": ".specify/templates",
+          "description": "Path where Spec-Kit template files are stored.",
+          "order": 10
+        },
+        "alma.speckit.scriptsPath": {
+          "type": "string",
+          "default": ".specify/scripts",
+          "description": "Path where Spec-Kit script files are stored.",
+          "order": 11
         }
       }
     },
@@ -348,6 +371,21 @@
       {
         "command": "alma.speckit.implementation",
         "title": "Implement Feature",
+        "category": "ALMA"
+      },
+      {
+        "command": "alma.migration.start",
+        "title": "Migrate to Spec-Kit",
+        "category": "ALMA"
+      },
+      {
+        "command": "alma.migration.generateConstitution",
+        "title": "Generate Constitution from Guidelines",
+        "category": "ALMA"
+      },
+      {
+        "command": "alma.migration.createBackup",
+        "title": "Create OpenSpec Backup",
         "category": "ALMA"
       }
     ],

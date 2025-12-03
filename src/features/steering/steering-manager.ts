@@ -1,5 +1,5 @@
 import { homedir } from "os";
-import { dirname, join } from "path";
+import { join } from "path";
 import { existsSync } from "fs";
 import {
 	type ExtensionContext,
@@ -13,9 +13,9 @@ import type { CopilotProvider } from "../../providers/copilot-provider";
 import { sendPromptToChat } from "../../utils/chat-prompt-runner";
 import { PromptLoader } from "../../services/prompt-loader";
 import { ConfigManager } from "../../utils/config-manager";
-import { getConstitutionPath } from "../../utils/spec-kit-utilities";
 import { getSpecSystemAdapter } from "../../utils/spec-kit-adapter";
 import { SPEC_SYSTEM_MODE } from "../../constants";
+import { ConstitutionManager } from "./constitution-manager";
 
 export class SteeringManager {
 	private readonly configManager: ConfigManager;
@@ -149,19 +149,10 @@ This file controls default behavior for GitHub Copilot across all projects.
 	}
 
 	private async createSpecKitConstitution(workspaceRoot: string) {
-		const filePath = getConstitutionPath(workspaceRoot);
-		const dirPath = dirname(filePath);
+		const constitutionManager = new ConstitutionManager(workspaceRoot);
+		const exists = await constitutionManager.ensureConstitutionExists();
 
-		// Ensure directory exists
-		try {
-			await workspace.fs.createDirectory(Uri.file(dirPath));
-		} catch (error) {
-			// Directory might already exist
-		}
-
-		// Check if file already exists
-		try {
-			await workspace.fs.stat(Uri.file(filePath));
+		if (exists) {
 			const overwrite = await window.showWarningMessage(
 				"Project constitution (constitution.md) already exists. Running the agent might overwrite it. Continue?",
 				"Continue",
@@ -170,8 +161,6 @@ This file controls default behavior for GitHub Copilot across all projects.
 			if (overwrite !== "Continue") {
 				return;
 			}
-		} catch {
-			// File doesn't exist
 		}
 
 		// Prompt for directives
