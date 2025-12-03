@@ -24,6 +24,7 @@ export interface OpenSpecSettings {
 		startAllTask: string;
 		runPrompt: string;
 	};
+	specSystem: string;
 }
 
 export class ConfigManager {
@@ -101,6 +102,11 @@ export class ConfigManager {
 		return config.get<string>("chatLanguage") ?? DEFAULT_CONFIG.chatLanguage;
 	}
 
+	private getSpecSystem(): string {
+		const config = workspace.getConfiguration(VSC_CONFIG_NAMESPACE);
+		return config.get<string>("specSystem") ?? "auto";
+	}
+
 	private getCustomInstructions(): OpenSpecSettings["customInstructions"] {
 		const config = workspace.getConfiguration(VSC_CONFIG_NAMESPACE);
 		return {
@@ -159,6 +165,7 @@ export class ConfigManager {
 			views: mergedViews,
 			chatLanguage: overrides.chatLanguage ?? defaults.chatLanguage,
 			customInstructions: mergedCustomInstructions,
+			specSystem: overrides.specSystem ?? defaults.specSystem,
 		};
 	}
 
@@ -166,6 +173,7 @@ export class ConfigManager {
 		const configuredPaths = this.getConfiguredPaths();
 		const chatLanguage = this.getChatLanguage();
 		const customInstructions = this.getCustomInstructions();
+		const specSystem = this.getSpecSystem();
 
 		return {
 			paths: { ...DEFAULT_PATHS, ...configuredPaths },
@@ -177,6 +185,7 @@ export class ConfigManager {
 			},
 			chatLanguage,
 			customInstructions,
+			specSystem,
 		};
 	}
 	// biome-ignore lint/suspicious/useAwait: ignore

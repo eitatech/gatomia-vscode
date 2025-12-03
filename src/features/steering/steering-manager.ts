@@ -1,5 +1,6 @@
 import { homedir } from "os";
 import { dirname, join } from "path";
+import { existsSync } from "fs";
 import {
 	type ExtensionContext,
 	type OutputChannel,
@@ -9,12 +10,11 @@ import {
 	workspace,
 } from "vscode";
 import type { CopilotProvider } from "../../providers/copilot-provider";
+import { sendPromptToChat } from "../../utils/chat-prompt-runner";
 import { PromptLoader } from "../../services/prompt-loader";
 import { ConfigManager } from "../../utils/config-manager";
-import {
-	detectActiveSpecSystem,
-	getConstitutionPath,
-} from "../../utils/spec-kit-utilities";
+import { getConstitutionPath } from "../../utils/spec-kit-utilities";
+import { getSpecSystemAdapter } from "../../utils/spec-kit-adapter";
 import { SPEC_SYSTEM_MODE } from "../../constants";
 
 export class SteeringManager {
@@ -92,7 +92,54 @@ This file controls default behavior for GitHub Copilot across all projects.
 			return;
 		}
 		const workspaceRoot = workspace.workspaceFolders[0].uri.fsPath;
-		const activeSystem = detectActiveSpecSystem(workspaceRoot);
+		const adapter = getSpecSystemAdapter();
+		let activeSystem = adapter.getActiveSystem();
+
+		// Check if project is initialized with any system
+		const hasOpenSpec = existsSync(join(workspaceRoot, "openspec"));
+		const hasSpecKit =
+			existsSync(join(workspaceRoot, ".specify")) ||
+			existsSync(join(workspaceRoot, "specs"));
+
+		// If no system is detected and we are about to create project rules,
+		// we must ask the user which system they intend to use.
+		if (!(hasOpenSpec || hasSpecKit)) {
+			const choice = await window.showQuickPick(
+				[
+					{
+						label: "Spec-Kit",
+						description: "Use Spec-Kit system (Recommended)",
+						value: SPEC_SYSTEM_MODE.SPECKIT,
+					},
+					{
+						label: "OpenSpec",
+						description: "Use OpenSpec system (Legacy)",
+						value: SPEC_SYSTEM_MODE.OPENSPEC,
+					},
+				],
+				{
+					placeHolder:
+						"No SDD system detected. Which agent do you want to initialize?",
+					ignoreFocusOut: true,
+				}
+			);
+
+			if (!choice) {
+				return;
+			}
+
+			activeSystem = choice.value;
+
+			// Save preference
+			const settings = this.configManager.getSettings();
+			await this.configManager.saveSettings({
+				...settings,
+				specSystem: activeSystem,
+			});
+
+			// Re-initialize adapter
+			await adapter.initialize();
+		}
 
 		if (activeSystem === SPEC_SYSTEM_MODE.SPECKIT) {
 			await this.createSpecKitConstitution(workspaceRoot);
@@ -116,32 +163,32 @@ This file controls default behavior for GitHub Copilot across all projects.
 		try {
 			await workspace.fs.stat(Uri.file(filePath));
 			const overwrite = await window.showWarningMessage(
-				"Project constitution (constitution.md) already exists. Overwrite?",
-				"Overwrite",
+				"Project constitution (constitution.md) already exists. Running the agent might overwrite it. Continue?",
+				"Continue",
 				"Cancel"
 			);
-			if (overwrite !== "Overwrite") {
+			if (overwrite !== "Continue") {
 				return;
 			}
 		} catch {
 			// File doesn't exist
 		}
 
-		// Create initial content
-		const initialContent = `# Project Constitution
-
-This file contains the core principles and rules for this project.
-`;
-		await workspace.fs.writeFile(
-			Uri.file(filePath),
-			Buffer.from(initialContent)
-		);
-
-		const document = await workspace.openTextDocument(filePath);
-		await window.showTextDocument(document, {
-			preview: false,
-			viewColumn: ViewColumn.Active,
+		// Prompt for directives
+		const directives = await window.showInputBox({
+			title: "Create Constitution",
+			prompt:
+				"Enter the constitution directives (e.g. 'Create principles focused on code quality...')",
+			placeHolder: "Directives...",
+			ignoreFocusOut: true,
 		});
+
+		if (!directives) {
+			return;
+		}
+
+		// Send to chat
+		await sendPromptToChat(`/speckit.constitution ${directives}`);
 	}
 
 	private async createOpenSpecAgents(workspaceRoot: string) {

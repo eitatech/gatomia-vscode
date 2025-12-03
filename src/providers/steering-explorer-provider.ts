@@ -14,6 +14,7 @@ import {
 	FileType,
 } from "vscode";
 import type { SteeringManager } from "../features/steering/steering-manager";
+import { getConstitutionPath } from "../utils/spec-kit-utilities";
 
 import { homedir } from "os";
 import { getVSCodeUserDataPath, isWindowsOrWsl } from "../utils/platform-utils";
@@ -23,11 +24,10 @@ const { joinPath } = Uri;
 export class SteeringExplorerProvider
 	implements TreeDataProvider<SteeringItem>
 {
-	static readonly viewId = "spec-ui-for-copilot.views.steeringExplorer";
-	static readonly createUserRuleCommandId =
-		"spec-ui-for-copilot.steering.createUserRule";
+	static readonly viewId = "alma.views.steeringExplorer";
+	static readonly createUserRuleCommandId = "alma.steering.createUserRule";
 	static readonly createProjectRuleCommandId =
-		"spec-ui-for-copilot.steering.createProjectRule";
+		"alma.steering.createProjectRule";
 	private readonly _onDidChangeTreeData: EventEmitter<
 		SteeringItem | undefined | null | void
 	> = new EventEmitter<SteeringItem | undefined | null | void>();
@@ -113,6 +113,26 @@ export class SteeringExplorerProvider
 		if (!element) {
 			const items: SteeringItem[] = [];
 
+			// User Instructions Group
+			const homeDir = homedir() || process.env.USERPROFILE || "";
+			const globalConfigPath = join(
+				homeDir,
+				".github",
+				"copilot-instructions.md"
+			);
+
+			if (existsSync(globalConfigPath)) {
+				items.push(
+					new SteeringItem(
+						"User Instructions",
+						TreeItemCollapsibleState.Expanded,
+						"user-instructions-group",
+						"",
+						this.context
+					)
+				);
+			}
+
 			if (workspace.workspaceFolders) {
 				const workspaceRoot = workspace.workspaceFolders[0].uri.fsPath;
 
@@ -124,11 +144,13 @@ export class SteeringExplorerProvider
 				);
 				const agentsMd = join(workspaceRoot, "openspec", "AGENTS.md");
 				const rootAgentsMd = join(workspaceRoot, "AGENTS.md");
+				const constitutionMd = getConstitutionPath(workspaceRoot);
 
 				const hasProjectInstructions =
 					existsSync(projectCopilotMd) ||
 					existsSync(agentsMd) ||
-					existsSync(rootAgentsMd);
+					existsSync(rootAgentsMd) ||
+					existsSync(constitutionMd);
 
 				if (hasProjectInstructions) {
 					items.push(
@@ -172,6 +194,32 @@ export class SteeringExplorerProvider
 			}
 
 			return items;
+		}
+
+		if (element.contextValue === "user-instructions-group") {
+			const homeDir = homedir() || process.env.USERPROFILE || "";
+			const globalConfigPath = join(
+				homeDir,
+				".github",
+				"copilot-instructions.md"
+			);
+			if (existsSync(globalConfigPath)) {
+				return [
+					new SteeringItem(
+						"Global Instructions",
+						TreeItemCollapsibleState.None,
+						"global-copilot-instructions",
+						globalConfigPath,
+						this.context,
+						{
+							command: "vscode.open",
+							title: "Open Global Instructions",
+							arguments: [Uri.file(globalConfigPath)],
+						}
+					),
+				];
+			}
+			return [];
 		}
 
 		if (element.contextValue === "project-instructions-group") {
@@ -232,6 +280,24 @@ export class SteeringExplorerProvider
 								command: "vscode.open",
 								title: "Open Root Instructions",
 								arguments: [Uri.file(rootAgentsMd)],
+							}
+						)
+					);
+				}
+
+				const constitutionMd = getConstitutionPath(workspaceRoot);
+				if (existsSync(constitutionMd)) {
+					items.push(
+						new SteeringItem(
+							"Constitution",
+							TreeItemCollapsibleState.None,
+							"project-constitution-md",
+							constitutionMd,
+							this.context,
+							{
+								command: "vscode.open",
+								title: "Open Constitution",
+								arguments: [Uri.file(constitutionMd)],
 							}
 						)
 					);
@@ -299,7 +365,14 @@ class SteeringItem extends TreeItem {
 		this.filename = filename;
 
 		// Set appropriate icons based on type
-		if (contextValue === "project-instructions-group") {
+		if (contextValue === "user-instructions-group") {
+			this.iconPath = new ThemeIcon("account");
+			this.tooltip = "User Instructions";
+		} else if (contextValue === "global-copilot-instructions") {
+			this.iconPath = new ThemeIcon("globe");
+			this.tooltip = `Global Instructions: ${resourcePath}`;
+			this.description = "~/.github/copilot-instructions.md";
+		} else if (contextValue === "project-instructions-group") {
 			this.iconPath = new ThemeIcon("folder");
 			this.tooltip = "AGENTS";
 		} else if (contextValue === "create-project-instructions") {
@@ -317,6 +390,10 @@ class SteeringItem extends TreeItem {
 			this.iconPath = new ThemeIcon("file-text");
 			this.tooltip = `Root Instructions: ${resourcePath}`;
 			this.description = "AGENTS.md";
+		} else if (contextValue === "project-constitution-md") {
+			this.iconPath = new ThemeIcon("law");
+			this.tooltip = `Constitution: ${resourcePath}`;
+			this.description = "constitution.md";
 		} else if (contextValue === "project-spec-group") {
 			this.iconPath = new ThemeIcon("book");
 			this.tooltip = "Project Specification";

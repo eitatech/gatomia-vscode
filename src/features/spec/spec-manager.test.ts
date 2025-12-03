@@ -93,6 +93,7 @@ describe("SpecManager", () => {
 			configManager: ConfigManager.getInstance(),
 			promptLoader: PromptLoader.getInstance(),
 			outputChannel: mockOutputChannel,
+			activeSystem: "auto",
 		});
 		expect(openMock).toHaveBeenCalled();
 	});
