@@ -1,13 +1,13 @@
-# Spec UI for Copilot
+# ALMA (Agentic Lifecycle Management Automation)
 
-[![Visual Studio Marketplace](https://img.shields.io/vscode-marketplace/v/atman-dev.openspec-for-copilot.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=atman-dev.openspec-for-copilot)
-[![Downloads](https://img.shields.io/vscode-marketplace/d/atman-dev.openspec-for-copilot.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=atman-dev.openspec-for-copilot)
-[![GitHub stars](https://img.shields.io/github/stars/atman-33/openspec-for-copilot.svg?style=flat-square)](https://github.com/atman-33/openspec-for-copilot/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/atman-33/openspec-for-copilot.svg?style=flat-square)](https://github.com/atman-33/openspec-for-copilot/issues)
+[![Visual Studio Marketplace](https://img.shields.io/vscode-marketplace/v/EITA.alma.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=EITA.alma)
+[![Downloads](https://img.shields.io/vscode-marketplace/d/EITA.alma.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=EITA.alma)
+[![GitHub stars](https://img.shields.io/github/stars/eitatech/alma-vscode.svg?style=flat-square)](https://github.com/eitatech/alma-vscode/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/eitatech/alma-vscode.svg?style=flat-square)](https://github.com/eitatech/alma-vscode/issues)
 
-Spec UI for Copilot is a VS Code extension that brings Spec-Driven Development (SDD) to your workflow, leveraging [OpenSpec](https://github.com/Fission-AI/OpenSpec) prompts and **GitHub Copilot**.
+ALMA is a VS Code extension that brings Agentic Lifecycle Management Automation to your workflow, leveraging **Spec-Kit**, **OpenSpec**, and **GitHub Copilot**.
 
-It allows you to visually manage Specs, Steering documents (AGENTS.md), and custom prompts, seamlessly integrating with GitHub Copilot Chat to generate high-quality documentation and code.
+It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.md), and custom prompts, seamlessly integrating with GitHub Copilot Chat to generate high-quality documentation and code.
 
 ![Create new Spec](./screenshots/image.png)
 
@@ -15,152 +15,147 @@ It allows you to visually manage Specs, Steering documents (AGENTS.md), and cust
 
 ### 📝 Spec Management
 
-- **Create Specs**: Run `Spec UI for Copilot: Create New Spec` (`openspec-for-copilot.spec.create`) to open the creation dialog. Define your summary, product context, and constraints.
-- **Generate with Copilot**: The extension compiles your input into an optimized OpenSpec prompt and sends it to **GitHub Copilot Chat** to generate the full specification (Requirements, Design, Tasks).
+- **Create Specs**: Run `ALMA: Create New Spec` (`alma.spec.create`) to open the creation dialog. Define your summary, product context, and constraints.
+- **Support for Multiple Systems**: Choose between **Spec-Kit** (Recommended) or **OpenSpec** (Legacy) for your Spec-Driven Development workflow.
+- **Generate with Copilot**: The extension compiles your input into an optimized prompt and sends it to **GitHub Copilot Chat** to generate the full specification.
 - **Manage Specs**: Browse generated specs in the **Specs** view.
 - **Execute Tasks**: Open `tasks.md` and use the "Start Task" CodeLens to send task context to GitHub Copilot Chat for implementation.
 
 ### 🧩 Prompt Management
+
 - **Custom Prompts**: Manage Markdown prompts under `.github/prompts` (configurable) alongside instructions and agents to keep all project guidance in one place.
-- **Project Instructions & Agents**: The Prompts explorer now shows `Project Instructions` and `Project Agents` groups, surfacing `.github/instructions` and `.github/agents` files (in that order) so you can reference reusable instructions and agent definitions without leaving VS Code.
+- **Project Instructions & Agents**: The Prompts explorer shows `Project Instructions` and `Project Agents` groups, surfacing `.github/instructions` and `.github/agents` files.
 - **Run Prompts**: Execute prompts directly from the tree view, passing the context to GitHub Copilot Chat.
-- **Rename or Delete**: Use the item context menu to rename or delete prompts, instructions, and agents without leaving the explorer. `Rename` always appears above `Delete` for quick edits.
+- **Rename or Delete**: Use the item context menu to rename or delete prompts.
+
+### 🧭 Steering
+
+- **Constitution / Agents**: Manage your project's "Constitution" (Spec-Kit) or "AGENTS.md" (OpenSpec) to steer Copilot's behavior.
+- **Global Instructions**: Configure global instructions for Copilot across all your projects.
 
 ## Installation
 
 ### Prerequisites
+
 - Visual Studio Code 1.84.0 or newer.
 - **[GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat)** extension must be installed.
-- **[OpenSpec](https://github.com/Fission-AI/OpenSpec)** must be globally installed and initialized.
 
-### OpenSpec Global Installation and Initialization:
+### Spec-Kit (Recommended)
 
-#### Step 1: Install the CLI globally
+ALMA works best with [Spec-Kit](https://github.com/github/spec-kit).
 
-```shell
-npm install -g @fission-ai/openspec@latest
-```
+1. Initialize Spec-Kit in your project:
 
-Verify installation:
+   ```shell
+   npx spec-kit init
+   ```
 
-```shell
-openspec --version
-```
+### OpenSpec (Legacy)
 
-#### Step 2: Initialize OpenSpec in your project
+If you prefer OpenSpec:
 
-Navigate to your project directory:
+1. Install the CLI globally:
 
-```shell
-cd my-project
-```
+   ```shell
+   npm install -g @fission-ai/openspec@latest
+   ```
 
-Run the initialization:
+2. Initialize in your project:
 
-```shell
-openspec init
-```
+   ```shell
+   openspec init
+   ```
 
 ### Marketplace
-Search for "Spec UI for Copilot" in the VS Code Marketplace and install the extension.
+
+Search for "ALMA" in the VS Code Marketplace and install the extension.
 
 ### From Local VSIX
-1. Build the package with `npm run package` (produces `openspec-for-copilot-<version>.vsix`).
-2. Install via `code --install-extension openspec-for-copilot-<version>.vsix`.
+
+1. Build the package with `npm run package` (produces `alma-<version>.vsix`).
+2. Install via `code --install-extension alma-<version>.vsix`.
 
 ## Usage
 
 ### 1. Create a Spec
+
 1. Open the **Specs** view in the Activity Bar.
 2. Click **Create New Spec**.
 3. Fill in the details (Product Context is required).
 4. Click **Create Spec**. This will open GitHub Copilot Chat with a generated prompt.
 5. Follow the chat instructions to generate the spec files.
 
-   ![Create new Spec](./screenshots/010-create-new-spec.png)
-
 ### 2. Implement Tasks
+
 1. Open a generated `tasks.md` file.
 2. Click **Start All Tasks** above a checklist item.
 3. GitHub Copilot Chat will open with the task context. Interact with it to implement the code.
 
-   ![Start All Tasks](./screenshots/020-start-all-tasksk.png)
+### 3. Create Constitution (Spec-Kit)
 
-### 3. Archive Change
-1. Right-click on a Change ID in the **Specs** view.
-2. Select **Archive Change** from the context menu.
-3. The change will be moved to the archive.
-
-   ![Archive Change](./screenshots/030-archive-change.png)
+1. Open the **Steering** view.
+2. Click **Create Project Rule**.
+3. Select **Spec-Kit**.
+4. Enter your directives (e.g., "Focus on clean code").
+5. Copilot will generate your `constitution.md`.
 
 ## Configuration
-All settings live under the `openspec-for-copilot` namespace.
+
+All settings live under the `alma` namespace.
 
 | Setting | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `chatLanguage` | string | `English` | The language GitHub Copilot should use for responses. |
-| `copilot.specsPath` | string | `openspec` | Workspace-relative path for generated specs. |
-| `copilot.promptsPath` | string | `.github/prompts` | Workspace-relative path for Markdown prompts. |
-| `views.specs.visible` | boolean | `true` | Show or hide the Specs explorer. |
-| `views.prompts.visible` | boolean | `true` | Toggle the Prompts explorer. |
-| `views.steering.visible` | boolean | `true` | Toggle the Steering explorer. |
-| `views.settings.visible` | boolean | `true` | Toggle the Settings overview. |
-| `customInstructions.global` | string | `""` | Global custom instructions appended to all prompts. |
-| `customInstructions.createSpec` | string | `""` | Custom instructions for "Create Spec". |
-| `customInstructions.startAllTask` | string | `""` | Custom instructions for "Start All Tasks". |
-| `customInstructions.runPrompt` | string | `""` | Custom instructions for "Run Prompt". |
-
-Paths accept custom locations inside the workspace; the extension mirrors watchers to match custom directories.
+| `alma.chatLanguage` | string | `English` | The language GitHub Copilot should use for responses. |
+| `alma.specSystem` | string | `auto` | The Spec System to use (`auto`, `speckit`, `openspec`). |
+| `alma.copilot.specsPath` | string | `speckit` | Workspace-relative path for generated specs. |
+| `alma.copilot.promptsPath` | string | `.github/prompts` | Workspace-relative path for Markdown prompts. |
+| `alma.views.specs.visible` | boolean | `true` | Show or hide the Specs explorer. |
+| `alma.views.prompts.visible` | boolean | `true` | Toggle the Prompts explorer. |
+| `alma.views.steering.visible` | boolean | `true` | Toggle the Steering explorer. |
+| `alma.views.settings.visible` | boolean | `true` | Toggle the Settings overview. |
 
 ## Workspace Layout
+
+### Spec-Kit Structure
+
+```text
+.specify/
+├── memory/                 # Project memory (constitution.md)
+├── templates/              # Spec templates
+specs/                      # Feature specifications
+├── 001-feature-name/
+│   ├── spec.md
+│   ├── plan.md
+│   └── tasks.md
 ```
-.github/
-├── prompts/                # Markdown prompts
-├── agents/                 # Project agent definitions surfaced in the Prompts view
+
+### OpenSpec Structure
+
+```text
 openspec/
 ├── AGENTS.md               # Project-specific steering rules
 ├── project.md              # Project specification
-├── <spec>/
-│   ├── requirements.md
-│   ├── design.md
-│   └── tasks.md
-LICENSE
-src/
-├── extension.ts            # Activation, command registration, tree providers
-├── features/               # Spec and steering managers
-├── providers/              # TreeDataProviders, CodeLens, webviews
-├── services/               # Prompt loader (Handlebars templates)
-├── utils/                  # Config manager, Copilot chat helpers
-└── prompts/                # Prompt source markdown and generated TypeScript
-webview-ui/                 # React + Vite webview bundle
-scripts/
-└── build-prompts.js        # Markdown → TypeScript prompt compiler
+├── specs/
+│   ├── <spec>/
+│       ├── requirements.md
+│       ├── design.md
+│       └── tasks.md
 ```
 
 ## Development
-1. Install dependencies for both the extension and webview UI:
+
+1. Install dependencies:
    - `npm run install:all`
-2. Build prompts and bundle the extension:
-   - `npm run build` (runs prompt compilation, extension bundle, and webview build)
-3. Launch the development host:
-   - Press `F5` inside VS Code or run the `Extension` launch configuration.
-4. Live development:
-   - `npm run watch` (TypeScript watch + webview dev server)
-   - `npm --prefix webview-ui run dev` (webview in isolation)
-5. Generate prompt modules when editing markdown under `src/prompts`:
-   - `npm run build-prompts`
-
-### Testing and Quality
-- Unit tests: `npm test`, `npm run test:watch`, or `npm run test:coverage` (Vitest).
-- Linting, formatting, and static checks: `npm run lint`, `npm run format`, `npm run check` (Ultracite toolchain).
-
-### Packaging
-- Produce a VSIX with `npm run package` (requires `vsce`).
-- The output bundle lives in `dist/extension.js`; webview assets emit to `dist/webview/app/`.
+2. Build:
+   - `npm run build`
+3. Launch:
+   - Press `F5` inside VS Code.
 
 ## License
+
 MIT License. See [`LICENSE`](LICENSE).
 
 ## Credits
-Based on [OpenSpec](https://github.com/Fission-AI/OpenSpec) by Fission AI.
-Originally forked from [kiro-for-codex-ide](https://github.com/notdp/kiro-for-codex-ide).
+
+- [Spec-Kit](https://github.com/github/spec-kit)
+- [OpenSpec](https://github.com/Fission-AI/OpenSpec)

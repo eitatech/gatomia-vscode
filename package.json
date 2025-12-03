@@ -37,6 +37,7 @@
     "watch": "concurrently \"tsc -w -p ./\" \"npm:watch:webview\"",
     "package": "vsce package",
     "lint": "ultracite lint",
+    "fix": "ultracite fix",
     "format": "ultracite format",
     "check": "ultracite check",
     "test": "vitest --pool threads --run",
