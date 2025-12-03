@@ -1,0 +1,99 @@
+import { Uri, workspace } from "vscode";
+import { sendPromptToChat } from "../../utils/chat-prompt-runner";
+import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../../constants";
+
+export interface SpecSubmissionContext {
+	productContext: string;
+	keyScenarios: string;
+	technicalConstraints: string;
+	relatedFiles: string;
+	openQuestions: string;
+}
+
+export interface SpecSubmissionStrategy {
+	submit(context: SpecSubmissionContext): Promise<void>;
+}
+
+export class OpenSpecSubmissionStrategy implements SpecSubmissionStrategy {
+	async submit(context: SpecSubmissionContext): Promise<void> {
+		const workspaceFolder = workspace.workspaceFolders?.[0];
+		if (!workspaceFolder) {
+			throw new Error("No workspace folder open");
+		}
+
+		const payload = this.formatDescription(context);
+
+		const promptUri = Uri.joinPath(
+			workspaceFolder.uri,
+			".github",
+			"prompts",
+			"openspec-proposal.prompt.md"
+		);
+		let promptTemplate = "";
+		try {
+			const fileData = await workspace.fs.readFile(promptUri);
+			promptTemplate = new TextDecoder().decode(fileData);
+		} catch (error) {
+			throw new Error(
+				"Required prompt file not found: .github/prompts/openspec-proposal.prompt.md"
+			);
+		}
+
+		const prompt = `${promptTemplate}\n\nThe following sections describe the specification and context for this change request.\n\n${payload}\n\nIMPORTANT:\nAfter generating the proposal documents, you MUST STOP and ask the user for confirmation.\nDo NOT proceed with any implementation steps until the user has explicitly approved the proposal.`;
+
+		await sendPromptToChat(prompt, { instructionType: "createSpec" });
+	}
+
+	private formatDescription(data: SpecSubmissionContext): string {
+		const sections = [
+			data.productContext.trim()
+				? `Product Context / Goal:\n${data.productContext.trim()}`
+				: undefined,
+			data.keyScenarios.trim()
+				? `Key Scenarios / Acceptance Criteria:\n${data.keyScenarios.trim()}`
+				: undefined,
+			data.technicalConstraints.trim()
+				? `Technical Constraints:\n${data.technicalConstraints.trim()}`
+				: undefined,
+			data.relatedFiles.trim()
+				? `Related Files / Impact:\n${data.relatedFiles.trim()}`
+				: undefined,
+			data.openQuestions.trim()
+				? `Open Questions:\n${data.openQuestions.trim()}`
+				: undefined,
+		].filter(Boolean);
+
+		return sections.join("\n\n");
+	}
+}
+
+export class SpecKitSubmissionStrategy implements SpecSubmissionStrategy {
+	async submit(context: SpecSubmissionContext): Promise<void> {
+		// For SpecKit, we use the slash command /speckit.specify
+		// We can pass the context as part of the prompt
+
+		const payload = this.formatDescription(context);
+		const prompt = `/speckit.specify ${payload}`;
+
+		await sendPromptToChat(prompt, { instructionType: "createSpec" });
+	}
+
+	private formatDescription(data: SpecSubmissionContext): string {
+		// Simplified format for SpecKit command argument
+		// We just concatenate the important parts
+		return [data.productContext, data.keyScenarios, data.technicalConstraints]
+			.filter(Boolean)
+			.join("\n\n");
+	}
+}
+
+export class SpecSubmissionStrategyFactory {
+	static create(mode: SpecSystemMode): SpecSubmissionStrategy {
+		switch (mode) {
+			case SPEC_SYSTEM_MODE.SPECKIT:
+				return new SpecKitSubmissionStrategy();
+			default:
+				return new OpenSpecSubmissionStrategy();
+		}
+	}
+}
