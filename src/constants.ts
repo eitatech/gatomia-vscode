@@ -1,5 +1,5 @@
 // VSCode configuration namespace for this extension
-export const VSC_CONFIG_NAMESPACE = "spec-ui-for-copilot";
+export const VSC_CONFIG_NAMESPACE = "alma";
 
 // Default configuration for OpenSpec (legacy support)
 export const DEFAULT_CONFIG = {

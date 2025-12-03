@@ -13,14 +13,12 @@ import type { SpecManager } from "../features/spec/spec-manager";
 import type { SpecSystemMode } from "../constants";
 
 export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
-	static readonly viewId = "spec-ui-for-copilot.views.specExplorer";
+	static readonly viewId = "alma.views.specExplorer";
 	static readonly navigateRequirementsCommandId =
-		"spec-ui-for-copilot.spec.navigate.requirements";
-	static readonly navigateDesignCommandId =
-		"spec-ui-for-copilot.spec.navigate.design";
-	static readonly navigateTasksCommandId =
-		"spec-ui-for-copilot.spec.navigate.tasks";
-	static readonly openSpecCommandId = "spec-ui-for-copilot.spec.open";
+		"alma.spec.navigate.requirements";
+	static readonly navigateDesignCommandId = "alma.spec.navigate.design";
+	static readonly navigateTasksCommandId = "alma.spec.navigate.tasks";
+	static readonly openSpecCommandId = "alma.spec.open";
 
 	private readonly _onDidChangeTreeData: EventEmitter<
 		SpecItem | undefined | null | void

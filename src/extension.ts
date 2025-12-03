@@ -27,6 +27,7 @@ import { PromptLoader } from "./services/prompt-loader";
 import { sendPromptToChat } from "./utils/chat-prompt-runner";
 import { ConfigManager } from "./utils/config-manager";
 import { getVSCodeUserDataPath } from "./utils/platform-utils";
+import { getSpecSystemAdapter } from "./utils/spec-kit-adapter";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -35,7 +36,7 @@ export let outputChannel: OutputChannel;
 
 export async function activate(context: ExtensionContext) {
 	// Create output channel for debugging
-	outputChannel = window.createOutputChannel("Spec UI for Copilot - Debug");
+	outputChannel = window.createOutputChannel("ALMA - Debug");
 
 	// Initialize PromptLoader
 	try {
@@ -59,6 +60,19 @@ export async function activate(context: ExtensionContext) {
 	const configManager = ConfigManager.getInstance();
 	await configManager.loadSettings();
 
+	// Initialize Spec System Adapter
+	try {
+		const adapter = getSpecSystemAdapter();
+		await adapter.initialize();
+		outputChannel.appendLine(
+			`Spec System Adapter initialized. Active system: ${adapter.getActiveSystem()}`
+		);
+	} catch (error) {
+		outputChannel.appendLine(
+			`Failed to initialize Spec System Adapter: ${error}`
+		);
+	}
+
 	// Initialize feature managers with output channel
 	specManager = new SpecManager(context, outputChannel);
 	steeringManager = new SteeringManager(
@@ -78,22 +92,16 @@ export async function activate(context: ExtensionContext) {
 	steeringExplorer.setSteeringManager(steeringManager);
 
 	context.subscriptions.push(
+		window.registerTreeDataProvider("alma.views.overview", overviewProvider),
+		window.registerTreeDataProvider("alma.views.specExplorer", specExplorer),
 		window.registerTreeDataProvider(
-			"spec-ui-for-copilot.views.overview",
-			overviewProvider
-		),
-		window.registerTreeDataProvider(
-			"spec-ui-for-copilot.views.specExplorer",
-			specExplorer
-		),
-		window.registerTreeDataProvider(
-			"spec-ui-for-copilot.views.steeringExplorer",
+			"alma.views.steeringExplorer",
 			steeringExplorer
 		)
 	);
 	context.subscriptions.push(
 		window.registerTreeDataProvider(
-			"spec-ui-for-copilot.views.promptsExplorer",
+			"alma.views.promptsExplorer",
 			promptsExplorer
 		)
 	);
@@ -183,7 +191,7 @@ function registerCommands(
 	promptsExplorer: PromptsExplorerProvider
 ) {
 	const createSpecCommand = commands.registerCommand(
-		"spec-ui-for-copilot.spec.create",
+		"alma.spec.create",
 		async () => {
 			outputChannel.appendLine(
 				`[Spec] create command triggered at ${new Date().toISOString()}`
@@ -200,49 +208,46 @@ function registerCommands(
 	);
 
 	context.subscriptions.push(
-		commands.registerCommand("spec-ui-for-copilot.noop", () => {
+		commands.registerCommand("alma.noop", () => {
 			// noop
 		}),
 		createSpecCommand,
 		commands.registerCommand(
-			"spec-ui-for-copilot.spec.navigate.requirements",
+			"alma.spec.navigate.requirements",
 			async (specName: string) => {
 				await specManager.navigateToDocument(specName, "requirements");
 			}
 		),
 
 		commands.registerCommand(
-			"spec-ui-for-copilot.spec.navigate.design",
+			"alma.spec.navigate.design",
 			async (specName: string) => {
 				await specManager.navigateToDocument(specName, "design");
 			}
 		),
 
 		commands.registerCommand(
-			"spec-ui-for-copilot.spec.navigate.tasks",
+			"alma.spec.navigate.tasks",
 			async (specName: string) => {
 				await specManager.navigateToDocument(specName, "tasks");
 			}
 		),
 
-		commands.registerCommand(
-			"spec-ui-for-copilot.spec.implTask",
-			async (documentUri: Uri) => {
-				outputChannel.appendLine(
-					`[Task Execute] Generating SpecUI apply prompt for: ${documentUri.fsPath}`
-				);
-				await specManager.runOpenSpecApply(documentUri);
-			}
-		),
+		commands.registerCommand("alma.spec.implTask", async (documentUri: Uri) => {
+			outputChannel.appendLine(
+				`[Task Execute] Generating ALMA apply prompt for: ${documentUri.fsPath}`
+			);
+			await specManager.runOpenSpecApply(documentUri);
+		}),
 
 		commands.registerCommand(
-			"spec-ui-for-copilot.spec.open",
+			"alma.spec.open",
 			async (relativePath: string, type: string) => {
 				await specManager.openDocument(relativePath, type);
 			}
 		),
 		// biome-ignore lint/suspicious/useAwait: ignore
-		commands.registerCommand("spec-ui-for-copilot.spec.refresh", async () => {
+		commands.registerCommand("alma.spec.refresh", async () => {
 			outputChannel.appendLine("[Manual Refresh] Refreshing spec explorer...");
 			specExplorer.refresh();
 		})
@@ -253,21 +258,15 @@ function registerCommands(
 	// Steering commands
 	context.subscriptions.push(
 		// Configuration commands
-		commands.registerCommand(
-			"spec-ui-for-copilot.steering.createUserRule",
-			async () => {
-				await steeringManager.createUserConfiguration();
-			}
-		),
+		commands.registerCommand("alma.steering.createUserRule", async () => {
+			await steeringManager.createUserConfiguration();
+		}),
 
-		commands.registerCommand(
-			"spec-ui-for-copilot.steering.createProjectRule",
-			async () => {
-				await steeringManager.createProjectDocumentation();
-			}
-		),
+		commands.registerCommand("alma.steering.createProjectRule", async () => {
+			await steeringManager.createProjectDocumentation();
+		}),
 
-		commands.registerCommand("spec-ui-for-copilot.steering.refresh", () => {
+		commands.registerCommand("alma.steering.refresh", () => {
 			outputChannel.appendLine(
 				"[Manual Refresh] Refreshing steering explorer..."
 			);
@@ -302,49 +301,43 @@ function registerCommands(
 
 	// Spec delete command
 	context.subscriptions.push(
-		commands.registerCommand(
-			"spec-ui-for-copilot.spec.delete",
-			async (item: any) => {
-				await specManager.delete(item.label);
+		commands.registerCommand("alma.spec.delete", async (item: any) => {
+			await specManager.delete(item.label);
+		}),
+		commands.registerCommand("alma.spec.archiveChange", async (item: any) => {
+			// item is SpecItem, item.specName is the ID
+			const changeId = item.specName;
+			if (!changeId) {
+				window.showErrorMessage("Could not determine change ID.");
+				return;
 			}
-		),
-		commands.registerCommand(
-			"spec-ui-for-copilot.spec.archiveChange",
-			async (item: any) => {
-				// item is SpecItem, item.specName is the ID
-				const changeId = item.specName;
-				if (!changeId) {
-					window.showErrorMessage("Could not determine change ID.");
-					return;
-				}
 
-				const ws = workspace.workspaceFolders?.[0];
-				if (!ws) {
-					window.showErrorMessage("No workspace folder found");
-					return;
-				}
+			const ws = workspace.workspaceFolders?.[0];
+			if (!ws) {
+				window.showErrorMessage("No workspace folder found");
+				return;
+			}
 
-				const promptPath = Uri.joinPath(
-					ws.uri,
-					".github/prompts/openspec-archive.prompt.md"
+			const promptPath = Uri.joinPath(
+				ws.uri,
+				".github/prompts/openspec-archive.prompt.md"
+			);
+
+			try {
+				const promptContent = await workspace.fs.readFile(promptPath);
+				const promptString = new TextDecoder().decode(promptContent);
+				const fullPrompt = `${promptString}\n\nid: ${changeId}`;
+
+				outputChannel.appendLine(
+					`[Archive Change] Archiving change: ${changeId}`
 				);
-
-				try {
-					const promptContent = await workspace.fs.readFile(promptPath);
-					const promptString = new TextDecoder().decode(promptContent);
-					const fullPrompt = `${promptString}\n\nid: ${changeId}`;
-
-					outputChannel.appendLine(
-						`[Archive Change] Archiving change: ${changeId}`
-					);
-					await sendPromptToChat(fullPrompt);
-				} catch (error) {
-					window.showErrorMessage(
-						`Failed to read archive prompt: ${error instanceof Error ? error.message : String(error)}`
-					);
-				}
+				await sendPromptToChat(fullPrompt);
+			} catch (error) {
+				window.showErrorMessage(
+					`Failed to read archive prompt: ${error instanceof Error ? error.message : String(error)}`
+				);
 			}
-		)
+		})
 	);
 
 	// Copilot integration commands
@@ -352,81 +345,72 @@ function registerCommands(
 
 	// Prompts commands
 	context.subscriptions.push(
-		commands.registerCommand("spec-ui-for-copilot.prompts.refresh", () => {
+		commands.registerCommand("alma.prompts.refresh", () => {
 			outputChannel.appendLine(
 				"[Manual Refresh] Refreshing prompts explorer..."
 			);
 			promptsExplorer.refresh();
 		}),
-		commands.registerCommand(
-			"spec-ui-for-copilot.prompts.createInstructions",
-			async () => {
-				await commands.executeCommand("workbench.command.new.instructions");
+		commands.registerCommand("alma.prompts.createInstructions", async () => {
+			await commands.executeCommand("workbench.command.new.instructions");
+		}),
+		commands.registerCommand("alma.prompts.createCopilotPrompt", async () => {
+			await commands.executeCommand("workbench.command.new.prompt");
+		}),
+		commands.registerCommand("alma.prompts.create", async (item?: any) => {
+			const ws = workspace.workspaceFolders?.[0];
+			if (!ws) {
+				window.showErrorMessage("No workspace folder found");
+				return;
 			}
-		),
-		commands.registerCommand(
-			"spec-ui-for-copilot.prompts.createCopilotPrompt",
-			async () => {
-				await commands.executeCommand("workbench.command.new.prompt");
-			}
-		),
-		commands.registerCommand(
-			"spec-ui-for-copilot.prompts.create",
-			async (item?: any) => {
-				const ws = workspace.workspaceFolders?.[0];
-				if (!ws) {
-					window.showErrorMessage("No workspace folder found");
-					return;
-				}
-				const configManager = ConfigManager.getInstance();
+			const configManager = ConfigManager.getInstance();
 
-				let targetDir: Uri;
-				let promptsPathLabel: string;
+			let targetDir: Uri;
+			let promptsPathLabel: string;
 
-				// Determine target directory based on the item source
-				if (item?.source === "global") {
-					const home = homedir();
-					const globalPath = join(home, ".github", "prompts");
-					targetDir = Uri.file(globalPath);
-					promptsPathLabel = globalPath;
-				} else {
-					// Default to project scope
-					promptsPathLabel = configManager.getPath("prompts");
-					targetDir = Uri.joinPath(ws.uri, ".copilot", "prompts");
-					try {
-						targetDir = Uri.file(configManager.getAbsolutePath("prompts"));
-					} catch {
-						// fall back to default under workspace
-					}
-				}
-
-				const name = await window.showInputBox({
-					title: "Create Prompt",
-					placeHolder: "prompt name (kebab-case)",
-					prompt: `A markdown file will be created under ${promptsPathLabel}`,
-					validateInput: (v) => (v ? undefined : "Name is required"),
-				});
-				if (!name) {
-					return;
-				}
-
-				const file = Uri.joinPath(targetDir, `${name}.prompt.md`);
+			// Determine target directory based on the item source
+			if (item?.source === "global") {
+				const home = homedir();
+				const globalPath = join(home, ".github", "prompts");
+				targetDir = Uri.file(globalPath);
+				promptsPathLabel = globalPath;
+			} else {
+				// Default to project scope
+				promptsPathLabel = configManager.getPath("prompts");
+				targetDir = Uri.joinPath(ws.uri, ".copilot", "prompts");
 				try {
-					await workspace.fs.createDirectory(targetDir);
-					const content = Buffer.from(
-						`# ${name}\n\nDescribe your prompt here. This file will be sent to Copilot when executed.\n`
-					);
-					await workspace.fs.writeFile(file, content);
-					const doc = await workspace.openTextDocument(file);
-					await window.showTextDocument(doc);
-					promptsExplorer.refresh();
-				} catch (e) {
-					window.showErrorMessage(`Failed to create prompt: ${e}`);
+					targetDir = Uri.file(configManager.getAbsolutePath("prompts"));
+				} catch {
+					// fall back to default under workspace
 				}
 			}
-		),
+
+			const name = await window.showInputBox({
+				title: "Create Prompt",
+				placeHolder: "prompt name (kebab-case)",
+				prompt: `A markdown file will be created under ${promptsPathLabel}`,
+				validateInput: (v) => (v ? undefined : "Name is required"),
+			});
+			if (!name) {
+				return;
+			}
+
+			const file = Uri.joinPath(targetDir, `${name}.prompt.md`);
+			try {
+				await workspace.fs.createDirectory(targetDir);
+				const content = Buffer.from(
+					`# ${name}\n\nDescribe your prompt here. This file will be sent to Copilot when executed.\n`
+				);
+				await workspace.fs.writeFile(file, content);
+				const doc = await workspace.openTextDocument(file);
+				await window.showTextDocument(doc);
+				promptsExplorer.refresh();
+			} catch (e) {
+				window.showErrorMessage(`Failed to create prompt: ${e}`);
+			}
+		}),
 		commands.registerCommand(
-			"spec-ui-for-copilot.prompts.run",
+			"alma.prompts.run",
 			// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ignore
 			async (filePathOrItem?: any) => {
 				try {
@@ -465,76 +449,52 @@ function registerCommands(
 				}
 			}
 		),
-		commands.registerCommand(
-			"spec-ui-for-copilot.prompts.rename",
-			async (item?: any) => {
-				await promptsExplorer.renamePrompt(item);
+		commands.registerCommand("alma.prompts.rename", async (item?: any) => {
+			await promptsExplorer.renamePrompt(item);
+		}),
+		commands.registerCommand("alma.prompts.delete", async (item: any) => {
+			if (!item?.resourceUri) {
+				return;
 			}
-		),
-		commands.registerCommand(
-			"spec-ui-for-copilot.prompts.delete",
-			async (item: any) => {
-				if (!item?.resourceUri) {
-					return;
-				}
-				const uri = item.resourceUri as Uri;
-				const confirm = await window.showWarningMessage(
-					`Are you sure you want to delete '${basename(uri.fsPath)}'?`,
-					{ modal: true },
-					"Delete"
-				);
-				if (confirm !== "Delete") {
-					return;
-				}
-				try {
-					await workspace.fs.delete(uri);
-					promptsExplorer.refresh();
-				} catch (e) {
-					window.showErrorMessage(`Failed to delete prompt: ${e}`);
-				}
+			const uri = item.resourceUri as Uri;
+			const confirm = await window.showWarningMessage(
+				`Are you sure you want to delete '${basename(uri.fsPath)}'?`,
+				{ modal: true },
+				"Delete"
+			);
+			if (confirm !== "Delete") {
+				return;
 			}
-		),
-		commands.registerCommand(
-			"spec-ui-for-copilot.prompts.createAgentFile",
-			async () => {
-				await commands.executeCommand("workbench.command.new.agent");
+			try {
+				await workspace.fs.delete(uri);
+				promptsExplorer.refresh();
+			} catch (e) {
+				window.showErrorMessage(`Failed to delete prompt: ${e}`);
 			}
-		),
+		}),
+		commands.registerCommand("alma.prompts.createAgentFile", async () => {
+			await commands.executeCommand("workbench.command.new.agent");
+		}),
 
 		// SpecKit commands
-		commands.registerCommand(
-			"spec-ui-for-copilot.speckit.constitution",
-			async () => {
-				await sendPromptToChat("/speckit.constitution");
-			}
-		),
-		commands.registerCommand(
-			"spec-ui-for-copilot.speckit.specify",
-			async () => {
-				await sendPromptToChat("/speckit.specify");
-			}
-		),
-		commands.registerCommand("spec-ui-for-copilot.speckit.plan", async () => {
+		commands.registerCommand("alma.speckit.constitution", async () => {
+			await sendPromptToChat("/speckit.constitution");
+		}),
+		commands.registerCommand("alma.speckit.specify", async () => {
+			await sendPromptToChat("/speckit.specify");
+		}),
+		commands.registerCommand("alma.speckit.plan", async () => {
 			await sendPromptToChat("/speckit.plan");
 		}),
-		commands.registerCommand(
-			"spec-ui-for-copilot.speckit.unit-test",
-			async () => {
-				await sendPromptToChat("/speckit.unit-test");
-			}
-		),
-		commands.registerCommand(
-			"spec-ui-for-copilot.speckit.integration-test",
-			async () => {
-				await sendPromptToChat("/speckit.integration-test");
-			}
-		),
-		commands.registerCommand(
-			"spec-ui-for-copilot.speckit.implementation",
-			async () => {
-				await sendPromptToChat("/speckit.implementation");
-			}
-		)
+		commands.registerCommand("alma.speckit.unit-test", async () => {
+			await sendPromptToChat("/speckit.unit-test");
+		}),
+		commands.registerCommand("alma.speckit.integration-test", async () => {
+			await sendPromptToChat("/speckit.integration-test");
+		}),
+		commands.registerCommand("alma.speckit.implementation", async () => {
+			await sendPromptToChat("/speckit.implementation");
+		})
 	);
 
 	// Update checker command
@@ -542,57 +502,57 @@ function registerCommands(
 	// Group the following commands in a single subscriptions push
 	context.subscriptions.push(
 		// Overview and settings commands
-		commands.registerCommand("spec-ui-for-copilot.settings.open", async () => {
-			outputChannel.appendLine("Opening SpecUI settings...");
+		commands.registerCommand("alma.settings.open", async () => {
+			outputChannel.appendLine("Opening ALMA settings...");
 			await commands.executeCommand(
 				"workbench.action.openSettings",
 				VSC_CONFIG_NAMESPACE
 			);
 		}),
-		commands.registerCommand(
-			"spec-ui-for-copilot.settings.openGlobalConfig",
-			async () => {
-				outputChannel.appendLine("Opening MCP config...");
+		commands.registerCommand("alma.settings.selectSpecSystem", async () => {
+			const adapter = getSpecSystemAdapter();
+			await adapter.selectSpecSystem();
+		}),
+		commands.registerCommand("alma.settings.openGlobalConfig", async () => {
+			outputChannel.appendLine("Opening MCP config...");
 
-				const configPath = await getMcpConfigPath();
-				const configUri = Uri.file(configPath);
+			const configPath = await getMcpConfigPath();
+			const configUri = Uri.file(configPath);
 
-				try {
-					await workspace.fs.stat(configUri);
-				} catch {
-					window.showWarningMessage(
-						`MCP config not found at ${configUri.fsPath}.`
-					);
-					return;
-				}
-
-				try {
-					const document = await workspace.openTextDocument(configUri);
-					await window.showTextDocument(document, { preview: false });
-				} catch (error) {
-					const message =
-						error instanceof Error ? error.message : String(error);
-					window.showErrorMessage(`Failed to open MCP config: ${message}`);
-				}
+			try {
+				await workspace.fs.stat(configUri);
+			} catch {
+				window.showWarningMessage(
+					`MCP config not found at ${configUri.fsPath}.`
+				);
+				return;
 			}
-		),
+
+			try {
+				const document = await workspace.openTextDocument(configUri);
+				await window.showTextDocument(document, { preview: false });
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				window.showErrorMessage(`Failed to open MCP config: ${message}`);
+			}
+		}),
 
 		// biome-ignore lint/suspicious/useAwait: ignore
-		commands.registerCommand("spec-ui-for-copilot.help.open", async () => {
-			outputChannel.appendLine("Opening SpecUI help...");
-			const helpUrl = "https://github.com/italoag/spec-ui-for-copilot#readme";
+		commands.registerCommand("alma.help.open", async () => {
+			outputChannel.appendLine("Opening ALMA help...");
+			const helpUrl = "https://github.com/eita/alma-vscode#readme";
 			env.openExternal(Uri.parse(helpUrl));
 		}),
 
 		// biome-ignore lint/suspicious/useAwait: ignore
-		commands.registerCommand("spec-ui-for-copilot.help.install", async () => {
-			outputChannel.appendLine("Opening SpecUI installation guide...");
-			const installUrl = "https://github.com/Fission-AI/OpenSpec#readme";
+		commands.registerCommand("alma.help.install", async () => {
+			outputChannel.appendLine("Opening Spec Kit installation guide...");
+			const installUrl = "https://github.com/github/spec-kit#readme";
 			env.openExternal(Uri.parse(installUrl));
 		}),
 
-		commands.registerCommand("spec-ui-for-copilot.menu.open", async () => {
-			outputChannel.appendLine("Opening SpecUI menu...");
+		commands.registerCommand("alma.menu.open", async () => {
+			outputChannel.appendLine("Opening ALMA menu...");
 			await toggleViews();
 		})
 	);

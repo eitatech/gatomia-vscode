@@ -13,10 +13,9 @@ import { ConfigManager } from "../../utils/config-manager";
 import { NotificationUtils } from "../../utils/notification-utils";
 import { sendPromptToChat } from "../../utils/chat-prompt-runner";
 import {
-	initializeSpecSystemAdapter,
+	getSpecSystemAdapter,
 	type SpecSystemAdapter,
 } from "../../utils/spec-kit-adapter";
-import { detectAvailableSpecSystems } from "../../utils/spec-kit-utilities";
 import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../../constants";
 import { CreateSpecInputController } from "./create-spec-input-controller";
 
@@ -46,48 +45,11 @@ export class SpecManager {
 		this.initializeAdapter(context);
 	}
 
-	private async initializeAdapter(context: ExtensionContext): Promise<void> {
+	private initializeAdapter(context: ExtensionContext): void {
 		try {
-			this.specAdapter = await initializeSpecSystemAdapter();
-
-			const workspaceFolder = workspace.workspaceFolders?.[0];
-			if (workspaceFolder) {
-				const availableSystems = detectAvailableSpecSystems(
-					workspaceFolder.uri.fsPath
-				);
-				if (availableSystems.length > 1) {
-					const selection = await window.showQuickPick(
-						[
-							{
-								label: "Spec-Kit",
-								description: "Use Spec-Kit agent",
-								mode: SPEC_SYSTEM_MODE.SPECKIT,
-							},
-							{
-								label: "OpenSpec",
-								description: "Use OpenSpec agent",
-								mode: SPEC_SYSTEM_MODE.OPENSPEC,
-							},
-						],
-						{
-							placeHolder:
-								"Multiple spec systems detected. Which agent do you want to use?",
-							ignoreFocusOut: true,
-						}
-					);
-
-					if (selection) {
-						this.activeSystem = selection.mode;
-					} else {
-						// Default to SpecKit if user cancels
-						this.activeSystem = SPEC_SYSTEM_MODE.SPECKIT;
-					}
-				} else {
-					this.activeSystem = this.specAdapter.getActiveSystem();
-				}
-			} else {
-				this.activeSystem = this.specAdapter.getActiveSystem();
-			}
+			// Adapter is already initialized in extension.ts
+			this.specAdapter = getSpecSystemAdapter();
+			this.activeSystem = this.specAdapter.getActiveSystem();
 
 			this.outputChannel.appendLine(
 				`[SpecManager] Initialized with active spec system: ${this.activeSystem}`
@@ -103,7 +65,7 @@ export class SpecManager {
 			});
 		} catch (error) {
 			this.outputChannel.appendLine(
-				`[SpecManager] Warning: Failed to initialize spec-kit adapter: ${error}`
+				`[SpecManager] Warning: Failed to get spec-kit adapter: ${error}`
 			);
 			// Fall back to OpenSpec mode
 			this.activeSystem = SPEC_SYSTEM_MODE.OPENSPEC;
