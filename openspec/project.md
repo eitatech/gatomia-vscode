@@ -1,7 +1,7 @@
 # Project Context
 
 ## Purpose
-Spec UI for Copilot is a Visual Studio Code extension that gives GitHub Copilot users a guided, spec-driven workflow. It keeps specs, steering rules, and reusable prompts in sync with the Copilot chat experience so teams can create, review, and execute change proposals without leaving the IDE.
+ALMA for Copilot is a Visual Studio Code extension that gives GitHub Copilot users a guided, spec-driven workflow. It keeps specs, steering rules, and reusable prompts in sync with the Copilot chat experience so teams can create, review, and execute change proposals without leaving the IDE.
 
 ## Tech Stack
 - TypeScript for the extension runtime, prompt tooling, and shared utilities compiled with `esbuild` for Node 16 targets.

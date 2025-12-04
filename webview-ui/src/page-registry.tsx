@@ -2,18 +2,21 @@ import { CreateSpecView } from "./features/create-spec-view";
 import { CreateSteeringView } from "./features/create-steering-view";
 import { InteractiveView } from "./features/interactive-view";
 import { SimpleView } from "./features/simple-view";
+import { HooksView } from "./features/hooks-view";
 
 export type SupportedPage =
 	| "simple"
 	| "interactive"
 	| "create-spec"
-	| "create-steering";
+	| "create-steering"
+	| "hooks";
 
 const pageRenderers = {
 	simple: () => <SimpleView />,
 	interactive: () => <InteractiveView />,
 	"create-spec": () => <CreateSpecView />,
 	"create-steering": () => <CreateSteeringView />,
+	hooks: () => <HooksView />,
 } satisfies Record<SupportedPage, () => JSX.Element>;
 
 export const getPageRenderer = (pageName: string) => {

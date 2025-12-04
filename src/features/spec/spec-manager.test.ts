@@ -114,4 +114,92 @@ describe("SpecManager", () => {
 		expect(changes).toEqual(["change1", "change2"]);
 		expect(workspace.fs.readDirectory).toHaveBeenCalled();
 	});
+
+	// 5. Trigger Integration: Test TriggerRegistry integration
+	describe("TriggerRegistry Integration", () => {
+		let mockTriggerRegistry: {
+			fireTrigger: ReturnType<typeof vi.fn>;
+		};
+
+		beforeEach(() => {
+			mockTriggerRegistry = {
+				fireTrigger: vi.fn(),
+			};
+		});
+
+		it("should set TriggerRegistry successfully", () => {
+			specManager.setTriggerRegistry(mockTriggerRegistry as any);
+
+			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
+				"[SpecManager] TriggerRegistry connected"
+			);
+		});
+
+		it("should fire trigger after successful SpecKit command execution", async () => {
+			specManager.setTriggerRegistry(mockTriggerRegistry as any);
+
+			await specManager.executeSpecKitCommand("specify");
+
+			expect(mockTriggerRegistry.fireTrigger).toHaveBeenCalledWith(
+				"speckit",
+				"specify"
+			);
+			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
+				"[SpecManager] Fired trigger: speckit.specify"
+			);
+		});
+
+		it("should fire triggers for all SpecKit operations", async () => {
+			specManager.setTriggerRegistry(mockTriggerRegistry as any);
+
+			const operations = [
+				"constitution",
+				"specify",
+				"clarify",
+				"plan",
+				"analyze",
+				"checklist",
+			];
+
+			for (const operation of operations) {
+				await specManager.executeSpecKitCommand(operation);
+				expect(mockTriggerRegistry.fireTrigger).toHaveBeenCalledWith(
+					"speckit",
+					operation
+				);
+			}
+
+			expect(mockTriggerRegistry.fireTrigger).toHaveBeenCalledTimes(
+				operations.length
+			);
+		});
+
+		it("should not fire trigger when TriggerRegistry is not set", async () => {
+			// Don't set trigger registry
+			await specManager.executeSpecKitCommand("specify");
+
+			// Should not throw, just skip trigger firing
+			expect(mockOutputChannel.appendLine).not.toHaveBeenCalledWith(
+				expect.stringContaining("Fired trigger")
+			);
+		});
+
+		it("should not fire trigger on command execution error", async () => {
+			const { sendPromptToChat } = await import(
+				"../../utils/chat-prompt-runner"
+			);
+			vi.mocked(sendPromptToChat).mockRejectedValueOnce(
+				new Error("Command failed")
+			);
+
+			specManager.setTriggerRegistry(mockTriggerRegistry as any);
+
+			await expect(
+				specManager.executeSpecKitCommand("specify")
+			).rejects.toThrow("Command failed");
+
+			// Trigger should not fire on error
+			expect(mockTriggerRegistry.fireTrigger).not.toHaveBeenCalled();
+		});
+	});
 });

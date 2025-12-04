@@ -16,7 +16,7 @@ export const DEFAULT_CONFIG = {
 	chatLanguage: "English",
 } as const;
 
-// Spec-Kit configuration
+// Spec Kit configuration
 export const SPECKIT_CONFIG = {
 	paths: {
 		specs: "specs",

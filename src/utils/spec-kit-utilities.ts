@@ -15,12 +15,12 @@ const BACKSLASH_REGEX = /\\/g;
 const LEADING_SLASH_REGEX = /^\//;
 
 /**
- * Spec-Kit Utilities
- * Provides helper functions for working with Spec-Kit file structure and conventions
+ * Spec Kit Utilities
+ * Provides helper functions for working with Spec Kit file structure and conventions
  */
 
 /**
- * Feature structure for Spec-Kit numbered directories
+ * Feature structure for Spec Kit numbered directories
  */
 export interface SpecKitFeature {
 	number: number;
@@ -40,7 +40,7 @@ export function detectAvailableSpecSystems(
 	const specsPath = join(workspacePath, "specs");
 	const specifyPath = join(workspacePath, ".specify");
 
-	// Check for Spec-Kit indicators
+	// Check for Spec Kit indicators
 	if (existsSync(specifyPath) && existsSync(specsPath)) {
 		systems.push(SPEC_SYSTEM_MODE.SPECKIT);
 	}
@@ -73,7 +73,7 @@ export function detectActiveSpecSystem(workspacePath: string): SpecSystemMode {
 }
 
 /**
- * Parses a Spec-Kit numbered directory name
+ * Parses a Spec Kit numbered directory name
  * Examples: "001-user-auth", "002-payment-integration"
  * Returns: { number: 1, name: "user-auth", slug: "001-user-auth" }
  */
@@ -145,7 +145,7 @@ export function discoverSpecKitFeatures(specsPath: string): SpecKitFeature[] {
 		}
 	} catch (error) {
 		console.error(
-			`Error discovering Spec-Kit features in ${specsPath}:`,
+			`Error discovering Spec Kit features in ${specsPath}:`,
 			error
 		);
 	}
@@ -177,7 +177,7 @@ export function formatFeatureNumber(num: number, padding = 3): string {
 }
 
 /**
- * Generates a Spec-Kit feature directory name
+ * Generates a Spec Kit feature directory name
  * Examples: createFeatureDirectoryName(1, "User Auth") → "001-user-auth"
  */
 export function createFeatureDirectoryName(
@@ -189,14 +189,14 @@ export function createFeatureDirectoryName(
 }
 
 /**
- * Checks if a directory follows Spec-Kit naming conventions
+ * Checks if a directory follows Spec Kit naming conventions
  */
 export function isSpecKitFeatureDirectory(dirName: string): boolean {
 	return SPEC_KIT_FEATURE_DIR_VALIDATION_REGEX.test(dirName);
 }
 
 /**
- * Gets all Spec-Kit spec template files in a feature directory
+ * Gets all Spec Kit spec template files in a feature directory
  * Returns paths to spec.md, plan.md, tasks.md, etc.
  */
 export function getSpecKitFeatureFiles(
@@ -228,7 +228,7 @@ export function getSpecKitFeatureFiles(
 }
 
 /**
- * Validates Spec-Kit project structure
+ * Validates Spec Kit project structure
  * Checks for required directories and files
  */
 export interface SpecKitValidationResult {
@@ -315,7 +315,7 @@ export function getSpecsPath(workspacePath: string): string {
 }
 
 /**
- * Extracts feature name from a Spec-Kit directory path
+ * Extracts feature name from a Spec Kit directory path
  * Example: "/workspace/specs/001-user-auth" → "User Auth"
  */
 export function extractFeatureNameFromPath(featurePath: string): string {
@@ -325,7 +325,7 @@ export function extractFeatureNameFromPath(featurePath: string): string {
 }
 
 /**
- * Extracts feature number from a Spec-Kit directory path
+ * Extracts feature number from a Spec Kit directory path
  * Example: "/workspace/specs/001-user-auth" → 1
  */
 export function extractFeatureNumberFromPath(
@@ -337,7 +337,7 @@ export function extractFeatureNumberFromPath(
 }
 
 /**
- * Checks if a file path belongs to a Spec-Kit feature directory
+ * Checks if a file path belongs to a Spec Kit feature directory
  */
 export function isInSpecKitFeatureDirectory(
 	filePath: string,

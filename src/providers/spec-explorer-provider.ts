@@ -103,11 +103,11 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 		}
 
 		if (element.contextValue === "spec") {
-			// Handle Spec-Kit System
+			// Handle Spec Kit System
 			if (element.system === SPEC_SYSTEM_MODE.SPECKIT) {
 				const adapter = getSpecSystemAdapter();
 				// Get files for this spec (returns absolute paths)
-				const files = await adapter.getSpecFiles(element.specName!);
+				const files = adapter.getSpecFiles(element.specName!);
 
 				const items: SpecItem[] = [];
 

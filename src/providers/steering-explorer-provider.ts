@@ -155,7 +155,7 @@ export class SteeringExplorerProvider
 				if (hasProjectInstructions) {
 					items.push(
 						new SteeringItem(
-							"AGENTS",
+							"Agents",
 							TreeItemCollapsibleState.Expanded,
 							"project-instructions-group",
 							"",
