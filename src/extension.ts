@@ -339,43 +339,7 @@ function registerCommands(
 			}
 		}),
 		commands.registerCommand("alma.hooks.import", async () => {
-			if (!hookManager) {
-				window.showErrorMessage("Hook manager is not ready yet.");
-				return;
-			}
-
-			const defaultUri = workspace.workspaceFolders?.[0]?.uri;
-			const openUris = await window.showOpenDialog({
-				title: "Import Hooks",
-				openLabel: "Import",
-				defaultUri: defaultUri ?? undefined,
-				canSelectMany: false,
-				filters: { JSON: ["json"] },
-			});
-
-			if (!openUris || openUris.length === 0) {
-				return;
-			}
-
-			const hooksFile = openUris[0];
-
-			try {
-				const bytes = await workspace.fs.readFile(hooksFile);
-				const json = Buffer.from(bytes).toString("utf8");
-				const importedCount = await hookManager.importHooks(json);
-
-				const summary =
-					importedCount === 0
-						? "No new hooks imported"
-						: `Imported ${importedCount} hook${importedCount === 1 ? "" : "s"}`;
-
-				window.showInformationMessage(`${summary} from ${hooksFile.fsPath}`);
-				outputChannel.appendLine(`[Hooks] ${summary} from ${hooksFile.fsPath}`);
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				window.showErrorMessage(`Failed to import hooks: ${message}`);
-				outputChannel.appendLine(`[Hooks] Failed to import hooks: ${message}`);
-			}
+			await handleHooksImport();
 		}),
 		commands.registerCommand("alma.hooks.addHook", async () => {
 			if (!hookViewProvider) {
@@ -870,6 +834,46 @@ function getDefaultWorkspaceFileUri(fileName: string): Uri | undefined {
 function getHooksExportFileName(): string {
 	const timestamp = new Date().toISOString().replace(/[:]/g, "-");
 	return `alma-hooks-${timestamp}.json`;
+}
+
+async function handleHooksImport(): Promise<void> {
+	if (!hookManager) {
+		window.showErrorMessage("Hook manager is not ready yet.");
+		return;
+	}
+
+	const defaultUri = workspace.workspaceFolders?.[0]?.uri;
+	const openUris = await window.showOpenDialog({
+		title: "Import Hooks",
+		openLabel: "Import",
+		defaultUri: defaultUri ?? undefined,
+		canSelectMany: false,
+		filters: { JSON: ["json"] },
+	});
+
+	if (!openUris || openUris.length === 0) {
+		return;
+	}
+
+	const hooksFile = openUris[0];
+
+	try {
+		const bytes = await workspace.fs.readFile(hooksFile);
+		const json = Buffer.from(bytes).toString("utf8");
+		const importedCount = await hookManager.importHooks(json);
+
+		const summary =
+			importedCount === 0
+				? "No new hooks imported"
+				: `Imported ${importedCount} hook${importedCount === 1 ? "" : "s"}`;
+
+		window.showInformationMessage(`${summary} from ${hooksFile.fsPath}`);
+		outputChannel.appendLine(`[Hooks] ${summary} from ${hooksFile.fsPath}`);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		window.showErrorMessage(`Failed to import hooks: ${message}`);
+		outputChannel.appendLine(`[Hooks] Failed to import hooks: ${message}`);
+	}
 }
 
 // biome-ignore lint/suspicious/noEmptyBlockStatements: ignore
