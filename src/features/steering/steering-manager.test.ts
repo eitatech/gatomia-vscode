@@ -163,17 +163,17 @@ describe("SteeringManager", () => {
 
 			expect(window.showQuickPick).toHaveBeenCalledWith(
 				expect.arrayContaining([
-					expect.objectContaining({ label: "Spec-Kit" }),
+					expect.objectContaining({ label: "Spec Kit" }),
 					expect.objectContaining({ label: "OpenSpec" }),
 				]),
 				expect.anything()
 			);
 		});
 
-		it("should create Spec-Kit constitution when selected", async () => {
+		it("should create Spec Kit constitution when selected", async () => {
 			vi.mocked(existsSync).mockReturnValue(false);
 			vi.mocked(window.showQuickPick).mockResolvedValue({
-				label: "Spec-Kit",
+				label: "Spec Kit",
 				value: "speckit",
 			} as any);
 			vi.mocked(window.showInputBox).mockResolvedValue("Test directives");

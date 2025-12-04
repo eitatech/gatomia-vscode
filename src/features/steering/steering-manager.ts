@@ -107,8 +107,8 @@ This file controls default behavior for GitHub Copilot across all projects.
 			const choice = await window.showQuickPick(
 				[
 					{
-						label: "Spec-Kit",
-						description: "Use Spec-Kit system (Recommended)",
+						label: "Spec Kit",
+						description: "Use Spec Kit system (Recommended)",
 						value: SPEC_SYSTEM_MODE.SPECKIT,
 					},
 					{
