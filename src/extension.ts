@@ -29,10 +29,18 @@ import { ConfigManager } from "./utils/config-manager";
 import { getVSCodeUserDataPath } from "./utils/platform-utils";
 import { getSpecSystemAdapter } from "./utils/spec-kit-adapter";
 import { SpecKitMigration } from "./utils/spec-kit-migration";
+import { TriggerRegistry } from "./features/hooks/trigger-registry";
+import { HookManager } from "./features/hooks/hook-manager";
+import { HookExecutor } from "./features/hooks/hook-executor";
+import { HookViewProvider } from "./providers/hook-view-provider";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
 let steeringManager: SteeringManager;
+let triggerRegistry: TriggerRegistry;
+let hookManager: HookManager;
+let hookExecutor: HookExecutor;
+let hookViewProvider: HookViewProvider;
 export let outputChannel: OutputChannel;
 
 export async function activate(context: ExtensionContext) {
@@ -87,6 +95,29 @@ export async function activate(context: ExtensionContext) {
 		outputChannel
 	);
 
+	// Initialize TriggerRegistry for hooks
+	triggerRegistry = new TriggerRegistry(outputChannel);
+	triggerRegistry.initialize();
+	outputChannel.appendLine("TriggerRegistry initialized");
+
+	// Connect TriggerRegistry to SpecManager
+	specManager.setTriggerRegistry(triggerRegistry);
+
+	// Initialize Hook infrastructure
+	hookManager = new HookManager(context, outputChannel);
+	await hookManager.initialize();
+
+	hookExecutor = new HookExecutor(hookManager, triggerRegistry, outputChannel);
+	hookExecutor.initialize();
+
+	hookViewProvider = new HookViewProvider(
+		context,
+		hookManager,
+		hookExecutor,
+		outputChannel
+	);
+	hookViewProvider.initialize();
+
 	// Register tree data providers
 	const overviewProvider = new OverviewProvider(context);
 	const specExplorer = new SpecExplorerProvider(context);
@@ -110,6 +141,15 @@ export async function activate(context: ExtensionContext) {
 			"alma.views.promptsExplorer",
 			promptsExplorer
 		)
+	);
+	context.subscriptions.push(
+		window.registerWebviewViewProvider(
+			HookViewProvider.viewId,
+			hookViewProvider
+		),
+		{ dispose: () => hookManager.dispose() },
+		{ dispose: () => hookExecutor.dispose() },
+		{ dispose: () => hookViewProvider.dispose() }
 	);
 
 	// Register commands
@@ -155,6 +195,11 @@ async function toggleViews() {
 			picked: currentVisibility.specs,
 			id: "specs",
 		},
+		{
+			label: `$(${currentVisibility.hooks ? "check" : "blank"}) Hooks`,
+			picked: currentVisibility.hooks,
+			id: "hooks",
+		},
 
 		{
 			label: `$(${currentVisibility.steering ? "check" : "blank"}) Agent Steering`,
@@ -178,6 +223,11 @@ async function toggleViews() {
 		await config.update(
 			"views.specs.visible",
 			newVisibility.specs,
+			ConfigurationTarget.Workspace
+		);
+		await config.update(
+			"views.hooks.visible",
+			newVisibility.hooks,
 			ConfigurationTarget.Workspace
 		);
 		await config.update(
@@ -256,6 +306,88 @@ function registerCommands(
 		commands.registerCommand("alma.spec.refresh", async () => {
 			outputChannel.appendLine("[Manual Refresh] Refreshing spec explorer...");
 			specExplorer.refresh();
+		}),
+		commands.registerCommand("alma.hooks.export", async () => {
+			if (!hookManager) {
+				window.showErrorMessage("Hook manager is not ready yet.");
+				return;
+			}
+
+			const defaultUri = getDefaultWorkspaceFileUri(getHooksExportFileName());
+			const saveUri = await window.showSaveDialog({
+				title: "Export Hooks",
+				saveLabel: "Export",
+				defaultUri: defaultUri ?? undefined,
+				filters: { JSON: ["json"] },
+			});
+
+			if (!saveUri) {
+				return;
+			}
+
+			try {
+				const json = hookManager.exportHooks();
+				await workspace.fs.writeFile(saveUri, Buffer.from(json, "utf8"));
+
+				const message = `Exported hooks to ${saveUri.fsPath}`;
+				window.showInformationMessage(message);
+				outputChannel.appendLine(`[Hooks] ${message}`);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				window.showErrorMessage(`Failed to export hooks: ${message}`);
+				outputChannel.appendLine(`[Hooks] Failed to export hooks: ${message}`);
+			}
+		}),
+		commands.registerCommand("alma.hooks.import", async () => {
+			if (!hookManager) {
+				window.showErrorMessage("Hook manager is not ready yet.");
+				return;
+			}
+
+			const defaultUri = workspace.workspaceFolders?.[0]?.uri;
+			const openUris = await window.showOpenDialog({
+				title: "Import Hooks",
+				openLabel: "Import",
+				defaultUri: defaultUri ?? undefined,
+				canSelectMany: false,
+				filters: { JSON: ["json"] },
+			});
+
+			if (!openUris || openUris.length === 0) {
+				return;
+			}
+
+			const hooksFile = openUris[0];
+
+			try {
+				const bytes = await workspace.fs.readFile(hooksFile);
+				const json = Buffer.from(bytes).toString("utf8");
+				const importedCount = await hookManager.importHooks(json);
+
+				const summary =
+					importedCount === 0
+						? "No new hooks imported"
+						: `Imported ${importedCount} hook${importedCount === 1 ? "" : "s"}`;
+
+				window.showInformationMessage(`${summary} from ${hooksFile.fsPath}`);
+				outputChannel.appendLine(`[Hooks] ${summary} from ${hooksFile.fsPath}`);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				window.showErrorMessage(`Failed to import hooks: ${message}`);
+				outputChannel.appendLine(`[Hooks] Failed to import hooks: ${message}`);
+			}
+		}),
+		commands.registerCommand("alma.hooks.addHook", async () => {
+			if (!hookViewProvider) {
+				return;
+			}
+			await hookViewProvider.showCreateHookForm();
+		}),
+		commands.registerCommand("alma.hooks.viewLogs", async () => {
+			if (!hookViewProvider) {
+				return;
+			}
+			await hookViewProvider.showLogsPanel();
 		})
 	);
 
@@ -484,22 +616,46 @@ function registerCommands(
 
 		// SpecKit commands
 		commands.registerCommand("alma.speckit.constitution", async () => {
-			await sendPromptToChat("/speckit.constitution");
+			await specManager.executeSpecKitCommand("constitution");
 		}),
 		commands.registerCommand("alma.speckit.specify", async () => {
-			await sendPromptToChat("/speckit.specify");
+			await specManager.executeSpecKitCommand("specify");
 		}),
 		commands.registerCommand("alma.speckit.plan", async () => {
-			await sendPromptToChat("/speckit.plan");
+			await specManager.executeSpecKitCommand("plan");
 		}),
 		commands.registerCommand("alma.speckit.unit-test", async () => {
-			await sendPromptToChat("/speckit.unit-test");
+			await specManager.executeSpecKitCommand("unit-test");
 		}),
 		commands.registerCommand("alma.speckit.integration-test", async () => {
-			await sendPromptToChat("/speckit.integration-test");
+			await specManager.executeSpecKitCommand("integration-test");
 		}),
 		commands.registerCommand("alma.speckit.implementation", async () => {
-			await sendPromptToChat("/speckit.implementation");
+			await specManager.executeSpecKitCommand("implementation");
+		}),
+		commands.registerCommand("alma.speckit.clarify", async () => {
+			await specManager.executeSpecKitCommand("clarify");
+		}),
+		commands.registerCommand("alma.speckit.analyze", async () => {
+			await specManager.executeSpecKitCommand("analyze");
+		}),
+		commands.registerCommand("alma.speckit.checklist", async () => {
+			await specManager.executeSpecKitCommand("checklist");
+		}),
+		commands.registerCommand("alma.speckit.tasks", async () => {
+			await specManager.executeSpecKitCommand("tasks");
+		}),
+		commands.registerCommand("alma.speckit.taskstoissues", async () => {
+			await specManager.executeSpecKitCommand("taskstoissues");
+		}),
+		commands.registerCommand("alma.speckit.research", async () => {
+			await specManager.executeSpecKitCommand("research");
+		}),
+		commands.registerCommand("alma.speckit.datamodel", async () => {
+			await specManager.executeSpecKitCommand("datamodel");
+		}),
+		commands.registerCommand("alma.speckit.design", async () => {
+			await specManager.executeSpecKitCommand("design");
 		})
 	);
 
@@ -700,6 +856,20 @@ function setupFileWatchers(
 	projectCopilotMdWatcher.onDidDelete(() => steeringExplorer.refresh());
 
 	context.subscriptions.push(globalCopilotMdWatcher, projectCopilotMdWatcher);
+}
+
+function getDefaultWorkspaceFileUri(fileName: string): Uri | undefined {
+	const workspaceFolder = workspace.workspaceFolders?.[0];
+	if (!workspaceFolder) {
+		return;
+	}
+
+	return Uri.joinPath(workspaceFolder.uri, fileName);
+}
+
+function getHooksExportFileName(): string {
+	const timestamp = new Date().toISOString().replace(/[:]/g, "-");
+	return `alma-hooks-${timestamp}.json`;
 }
 
 // biome-ignore lint/suspicious/noEmptyBlockStatements: ignore

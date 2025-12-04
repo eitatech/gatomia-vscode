@@ -19,6 +19,7 @@ import {
 import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../../constants";
 import { CreateSpecInputController } from "./create-spec-input-controller";
 import { SpecKitManager } from "./spec-kit-manager";
+import type { TriggerRegistry } from "../hooks/trigger-registry";
 
 export type SpecDocumentType = "requirements" | "design" | "tasks";
 
@@ -29,6 +30,7 @@ export class SpecManager {
 	private createSpecInputController: CreateSpecInputController;
 	private specAdapter: SpecSystemAdapter | null = null;
 	private activeSystem: SpecSystemMode = SPEC_SYSTEM_MODE.AUTO;
+	private triggerRegistry: TriggerRegistry | null = null;
 
 	constructor(context: ExtensionContext, outputChannel: OutputChannel) {
 		this.configManager = ConfigManager.getInstance();
@@ -83,7 +85,46 @@ export class SpecManager {
 	}
 
 	/**
-	 * Gets the active spec system (OpenSpec, Spec-Kit, or Auto)
+	 * Sets the TriggerRegistry for hook integration
+	 */
+	setTriggerRegistry(registry: TriggerRegistry): void {
+		this.triggerRegistry = registry;
+		this.outputChannel.appendLine("[SpecManager] TriggerRegistry connected");
+	}
+
+	/**
+	 * Executes a SpecKit command and fires the appropriate trigger
+	 */
+	async executeSpecKitCommand(operation: string): Promise<void> {
+		try {
+			// Send command to Copilot Chat
+			await sendPromptToChat(`/speckit.${operation}`);
+
+			// Fire trigger after command is sent
+			// NOTE: We fire immediately after sending, as we don't have a way
+			// to know when the Copilot agent completes the operation.
+			// This is a best-effort approach for MVP.
+			if (this.triggerRegistry) {
+				this.triggerRegistry.fireTrigger("speckit", operation);
+				this.outputChannel.appendLine(
+					`[SpecManager] Fired trigger: speckit.${operation}`
+				);
+			}
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: `Failed to execute speckit.${operation}`;
+			this.outputChannel.appendLine(
+				`[SpecManager] Error executing ${operation}: ${message}`
+			);
+			// Don't fire trigger on error
+			throw error;
+		}
+	}
+
+	/**
+	 * Gets the active spec system (OpenSpec, Spec Kit, or Auto)
 	 */
 	getActiveSystem(): SpecSystemMode {
 		return this.activeSystem;
@@ -284,7 +325,7 @@ This document has not been created yet.`;
 	}
 
 	/**
-	 * Gets all available specs from both OpenSpec and Spec-Kit systems
+	 * Gets all available specs from both OpenSpec and Spec Kit systems
 	 * This method unifies spec discovery across both systems
 	 */
 	async getAllSpecsUnified(): Promise<
@@ -322,7 +363,7 @@ This document has not been created yet.`;
 	}
 
 	/**
-	 * Creates a new spec using the appropriate system (OpenSpec or Spec-Kit)
+	 * Creates a new spec using the appropriate system (OpenSpec or Spec Kit)
 	 */
 	async createUnified(specName: string): Promise<boolean> {
 		try {
@@ -332,7 +373,7 @@ This document has not been created yet.`;
 				await manager.createFeature(specName);
 
 				this.outputChannel.appendLine(
-					`[SpecManager] Created Spec-Kit feature: ${specName}`
+					`[SpecManager] Created Spec Kit feature: ${specName}`
 				);
 				return true;
 			}

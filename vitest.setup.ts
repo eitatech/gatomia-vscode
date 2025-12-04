@@ -1,3 +1,7 @@
-// vitest.setup.ts
-// You can add any global setup here, like configuring snapshot serializers.
-export {};
+import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
+
+afterEach(() => {
+	cleanup();
+});
