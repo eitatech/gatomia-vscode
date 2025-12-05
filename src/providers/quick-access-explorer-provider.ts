@@ -138,7 +138,7 @@ export class QuickAccessExplorerProvider
 					command: "gatomia.settings.openGlobalConfig",
 					title: "Open MCP Config",
 				},
-				new ThemeIcon("file-text"),
+				new ThemeIcon("mcp"),
 				"Open the MCP configuration file (mcp.json)."
 			),
 		];

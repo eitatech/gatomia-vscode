@@ -438,6 +438,7 @@ export class PromptsExplorerProvider implements TreeDataProvider<PromptItem> {
 						resourceUri: uri,
 						command,
 						source,
+						isAgent,
 					}
 				);
 			});
@@ -627,6 +628,7 @@ interface PromptItemOptions {
 	tooltip?: string;
 	description?: string;
 	source?: PromptSource;
+	isAgent?: boolean;
 }
 
 class PromptItem extends TreeItem {
@@ -699,7 +701,7 @@ class PromptItem extends TreeItem {
 				"Create prompts under the configured prompts directory";
 		},
 		prompt: (item, options) => {
-			item.iconPath = new ThemeIcon("file-code");
+			item.iconPath = new ThemeIcon("code-oss");
 			if (!options) {
 				return;
 			}
@@ -722,7 +724,8 @@ class PromptItem extends TreeItem {
 			item.tooltip = options.tooltip ?? description;
 		},
 		"prompt-runnable": (item, options) => {
-			item.iconPath = new ThemeIcon("file-code");
+			// Use robot icon for agents, code-oss for prompts
+			item.iconPath = new ThemeIcon(options?.isAgent ? "robot" : "code-oss");
 			if (!options) {
 				return;
 			}

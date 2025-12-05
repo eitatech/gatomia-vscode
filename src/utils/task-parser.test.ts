@@ -288,21 +288,19 @@ Strategy details.
 
 	describe("getTaskStatusIcon", () => {
 		it("should return correct icon for completed status", () => {
-			expect(getTaskStatusIcon("completed")).toBe("testing-passed-icon");
+			expect(getTaskStatusIcon("completed")).toBe("pass");
 		});
 
 		it("should return correct icon for in-progress status", () => {
-			expect(getTaskStatusIcon("in-progress")).toBe("testing-run-icon");
+			expect(getTaskStatusIcon("in-progress")).toBe("sync~spin");
 		});
 
 		it("should return correct icon for not-started status", () => {
-			expect(getTaskStatusIcon("not-started")).toBe("testing-unset-icon");
+			expect(getTaskStatusIcon("not-started")).toBe("record");
 		});
 
 		it("should return default icon for unknown status", () => {
-			expect(getTaskStatusIcon("unknown" as TaskStatus)).toBe(
-				"testing-unset-icon"
-			);
+			expect(getTaskStatusIcon("unknown" as TaskStatus)).toBe("record");
 		});
 	});
 
