@@ -504,7 +504,8 @@ function registerCommands({
 	// Spec delete command
 	context.subscriptions.push(
 		commands.registerCommand("gatomia.spec.delete", async (item: any) => {
-			await specManager.delete(item.label);
+			await specManager.delete(item.specName || item.label, item.system);
+			specExplorer.refresh();
 		}),
 		commands.registerCommand(
 			"gatomia.spec.archiveChange",

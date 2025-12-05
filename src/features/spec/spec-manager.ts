@@ -16,7 +16,12 @@ import {
 	getSpecSystemAdapter,
 	type SpecSystemAdapter,
 } from "../../utils/spec-kit-adapter";
-import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../../constants";
+import {
+	SPEC_SYSTEM_MODE,
+	SPECKIT_CONFIG,
+	DEFAULT_CONFIG,
+	type SpecSystemMode,
+} from "../../constants";
 import { CreateSpecInputController } from "./create-spec-input-controller";
 import { SpecKitManager } from "./spec-kit-manager";
 import type { TriggerRegistry } from "../hooks/trigger-registry";
@@ -212,18 +217,45 @@ This document has not been created yet.`;
 		await this.openDocument(path, type);
 	}
 
-	async delete(specName: string): Promise<void> {
+	async delete(specName: string, system?: SpecSystemMode): Promise<void> {
 		const workspaceFolder = workspace.workspaceFolders?.[0];
 		if (!workspaceFolder) {
 			window.showErrorMessage("No workspace folder open");
 			return;
 		}
 
-		const specPath = join(
-			workspaceFolder.uri.fsPath,
-			this.getSpecBasePath(),
-			specName
+		// Show confirmation dialog
+		const confirm = await window.showWarningMessage(
+			`Are you sure you want to delete "${specName}"? This action cannot be undone.`,
+			{ modal: true },
+			"Delete"
 		);
+
+		if (confirm !== "Delete") {
+			return;
+		}
+
+		// Use provided system or fall back to active system
+		const targetSystem = system || this.activeSystem;
+
+		// Construct path based on system type
+		let specPath: string;
+		if (targetSystem === SPEC_SYSTEM_MODE.SPECKIT) {
+			// SpecKit path: specs/<specName>
+			specPath = join(
+				workspaceFolder.uri.fsPath,
+				SPECKIT_CONFIG.paths.specs,
+				specName
+			);
+		} else {
+			// OpenSpec path: openspec/specs/<specName>
+			specPath = join(
+				workspaceFolder.uri.fsPath,
+				DEFAULT_CONFIG.paths.specs,
+				"specs",
+				specName
+			);
+		}
 
 		try {
 			await workspace.fs.delete(Uri.file(specPath), {
