@@ -236,7 +236,7 @@
   - Verify deleted from `openspec/specs/test-spec`
   - Verify success notification
 
-- [ ] T030 Manual test error case:
+- [x] T030 Manual test error case:
   - Create read-only spec: `mkdir -p specs/999-readonly && touch specs/999-readonly/spec.md && chmod 444 specs/999-readonly/spec.md`
   - Try to delete
   - Confirm
