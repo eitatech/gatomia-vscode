@@ -228,7 +228,7 @@
   - Verify spec disappears from tree
   - Verify directory deleted from filesystem: `ls specs/ | grep -v 999` (should not show 999-test-spec)
 
-- [ ] T029 Manual test OpenSpec regression:
+- [x] T029 Manual test OpenSpec regression:
   - Create test OpenSpec spec: `mkdir -p openspec/specs/test-spec && touch openspec/specs/test-spec/spec.md`
   - Right-click in Spec Explorer
   - Select delete

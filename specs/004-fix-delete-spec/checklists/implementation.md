@@ -85,10 +85,10 @@
 
 ### Manual Testing - OpenSpec (Regression)
 
-- [ ] CHK048 - Create test OpenSpec spec in `openspec/specs/test-spec/` [Manual]
-- [ ] CHK049 - Delete works via same UI flow [Manual]
-- [ ] CHK050 - Correct path deleted: `openspec/specs/test-spec/` [Manual]
-- [ ] CHK051 - Success notification displays [Manual]
+- [x] CHK048 - Create test OpenSpec spec in `openspec/specs/test-spec/` [Manual]
+- [x] CHK049 - Delete works via same UI flow [Manual]
+- [x] CHK050 - Correct path deleted: `openspec/specs/test-spec/` [Manual]
+- [x] CHK051 - Success notification displays [Manual]
 
 ### Manual Testing - Error Cases
 
