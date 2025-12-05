@@ -8,7 +8,7 @@ import type {
 import { getWebviewContent } from "../utils/get-webview-content";
 
 export class SimpleViewProvider implements WebviewViewProvider {
-	static readonly viewId = "alma.simpleView";
+	static readonly viewId = "gatomia.simpleView";
 
 	private _view?: WebviewView;
 	private readonly _extensionUri: Uri;

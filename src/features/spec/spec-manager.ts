@@ -124,7 +124,7 @@ export class SpecManager {
 	}
 
 	/**
-	 * Gets the active spec system (OpenSpec, Spec Kit, or Auto)
+	 * Gets the active spec system (OpenSpec, SpecKit, or Auto)
 	 */
 	getActiveSystem(): SpecSystemMode {
 		return this.activeSystem;
@@ -325,7 +325,7 @@ This document has not been created yet.`;
 	}
 
 	/**
-	 * Gets all available specs from both OpenSpec and Spec Kit systems
+	 * Gets all available specs from both OpenSpec and SpecKit systems
 	 * This method unifies spec discovery across both systems
 	 */
 	async getAllSpecsUnified(): Promise<
@@ -363,7 +363,7 @@ This document has not been created yet.`;
 	}
 
 	/**
-	 * Creates a new spec using the appropriate system (OpenSpec or Spec Kit)
+	 * Creates a new spec using the appropriate system (OpenSpec or SpecKit)
 	 */
 	async createUnified(specName: string): Promise<boolean> {
 		try {
@@ -373,7 +373,7 @@ This document has not been created yet.`;
 				await manager.createFeature(specName);
 
 				this.outputChannel.appendLine(
-					`[SpecManager] Created Spec Kit feature: ${specName}`
+					`[SpecManager] Created SpecKit feature: ${specName}`
 				);
 				return true;
 			}

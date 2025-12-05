@@ -215,15 +215,20 @@ export const HookForm = ({
 				)}
 
 				<div className="flex flex-col gap-2">
-					<label
-						className="font-medium text-[color:var(--vscode-foreground)] text-sm"
-						htmlFor="hook-name"
-					>
-						Name{" "}
-						<span className="text-[color:var(--vscode-errorForeground)]">
+					<div className="flex items-center gap-1">
+						<label
+							className="font-medium text-[color:var(--vscode-foreground)] text-sm"
+							htmlFor="hook-name"
+						>
+							Name
+						</label>
+						<span
+							aria-hidden="true"
+							className="text-[color:var(--vscode-errorForeground)]"
+						>
 							*
 						</span>
-					</label>
+					</div>
 					<input
 						className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-input-background)] px-3 py-2 text-[color:var(--vscode-input-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
 						disabled={isSubmitting}

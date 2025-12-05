@@ -361,7 +361,9 @@ describe("HookForm", () => {
 			await user.selectOptions(actionTypeSelect, "git");
 
 			const messageTemplateInput = screen.getByLabelText("Message Template");
-			await user.type(messageTemplateInput, "a".repeat(501));
+			fireEvent.change(messageTemplateInput, {
+				target: { value: "a".repeat(501) },
+			});
 
 			const submitButton = screen.getByRole("button", {
 				name: CREATE_HOOK_BUTTON,
@@ -721,7 +723,9 @@ describe("HookForm", () => {
 			await user.type(agentNameInput, "my-agent");
 
 			const argumentsInput = screen.getByLabelText("Arguments");
-			await user.type(argumentsInput, "a".repeat(1001));
+			fireEvent.change(argumentsInput, {
+				target: { value: "a".repeat(1001) },
+			});
 
 			const submitButton = screen.getByRole("button", {
 				name: CREATE_HOOK_BUTTON,
@@ -746,13 +750,15 @@ describe("HookForm", () => {
 			);
 
 			const nameInput = screen.getByLabelText("Name");
-			await user.type(nameInput, "Run custom agent");
+			fireEvent.change(nameInput, { target: { value: "Run custom agent" } });
 
 			const actionTypeSelect = screen.getByLabelText("Type");
 			await user.selectOptions(actionTypeSelect, "custom");
 
 			const agentNameInput = screen.getByLabelText("Agent Name");
-			await user.type(agentNameInput, "my-custom-agent");
+			fireEvent.change(agentNameInput, {
+				target: { value: "my-custom-agent" },
+			});
 
 			const argumentsInput = screen.getByLabelText("Arguments");
 			fireEvent.change(argumentsInput, {

@@ -114,7 +114,7 @@ describe("HookManager", () => {
 				executionCount: 0,
 			};
 
-			await mockContext.workspaceState.update("alma.hooks.configurations", [
+			await mockContext.workspaceState.update("gatomia.hooks.configurations", [
 				existingHook,
 			]);
 

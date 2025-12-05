@@ -1,5 +1,5 @@
 ---
-name: Spec-Kit Specify
+name: SpecKit Specify
 description: Generate a specification document from context
 version: 1.0.0
 variables:
@@ -17,7 +17,7 @@ You are an expert software architect. Your task is to create a comprehensive tec
 
 ## Instructions
 1. Analyze the context provided.
-2. Create a detailed specification following the Spec-Kit format.
+2. Create a detailed specification following the SpecKit format.
 3. Include the following sections:
    - **Overview**: High-level summary of the feature.
    - **Scenarios**: User scenarios or use cases.

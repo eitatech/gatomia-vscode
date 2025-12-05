@@ -174,15 +174,20 @@ export const TriggerActionSelector = ({
 				const commandListId = "hooks-agent-commands";
 				return (
 					<div className="flex flex-col gap-2">
-						<label
-							className="font-medium text-[color:var(--vscode-foreground)] text-sm"
-							htmlFor="action-command"
-						>
-							Command{" "}
-							<span className="text-[color:var(--vscode-errorForeground)]">
+						<div className="flex items-center gap-1">
+							<label
+								className="font-medium text-[color:var(--vscode-foreground)] text-sm"
+								htmlFor="action-command"
+							>
+								Command
+							</label>
+							<span
+								aria-hidden="true"
+								className="text-[color:var(--vscode-errorForeground)]"
+							>
 								*
 							</span>
-						</label>
+						</div>
 						<input
 							className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-input-background)] px-3 py-2 text-[color:var(--vscode-input-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
 							disabled={disabled}
@@ -227,15 +232,20 @@ export const TriggerActionSelector = ({
 						{isCommitOperation ? (
 							<>
 								<div className="flex flex-col gap-2">
-									<label
-										className="font-medium text-[color:var(--vscode-foreground)] text-sm"
-										htmlFor="git-message-template"
-									>
-										Message Template{" "}
-										<span className="text-[color:var(--vscode-errorForeground)]">
+									<div className="flex items-center gap-1">
+										<label
+											className="font-medium text-[color:var(--vscode-foreground)] text-sm"
+											htmlFor="git-message-template"
+										>
+											Message Template
+										</label>
+										<span
+											aria-hidden="true"
+											className="text-[color:var(--vscode-errorForeground)]"
+										>
 											*
 										</span>
-									</label>
+									</div>
 									<TextareaPanel
 										disabled={disabled}
 										onChange={handleActionParamChange("messageTemplate")}
@@ -321,15 +331,20 @@ export const TriggerActionSelector = ({
 							params.operation === "create-pr") && (
 							<>
 								<div className="flex flex-col gap-2">
-									<label
-										className="font-medium text-[color:var(--vscode-foreground)] text-sm"
-										htmlFor="github-title-template"
-									>
-										Title{" "}
-										<span className="text-[color:var(--vscode-errorForeground)]">
+									<div className="flex items-center gap-1">
+										<label
+											className="font-medium text-[color:var(--vscode-foreground)] text-sm"
+											htmlFor="github-title-template"
+										>
+											Title
+										</label>
+										<span
+											aria-hidden="true"
+											className="text-[color:var(--vscode-errorForeground)]"
+										>
 											*
 										</span>
-									</label>
+									</div>
 									<input
 										className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-input-background)] px-3 py-2 text-[color:var(--vscode-input-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
 										disabled={disabled}
@@ -366,15 +381,20 @@ export const TriggerActionSelector = ({
 						{(params.operation === "close-issue" ||
 							params.operation === "add-comment") && (
 							<div className="flex flex-col gap-2">
-								<label
-									className="font-medium text-[color:var(--vscode-foreground)] text-sm"
-									htmlFor="github-issue-number"
-								>
-									Issue Number{" "}
-									<span className="text-[color:var(--vscode-errorForeground)]">
+								<div className="flex items-center gap-1">
+									<label
+										className="font-medium text-[color:var(--vscode-foreground)] text-sm"
+										htmlFor="github-issue-number"
+									>
+										Issue Number
+									</label>
+									<span
+										aria-hidden="true"
+										className="text-[color:var(--vscode-errorForeground)]"
+									>
 										*
 									</span>
-								</label>
+								</div>
 								<input
 									className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-input-background)] px-3 py-2 text-[color:var(--vscode-input-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
 									disabled={disabled}
@@ -394,15 +414,20 @@ export const TriggerActionSelector = ({
 				return (
 					<>
 						<div className="flex flex-col gap-2">
-							<label
-								className="font-medium text-[color:var(--vscode-foreground)] text-sm"
-								htmlFor="custom-agent-name"
-							>
-								Agent Name{" "}
-								<span className="text-[color:var(--vscode-errorForeground)]">
+							<div className="flex items-center gap-1">
+								<label
+									className="font-medium text-[color:var(--vscode-foreground)] text-sm"
+									htmlFor="custom-agent-name"
+								>
+									Agent Name
+								</label>
+								<span
+									aria-hidden="true"
+									className="text-[color:var(--vscode-errorForeground)]"
+								>
 									*
 								</span>
-							</label>
+							</div>
 							<input
 								className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-input-background)] px-3 py-2 text-[color:var(--vscode-input-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
 								disabled={disabled}

@@ -18,7 +18,7 @@ import { VSC_CONFIG_NAMESPACE } from "./constants";
 import { SpecManager } from "./features/spec/spec-manager";
 import { SteeringManager } from "./features/steering/steering-manager";
 import { CopilotProvider } from "./providers/copilot-provider";
-import { OverviewProvider } from "./providers/overview-provider";
+import { QuickAccessExplorerProvider } from "./providers/quick-access-explorer-provider";
 import { PromptsExplorerProvider } from "./providers/prompts-explorer-provider";
 import { SpecExplorerProvider } from "./providers/spec-explorer-provider";
 import { SpecTaskCodeLensProvider } from "./providers/spec-task-code-lens-provider";
@@ -33,6 +33,8 @@ import { TriggerRegistry } from "./features/hooks/trigger-registry";
 import { HookManager } from "./features/hooks/hook-manager";
 import { HookExecutor } from "./features/hooks/hook-executor";
 import { HookViewProvider } from "./providers/hook-view-provider";
+import { HooksExplorerProvider } from "./providers/hooks-explorer-provider";
+import { DependenciesViewProvider } from "./providers/dependencies-view-provider";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -41,11 +43,13 @@ let triggerRegistry: TriggerRegistry;
 let hookManager: HookManager;
 let hookExecutor: HookExecutor;
 let hookViewProvider: HookViewProvider;
+let dependenciesViewProvider: DependenciesViewProvider;
+type HookCommandTarget = { hookId?: string } | string;
 export let outputChannel: OutputChannel;
 
 export async function activate(context: ExtensionContext) {
 	// Create output channel for debugging
-	outputChannel = window.createOutputChannel("ALMA - Debug");
+	outputChannel = window.createOutputChannel("GatomIA - Debug");
 
 	// Initialize PromptLoader
 	try {
@@ -118,50 +122,63 @@ export async function activate(context: ExtensionContext) {
 	);
 	hookViewProvider.initialize();
 
+	// Initialize Dependencies View Provider
+	dependenciesViewProvider = new DependenciesViewProvider(
+		context,
+		outputChannel
+	);
+
 	// Register tree data providers
-	const overviewProvider = new OverviewProvider(context);
+	const quickAccessExplorer = new QuickAccessExplorerProvider();
 	const specExplorer = new SpecExplorerProvider(context);
 	const steeringExplorer = new SteeringExplorerProvider(context);
 	const promptsExplorer = new PromptsExplorerProvider(context);
+	const hooksExplorer = new HooksExplorerProvider(hookManager);
+	hooksExplorer.initialize();
 
 	// Set managers
 	specExplorer.setSpecManager(specManager);
 	steeringExplorer.setSteeringManager(steeringManager);
 
 	context.subscriptions.push(
-		window.registerTreeDataProvider("alma.views.overview", overviewProvider),
-		window.registerTreeDataProvider("alma.views.specExplorer", specExplorer),
 		window.registerTreeDataProvider(
-			"alma.views.steeringExplorer",
-			steeringExplorer
-		)
-	);
-	context.subscriptions.push(
-		window.registerTreeDataProvider(
-			"alma.views.promptsExplorer",
-			promptsExplorer
-		)
-	);
-	context.subscriptions.push(
-		window.registerWebviewViewProvider(
-			HookViewProvider.viewId,
-			hookViewProvider
+			QuickAccessExplorerProvider.viewId,
+			quickAccessExplorer
 		),
+		window.registerTreeDataProvider("gatomia.views.specExplorer", specExplorer),
+		window.registerTreeDataProvider(
+			"gatomia.views.steeringExplorer",
+			steeringExplorer
+		),
+		window.registerTreeDataProvider(
+			"gatomia.views.promptsExplorer",
+			promptsExplorer
+		),
+		window.registerTreeDataProvider(HooksExplorerProvider.viewId, hooksExplorer)
+	);
+	context.subscriptions.push(
 		{ dispose: () => hookManager.dispose() },
 		{ dispose: () => hookExecutor.dispose() },
-		{ dispose: () => hookViewProvider.dispose() }
+		{ dispose: () => hookViewProvider.dispose() },
+		{ dispose: () => hooksExplorer.dispose() },
+		{ dispose: () => quickAccessExplorer.dispose() },
+		{ dispose: () => dependenciesViewProvider.dispose() }
 	);
 
 	// Register commands
-	registerCommands(context, specExplorer, steeringExplorer, promptsExplorer);
+	registerCommands({
+		context,
+		specExplorer,
+		steeringExplorer,
+		promptsExplorer,
+		hooksExplorer,
+	});
 
 	// Set up file watchers
 	setupFileWatchers(context, specExplorer, steeringExplorer, promptsExplorer);
 
 	// Register CodeLens provider for spec tasks
 	const specTaskCodeLensProvider = new SpecTaskCodeLensProvider();
-
-	// Use document selector for spec task files (dynamic paths handled inside provider)
 	const selector: DocumentSelector = [
 		{
 			language: "markdown",
@@ -169,15 +186,653 @@ export async function activate(context: ExtensionContext) {
 			scheme: "file",
 		},
 	];
-
-	const disposable = languages.registerCodeLensProvider(
+	const specTasksDisposable = languages.registerCodeLensProvider(
 		selector,
 		specTaskCodeLensProvider
 	);
-
-	context.subscriptions.push(disposable);
-
+	context.subscriptions.push(specTasksDisposable);
 	outputChannel.appendLine("CodeLens provider for spec tasks registered");
+
+	// No UI mode toggle commands required
+}
+
+interface RegisterCommandsOptions {
+	context: ExtensionContext;
+	specExplorer: SpecExplorerProvider;
+	steeringExplorer: SteeringExplorerProvider;
+	promptsExplorer: PromptsExplorerProvider;
+	hooksExplorer: HooksExplorerProvider;
+}
+
+function registerCommands({
+	context,
+	specExplorer,
+	steeringExplorer,
+	promptsExplorer,
+	hooksExplorer,
+}: RegisterCommandsOptions) {
+	const createSpecCommand = commands.registerCommand(
+		"gatomia.spec.create",
+		async () => {
+			outputChannel.appendLine(
+				`[Spec] create command triggered at ${new Date().toISOString()}`
+			);
+
+			try {
+				await specManager.create();
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				outputChannel.appendLine(`[Spec] create command failed: ${message}`);
+				window.showErrorMessage(`Failed to create spec prompt: ${message}`);
+			}
+		}
+	);
+
+	const resolveHookId = (target?: HookCommandTarget): string | undefined => {
+		if (!target) {
+			return;
+		}
+		if (typeof target === "string") {
+			return target;
+		}
+		if (typeof target.hookId === "string") {
+			return target.hookId;
+		}
+		return;
+	};
+
+	context.subscriptions.push(
+		commands.registerCommand("gatomia.noop", () => {
+			// noop
+		}),
+		createSpecCommand,
+		commands.registerCommand(
+			"gatomia.spec.navigate.requirements",
+			async (specName: string) => {
+				await specManager.navigateToDocument(specName, "requirements");
+			}
+		),
+
+		commands.registerCommand(
+			"gatomia.spec.navigate.design",
+			async (specName: string) => {
+				await specManager.navigateToDocument(specName, "design");
+			}
+		),
+
+		commands.registerCommand(
+			"gatomia.spec.navigate.tasks",
+			async (specName: string) => {
+				await specManager.navigateToDocument(specName, "tasks");
+			}
+		),
+
+		commands.registerCommand(
+			"gatomia.spec.implTask",
+			async (documentUri: Uri) => {
+				outputChannel.appendLine(
+					`[Task Execute] Generating GatomIA apply prompt for: ${documentUri.fsPath}`
+				);
+				await specManager.runOpenSpecApply(documentUri);
+			}
+		),
+
+		commands.registerCommand(
+			"gatomia.spec.runTask",
+			async (item?: { task?: { id: string; title: string } }) => {
+				if (!item?.task) {
+					window.showErrorMessage("Select a task to run.");
+					return;
+				}
+
+				const { id, title } = item.task;
+				const taskDescription = `${id}: ${title}`;
+				outputChannel.appendLine(
+					`[Run Task] Triggering speckit.implement for task: ${taskDescription}`
+				);
+
+				try {
+					await sendPromptToChat(`/speckit.implement ${taskDescription}`);
+				} catch (error) {
+					const message =
+						error instanceof Error ? error.message : String(error);
+					window.showErrorMessage(`Failed to run task: ${message}`);
+					outputChannel.appendLine(`[Run Task] Failed: ${message}`);
+				}
+			}
+		),
+
+		commands.registerCommand(
+			"gatomia.spec.open",
+			async (relativePath: string, type: string) => {
+				await specManager.openDocument(relativePath, type);
+			}
+		),
+		// biome-ignore lint/suspicious/useAwait: ignore
+		commands.registerCommand("gatomia.spec.refresh", async () => {
+			outputChannel.appendLine("[Manual Refresh] Refreshing spec explorer...");
+			specExplorer.refresh();
+		}),
+		commands.registerCommand("gatomia.hooks.export", async () => {
+			if (!hookManager) {
+				window.showErrorMessage("Hook manager is not ready yet.");
+				return;
+			}
+
+			const defaultUri = getDefaultWorkspaceFileUri(getHooksExportFileName());
+			const saveUri = await window.showSaveDialog({
+				title: "Export Hooks",
+				saveLabel: "Export",
+				defaultUri: defaultUri ?? undefined,
+				filters: { JSON: ["json"] },
+			});
+
+			if (!saveUri) {
+				return;
+			}
+
+			try {
+				const json = hookManager.exportHooks();
+				await workspace.fs.writeFile(saveUri, Buffer.from(json, "utf8"));
+
+				const message = `Exported hooks to ${saveUri.fsPath}`;
+				window.showInformationMessage(message);
+				outputChannel.appendLine(`[Hooks] ${message}`);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				window.showErrorMessage(`Failed to export hooks: ${message}`);
+				outputChannel.appendLine(`[Hooks] Failed to export hooks: ${message}`);
+			}
+		}),
+		commands.registerCommand("gatomia.hooks.import", async () => {
+			await handleHooksImport();
+		}),
+		commands.registerCommand("gatomia.hooks.addHook", async () => {
+			if (!hookViewProvider) {
+				return;
+			}
+			await hookViewProvider.showCreateHookForm();
+		}),
+		commands.registerCommand(
+			"gatomia.hooks.viewLogs",
+			async (target?: HookCommandTarget) => {
+				if (!hookViewProvider) {
+					return;
+				}
+				await hookViewProvider.showLogsPanel(resolveHookId(target));
+			}
+		),
+		commands.registerCommand("gatomia.hooks.refresh", () => {
+			outputChannel.appendLine("[Manual Refresh] Refreshing hooks explorer...");
+			hooksExplorer.refresh();
+		}),
+		commands.registerCommand(
+			"gatomia.hooks.edit",
+			async (target?: HookCommandTarget) => {
+				if (!(hookViewProvider && hookManager)) {
+					return;
+				}
+				const hookId = resolveHookId(target);
+				if (!hookId) {
+					window.showErrorMessage("Select a hook to edit.");
+					return;
+				}
+				const hook = hookManager.getHook(hookId);
+				if (!hook) {
+					window.showErrorMessage("Hook could not be found.");
+					return;
+				}
+				await hookViewProvider.showEditHookForm(hook);
+			}
+		),
+		commands.registerCommand(
+			"gatomia.hooks.enable",
+			async (target?: HookCommandTarget) => {
+				if (!hookManager) {
+					window.showErrorMessage("Hook manager is not ready yet.");
+					return;
+				}
+				const hookId = resolveHookId(target);
+				if (!hookId) {
+					return;
+				}
+				try {
+					await hookManager.updateHook(hookId, { enabled: true });
+				} catch (error) {
+					const message =
+						error instanceof Error ? error.message : String(error);
+					window.showErrorMessage(`Failed to enable hook: ${message}`);
+				}
+			}
+		),
+		commands.registerCommand(
+			"gatomia.hooks.disable",
+			async (target?: HookCommandTarget) => {
+				if (!hookManager) {
+					window.showErrorMessage("Hook manager is not ready yet.");
+					return;
+				}
+				const hookId = resolveHookId(target);
+				if (!hookId) {
+					return;
+				}
+				try {
+					await hookManager.updateHook(hookId, { enabled: false });
+				} catch (error) {
+					const message =
+						error instanceof Error ? error.message : String(error);
+					window.showErrorMessage(`Failed to pause hook: ${message}`);
+				}
+			}
+		),
+		commands.registerCommand(
+			"gatomia.hooks.delete",
+			async (target?: HookCommandTarget) => {
+				if (!hookManager) {
+					window.showErrorMessage("Hook manager is not ready yet.");
+					return;
+				}
+				const hookId = resolveHookId(target);
+				if (!hookId) {
+					return;
+				}
+				const confirmation = await window.showWarningMessage(
+					"Delete this hook? This action cannot be undone.",
+					{ modal: true },
+					"Delete"
+				);
+				if (confirmation !== "Delete") {
+					return;
+				}
+				try {
+					await hookManager.deleteHook(hookId);
+				} catch (error) {
+					const message =
+						error instanceof Error ? error.message : String(error);
+					window.showErrorMessage(`Failed to delete hook: ${message}`);
+				}
+			}
+		)
+	);
+
+	// No UI mode toggle commands required
+
+	// Steering commands
+	context.subscriptions.push(
+		// Configuration commands
+		commands.registerCommand("gatomia.steering.createUserRule", async () => {
+			await steeringManager.createUserConfiguration();
+		}),
+
+		commands.registerCommand("gatomia.steering.createProjectRule", async () => {
+			await steeringManager.createProjectDocumentation();
+		}),
+
+		commands.registerCommand("gatomia.steering.refresh", () => {
+			outputChannel.appendLine(
+				"[Manual Refresh] Refreshing steering explorer..."
+			);
+			steeringExplorer.refresh();
+		})
+	);
+
+	// Add file save confirmation for agent files
+	context.subscriptions.push(
+		workspace.onWillSaveTextDocument(async (event) => {
+			const document = event.document;
+			const filePath = document.fileName;
+
+			// Check if this is an agent file in .copilot directories
+			if (filePath.includes(".copilot/agents/") && filePath.endsWith(".md")) {
+				// Show confirmation dialog
+				const result = await window.showWarningMessage(
+					"Are you sure you want to save changes to this agent file?",
+					{ modal: true },
+					"Save",
+					"Cancel"
+				);
+
+				if (result !== "Save") {
+					// Cancel the save operation by waiting forever
+					// biome-ignore lint/suspicious/noEmptyBlockStatements: ignore
+					event.waitUntil(new Promise(() => {}));
+				}
+			}
+		})
+	);
+
+	// Spec delete command
+	context.subscriptions.push(
+		commands.registerCommand("gatomia.spec.delete", async (item: any) => {
+			await specManager.delete(item.label);
+		}),
+		commands.registerCommand(
+			"gatomia.spec.archiveChange",
+			async (item: any) => {
+				// item is SpecItem, item.specName is the ID
+				const changeId = item.specName;
+				if (!changeId) {
+					window.showErrorMessage("Could not determine change ID.");
+					return;
+				}
+
+				const ws = workspace.workspaceFolders?.[0];
+				if (!ws) {
+					window.showErrorMessage("No workspace folder found");
+					return;
+				}
+
+				const promptPath = Uri.joinPath(
+					ws.uri,
+					".github/prompts/openspec-archive.prompt.md"
+				);
+
+				try {
+					const promptContent = await workspace.fs.readFile(promptPath);
+					const promptString = new TextDecoder().decode(promptContent);
+					const fullPrompt = `${promptString}\n\nid: ${changeId}`;
+
+					outputChannel.appendLine(
+						`[Archive Change] Archiving change: ${changeId}`
+					);
+					await sendPromptToChat(fullPrompt);
+				} catch (error) {
+					window.showErrorMessage(
+						`Failed to read archive prompt: ${error instanceof Error ? error.message : String(error)}`
+					);
+				}
+			}
+		)
+	);
+
+	// Copilot integration commands
+	// Copilot CLI integration commands
+
+	// Prompts commands
+	context.subscriptions.push(
+		commands.registerCommand("gatomia.prompts.refresh", () => {
+			outputChannel.appendLine(
+				"[Manual Refresh] Refreshing prompts explorer..."
+			);
+			promptsExplorer.refresh();
+		}),
+		commands.registerCommand("gatomia.prompts.createInstructions", async () => {
+			await commands.executeCommand("workbench.command.new.instructions");
+		}),
+		commands.registerCommand(
+			"gatomia.prompts.createCopilotPrompt",
+			async () => {
+				await commands.executeCommand("workbench.command.new.prompt");
+			}
+		),
+		commands.registerCommand("gatomia.prompts.create", async (item?: any) => {
+			const ws = workspace.workspaceFolders?.[0];
+			if (!ws) {
+				window.showErrorMessage("No workspace folder found");
+				return;
+			}
+			const configManager = ConfigManager.getInstance();
+
+			let targetDir: Uri;
+			let promptsPathLabel: string;
+
+			// Determine target directory based on the item source
+			if (item?.source === "global") {
+				const home = homedir();
+				const globalPath = join(home, ".github", "prompts");
+				targetDir = Uri.file(globalPath);
+				promptsPathLabel = globalPath;
+			} else {
+				// Default to project scope
+				promptsPathLabel = configManager.getPath("prompts");
+				targetDir = Uri.joinPath(ws.uri, ".copilot", "prompts");
+				try {
+					targetDir = Uri.file(configManager.getAbsolutePath("prompts"));
+				} catch {
+					// fall back to default under workspace
+				}
+			}
+
+			const name = await window.showInputBox({
+				title: "Create Prompt",
+				placeHolder: "prompt name (kebab-case)",
+				prompt: `A markdown file will be created under ${promptsPathLabel}`,
+				validateInput: (v) => (v ? undefined : "Name is required"),
+			});
+			if (!name) {
+				return;
+			}
+
+			const file = Uri.joinPath(targetDir, `${name}.prompt.md`);
+			try {
+				await workspace.fs.createDirectory(targetDir);
+				const content = Buffer.from(
+					`# ${name}\n\nDescribe your prompt here. This file will be sent to Copilot when executed.\n`
+				);
+				await workspace.fs.writeFile(file, content);
+				const doc = await workspace.openTextDocument(file);
+				await window.showTextDocument(doc);
+				promptsExplorer.refresh();
+			} catch (e) {
+				window.showErrorMessage(`Failed to create prompt: ${e}`);
+			}
+		}),
+		commands.registerCommand(
+			"gatomia.prompts.run",
+			// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ignore
+			async (filePathOrItem?: any) => {
+				try {
+					let targetUri: Uri | undefined;
+
+					if (typeof filePathOrItem === "string") {
+						targetUri = Uri.file(filePathOrItem);
+					} else if (filePathOrItem && typeof filePathOrItem === "object") {
+						const candidateUri: Uri | undefined =
+							filePathOrItem.resourceUri ??
+							(typeof filePathOrItem.resourcePath === "string"
+								? Uri.file(filePathOrItem.resourcePath)
+								: undefined);
+
+						if (candidateUri) {
+							targetUri = candidateUri;
+						}
+					}
+
+					if (!targetUri) {
+						targetUri = window.activeTextEditor?.document.uri;
+					}
+
+					if (!targetUri) {
+						window.showErrorMessage("No prompt file selected");
+						return;
+					}
+
+					const fileData = await workspace.fs.readFile(targetUri);
+					const promptContent = new TextDecoder().decode(fileData);
+					await sendPromptToChat(promptContent, {
+						instructionType: "runPrompt",
+					});
+				} catch (e) {
+					window.showErrorMessage(`Failed to run prompt: ${e}`);
+				}
+			}
+		),
+		commands.registerCommand("gatomia.prompts.rename", async (item?: any) => {
+			await promptsExplorer.renamePrompt(item);
+		}),
+		commands.registerCommand("gatomia.prompts.delete", async (item: any) => {
+			if (!item?.resourceUri) {
+				return;
+			}
+			const uri = item.resourceUri as Uri;
+			const confirm = await window.showWarningMessage(
+				`Are you sure you want to delete '${basename(uri.fsPath)}'?`,
+				{ modal: true },
+				"Delete"
+			);
+			if (confirm !== "Delete") {
+				return;
+			}
+			try {
+				await workspace.fs.delete(uri);
+				promptsExplorer.refresh();
+			} catch (e) {
+				window.showErrorMessage(`Failed to delete prompt: ${e}`);
+			}
+		}),
+		commands.registerCommand("gatomia.prompts.createAgentFile", async () => {
+			await commands.executeCommand("workbench.command.new.agent");
+		}),
+
+		// SpecKit commands
+		commands.registerCommand("gatomia.speckit.constitution", async () => {
+			await specManager.executeSpecKitCommand("constitution");
+		}),
+		commands.registerCommand("gatomia.speckit.specify", async () => {
+			await specManager.executeSpecKitCommand("specify");
+		}),
+		commands.registerCommand("gatomia.speckit.plan", async () => {
+			await specManager.executeSpecKitCommand("plan");
+		}),
+		commands.registerCommand("gatomia.speckit.unit-test", async () => {
+			await specManager.executeSpecKitCommand("unit-test");
+		}),
+		commands.registerCommand("gatomia.speckit.integration-test", async () => {
+			await specManager.executeSpecKitCommand("integration-test");
+		}),
+		commands.registerCommand("gatomia.speckit.implementation", async () => {
+			await specManager.executeSpecKitCommand("implementation");
+		}),
+		commands.registerCommand("gatomia.speckit.clarify", async () => {
+			await specManager.executeSpecKitCommand("clarify");
+		}),
+		commands.registerCommand("gatomia.speckit.analyze", async () => {
+			await specManager.executeSpecKitCommand("analyze");
+		}),
+		commands.registerCommand("gatomia.speckit.checklist", async () => {
+			await specManager.executeSpecKitCommand("checklist");
+		}),
+		commands.registerCommand("gatomia.speckit.tasks", async () => {
+			await specManager.executeSpecKitCommand("tasks");
+		}),
+		commands.registerCommand("gatomia.speckit.taskstoissues", async () => {
+			await specManager.executeSpecKitCommand("taskstoissues");
+		}),
+		commands.registerCommand("gatomia.speckit.research", async () => {
+			await specManager.executeSpecKitCommand("research");
+		}),
+		commands.registerCommand("gatomia.speckit.datamodel", async () => {
+			await specManager.executeSpecKitCommand("datamodel");
+		}),
+		commands.registerCommand("gatomia.speckit.design", async () => {
+			await specManager.executeSpecKitCommand("design");
+		})
+	);
+
+	// Update checker command
+
+	// Group the following commands in a single subscriptions push
+	context.subscriptions.push(
+		// Overview and settings commands
+		commands.registerCommand("gatomia.settings.open", async () => {
+			outputChannel.appendLine("Opening GatomIA settings...");
+			await commands.executeCommand(
+				"workbench.action.openSettings",
+				VSC_CONFIG_NAMESPACE
+			);
+		}),
+		commands.registerCommand("gatomia.settings.selectSpecSystem", async () => {
+			const adapter = getSpecSystemAdapter();
+			await adapter.selectSpecSystem();
+		}),
+		commands.registerCommand("gatomia.settings.openGlobalConfig", async () => {
+			outputChannel.appendLine("Opening MCP config...");
+
+			const configPath = await getMcpConfigPath();
+			const configUri = Uri.file(configPath);
+
+			try {
+				await workspace.fs.stat(configUri);
+			} catch {
+				window.showWarningMessage(
+					`MCP config not found at ${configUri.fsPath}.`
+				);
+				return;
+			}
+
+			try {
+				const document = await workspace.openTextDocument(configUri);
+				await window.showTextDocument(document, { preview: false });
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				window.showErrorMessage(`Failed to open MCP config: ${message}`);
+			}
+		}),
+
+		// biome-ignore lint/suspicious/useAwait: ignore
+		commands.registerCommand("gatomia.help.open", async () => {
+			outputChannel.appendLine("Opening GatomIA help...");
+			const helpUrl = "https://github.com/eita/gatomia-vscode#readme";
+			env.openExternal(Uri.parse(helpUrl));
+		}),
+
+		// biome-ignore lint/suspicious/useAwait: ignore
+		commands.registerCommand("gatomia.help.install", async () => {
+			outputChannel.appendLine("Opening SpecKit installation guide...");
+			const installUrl = "https://github.com/github/spec-kit#readme";
+			env.openExternal(Uri.parse(installUrl));
+		}),
+
+		commands.registerCommand("gatomia.dependencies.check", async () => {
+			outputChannel.appendLine("Opening dependencies checker...");
+			await dependenciesViewProvider.show();
+		}),
+
+		commands.registerCommand("gatomia.menu.open", async () => {
+			outputChannel.appendLine("Opening GatomIA menu...");
+			await toggleViews();
+		}),
+
+		commands.registerCommand("gatomia.migration.start", async () => {
+			const ws = workspace.workspaceFolders?.[0];
+			if (!ws) {
+				window.showErrorMessage("No workspace folder found");
+				return;
+			}
+			const migration = new SpecKitMigration(ws.uri.fsPath);
+			await migration.migrateAllSpecs();
+		}),
+
+		commands.registerCommand(
+			"gatomia.migration.generateConstitution",
+			async () => {
+				const ws = workspace.workspaceFolders?.[0];
+				if (!ws) {
+					window.showErrorMessage("No workspace folder found");
+					return;
+				}
+				const migration = new SpecKitMigration(ws.uri.fsPath);
+				await migration.generateConstitution();
+			}
+		),
+
+		commands.registerCommand("gatomia.migration.createBackup", () => {
+			const ws = workspace.workspaceFolders?.[0];
+			if (!ws) {
+				window.showErrorMessage("No workspace folder found");
+				return;
+			}
+			const migration = new SpecKitMigration(ws.uri.fsPath);
+			const backupPath = migration.createBackup();
+			if (backupPath) {
+				window.showInformationMessage(`Backup created at: ${backupPath}`);
+			} else {
+				window.showWarningMessage(
+					"No OpenSpec directory found to backup, or backup failed."
+				);
+			}
+		})
+	);
 }
 
 async function toggleViews() {
@@ -238,490 +893,6 @@ async function toggleViews() {
 
 		window.showInformationMessage("View visibility updated!");
 	}
-}
-
-function registerCommands(
-	context: ExtensionContext,
-	specExplorer: SpecExplorerProvider,
-	steeringExplorer: SteeringExplorerProvider,
-	promptsExplorer: PromptsExplorerProvider
-) {
-	const createSpecCommand = commands.registerCommand(
-		"alma.spec.create",
-		async () => {
-			outputChannel.appendLine(
-				`[Spec] create command triggered at ${new Date().toISOString()}`
-			);
-
-			try {
-				await specManager.create();
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				outputChannel.appendLine(`[Spec] create command failed: ${message}`);
-				window.showErrorMessage(`Failed to create spec prompt: ${message}`);
-			}
-		}
-	);
-
-	context.subscriptions.push(
-		commands.registerCommand("alma.noop", () => {
-			// noop
-		}),
-		createSpecCommand,
-		commands.registerCommand(
-			"alma.spec.navigate.requirements",
-			async (specName: string) => {
-				await specManager.navigateToDocument(specName, "requirements");
-			}
-		),
-
-		commands.registerCommand(
-			"alma.spec.navigate.design",
-			async (specName: string) => {
-				await specManager.navigateToDocument(specName, "design");
-			}
-		),
-
-		commands.registerCommand(
-			"alma.spec.navigate.tasks",
-			async (specName: string) => {
-				await specManager.navigateToDocument(specName, "tasks");
-			}
-		),
-
-		commands.registerCommand("alma.spec.implTask", async (documentUri: Uri) => {
-			outputChannel.appendLine(
-				`[Task Execute] Generating ALMA apply prompt for: ${documentUri.fsPath}`
-			);
-			await specManager.runOpenSpecApply(documentUri);
-		}),
-
-		commands.registerCommand(
-			"alma.spec.open",
-			async (relativePath: string, type: string) => {
-				await specManager.openDocument(relativePath, type);
-			}
-		),
-		// biome-ignore lint/suspicious/useAwait: ignore
-		commands.registerCommand("alma.spec.refresh", async () => {
-			outputChannel.appendLine("[Manual Refresh] Refreshing spec explorer...");
-			specExplorer.refresh();
-		}),
-		commands.registerCommand("alma.hooks.export", async () => {
-			if (!hookManager) {
-				window.showErrorMessage("Hook manager is not ready yet.");
-				return;
-			}
-
-			const defaultUri = getDefaultWorkspaceFileUri(getHooksExportFileName());
-			const saveUri = await window.showSaveDialog({
-				title: "Export Hooks",
-				saveLabel: "Export",
-				defaultUri: defaultUri ?? undefined,
-				filters: { JSON: ["json"] },
-			});
-
-			if (!saveUri) {
-				return;
-			}
-
-			try {
-				const json = hookManager.exportHooks();
-				await workspace.fs.writeFile(saveUri, Buffer.from(json, "utf8"));
-
-				const message = `Exported hooks to ${saveUri.fsPath}`;
-				window.showInformationMessage(message);
-				outputChannel.appendLine(`[Hooks] ${message}`);
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				window.showErrorMessage(`Failed to export hooks: ${message}`);
-				outputChannel.appendLine(`[Hooks] Failed to export hooks: ${message}`);
-			}
-		}),
-		commands.registerCommand("alma.hooks.import", async () => {
-			await handleHooksImport();
-		}),
-		commands.registerCommand("alma.hooks.addHook", async () => {
-			if (!hookViewProvider) {
-				return;
-			}
-			await hookViewProvider.showCreateHookForm();
-		}),
-		commands.registerCommand("alma.hooks.viewLogs", async () => {
-			if (!hookViewProvider) {
-				return;
-			}
-			await hookViewProvider.showLogsPanel();
-		})
-	);
-
-	// No UI mode toggle commands required
-
-	// Steering commands
-	context.subscriptions.push(
-		// Configuration commands
-		commands.registerCommand("alma.steering.createUserRule", async () => {
-			await steeringManager.createUserConfiguration();
-		}),
-
-		commands.registerCommand("alma.steering.createProjectRule", async () => {
-			await steeringManager.createProjectDocumentation();
-		}),
-
-		commands.registerCommand("alma.steering.refresh", () => {
-			outputChannel.appendLine(
-				"[Manual Refresh] Refreshing steering explorer..."
-			);
-			steeringExplorer.refresh();
-		})
-	);
-
-	// Add file save confirmation for agent files
-	context.subscriptions.push(
-		workspace.onWillSaveTextDocument(async (event) => {
-			const document = event.document;
-			const filePath = document.fileName;
-
-			// Check if this is an agent file in .copilot directories
-			if (filePath.includes(".copilot/agents/") && filePath.endsWith(".md")) {
-				// Show confirmation dialog
-				const result = await window.showWarningMessage(
-					"Are you sure you want to save changes to this agent file?",
-					{ modal: true },
-					"Save",
-					"Cancel"
-				);
-
-				if (result !== "Save") {
-					// Cancel the save operation by waiting forever
-					// biome-ignore lint/suspicious/noEmptyBlockStatements: ignore
-					event.waitUntil(new Promise(() => {}));
-				}
-			}
-		})
-	);
-
-	// Spec delete command
-	context.subscriptions.push(
-		commands.registerCommand("alma.spec.delete", async (item: any) => {
-			await specManager.delete(item.label);
-		}),
-		commands.registerCommand("alma.spec.archiveChange", async (item: any) => {
-			// item is SpecItem, item.specName is the ID
-			const changeId = item.specName;
-			if (!changeId) {
-				window.showErrorMessage("Could not determine change ID.");
-				return;
-			}
-
-			const ws = workspace.workspaceFolders?.[0];
-			if (!ws) {
-				window.showErrorMessage("No workspace folder found");
-				return;
-			}
-
-			const promptPath = Uri.joinPath(
-				ws.uri,
-				".github/prompts/openspec-archive.prompt.md"
-			);
-
-			try {
-				const promptContent = await workspace.fs.readFile(promptPath);
-				const promptString = new TextDecoder().decode(promptContent);
-				const fullPrompt = `${promptString}\n\nid: ${changeId}`;
-
-				outputChannel.appendLine(
-					`[Archive Change] Archiving change: ${changeId}`
-				);
-				await sendPromptToChat(fullPrompt);
-			} catch (error) {
-				window.showErrorMessage(
-					`Failed to read archive prompt: ${error instanceof Error ? error.message : String(error)}`
-				);
-			}
-		})
-	);
-
-	// Copilot integration commands
-	// Copilot CLI integration commands
-
-	// Prompts commands
-	context.subscriptions.push(
-		commands.registerCommand("alma.prompts.refresh", () => {
-			outputChannel.appendLine(
-				"[Manual Refresh] Refreshing prompts explorer..."
-			);
-			promptsExplorer.refresh();
-		}),
-		commands.registerCommand("alma.prompts.createInstructions", async () => {
-			await commands.executeCommand("workbench.command.new.instructions");
-		}),
-		commands.registerCommand("alma.prompts.createCopilotPrompt", async () => {
-			await commands.executeCommand("workbench.command.new.prompt");
-		}),
-		commands.registerCommand("alma.prompts.create", async (item?: any) => {
-			const ws = workspace.workspaceFolders?.[0];
-			if (!ws) {
-				window.showErrorMessage("No workspace folder found");
-				return;
-			}
-			const configManager = ConfigManager.getInstance();
-
-			let targetDir: Uri;
-			let promptsPathLabel: string;
-
-			// Determine target directory based on the item source
-			if (item?.source === "global") {
-				const home = homedir();
-				const globalPath = join(home, ".github", "prompts");
-				targetDir = Uri.file(globalPath);
-				promptsPathLabel = globalPath;
-			} else {
-				// Default to project scope
-				promptsPathLabel = configManager.getPath("prompts");
-				targetDir = Uri.joinPath(ws.uri, ".copilot", "prompts");
-				try {
-					targetDir = Uri.file(configManager.getAbsolutePath("prompts"));
-				} catch {
-					// fall back to default under workspace
-				}
-			}
-
-			const name = await window.showInputBox({
-				title: "Create Prompt",
-				placeHolder: "prompt name (kebab-case)",
-				prompt: `A markdown file will be created under ${promptsPathLabel}`,
-				validateInput: (v) => (v ? undefined : "Name is required"),
-			});
-			if (!name) {
-				return;
-			}
-
-			const file = Uri.joinPath(targetDir, `${name}.prompt.md`);
-			try {
-				await workspace.fs.createDirectory(targetDir);
-				const content = Buffer.from(
-					`# ${name}\n\nDescribe your prompt here. This file will be sent to Copilot when executed.\n`
-				);
-				await workspace.fs.writeFile(file, content);
-				const doc = await workspace.openTextDocument(file);
-				await window.showTextDocument(doc);
-				promptsExplorer.refresh();
-			} catch (e) {
-				window.showErrorMessage(`Failed to create prompt: ${e}`);
-			}
-		}),
-		commands.registerCommand(
-			"alma.prompts.run",
-			// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ignore
-			async (filePathOrItem?: any) => {
-				try {
-					let targetUri: Uri | undefined;
-
-					if (typeof filePathOrItem === "string") {
-						targetUri = Uri.file(filePathOrItem);
-					} else if (filePathOrItem && typeof filePathOrItem === "object") {
-						const candidateUri: Uri | undefined =
-							filePathOrItem.resourceUri ??
-							(typeof filePathOrItem.resourcePath === "string"
-								? Uri.file(filePathOrItem.resourcePath)
-								: undefined);
-
-						if (candidateUri) {
-							targetUri = candidateUri;
-						}
-					}
-
-					if (!targetUri) {
-						targetUri = window.activeTextEditor?.document.uri;
-					}
-
-					if (!targetUri) {
-						window.showErrorMessage("No prompt file selected");
-						return;
-					}
-
-					const fileData = await workspace.fs.readFile(targetUri);
-					const promptContent = new TextDecoder().decode(fileData);
-					await sendPromptToChat(promptContent, {
-						instructionType: "runPrompt",
-					});
-				} catch (e) {
-					window.showErrorMessage(`Failed to run prompt: ${e}`);
-				}
-			}
-		),
-		commands.registerCommand("alma.prompts.rename", async (item?: any) => {
-			await promptsExplorer.renamePrompt(item);
-		}),
-		commands.registerCommand("alma.prompts.delete", async (item: any) => {
-			if (!item?.resourceUri) {
-				return;
-			}
-			const uri = item.resourceUri as Uri;
-			const confirm = await window.showWarningMessage(
-				`Are you sure you want to delete '${basename(uri.fsPath)}'?`,
-				{ modal: true },
-				"Delete"
-			);
-			if (confirm !== "Delete") {
-				return;
-			}
-			try {
-				await workspace.fs.delete(uri);
-				promptsExplorer.refresh();
-			} catch (e) {
-				window.showErrorMessage(`Failed to delete prompt: ${e}`);
-			}
-		}),
-		commands.registerCommand("alma.prompts.createAgentFile", async () => {
-			await commands.executeCommand("workbench.command.new.agent");
-		}),
-
-		// SpecKit commands
-		commands.registerCommand("alma.speckit.constitution", async () => {
-			await specManager.executeSpecKitCommand("constitution");
-		}),
-		commands.registerCommand("alma.speckit.specify", async () => {
-			await specManager.executeSpecKitCommand("specify");
-		}),
-		commands.registerCommand("alma.speckit.plan", async () => {
-			await specManager.executeSpecKitCommand("plan");
-		}),
-		commands.registerCommand("alma.speckit.unit-test", async () => {
-			await specManager.executeSpecKitCommand("unit-test");
-		}),
-		commands.registerCommand("alma.speckit.integration-test", async () => {
-			await specManager.executeSpecKitCommand("integration-test");
-		}),
-		commands.registerCommand("alma.speckit.implementation", async () => {
-			await specManager.executeSpecKitCommand("implementation");
-		}),
-		commands.registerCommand("alma.speckit.clarify", async () => {
-			await specManager.executeSpecKitCommand("clarify");
-		}),
-		commands.registerCommand("alma.speckit.analyze", async () => {
-			await specManager.executeSpecKitCommand("analyze");
-		}),
-		commands.registerCommand("alma.speckit.checklist", async () => {
-			await specManager.executeSpecKitCommand("checklist");
-		}),
-		commands.registerCommand("alma.speckit.tasks", async () => {
-			await specManager.executeSpecKitCommand("tasks");
-		}),
-		commands.registerCommand("alma.speckit.taskstoissues", async () => {
-			await specManager.executeSpecKitCommand("taskstoissues");
-		}),
-		commands.registerCommand("alma.speckit.research", async () => {
-			await specManager.executeSpecKitCommand("research");
-		}),
-		commands.registerCommand("alma.speckit.datamodel", async () => {
-			await specManager.executeSpecKitCommand("datamodel");
-		}),
-		commands.registerCommand("alma.speckit.design", async () => {
-			await specManager.executeSpecKitCommand("design");
-		})
-	);
-
-	// Update checker command
-
-	// Group the following commands in a single subscriptions push
-	context.subscriptions.push(
-		// Overview and settings commands
-		commands.registerCommand("alma.settings.open", async () => {
-			outputChannel.appendLine("Opening ALMA settings...");
-			await commands.executeCommand(
-				"workbench.action.openSettings",
-				VSC_CONFIG_NAMESPACE
-			);
-		}),
-		commands.registerCommand("alma.settings.selectSpecSystem", async () => {
-			const adapter = getSpecSystemAdapter();
-			await adapter.selectSpecSystem();
-		}),
-		commands.registerCommand("alma.settings.openGlobalConfig", async () => {
-			outputChannel.appendLine("Opening MCP config...");
-
-			const configPath = await getMcpConfigPath();
-			const configUri = Uri.file(configPath);
-
-			try {
-				await workspace.fs.stat(configUri);
-			} catch {
-				window.showWarningMessage(
-					`MCP config not found at ${configUri.fsPath}.`
-				);
-				return;
-			}
-
-			try {
-				const document = await workspace.openTextDocument(configUri);
-				await window.showTextDocument(document, { preview: false });
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				window.showErrorMessage(`Failed to open MCP config: ${message}`);
-			}
-		}),
-
-		// biome-ignore lint/suspicious/useAwait: ignore
-		commands.registerCommand("alma.help.open", async () => {
-			outputChannel.appendLine("Opening ALMA help...");
-			const helpUrl = "https://github.com/eita/alma-vscode#readme";
-			env.openExternal(Uri.parse(helpUrl));
-		}),
-
-		// biome-ignore lint/suspicious/useAwait: ignore
-		commands.registerCommand("alma.help.install", async () => {
-			outputChannel.appendLine("Opening Spec Kit installation guide...");
-			const installUrl = "https://github.com/github/spec-kit#readme";
-			env.openExternal(Uri.parse(installUrl));
-		}),
-
-		commands.registerCommand("alma.menu.open", async () => {
-			outputChannel.appendLine("Opening ALMA menu...");
-			await toggleViews();
-		}),
-
-		commands.registerCommand("alma.migration.start", async () => {
-			const ws = workspace.workspaceFolders?.[0];
-			if (!ws) {
-				window.showErrorMessage("No workspace folder found");
-				return;
-			}
-			const migration = new SpecKitMigration(ws.uri.fsPath);
-			await migration.migrateAllSpecs();
-		}),
-
-		commands.registerCommand(
-			"alma.migration.generateConstitution",
-			async () => {
-				const ws = workspace.workspaceFolders?.[0];
-				if (!ws) {
-					window.showErrorMessage("No workspace folder found");
-					return;
-				}
-				const migration = new SpecKitMigration(ws.uri.fsPath);
-				await migration.generateConstitution();
-			}
-		),
-
-		commands.registerCommand("alma.migration.createBackup", () => {
-			const ws = workspace.workspaceFolders?.[0];
-			if (!ws) {
-				window.showErrorMessage("No workspace folder found");
-				return;
-			}
-			const migration = new SpecKitMigration(ws.uri.fsPath);
-			const backupPath = migration.createBackup();
-			if (backupPath) {
-				window.showInformationMessage(`Backup created at: ${backupPath}`);
-			} else {
-				window.showWarningMessage(
-					"No OpenSpec directory found to backup, or backup failed."
-				);
-			}
-		})
-	);
 }
 
 async function getMcpConfigPath(): Promise<string> {
@@ -833,7 +1004,7 @@ function getDefaultWorkspaceFileUri(fileName: string): Uri | undefined {
 
 function getHooksExportFileName(): string {
 	const timestamp = new Date().toISOString().replace(/[:]/g, "-");
-	return `alma-hooks-${timestamp}.json`;
+	return `gatomia-hooks-${timestamp}.json`;
 }
 
 async function handleHooksImport(): Promise<void> {
