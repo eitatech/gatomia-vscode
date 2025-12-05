@@ -18,6 +18,9 @@ import {
 	parseTasksFromFile,
 	getTaskStatusIcon,
 	getTaskStatusTooltip,
+	getGroupStatusIcon,
+	calculateGroupStatus,
+	calculateOverallStatus,
 	type ParsedTask,
 	type TaskStatus,
 } from "../utils/task-parser";
@@ -136,6 +139,9 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 					// Handle tasks.md as a folder with task items
 					if (fileName === "tasks.md") {
 						const relativePath = workspace.asRelativePath(absolutePath);
+						// Calculate overall status for tasks folder
+						const taskGroups = parseTasksFromFile(absolutePath);
+						const overallStatus = calculateOverallStatus(taskGroups);
 						items.push(
 							new SpecItem(
 								"Tasks",
@@ -147,7 +153,9 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 								undefined,
 								relativePath,
 								undefined,
-								element.system
+								element.system,
+								undefined,
+								overallStatus
 							)
 						);
 						continue;
@@ -223,21 +231,23 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 			}
 
 			// Return task groups as collapsible items
-			return taskGroups.map(
-				(group) =>
-					new SpecItem(
-						group.name,
-						TreeItemCollapsibleState.Collapsed,
-						"task-group",
-						this.context,
-						element.specName,
-						"task-group",
-						undefined,
-						tasksFilePath,
-						group.name,
-						element.system
-					)
-			);
+			return taskGroups.map((group) => {
+				const groupStatus = calculateGroupStatus(group.tasks);
+				return new SpecItem(
+					group.name,
+					TreeItemCollapsibleState.Collapsed,
+					"task-group",
+					this.context,
+					element.specName,
+					"task-group",
+					undefined,
+					tasksFilePath,
+					group.name,
+					element.system,
+					undefined,
+					groupStatus
+				);
+			});
 		}
 
 		// Handle task group - show individual tasks
@@ -398,6 +408,7 @@ class SpecItem extends TreeItem {
 	readonly parentName?: string;
 	readonly system?: SpecSystemMode;
 	readonly task?: ParsedTask;
+	readonly groupStatus?: TaskStatus;
 
 	// biome-ignore lint/nursery/useMaxParams: ignore
 	constructor(
@@ -411,7 +422,8 @@ class SpecItem extends TreeItem {
 		filePath?: string,
 		parentName?: string,
 		system?: SpecSystemMode,
-		task?: ParsedTask
+		task?: ParsedTask,
+		groupStatus?: TaskStatus
 	) {
 		super(label, collapsibleState);
 		this.label = label;
@@ -425,6 +437,7 @@ class SpecItem extends TreeItem {
 		this.parentName = parentName;
 		this.system = system;
 		this.task = task;
+		this.groupStatus = groupStatus;
 
 		this.updateIconAndTooltip();
 	}
@@ -448,14 +461,18 @@ class SpecItem extends TreeItem {
 
 		// Handle tasks folder
 		if (this.contextValue === "tasks-folder") {
-			this.iconPath = new ThemeIcon("tasklist");
+			const statusIcon = getGroupStatusIcon(this.groupStatus);
+			const statusColor = this.getTaskStatusColor(this.groupStatus);
+			this.iconPath = new ThemeIcon(statusIcon, statusColor);
 			this.tooltip = "Tasks - Click to expand";
 			return;
 		}
 
 		// Handle task group (phase)
 		if (this.contextValue === "task-group") {
-			this.iconPath = new ThemeIcon("folder");
+			const statusIcon = getGroupStatusIcon(this.groupStatus);
+			const statusColor = this.getTaskStatusColor(this.groupStatus);
+			this.iconPath = new ThemeIcon(statusIcon, statusColor);
 			this.tooltip = `Phase: ${this.label}`;
 			return;
 		}
@@ -486,7 +503,7 @@ class SpecItem extends TreeItem {
 		}
 	}
 
-	private getTaskStatusColor(status: TaskStatus): ThemeColor | undefined {
+	private getTaskStatusColor(status?: TaskStatus): ThemeColor | undefined {
 		switch (status) {
 			case "completed":
 				return new ThemeColor("terminal.ansiGreen");

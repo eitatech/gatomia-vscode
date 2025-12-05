@@ -298,14 +298,59 @@ export function getTasksFilePath(
 export function getTaskStatusIcon(status: TaskStatus): string {
 	switch (status) {
 		case "completed":
-			return "testing-passed-icon"; // Green checkmark (same as passed test)
+			return "pass"; // Green checkmark
 		case "in-progress":
-			return "testing-run-icon"; // Running/spinning icon
+			return "sync~spin"; // Spinning/in-progress icon
 		case "not-started":
-			return "testing-unset-icon"; // Empty/unset icon
+			return "record"; // Circle/record icon
 		default:
-			return "testing-unset-icon";
+			return "record";
 	}
+}
+
+/**
+ * Get the icon name for a group status (folder/phase)
+ */
+export function getGroupStatusIcon(status: TaskStatus): string {
+	switch (status) {
+		case "completed":
+			return "pass"; // All tasks completed
+		case "in-progress":
+			return "color-mode"; // Some tasks completed
+		case "not-started":
+			return "record"; // No tasks completed
+		default:
+			return "record";
+	}
+}
+
+/**
+ * Calculate the aggregate status of a group of tasks
+ */
+export function calculateGroupStatus(tasks: ParsedTask[]): TaskStatus {
+	if (tasks.length === 0) {
+		return "not-started";
+	}
+
+	const completedCount = tasks.filter((t) => t.status === "completed").length;
+
+	if (completedCount === tasks.length) {
+		return "completed";
+	}
+
+	if (completedCount > 0) {
+		return "in-progress";
+	}
+
+	return "not-started";
+}
+
+/**
+ * Calculate the aggregate status of all task groups
+ */
+export function calculateOverallStatus(groups: TaskGroup[]): TaskStatus {
+	const allTasks = groups.flatMap((g) => g.tasks);
+	return calculateGroupStatus(allTasks);
 }
 
 /**
