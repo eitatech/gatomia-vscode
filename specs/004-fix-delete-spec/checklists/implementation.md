@@ -92,9 +92,9 @@
 
 ### Manual Testing - Error Cases
 
-- [ ] CHK052 - Delete read-only spec shows appropriate error [Manual]
-- [ ] CHK053 - Delete nonexistent spec shows error message [Manual]
-- [ ] CHK054 - Delete spec with open file in editor shows warning/error [Manual]
+- [x] CHK052 - Delete read-only spec shows appropriate error [Manual]
+- [x] CHK053 - Delete nonexistent spec shows error message [Manual]
+- [x] CHK054 - Delete spec with open file in editor shows warning/error [Manual]
 
 ## Documentation
 
