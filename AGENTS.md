@@ -5,7 +5,7 @@
 - `webview-ui/`: React + Vite webview; outputs to `webview-ui/dist` and is pulled into the extension build.
 - `scripts/`: Build helpers (e.g., prompt bundling).
 - `tests/`: Vitest suites (`unit/`, `integration/`) with shared mocks in `__mocks__/`.
-- `specs/` and `openspec/`: Example spec assets for Spec-Kit/OpenSpec workflows; keep in sync with extension behaviors.
+- `specs/` and `openspec/`: Example spec assets for SpecKit/OpenSpec workflows; keep in sync with extension behaviors.
 - `dist/`, `icons/`, `screenshots/`: Generated or static assets—avoid manual edits in `dist/`.
 
 ## Build, Test, and Development Commands
@@ -13,7 +13,7 @@
 - `npm run build`: Build prompts, extension, and webview for publishing.
 - `npm run watch`: Dev loop; TypeScript watch plus webview dev server.
 - `npm run build:webview`: Rebuild only the React webview bundle.
-- `npm run package`: Produce the VSIX (`alma-<version>.vsix`).
+- `npm run package`: Produce the VSIX (`gatomia-<version>.vsix`).
 - `npm run lint` | `npm run fix`: Lint or auto-fix via Ultracite/Biome.
 - `npm run format`: Apply formatter settings (tabs, double quotes, semicolons).
 - `npm run check`: Type and style checks without fixing.
@@ -40,4 +40,4 @@
 ## Security & Configuration Tips
 - Do not commit secrets or tokens; VS Code uses user-level settings for credentials.
 - Keep `node_modules/` and build artifacts out of commits; rely on scripts above to regenerate outputs.
-- Validate spec-related changes with the Spec-Kit/OpenSpec workflows documented in `README.md` to avoid drift between prompts, specs, and UI.
+- Validate spec-related changes with the SpecKit/OpenSpec workflows documented in `README.md` to avoid drift between prompts, specs, and UI.

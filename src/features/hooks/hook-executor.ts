@@ -9,6 +9,7 @@ import type { HookManager } from "./hook-manager";
 import type { TriggerRegistry } from "./trigger-registry";
 import { AgentActionExecutor } from "./actions/agent-action";
 import { GitActionExecutor } from "./actions/git-action";
+import { GitHubActionExecutor } from "./actions/github-action";
 import type {
 	Hook,
 	ExecutionContext,
@@ -16,6 +17,7 @@ import type {
 	TemplateContext,
 	AgentActionParams,
 	GitActionParams,
+	GitHubActionParams,
 } from "./types";
 import {
 	MAX_CHAIN_DEPTH,
@@ -98,6 +100,7 @@ export class HookExecutor {
 	private readonly outputChannel: OutputChannel;
 	private readonly agentExecutor: AgentActionExecutor;
 	private readonly gitExecutor: GitActionExecutor;
+	private readonly githubExecutor: GitHubActionExecutor;
 	private executionLogs: HookExecutionLog[] = [];
 
 	// Event emitters
@@ -123,6 +126,7 @@ export class HookExecutor {
 		this.outputChannel = outputChannel;
 		this.agentExecutor = new AgentActionExecutor();
 		this.gitExecutor = new GitActionExecutor();
+		this.githubExecutor = new GitHubActionExecutor();
 	}
 
 	/**
@@ -232,6 +236,14 @@ export class HookExecutor {
 					const gitParams = hook.action.parameters as GitActionParams;
 					actionResult = await this.executeWithTimeout(
 						() => this.gitExecutor.execute(gitParams, templateContext),
+						ACTION_TIMEOUT_MS
+					);
+					break;
+				}
+				case "github": {
+					const githubParams = hook.action.parameters as GitHubActionParams;
+					actionResult = await this.executeWithTimeout(
+						() => this.githubExecutor.execute(githubParams, templateContext),
 						ACTION_TIMEOUT_MS
 					);
 					break;

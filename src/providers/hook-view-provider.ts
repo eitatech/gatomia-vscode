@@ -1,13 +1,11 @@
 import {
-	commands,
-	type CancellationToken,
 	type Disposable,
 	type ExtensionContext,
 	type OutputChannel,
-	type Uri,
-	type WebviewView,
-	type WebviewViewProvider,
-	type WebviewViewResolveContext,
+	type Webview,
+	type WebviewPanel,
+	ViewColumn,
+	window,
 } from "vscode";
 import type { HookManager } from "../features/hooks/hook-manager";
 import type { HookExecutor } from "../features/hooks/hook-executor";
@@ -138,7 +136,7 @@ type ExtensionMessage =
 interface ShowFormMessage {
 	command: "hooks.show-form";
 	type: "hooks/show-form";
-	data?: { mode?: "create" | "edit" };
+	data?: { mode?: "create" | "edit"; hook?: Hook };
 }
 
 interface ShowLogsPanelMessage {
@@ -148,28 +146,29 @@ interface ShowLogsPanelMessage {
 }
 
 /**
- * HookViewProvider - Manages the Hooks configuration webview
+ * HookViewProvider - Manages the Hooks configuration webview panel
  *
  * Responsibilities:
- * - Initialize and manage webview lifecycle
+ * - Initialize panel lifecycle
  * - Route messages between webview and extension
  * - Synchronize hook state to webview
- * - Handle CRUD operations from webview
+ * - Handle CRUD operations and execution logs from webview
  */
-export class HookViewProvider implements WebviewViewProvider {
-	static readonly viewId = "alma.hooksView";
+export class HookViewProvider {
+	static readonly panelType = "gatomia.hooksPanel";
 
-	private _view?: WebviewView;
-	private readonly _extensionUri: Uri;
+	private panel?: WebviewPanel;
+	private readonly context: ExtensionContext;
 	private readonly hookManager: HookManager;
 	private readonly hookExecutor: HookExecutor;
 	private readonly outputChannel: OutputChannel;
-	private readonly _disposables: Disposable[] = [];
+	private readonly disposables: Disposable[] = [];
 	private readonly executionStatusCache = new Map<
 		string,
 		HookExecutionStatusPayload
 	>();
 	private readonly pendingMessages: ExtensionMessage[] = [];
+	private isWebviewReady = false;
 
 	constructor(
 		context: ExtensionContext,
@@ -177,18 +176,14 @@ export class HookViewProvider implements WebviewViewProvider {
 		hookExecutor: HookExecutor,
 		outputChannel: OutputChannel
 	) {
-		this._extensionUri = context.extensionUri;
+		this.context = context;
 		this.hookManager = hookManager;
 		this.hookExecutor = hookExecutor;
 		this.outputChannel = outputChannel;
 	}
 
-	/**
-	 * Initialize the provider and subscribe to hook changes
-	 */
 	initialize(): void {
-		// Subscribe to hook manager events
-		this._disposables.push(
+		this.disposables.push(
 			this.hookManager.onHooksChanged(() => {
 				this.syncHooksToWebview();
 			}),
@@ -212,103 +207,35 @@ export class HookViewProvider implements WebviewViewProvider {
 				});
 			})
 		);
-
 		this.outputChannel.appendLine("[HookViewProvider] Initialized");
 	}
 
-	/**
-	 * Dispose of resources
-	 */
 	dispose(): void {
-		for (const disposable of this._disposables) {
-			disposable.dispose();
+		this.panel?.dispose();
+		this.panel = undefined;
+		this.isWebviewReady = false;
+		while (this.disposables.length > 0) {
+			this.disposables.pop()?.dispose();
 		}
 		this.outputChannel.appendLine("[HookViewProvider] Disposed");
 	}
 
-	/**
-	 * Resolve the webview view - called when the view becomes visible
-	 */
-	resolveWebviewView(
-		webviewView: WebviewView,
-		context: WebviewViewResolveContext,
-		_token: CancellationToken
-	): void {
-		this._view = webviewView;
-
-		// Configure webview options
-		webviewView.webview.options = {
-			enableScripts: true,
-			localResourceRoots: [this._extensionUri],
-		};
-
-		// Set HTML content
-		webviewView.webview.html = getWebviewContent(
-			webviewView.webview,
-			this._extensionUri,
-			"hooks"
-		);
-
-		// Setup message handling
-		webviewView.webview.onDidReceiveMessage(
-			(message) => this.handleWebviewMessage(message),
-			undefined,
-			this._disposables
-		);
-		webviewView.onDidDispose(
-			() => {
-				this._view = undefined;
-			},
-			undefined,
-			this._disposables
-		);
-
-		// Initial sync
-		this.syncHooksToWebview();
-		this.flushExecutionStatuses();
-		this.flushPendingMessages();
-
-		this.outputChannel.appendLine("[HookViewProvider] Webview resolved");
+	private get webview(): Webview | undefined {
+		return this.panel?.webview;
 	}
 
-	/**
-	 * Synchronize all hooks to the webview
-	 */
 	async syncHooksToWebview(): Promise<void> {
-		if (!this._view) {
-			return;
-		}
-
-		try {
-			const hooks = await this.hookManager.getAllHooks();
-
-			await this._view.webview.postMessage({
-				command: "hooks.sync",
-				type: "hooks/sync",
-				data: { hooks },
-			} as HooksSyncMessage);
-
-			this.outputChannel.appendLine(
-				`[HookViewProvider] Synced ${hooks.length} hooks to webview`
-			);
-			this.flushExecutionStatuses();
-		} catch (error) {
-			this.outputChannel.appendLine(
-				`[HookViewProvider] Error syncing hooks: ${error instanceof Error ? error.message : String(error)}`
-			);
-		}
+		const hooks = await this.hookManager.getAllHooks();
+		await this.sendMessageToWebview({
+			command: "hooks.sync",
+			type: "hooks/sync",
+			data: { hooks },
+		} as HooksSyncMessage);
+		this.outputChannel.appendLine(
+			`[HookViewProvider] Synced ${hooks.length} hooks to webview`
+		);
 	}
 
-	/**
-	 * Manually refresh the webview
-	 */
-	async refreshWebview(): Promise<void> {
-		await this.syncHooksToWebview();
-	}
-
-	/**
-	 * Route incoming webview messages to appropriate handlers
-	 */
 	private async handleWebviewMessage(message: WebviewMessage): Promise<void> {
 		try {
 			const normalizedCommand =
@@ -322,31 +249,27 @@ export class HookViewProvider implements WebviewViewProvider {
 				case "hooks.create":
 					await this.handleCreateHook(messageData);
 					break;
-
 				case "hooks.update":
 					await this.handleUpdateHook(messageData.id, messageData.updates);
 					break;
-
 				case "hooks.delete":
 					await this.handleDeleteHook(messageData.id);
 					break;
-
 				case "hooks.toggle":
 					await this.handleToggleHook(messageData.id, messageData.enabled);
 					break;
-
 				case "hooks.list":
 					await this.syncHooksToWebview();
 					break;
-
 				case "hooks.logs":
 					await this.sendExecutionLogs(messageData?.hookId);
 					break;
-
 				case "hooks.ready":
-					// no-op handshake
+					this.isWebviewReady = true;
+					this.flushPendingMessages();
+					this.flushExecutionStatuses();
+					await this.syncHooksToWebview();
 					break;
-
 				default:
 					this.outputChannel.appendLine(
 						`[HookViewProvider] Unknown command: ${(message as any).command ?? (message as any).type}`
@@ -357,83 +280,67 @@ export class HookViewProvider implements WebviewViewProvider {
 		}
 	}
 
-	/**
-	 * Handle create hook request from webview
-	 */
 	private async handleCreateHook(
-		data: Omit<Hook, "id" | "createdAt" | "modifiedAt" | "executionCount">
+		hookData: Omit<Hook, "id" | "createdAt" | "modifiedAt" | "executionCount">
 	): Promise<void> {
-		const hook = await this.hookManager.createHook(data);
-
-		this.outputChannel.appendLine(
-			`[HookViewProvider] Hook created: ${hook.name} (${hook.id})`
-		);
-
-		// Send confirmation to webview
-		await this._view?.webview.postMessage({
+		const hook = await this.hookManager.createHook(hookData);
+		await this.sendMessageToWebview({
 			command: "hooks.created",
 			type: "hooks/created",
 			data: { hook },
 		} as HookCreatedMessage);
 	}
 
-	/**
-	 * Handle update hook request from webview
-	 */
 	private async handleUpdateHook(
-		id: string,
+		hookId: string,
 		updates: Partial<Hook>
 	): Promise<void> {
-		const hook = await this.hookManager.updateHook(id, updates);
-
-		this.outputChannel.appendLine(
-			`[HookViewProvider] Hook updated: ${hook.name} (${hook.id})`
-		);
-
-		await this._view?.webview.postMessage({
+		const hook = await this.hookManager.updateHook(hookId, updates);
+		await this.sendMessageToWebview({
 			command: "hooks.updated",
 			type: "hooks/updated",
 			data: { hook },
 		} as HookUpdatedMessage);
 	}
 
-	/**
-	 * Handle delete hook request from webview
-	 */
-	private async handleDeleteHook(id: string): Promise<void> {
-		const success = await this.hookManager.deleteHook(id);
-
-		if (success) {
-			this.outputChannel.appendLine(`[HookViewProvider] Hook deleted: ${id}`);
-
-			await this._view?.webview.postMessage({
-				command: "hooks.deleted",
-				type: "hooks/deleted",
-				data: { id },
-			} as HookDeletedMessage);
-
-			this.executionStatusCache.delete(id);
-		}
+	private async handleDeleteHook(hookId: string): Promise<void> {
+		await this.hookManager.deleteHook(hookId);
+		await this.sendMessageToWebview({
+			command: "hooks.deleted",
+			type: "hooks/deleted",
+			data: { id: hookId },
+		} as HookDeletedMessage);
 	}
 
-	/**
-	 * Handle toggle hook enabled state from webview
-	 */
-	private async handleToggleHook(id: string, enabled: boolean): Promise<void> {
-		await this.hookManager.updateHook(id, { enabled });
-
-		this.outputChannel.appendLine(
-			`[HookViewProvider] Hook toggled: ${id} -> ${enabled}`
-		);
+	private async handleToggleHook(
+		hookId: string,
+		enabled: boolean
+	): Promise<void> {
+		const hook = await this.hookManager.updateHook(hookId, { enabled });
+		await this.sendMessageToWebview({
+			command: "hooks.updated",
+			type: "hooks/updated",
+			data: { hook },
+		} as HookUpdatedMessage);
 	}
 
-	/**
-	 * Send error message to webview
-	 */
+	private async sendExecutionLogs(hookId?: string): Promise<void> {
+		const logs = hookId
+			? this.hookExecutor.getExecutionLogsForHook(hookId)
+			: this.hookExecutor.getExecutionLogs();
+		await this.sendMessageToWebview({
+			command: "hooks.logs",
+			type: "hooks/logs",
+			data: { logs },
+		} as ExecutionLogsMessage);
+	}
+
 	private async sendError(error: Error): Promise<void> {
-		this.outputChannel.appendLine(`[HookViewProvider] Error: ${error.message}`);
+		this.outputChannel.appendLine(
+			`[HookViewProvider] Webview error: ${error.message}`
+		);
 
-		await this._view?.webview.postMessage({
+		await this.sendMessageToWebview({
 			command: "hooks.error",
 			type: "hooks/error",
 			data: {
@@ -443,61 +350,26 @@ export class HookViewProvider implements WebviewViewProvider {
 		} as ErrorMessage);
 	}
 
-	/**
-	 * Send execution logs to the webview
-	 */
-	private async sendExecutionLogs(hookId?: string): Promise<void> {
-		if (!this._view) {
-			await this.enqueueMessage({
-				command: "hooks.logs",
-				type: "hooks/logs",
-				data: {
-					logs: hookId
-						? this.hookExecutor.getExecutionLogsForHook(hookId)
-						: this.hookExecutor.getExecutionLogs(),
-				},
-			});
-			return;
-		}
-
-		const logs = hookId
-			? this.hookExecutor.getExecutionLogsForHook(hookId)
-			: this.hookExecutor.getExecutionLogs();
-
-		await this._view.webview.postMessage({
-			command: "hooks.logs",
-			type: "hooks/logs",
-			data: { logs },
-		} as ExecutionLogsMessage);
-	}
-
-	/**
-	 * Cache and broadcast execution status updates
-	 */
 	private handleExecutionStatus(payload: HookExecutionStatusPayload): void {
-		this.executionStatusCache.set(payload.hookId, payload);
-
-		if (!this._view) {
+		if (!this.webview) {
+			this.executionStatusCache.set(payload.hookId, payload);
 			return;
 		}
 
-		this._view.webview.postMessage({
+		this.webview.postMessage({
 			command: "hooks.execution-status",
 			type: "hooks/execution-status",
 			data: payload,
 		} as ExecutionStatusMessage);
 	}
 
-	/**
-	 * Flush cached status updates to the active webview
-	 */
 	private flushExecutionStatuses(): void {
-		if (!this._view) {
+		if (!this.webview) {
 			return;
 		}
 
 		for (const payload of this.executionStatusCache.values()) {
-			this._view.webview.postMessage({
+			this.webview.postMessage({
 				command: "hooks.execution-status",
 				type: "hooks/execution-status",
 				data: payload,
@@ -505,42 +377,31 @@ export class HookViewProvider implements WebviewViewProvider {
 		}
 	}
 
-	private async revealView(): Promise<void> {
-		if (this._view) {
-			this._view.show?.(true);
-			return;
-		}
-		await commands.executeCommand(`${HookViewProvider.viewId}.focus`);
-	}
-
 	private flushPendingMessages(): void {
-		if (!this._view) {
+		if (!(this.webview && this.isWebviewReady)) {
 			return;
 		}
 
 		while (this.pendingMessages.length > 0) {
 			const message = this.pendingMessages.shift();
 			if (message) {
-				this._view.webview.postMessage(message);
+				this.webview.postMessage(message);
 			}
 		}
 	}
 
-	private async enqueueMessage(message: ExtensionMessage): Promise<void> {
-		this.pendingMessages.push(message);
-		await this.revealView();
-	}
-
 	private async sendMessageToWebview(message: ExtensionMessage): Promise<void> {
-		if (!this._view) {
-			await this.enqueueMessage(message);
+		if (!(this.webview && this.isWebviewReady)) {
+			this.pendingMessages.push(message);
 			return;
 		}
-		await this._view.webview.postMessage(message);
+
+		await this.webview.postMessage(message);
 	}
 
 	async showCreateHookForm(): Promise<void> {
-		await this.revealView();
+		await this.ensurePanel();
+		await this.syncHooksToWebview();
 		await this.sendMessageToWebview({
 			command: "hooks.show-form",
 			type: "hooks/show-form",
@@ -548,12 +409,70 @@ export class HookViewProvider implements WebviewViewProvider {
 		} as ShowFormMessage);
 	}
 
+	async showEditHookForm(hook: Hook): Promise<void> {
+		await this.ensurePanel();
+		await this.syncHooksToWebview();
+		await this.sendMessageToWebview({
+			command: "hooks.show-form",
+			type: "hooks/show-form",
+			data: { mode: "edit", hook },
+		} as ShowFormMessage);
+	}
+
 	async showLogsPanel(hookId?: string): Promise<void> {
-		await this.revealView();
+		await this.ensurePanel();
+		await this.syncHooksToWebview();
 		await this.sendMessageToWebview({
 			command: "hooks.show-logs",
 			type: "hooks/show-logs",
 			data: { visible: true, hookId },
 		} as ShowLogsPanelMessage);
+	}
+
+	private ensurePanel(): void {
+		if (this.panel) {
+			this.panel.reveal(ViewColumn.Active, false);
+			return;
+		}
+
+		const panel = window.createWebviewPanel(
+			HookViewProvider.panelType,
+			"Hooks",
+			{
+				viewColumn: ViewColumn.Active,
+				preserveFocus: false,
+			},
+			{
+				enableScripts: true,
+				retainContextWhenHidden: true,
+				localResourceRoots: [this.context.extensionUri],
+			}
+		);
+
+		this.isWebviewReady = false;
+		panel.webview.html = this.getHtmlForWebview(panel.webview);
+		panel.webview.onDidReceiveMessage(
+			(message) => this.handleWebviewMessage(message),
+			undefined,
+			this.disposables
+		);
+		panel.onDidDispose(
+			() => {
+				this.panel = undefined;
+				this.isWebviewReady = false;
+				this.outputChannel.appendLine("[HookViewProvider] Panel disposed");
+			},
+			undefined,
+			this.disposables
+		);
+
+		this.panel = panel;
+		this.flushPendingMessages();
+		this.flushExecutionStatuses();
+		this.outputChannel.appendLine("[HookViewProvider] Panel created");
+	}
+
+	private getHtmlForWebview(webview: Webview): string {
+		return getWebviewContent(webview, this.context.extensionUri, "hooks");
 	}
 }

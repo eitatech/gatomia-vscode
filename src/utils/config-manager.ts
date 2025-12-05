@@ -24,7 +24,7 @@ export interface OpenSpecSettings {
 		specs: { visible: boolean };
 		steering: { visible: boolean };
 		prompts: { visible: boolean };
-		settings: { visible: boolean };
+		quickAccess: { visible: boolean };
 	};
 	chatLanguage: string;
 	customInstructions: {
@@ -169,9 +169,10 @@ export class ConfigManager {
 				visible:
 					overrides.views?.prompts?.visible ?? defaults.views.prompts.visible,
 			},
-			settings: {
+			quickAccess: {
 				visible:
-					overrides.views?.settings?.visible ?? defaults.views.settings.visible,
+					overrides.views?.quickAccess?.visible ??
+					defaults.views.quickAccess.visible,
 			},
 		};
 
@@ -218,7 +219,7 @@ export class ConfigManager {
 				specs: { visible: DEFAULT_VIEW_VISIBILITY.specs },
 				steering: { visible: DEFAULT_VIEW_VISIBILITY.steering },
 				prompts: { visible: DEFAULT_VIEW_VISIBILITY.prompts },
-				settings: { visible: DEFAULT_VIEW_VISIBILITY.settings },
+				quickAccess: { visible: DEFAULT_VIEW_VISIBILITY.quickAccess },
 			},
 			chatLanguage,
 			customInstructions,

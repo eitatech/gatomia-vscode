@@ -260,8 +260,8 @@ export const MAX_EXECUTION_LOGS = 100;
 export const ACTION_TIMEOUT_MS = 30_000; // 30 seconds
 
 // Storage
-export const HOOKS_STORAGE_KEY = "alma.hooks.configurations";
-export const LOGS_STORAGE_KEY = "alma.hooks.execution-logs";
+export const HOOKS_STORAGE_KEY = "gatomia.hooks.configurations";
+export const LOGS_STORAGE_KEY = "gatomia.hooks.execution-logs";
 
 // Trigger History
 export const MAX_TRIGGER_HISTORY = 50;

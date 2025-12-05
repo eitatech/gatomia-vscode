@@ -55,7 +55,7 @@ export class ConstitutionManager {
 
 ## 3. Workflow
 - All changes must be specified before implementation.
-- Use the Spec Kit workflow: Specify -> Plan -> Implement.
+- Use the SpecKit workflow: Specify -> Plan -> Implement.
 `;
 
 		const uri = Uri.file(filePath);

@@ -7,6 +7,7 @@ interface HookListItemProps {
 	onToggle: (id: string, enabled: boolean) => void;
 	onDelete: (id: string) => void;
 	onEdit: (hook: Hook) => void;
+	className?: string;
 }
 
 export const HookListItem = ({
@@ -15,6 +16,7 @@ export const HookListItem = ({
 	onToggle,
 	onDelete,
 	onEdit,
+	className,
 }: HookListItemProps) => {
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -147,103 +149,66 @@ export const HookListItem = ({
 	};
 
 	return (
-		<div className="flex flex-col gap-2 rounded border border-[color:var(--vscode-panel-border)] bg-[color:var(--vscode-editor-background)] p-3">
-			<div className="flex items-start justify-between gap-2">
-				<div className="flex min-w-0 flex-1 flex-col gap-1">
-					<div className="flex flex-wrap items-center gap-2">
-						<h3 className="truncate font-medium text-[color:var(--vscode-foreground)] text-sm">
-							{hook.name}
-						</h3>
-						{!hook.enabled && (
-							<span className="rounded bg-[color:var(--vscode-badge-background)] px-1.5 py-0.5 text-[color:var(--vscode-badge-foreground)] text-xs">
-								Disabled
-							</span>
-						)}
-						{renderExecutionStatus()}
-					</div>
-					<div className="flex flex-col gap-0.5 text-[color:var(--vscode-descriptionForeground)] text-xs">
-						<div>
-							<span className="font-medium">Trigger:</span> {triggerDisplay}
-						</div>
-						<div className="truncate">
-							<span className="font-medium">Action:</span> {getActionDisplay()}
-						</div>
-						{hook.executionCount > 0 && (
-							<div className="text-[color:var(--vscode-descriptionForeground)] text-xs opacity-70">
-								Executed {hook.executionCount} time
-								{hook.executionCount !== 1 ? "s" : ""}
-								{hook.lastExecutedAt &&
-									` • Last: ${new Date(hook.lastExecutedAt).toLocaleString()}`}
-							</div>
-						)}
-					</div>
+		<div
+			className={`group flex items-center justify-between gap-3 rounded px-2 py-1 transition-colors focus-within:bg-[color:var(--vscode-list-hoverBackground)] hover:bg-[color:var(--vscode-list-hoverBackground)] ${
+				className ?? ""
+			}`}
+		>
+			<div className="flex min-w-0 flex-col gap-1">
+				<div className="flex items-center gap-2">
+					<span
+						aria-hidden="true"
+						className="codicon codicon-git-pull-request text-[color:var(--vscode-foreground)] text-sm"
+					/>
+					<span className="truncate font-medium text-[color:var(--vscode-foreground)] text-sm">
+						{hook.name}
+					</span>
+					{!hook.enabled && (
+						<span className="rounded bg-[color:var(--vscode-badge-background)] px-1.5 py-0.5 text-[10px] text-[color:var(--vscode-badge-foreground)] uppercase tracking-widest">
+							Paused
+						</span>
+					)}
+					{renderExecutionStatus()}
 				</div>
-
-				<div className="flex items-center gap-1">
-					{/* Toggle switch */}
-					<button
-						aria-checked={hook.enabled}
-						aria-label={`${hook.enabled ? "Disable" : "Enable"} hook`}
-						className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[color:var(--vscode-focusBorder)] ${
-							hook.enabled
-								? "bg-[color:var(--vscode-button-background)]"
-								: "bg-[color:var(--vscode-input-background)]"
-						}`}
-						onClick={handleToggle}
-						role="switch"
-						type="button"
-					>
-						<span
-							aria-hidden="true"
-							className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-								hook.enabled ? "translate-x-4" : "translate-x-0"
-							}`}
-						/>
-					</button>
-
-					{/* Edit button */}
-					<button
-						className="rounded p-1 text-[color:var(--vscode-foreground)] hover:bg-[color:var(--vscode-list-hoverBackground)]"
-						onClick={handleEdit}
-						title="Edit hook"
-						type="button"
-					>
-						<svg
-							fill="currentColor"
-							height="16"
-							viewBox="0 0 16 16"
-							width="16"
-							xmlns="http://www.w3.org/2000/svg"
-						>
-							<title>Edit hook</title>
-							<path d="M13.23 1h-1.46L3.52 9.25l-.16.22L1 13.59 2.41 15l4.12-2.36.22-.16L15 4.23V2.77L13.23 1zM2.41 13.59l1.51-3 1.45 1.45-2.96 1.55zm3.83-2.06L4.47 9.76l8-8 1.77 1.77-8 8z" />
-						</svg>
-					</button>
-
-					{/* Delete button */}
-					<button
-						className="rounded p-1 text-[color:var(--vscode-errorForeground)] hover:bg-[color:var(--vscode-list-hoverBackground)]"
-						onClick={handleDeleteClick}
-						title="Delete hook"
-						type="button"
-					>
-						<svg
-							fill="currentColor"
-							height="16"
-							viewBox="0 0 16 16"
-							width="16"
-							xmlns="http://www.w3.org/2000/svg"
-						>
-							<title>Delete hook</title>
-							<path d="M10 3h3v1h-1v9l-1 1H4l-1-1V4H2V3h3V2a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1zM9 2H6v1h3V2zM4 13h7V4H4v9zm2-8H5v7h1V5zm1 0h1v7H7V5zm2 0h1v7H9V5z" />
-						</svg>
-					</button>
+				<div className="flex flex-wrap gap-2 text-[color:var(--vscode-descriptionForeground)] text-xs">
+					<span className="rounded border border-[color:color-mix(in_srgb,var(--vscode-foreground)_20%,transparent)] px-2 py-0.5">
+						{triggerDisplay}
+					</span>
+					<span className="rounded border border-[color:color-mix(in_srgb,var(--vscode-foreground)_20%,transparent)] px-2 py-0.5">
+						{hook.action.type} action
+					</span>
+					<span className="truncate">
+						{getActionDisplay()}
+						{hook.executionCount > 0 &&
+							` • ${hook.executionCount} run${hook.executionCount === 1 ? "" : "s"}`}
+					</span>
 				</div>
+			</div>
+			<div className="flex items-center gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+				<IconActionButton
+					ariaLabel={hook.enabled ? "Pause hook" : "Resume hook"}
+					iconClass={hook.enabled ? "codicon-debug-pause" : "codicon-play"}
+					onClick={handleToggle}
+					title={hook.enabled ? "Pause hook" : "Resume hook"}
+				/>
+				<IconActionButton
+					ariaLabel="Edit hook"
+					iconClass="codicon-edit"
+					onClick={handleEdit}
+					title="Edit hook"
+				/>
+				<IconActionButton
+					ariaLabel="Delete hook"
+					iconClass="codicon-trash"
+					onClick={handleDeleteClick}
+					title="Delete hook"
+					tone="danger"
+				/>
 			</div>
 
 			{/* Delete confirmation */}
 			{showDeleteConfirm && (
-				<div className="flex items-center justify-between gap-2 rounded bg-[color:var(--vscode-inputValidation-warningBackground)] px-3 py-2">
+				<div className="mt-2 flex items-center justify-between gap-2 rounded border border-[color:var(--vscode-inputValidation-warningBorder,#cca700)] bg-[color:var(--vscode-inputValidation-warningBackground)] px-3 py-2 text-[color:var(--vscode-inputValidation-warningForeground)]">
 					<span className="text-[color:var(--vscode-inputValidation-warningForeground)] text-xs">
 						Delete "{hook.name}"?
 					</span>
@@ -268,3 +233,33 @@ export const HookListItem = ({
 		</div>
 	);
 };
+
+interface IconActionButtonProps {
+	ariaLabel: string;
+	iconClass: string;
+	title: string;
+	onClick: () => void;
+	tone?: "default" | "danger";
+}
+
+const IconActionButton = ({
+	ariaLabel,
+	iconClass,
+	title,
+	onClick,
+	tone = "default",
+}: IconActionButtonProps) => (
+	<button
+		aria-label={ariaLabel}
+		className={`flex h-7 w-7 items-center justify-center rounded border border-transparent text-base transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--vscode-focusBorder)] ${
+			tone === "danger"
+				? "text-[color:var(--vscode-errorForeground)] hover:bg-[color:color-mix(in_srgb,var(--vscode-errorForeground)_15%,transparent)]"
+				: "text-[color:var(--vscode-foreground)] hover:bg-[color:var(--vscode-list-hoverBackground)]"
+		}`}
+		onClick={onClick}
+		title={title}
+		type="button"
+	>
+		<span aria-hidden="true" className={`codicon ${iconClass}`} />
+	</button>
+);
