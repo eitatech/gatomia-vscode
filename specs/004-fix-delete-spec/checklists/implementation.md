@@ -75,13 +75,13 @@
 
 ### Manual Testing - SpecKit
 
-- [ ] CHK041 - Create test SpecKit spec: `mkdir -p specs/999-test && touch specs/999-test/spec.md` [Manual]
-- [ ] CHK042 - Right-click spec in explorer shows "Delete Spec" option [Manual]
-- [ ] CHK043 - Click delete shows confirmation dialog with spec name [Manual]
-- [ ] CHK044 - Cancel dialog prevents deletion [Manual]
-- [ ] CHK045 - Confirm deletion shows success notification [Manual]
-- [ ] CHK046 - Spec removed from tree view immediately [Manual]
-- [ ] CHK047 - Directory deleted from filesystem [Manual]
+- [x] CHK041 - Create test SpecKit spec: `mkdir -p specs/999-test && touch specs/999-test/spec.md` [Manual]
+- [x] CHK042 - Right-click spec in explorer shows "Delete Spec" option [Manual]
+- [x] CHK043 - Click delete shows confirmation dialog with spec name [Manual]
+- [x] CHK044 - Cancel dialog prevents deletion [Manual]
+- [x] CHK045 - Confirm deletion shows success notification [Manual]
+- [x] CHK046 - Spec removed from tree view immediately [Manual]
+- [x] CHK047 - Directory deleted from filesystem [Manual]
 
 ### Manual Testing - OpenSpec (Regression)
 
