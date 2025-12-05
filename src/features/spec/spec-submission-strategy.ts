@@ -1,7 +1,6 @@
-import { Uri, workspace, window } from "vscode";
 import { sendPromptToChat } from "../../utils/chat-prompt-runner";
 import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../../constants";
-import { SpecKitManager } from "./spec-kit-manager";
+import { workspace, Uri } from "vscode";
 
 export interface SpecSubmissionContext {
 	productContext: string;
@@ -70,31 +69,7 @@ export class OpenSpecSubmissionStrategy implements SpecSubmissionStrategy {
 
 export class SpecKitSubmissionStrategy implements SpecSubmissionStrategy {
 	async submit(context: SpecSubmissionContext): Promise<void> {
-		// 1. Ask for feature name since it's required for SpecKit directory structure
-		const name = await window.showInputBox({
-			prompt: "Enter a name for the new feature (e.g., user-auth)",
-			placeHolder: "feature-name",
-			validateInput: (value) => (value ? null : "Name is required"),
-		});
-
-		if (!name) {
-			return;
-		}
-
-		// 2. Create feature scaffolding
-		const manager = SpecKitManager.getInstance();
-		const featurePath = await manager.createFeature(name, context);
-
-		// 3. Open the spec.md file
-		const specUri = Uri.file(`${featurePath}/spec.md`);
-		try {
-			const doc = await workspace.openTextDocument(specUri);
-			await window.showTextDocument(doc);
-		} catch (error) {
-			console.error("Failed to open spec file:", error);
-		}
-
-		// 4. Send prompt to Copilot to fill in the details
+		// Format the description and send to Speckit agent
 		const payload = this.formatDescription(context);
 		const prompt = `/speckit.specify ${payload}`;
 
@@ -102,11 +77,25 @@ export class SpecKitSubmissionStrategy implements SpecSubmissionStrategy {
 	}
 
 	private formatDescription(data: SpecSubmissionContext): string {
-		// Simplified format for SpecKit command argument
-		// We just concatenate the important parts
-		return [data.productContext, data.keyScenarios, data.technicalConstraints]
-			.filter(Boolean)
-			.join("\n\n");
+		const sections = [
+			data.productContext.trim()
+				? `Product Context / Goal:\n${data.productContext.trim()}`
+				: undefined,
+			data.keyScenarios.trim()
+				? `Key Scenarios / Acceptance Criteria:\n${data.keyScenarios.trim()}`
+				: undefined,
+			data.technicalConstraints.trim()
+				? `Technical Constraints:\n${data.technicalConstraints.trim()}`
+				: undefined,
+			data.relatedFiles.trim()
+				? `Related Files / Impact:\n${data.relatedFiles.trim()}`
+				: undefined,
+			data.openQuestions.trim()
+				? `Open Questions:\n${data.openQuestions.trim()}`
+				: undefined,
+		].filter(Boolean);
+
+		return sections.join("\n\n");
 	}
 }
 

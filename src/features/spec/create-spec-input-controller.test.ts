@@ -3,6 +3,7 @@ import type { ExtensionContext, MessageItem } from "vscode";
 import { Uri, ViewColumn, window, workspace } from "vscode";
 import { CreateSpecInputController } from "./create-spec-input-controller";
 import type { CreateSpecDraftState } from "./types";
+import { SPEC_SYSTEM_MODE } from "../../constants";
 import { sendPromptToChat } from "../../utils/chat-prompt-runner";
 
 vi.mock("../../utils/chat-prompt-runner", () => ({
@@ -44,6 +45,7 @@ describe("CreateSpecInputController", () => {
 			configManager: configManager as any,
 			promptLoader: promptLoader as any,
 			outputChannel: outputChannel as any,
+			activeSystem: SPEC_SYSTEM_MODE.OPENSPEC,
 		});
 
 	beforeEach(() => {
@@ -130,6 +132,16 @@ describe("CreateSpecInputController", () => {
 		vi.mocked(window.showWarningMessage).mockResolvedValue(
 			createMessageItem("Cancel")
 		);
+
+		// Mock workspace.fs.readFile for OpenSpec strategy
+		(workspace.fs as any).readFile = vi
+			.fn()
+			.mockResolvedValue(new TextEncoder().encode("Prompt Template"));
+
+		// Mock workspace.workspaceFolders
+		(workspace as any).workspaceFolders = [
+			{ uri: Uri.parse("file:///workspace") },
+		];
 	});
 
 	const emitMessage = async (message: any) => {
@@ -201,11 +213,6 @@ describe("CreateSpecInputController", () => {
 		const controller = createController();
 		await controller.open();
 
-		// Mock readFile
-		(workspace.fs as any).readFile = vi
-			.fn()
-			.mockResolvedValue(new TextEncoder().encode("Prompt Template"));
-
 		await emitMessage({
 			type: "create-spec/submit",
 			payload: {
@@ -218,12 +225,8 @@ describe("CreateSpecInputController", () => {
 		});
 
 		expect(sendPromptToChat).toHaveBeenCalledWith(
-			expect.stringContaining("Prompt Template"),
-			{ instructionType: "createSpec" }
-		);
-		expect(sendPromptToChat).toHaveBeenCalledWith(
-			expect.stringContaining(
-				"Key Scenarios / Acceptance Criteria:\nFeature idea"
+			expect.stringMatching(
+				/Prompt Template[\s\S]*Key Scenarios \/ Acceptance Criteria:[\s\S]*Feature idea/
 			),
 			{ instructionType: "createSpec" }
 		);
