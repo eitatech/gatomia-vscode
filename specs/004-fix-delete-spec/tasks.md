@@ -274,19 +274,19 @@
 
 **Purpose**: Ensure everything is ready for code review
 
-- [ ] T036 Full build: `npm run compile`
+- [x] T036 Full build: `npm run compile`
   - No TypeScript errors
   - Extension compiles successfully
 
-- [ ] T037 Final lint check: `npm run check`
+- [x] T037 Final lint check: `npm run check`
   - Zero violations
   - All files compliant
 
-- [ ] T038 Final test run: `npm run test`
+- [x] T038 Final test run: `npm run test`
   - All tests pass
   - 100% of new code paths covered
 
-- [ ] T039 Create PR with:
+- [x] T039 Create PR with:
   - Title: "Fix: Delete Spec button now works for SpecKit specs"
   - Description linking to spec.md
   - List of files changed
