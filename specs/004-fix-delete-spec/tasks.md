@@ -213,7 +213,7 @@
 
 - [x] T027 Create test SpecKit spec: `mkdir -p specs/999-test-spec && touch specs/999-test-spec/spec.md`
 
-- [ ] T028 Manual test SpecKit deletion:
+- [x] T028 Manual test SpecKit deletion:
   - Open VS Code
   - Navigate to Spec Explorer
   - Right-click on "999-test-spec"
