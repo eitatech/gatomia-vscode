@@ -6,70 +6,70 @@
 
 ## Pre-Implementation
 
-- [ ] CHK001 - Environment setup complete: `npm run install:all` executed successfully [Setup]
-- [ ] CHK002 - Branch `004-fix-delete-spec` created and checked out [Setup]
-- [ ] CHK003 - All specification documents reviewed and understood [Review]
-- [ ] CHK004 - Technical context confirmed: TypeScript 5.x, VS Code Extension API [Context]
-- [ ] CHK005 - Existing test patterns reviewed in `spec-manager.test.ts` [Review]
+- [x] CHK001 - Environment setup complete: `npm run install:all` executed successfully [Setup]
+- [x] CHK002 - Branch `004-fix-delete-spec` created and checked out [Setup]
+- [x] CHK003 - All specification documents reviewed and understood [Review]
+- [x] CHK004 - Technical context confirmed: TypeScript 5.x, VS Code Extension API [Context]
+- [x] CHK005 - Existing test patterns reviewed in `spec-manager.test.ts` [Review]
 
 ## Code Implementation
 
 ### Changes to src/extension.ts
 
-- [ ] CHK006 - Command handler updated to pass `item.specName` and `item.system` [Implementation]
-- [ ] CHK007 - Tree explorer refresh added after successful deletion [Implementation]
-- [ ] CHK008 - Error handling preserves existing error display behavior [Implementation]
+- [x] CHK006 - Command handler updated to pass `item.specName` and `item.system` [Implementation]
+- [x] CHK007 - Tree explorer refresh added after successful deletion [Implementation]
+- [x] CHK008 - Error handling preserves existing error display behavior [Implementation]
 
 ### Changes to src/features/spec/spec-manager.ts
 
-- [ ] CHK009 - Delete method signature updated: `delete(specName: string, system?: SpecSystemMode)` [Implementation]
-- [ ] CHK010 - Imports added: `SPEC_SYSTEM_MODE`, `SPECKIT_CONFIG` from constants [Implementation]
-- [ ] CHK011 - Confirmation dialog implemented using `window.showWarningMessage` with modal option [Implementation]
-- [ ] CHK012 - Confirmation dialog displays spec name in message [Implementation]
-- [ ] CHK013 - Return early if user cancels confirmation [Implementation]
-- [ ] CHK014 - Path resolution logic handles SpecKit path correctly: `specs/<specName>` [Implementation]
-- [ ] CHK015 - Path resolution logic handles OpenSpec path correctly: `openspec/specs/<specName>` [Implementation]
-- [ ] CHK016 - Fallback to `this.activeSystem` when no system parameter provided [Implementation]
-- [ ] CHK017 - Success notification displays correct spec name [Implementation]
-- [ ] CHK018 - Error message includes filesystem error details [Implementation]
-- [ ] CHK019 - Output channel logging added for debugging [Implementation]
+- [x] CHK009 - Delete method signature updated: `delete(specName: string, system?: SpecSystemMode)` [Implementation]
+- [x] CHK010 - Imports added: `SPEC_SYSTEM_MODE`, `SPECKIT_CONFIG` from constants [Implementation]
+- [x] CHK011 - Confirmation dialog implemented using `window.showWarningMessage` with modal option [Implementation]
+- [x] CHK012 - Confirmation dialog displays spec name in message [Implementation]
+- [x] CHK013 - Return early if user cancels confirmation [Implementation]
+- [x] CHK014 - Path resolution logic handles SpecKit path correctly: `specs/<specName>` [Implementation]
+- [x] CHK015 - Path resolution logic handles OpenSpec path correctly: `openspec/specs/<specName>` [Implementation]
+- [x] CHK016 - Fallback to `this.activeSystem` when no system parameter provided [Implementation]
+- [x] CHK017 - Success notification displays correct spec name [Implementation]
+- [x] CHK018 - Error message includes filesystem error details [Implementation]
+- [x] CHK019 - Output channel logging added for debugging [Implementation]
 
 ## Testing
 
 ### Unit Test Coverage
 
-- [ ] CHK020 - Test: Delete SpecKit spec constructs correct path [Testing]
-- [ ] CHK021 - Test: Delete OpenSpec spec constructs correct path [Testing]
-- [ ] CHK022 - Test: Delete without system parameter uses activeSystem [Testing]
-- [ ] CHK023 - Test: User cancel prevents deletion [Testing]
-- [ ] CHK024 - Test: Missing workspace shows error [Testing]
-- [ ] CHK025 - Test: Filesystem error caught and displayed [Testing]
-- [ ] CHK026 - Test: Success notification shown after deletion [Testing]
-- [ ] CHK027 - Test: Confirmation dialog shows correct message [Testing]
+- [x] CHK020 - Test: Delete SpecKit spec constructs correct path [Testing]
+- [x] CHK021 - Test: Delete OpenSpec spec constructs correct path [Testing]
+- [x] CHK022 - Test: Delete without system parameter uses activeSystem [Testing]
+- [x] CHK023 - Test: User cancel prevents deletion [Testing]
+- [x] CHK024 - Test: Missing workspace shows error [Testing]
+- [x] CHK025 - Test: Filesystem error caught and displayed [Testing]
+- [x] CHK026 - Test: Success notification shown after deletion [Testing]
+- [x] CHK027 - Test: Confirmation dialog shows correct message [Testing]
 
 ### Test Execution
 
-- [ ] CHK028 - All tests pass: `npm run test -- spec-manager.test.ts` [Validation]
-- [ ] CHK029 - Test coverage includes success, error, and cancel paths [Coverage]
-- [ ] CHK030 - No console errors or warnings in test output [Quality]
+- [x] CHK028 - All tests pass: `npm run test -- spec-manager.test.ts` [Validation]
+- [x] CHK029 - Test coverage includes success, error, and cancel paths [Coverage]
+- [x] CHK030 - No console errors or warnings in test output [Quality]
 
 ## Code Quality
 
 ### Linting & Formatting
 
-- [ ] CHK031 - No lint errors: `npm run check` passes completely [Quality]
-- [ ] CHK032 - All formatting correct: `npm run format` applied [Quality]
-- [ ] CHK033 - Complexity limits respected (all functions <complexity threshold) [Quality]
-- [ ] CHK034 - No unused imports or variables [Quality]
-- [ ] CHK035 - TypeScript strict mode satisfied (no `any` casts unless justified) [Quality]
+- [x] CHK031 - No lint errors: `npm run check` passes completely [Quality]
+- [x] CHK032 - All formatting correct: `npm run format` applied [Quality]
+- [x] CHK033 - Complexity limits respected (all functions <complexity threshold) [Quality]
+- [x] CHK034 - No unused imports or variables [Quality]
+- [x] CHK035 - TypeScript strict mode satisfied (no `any` casts unless justified) [Quality]
 
 ### Best Practices
 
-- [ ] CHK036 - Cross-platform path construction uses `path.join()` [Practice]
-- [ ] CHK037 - Async/await used consistently (no Promise chaining) [Practice]
-- [ ] CHK038 - Error messages are user-friendly and actionable [Practice]
-- [ ] CHK039 - Output channel logs include meaningful context [Practice]
-- [ ] CHK040 - Command registration pattern matches existing code style [Practice]
+- [x] CHK036 - Cross-platform path construction uses `path.join()` [Practice]
+- [x] CHK037 - Async/await used consistently (no Promise chaining) [Practice]
+- [x] CHK038 - Error messages are user-friendly and actionable [Practice]
+- [x] CHK039 - Output channel logs include meaningful context [Practice]
+- [x] CHK040 - Command registration pattern matches existing code style [Practice]
 
 ## Functional Verification
 
@@ -98,16 +98,16 @@
 
 ## Documentation
 
-- [ ] CHK055 - `plan.md` updated with post-implementation notes [Documentation]
-- [ ] CHK056 - `research.md` remains accurate with actual implementation [Documentation]
-- [ ] CHK057 - `data-model.md` reflects actual interface changes [Documentation]
-- [ ] CHK058 - `quickstart.md` step-by-step guide matches implementation [Documentation]
+- [x] CHK055 - `plan.md` updated with post-implementation notes [Documentation]
+- [x] CHK056 - `research.md` remains accurate with actual implementation [Documentation]
+- [x] CHK057 - `data-model.md` reflects actual interface changes [Documentation]
+- [x] CHK058 - `quickstart.md` step-by-step guide matches implementation [Documentation]
 
 ## Git & PR Preparation
 
-- [ ] CHK059 - All changes committed with clear, imperative commit messages [Git]
-- [ ] CHK060 - Commits follow pattern: "Fix delete spec for SpecKit" [Git]
-- [ ] CHK061 - No debug `console.log()` statements left in code [Git]
+- [x] CHK059 - All changes committed with clear, imperative commit messages [Git]
+- [x] CHK060 - Commits follow pattern: "Fix delete spec for SpecKit" [Git]
+- [x] CHK061 - No debug `console.log()` statements left in code [Git]
 - [ ] CHK062 - Branch is up to date with `main` (no conflicts) [Git]
 - [ ] CHK063 - PR title: "Fix: Delete Spec button now works for SpecKit specs" [Git]
 - [ ] CHK064 - PR description links to feature spec [Git]
@@ -115,10 +115,10 @@
 
 ## Final Verification
 
-- [ ] CHK066 - Extension compiles without errors: `npm run compile` [Build]
-- [ ] CHK067 - Full test suite passes: `npm run test` [Build]
-- [ ] CHK068 - Build artifacts created successfully [Build]
-- [ ] CHK069 - No lint warnings in final state [Build]
+- [x] CHK066 - Extension compiles without errors: `npm run compile` [Build]
+- [x] CHK067 - Full test suite passes: `npm run test` [Build]
+- [x] CHK068 - Build artifacts created successfully [Build]
+- [x] CHK069 - No lint warnings in final state [Build]
 - [ ] CHK070 - Feature works as specified in user scenarios [Acceptance]
 
 ## Post-Implementation
