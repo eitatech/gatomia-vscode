@@ -108,7 +108,7 @@
 - [x] CHK059 - All changes committed with clear, imperative commit messages [Git]
 - [x] CHK060 - Commits follow pattern: "Fix delete spec for SpecKit" [Git]
 - [x] CHK061 - No debug `console.log()` statements left in code [Git]
-- [ ] CHK062 - Branch is up to date with `main` (no conflicts) [Git]
+- [x] CHK062 - Branch is up to date with `main` (no conflicts) [Git]
 - [ ] CHK063 - PR title: "Fix: Delete Spec button now works for SpecKit specs" [Git]
 - [ ] CHK064 - PR description links to feature spec [Git]
 - [ ] CHK065 - PR lists all files changed [Git]
