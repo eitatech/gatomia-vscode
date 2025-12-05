@@ -243,7 +243,7 @@
   - Verify error message displays
   - Verify spec not deleted
 
-- [ ] T031 Update quickstart.md if implementation differs from documentation
+- [x] T031 Update quickstart.md if implementation differs from documentation
 
 ---
 
@@ -251,22 +251,22 @@
 
 **Purpose**: Prepare for code review and merging
 
-- [ ] T032 Stage changes:
+- [x] T032 Stage changes:
   - `src/extension.ts` (command handler update)
   - `src/features/spec/spec-manager.ts` (delete method implementation)
   - `src/features/spec/spec-manager.test.ts` (new tests)
 
-- [ ] T033 Verify no debugging code left:
+- [x] T033 Verify no debugging code left:
   - No `console.log()` statements
   - No commented-out code
   - No debug flags
 
-- [ ] T034 Create commits with clear messages:
+- [x] T034 Create commits with clear messages:
   - Commit 1: "Fix: Update delete command to pass system parameter to spec-manager"
   - Commit 2: "Fix: Implement system-aware delete for SpecKit and OpenSpec specs"
   - Commit 3: "Fix: Add comprehensive tests for delete spec functionality"
 
-- [ ] T035 Verify branch is up to date: `git rebase main` (if needed)
+- [x] T035 Verify branch is up to date: `git rebase main` (if needed)
 
 ---
 
