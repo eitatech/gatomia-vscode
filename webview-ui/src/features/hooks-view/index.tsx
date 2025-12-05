@@ -146,8 +146,16 @@ export const HooksView = () => {
 				}
 				case "hooks/show-form":
 				case "hooks.show-form": {
+					const mode =
+						body && typeof body.mode === "string"
+							? (body.mode as "create" | "edit")
+							: undefined;
+					const hookPayload =
+						body && typeof body.hook === "object" ? body.hook : undefined;
 					setShowForm(true);
-					setEditingHook(undefined);
+					setEditingHook(
+						mode === "edit" && hookPayload ? (hookPayload as Hook) : undefined
+					);
 					setError(undefined);
 					setShowLogsPanel(false);
 					setLogsLoading(false);
@@ -217,12 +225,6 @@ export const HooksView = () => {
 		[sendMessage]
 	);
 
-	const handleAddHook = useCallback(() => {
-		setShowForm(true);
-		setEditingHook(undefined);
-		setError(undefined);
-	}, []);
-
 	const handleEditHook = useCallback((hook: Hook) => {
 		setShowForm(true);
 		setEditingHook(hook);
@@ -262,17 +264,13 @@ export const HooksView = () => {
 		[editingHook, sendMessage]
 	);
 
-	const handleToggleLogsPanel = useCallback(() => {
-		if (showLogsPanel) {
-			setShowLogsPanel(false);
-			setLogsLoading(false);
-		} else {
-			setShowLogsPanel(true);
-		}
-	}, [showLogsPanel]);
-
 	const handleSelectHookForLogs = useCallback((hookId?: string) => {
 		setSelectedHookForLogs(hookId ?? "all");
+	}, []);
+
+	const handleCloseLogsPanel = useCallback(() => {
+		setShowLogsPanel(false);
+		setLogsLoading(false);
 	}, []);
 
 	const handleRefreshLogs = useCallback(() => {
@@ -292,30 +290,14 @@ export const HooksView = () => {
 
 	return (
 		<div className="flex h-full w-full flex-col gap-4 px-4 py-4">
-			<header className="flex flex-col gap-2">
-				<div className="flex items-center justify-between">
-					<h1 className="font-semibold text-[color:var(--vscode-foreground)] text-xl">
-						Hooks
-					</h1>
-					<div className="flex items-center gap-2">
-						<button
-							className="rounded border border-[color:var(--vscode-button-border,transparent)] bg-[color:var(--vscode-button-secondaryBackground)] px-3 py-1 text-[color:var(--vscode-button-secondaryForeground)] text-sm hover:bg-[color:var(--vscode-button-secondaryHoverBackground)]"
-							onClick={handleToggleLogsPanel}
-							type="button"
-						>
-							{showLogsPanel ? "Hide Logs" : "View Logs"}
-						</button>
-						<button
-							className="rounded bg-[color:var(--vscode-button-background)] px-3 py-1 text-[color:var(--vscode-button-foreground)] text-sm hover:bg-[color:var(--vscode-button-hoverBackground)]"
-							onClick={handleAddHook}
-							type="button"
-						>
-							Add Hook
-						</button>
-					</div>
-				</div>
+			<header className="flex flex-col gap-1">
+				<h1 className="font-semibold text-[color:var(--vscode-foreground)] text-xl">
+					Hooks
+				</h1>
 				<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.65))] text-sm">
-					Configure automated actions triggered by agent operations
+					Configure automated actions triggered by agent operations. Use the
+					Hooks view toolbar to add hooks, open execution logs, or import/export
+					configurations.
 				</p>
 			</header>
 
@@ -352,7 +334,7 @@ export const HooksView = () => {
 					hooks={hooks}
 					isLoading={logsLoading}
 					logs={executionLogs}
-					onClose={handleToggleLogsPanel}
+					onClose={handleCloseLogsPanel}
 					onRefresh={handleRefreshLogs}
 					onSelectHook={handleSelectHookForLogs}
 					selectedHookId={selectedHookIdForLogs}

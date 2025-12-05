@@ -50,7 +50,7 @@ export class SpecTaskCodeLensProvider implements CodeLensProvider {
 				new CodeLens(range, {
 					title: "$(play) Start All Tasks",
 					tooltip: "Click to generate OpenSpec apply prompt",
-					command: "alma.spec.implTask",
+					command: "gatomia.spec.implTask",
 					arguments: [document.uri],
 				}),
 			];
@@ -61,7 +61,7 @@ export class SpecTaskCodeLensProvider implements CodeLensProvider {
 				new CodeLens(range, {
 					title: "$(check) All Tasks Completed",
 					tooltip: "All tasks are completed",
-					command: "alma.noop",
+					command: "gatomia.noop",
 				}),
 			];
 		}

@@ -1,50 +1,34 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# Copilot Spec UI Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Biome-First Code Quality
+All code must satisfy the repository lint/format suite (`npm run check` / `npm run fix`) before merging. No file may be left with lint warnings, formatting drift, or complexity violations. Prefer refactors over ignore comments; an ignore directive must include justification and a follow-up issue if the complexity cannot be reduced immediately.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Exhaustive Agent Coverage
+Whenever SpecKit/OpenSpec commands are added or modified, the Hooks feature must expose the same operations in both triggers and actions. Documentation, dropdowns, constants, and VS Code command registrations must stay in sync with `.github/agents` and `.github/prompts` to guarantee hook automation parity.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. UI Accessibility and Determinism
+All UI changes must preserve accessibility semantics (SVG titles, aria labels, keyboard focus). Webview actions toggled from VS Code commands or buttons must always render deterministic fallbacks (e.g., "No execution logs yet" when empty) to prevent disappearing panels.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Test-Driven Stability (NON-NEGOTIABLE)
+Every code path added or refactored must have corresponding tests (unit or integration). Tests must cover failure modes and guard against regressions in hooks, SpecKit command routing, and webview messaging.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Simplicity & Maintainability
+Favor small components and helper utilities to keep functions below complexity limits. Shared logic (file dialogs, message handlers) should live in helpers rather than repeated inline.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Quality Gates
+- `npm run check` must pass on every commit; `npm run fix` must be executed whenever biome suggests autofixes.
+- Hooks commands/actions must be tested via the existing Vitest suites (`hook-form`, `hook-view-provider`, `hook-executor`, etc.).
+- Any change that touches lint config or introduces exceptions requires explicit approval and documentation in PR notes.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
-
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
-
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+## Development Workflow
+1. Implement feature with TDD.
+2. Run `npm run check` → `npm run test -- <target>` before committing.
+3. If lint failures recur, stop and refactor immediately; do not push with `// biome-ignore` unless justified and documented.
+4. Update docs (`plan.md`, `tasks.md`, quickstart) whenever file names or workflows change (kebab-case, new operations, etc.).
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+This constitution supersedes prior informal practices. Amendments require updating this file, bumping the version, and recording the change in PR notes. Every PR reviewer must verify compliance.
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
-
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-04

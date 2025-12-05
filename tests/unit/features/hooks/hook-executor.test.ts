@@ -49,6 +49,13 @@ vi.mock("../../../../src/features/hooks/actions/git-action", () => ({
 	})),
 }));
 
+// Mock GitHubActionExecutor
+vi.mock("../../../../src/features/hooks/actions/github-action", () => ({
+	GitHubActionExecutor: vi.fn().mockImplementation(() => ({
+		execute: vi.fn(() => Promise.resolve({ success: true })),
+	})),
+}));
+
 // Mock vscode extensions for Git
 vi.mock("vscode", async () => {
 	const actual = await vi.importActual("vscode");
@@ -244,6 +251,24 @@ describe("HookExecutor", () => {
 			expect(logs).toHaveLength(1);
 			expect(logs[0].hookId).toBe(hook.id);
 			expect(logs[0].status).toBe("success");
+		});
+
+		it("should route github actions through the GitHubActionExecutor", async () => {
+			const hook = await hookManager.createHook(
+				createTestHook({
+					action: {
+						type: "github",
+						parameters: {
+							operation: "open-issue",
+							titleTemplate: "Spec ready",
+						},
+					},
+				})
+			);
+
+			const result = await executor.executeHook(hook);
+
+			expect(result.status).toBe("success");
 		});
 	});
 

@@ -70,7 +70,7 @@ export class OpenSpecSubmissionStrategy implements SpecSubmissionStrategy {
 
 export class SpecKitSubmissionStrategy implements SpecSubmissionStrategy {
 	async submit(context: SpecSubmissionContext): Promise<void> {
-		// 1. Ask for feature name since it's required for Spec Kit directory structure
+		// 1. Ask for feature name since it's required for SpecKit directory structure
 		const name = await window.showInputBox({
 			prompt: "Enter a name for the new feature (e.g., user-auth)",
 			placeHolder: "feature-name",

@@ -24,7 +24,7 @@ describe("get-webview-content", () => {
 		expect(html).toContain(
 			'href="file:///mock/extension/dist/webview/app/assets/index.css"'
 		);
-		expect(html).toContain("<title>ALMA</title>");
+		expect(html).toContain("<title>GatomIA</title>");
 	});
 
 	// 2. Edge Case: Test getNonce function for correct length and format.
@@ -48,6 +48,7 @@ describe("get-webview-content", () => {
 		expect(cspContent).toContain(`default-src 'none'`);
 		expect(cspContent).toContain(`img-src ${mockWebview.cspSource} data:`);
 		expect(cspContent).toContain(`style-src ${mockWebview.cspSource}`);
+		expect(cspContent).toContain(`font-src ${mockWebview.cspSource}`);
 		const nonceMatch = cspContent.match(/script-src 'nonce-([a-zA-Z0-9]{32})'/);
 		expect(nonceMatch).not.toBeNull();
 	});

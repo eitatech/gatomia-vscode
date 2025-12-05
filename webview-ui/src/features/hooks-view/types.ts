@@ -144,7 +144,7 @@ export type HooksExtensionMessage =
 	| {
 			type: "hooks/show-form";
 			command?: "hooks.show-form";
-			payload?: { mode?: "create" | "edit" };
+			payload?: { mode?: "create" | "edit"; hook?: Hook };
 	  }
 	| {
 			type: "hooks/show-logs";

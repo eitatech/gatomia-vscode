@@ -19,9 +19,9 @@ export const getWebviewContent = (
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
             <link href="${styleUri}" rel="stylesheet" />
-            <title>ALMA</title>
+            <title>GatomIA</title>
         </head>
         <body>
             <div id="root" data-page="${page}"></div>

@@ -1,5 +1,5 @@
 // VSCode configuration namespace for this extension
-export const VSC_CONFIG_NAMESPACE = "alma";
+export const VSC_CONFIG_NAMESPACE = "gatomia";
 
 // Default configuration for OpenSpec (legacy support)
 export const DEFAULT_CONFIG = {
@@ -11,12 +11,12 @@ export const DEFAULT_CONFIG = {
 		specs: true,
 		steering: true,
 		prompts: true,
-		settings: false,
+		quickAccess: true,
 	},
 	chatLanguage: "English",
 } as const;
 
-// Spec Kit configuration
+// SpecKit configuration
 export const SPECKIT_CONFIG = {
 	paths: {
 		specs: "specs",
@@ -29,7 +29,7 @@ export const SPECKIT_CONFIG = {
 		specs: true,
 		steering: true,
 		prompts: true,
-		settings: false,
+		quickAccess: true,
 	},
 	chatLanguage: "English",
 } as const;
