@@ -32,6 +32,8 @@ import { SpecKitMigration } from "./utils/spec-kit-migration";
 import { TriggerRegistry } from "./features/hooks/trigger-registry";
 import { HookManager } from "./features/hooks/hook-manager";
 import { HookExecutor } from "./features/hooks/hook-executor";
+import { CommandCompletionDetector } from "./features/hooks/services/command-completion-detector";
+import { MCPDiscoveryService } from "./features/hooks/services/mcp-discovery";
 import { HookViewProvider } from "./providers/hook-view-provider";
 import { HooksExplorerProvider } from "./providers/hooks-explorer-provider";
 import { DependenciesViewProvider } from "./providers/dependencies-view-provider";
@@ -42,6 +44,8 @@ let steeringManager: SteeringManager;
 let triggerRegistry: TriggerRegistry;
 let hookManager: HookManager;
 let hookExecutor: HookExecutor;
+let commandCompletionDetector: CommandCompletionDetector;
+let mcpDiscoveryService: MCPDiscoveryService;
 let hookViewProvider: HookViewProvider;
 let dependenciesViewProvider: DependenciesViewProvider;
 type HookCommandTarget = { hookId?: string } | string;
@@ -107,19 +111,37 @@ export async function activate(context: ExtensionContext) {
 	// Connect TriggerRegistry to SpecManager
 	specManager.setTriggerRegistry(triggerRegistry);
 
-	// Initialize Hook infrastructure
-	hookManager = new HookManager(context, outputChannel);
+	// Initialize MCP Discovery Service (needed for HookManager and HookExecutor)
+	mcpDiscoveryService = new MCPDiscoveryService();
+	outputChannel.appendLine("MCPDiscoveryService initialized");
+
+	// Initialize Hook infrastructure with MCP support
+	hookManager = new HookManager(context, outputChannel, mcpDiscoveryService);
 	await hookManager.initialize();
 
-	hookExecutor = new HookExecutor(hookManager, triggerRegistry, outputChannel);
+	hookExecutor = new HookExecutor(
+		hookManager,
+		triggerRegistry,
+		outputChannel,
+		mcpDiscoveryService
+	);
 	hookExecutor.initialize();
 
-	hookViewProvider = new HookViewProvider(
+	// Initialize CommandCompletionDetector to detect when SpecKit commands complete
+	commandCompletionDetector = new CommandCompletionDetector(
+		triggerRegistry,
+		outputChannel
+	);
+	commandCompletionDetector.initialize();
+	outputChannel.appendLine("CommandCompletionDetector initialized");
+
+	hookViewProvider = new HookViewProvider({
 		context,
 		hookManager,
 		hookExecutor,
-		outputChannel
-	);
+		mcpDiscoveryService,
+		outputChannel,
+	});
 	hookViewProvider.initialize();
 
 	// Initialize Dependencies View Provider
@@ -159,6 +181,7 @@ export async function activate(context: ExtensionContext) {
 	context.subscriptions.push(
 		{ dispose: () => hookManager.dispose() },
 		{ dispose: () => hookExecutor.dispose() },
+		{ dispose: () => commandCompletionDetector.dispose() },
 		{ dispose: () => hookViewProvider.dispose() },
 		{ dispose: () => hooksExplorer.dispose() },
 		{ dispose: () => quickAccessExplorer.dispose() },

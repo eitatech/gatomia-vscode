@@ -5,8 +5,10 @@ import {
 	type OutputChannel,
 } from "vscode";
 import { randomUUID } from "node:crypto";
+import type { IMCPDiscoveryService } from "./services/mcp-contracts";
 import {
 	type Hook,
+	type MCPActionParams,
 	isValidHook,
 	HOOKS_STORAGE_KEY,
 	MAX_HOOK_NAME_LENGTH,
@@ -71,6 +73,7 @@ export class PersistenceError extends Error {
 export class HookManager {
 	private readonly context: ExtensionContext;
 	private readonly outputChannel: OutputChannel;
+	private readonly mcpDiscoveryService?: IMCPDiscoveryService;
 	private hooks: Hook[] = [];
 
 	// Event emitters
@@ -85,9 +88,14 @@ export class HookManager {
 	readonly onHookDeleted: Event<string> = this._onHookDeleted.event;
 	readonly onHooksChanged: Event<void> = this._onHooksChanged.event;
 
-	constructor(context: ExtensionContext, outputChannel: OutputChannel) {
+	constructor(
+		context: ExtensionContext,
+		outputChannel: OutputChannel,
+		mcpDiscoveryService?: IMCPDiscoveryService
+	) {
 		this.context = context;
 		this.outputChannel = outputChannel;
+		this.mcpDiscoveryService = mcpDiscoveryService;
 	}
 
 	/**
@@ -133,8 +141,8 @@ export class HookManager {
 			executionCount: 0,
 		};
 
-		// Validate
-		const validation = this.validateHook(newHook);
+		// Validate (now async to support MCP validation)
+		const validation = await this.validateHook(newHook);
 		if (!validation.valid) {
 			throw new HookValidationError(
 				"Hook validation failed",
@@ -207,8 +215,8 @@ export class HookManager {
 			modifiedAt: Date.now(),
 		};
 
-		// Validate
-		const validation = this.validateHook(updatedHook);
+		// Validate (now async to support MCP validation)
+		const validation = await this.validateHook(updatedHook);
 		if (!validation.valid) {
 			throw new HookValidationError(
 				"Hook validation failed",
@@ -429,8 +437,9 @@ export class HookManager {
 
 	/**
 	 * Validate a hook
+	 * T085: Add MCP server validation check
 	 */
-	validateHook(hook: Hook): ValidationResult {
+	async validateHook(hook: Hook): Promise<ValidationResult> {
 		const errors: ValidationError[] = [];
 
 		// Basic structure validation
@@ -463,10 +472,104 @@ export class HookManager {
 			});
 		}
 
+		// T085: Validate MCP server references if action type is "mcp"
+		if (hook.action.type === "mcp" && this.mcpDiscoveryService) {
+			const mcpParams = hook.action.parameters as MCPActionParams;
+			const serverValid = await this.validateMCPServer(
+				mcpParams.serverId,
+				mcpParams.toolName
+			);
+
+			if (!serverValid.valid) {
+				errors.push(...serverValid.errors);
+			}
+		}
+
 		return {
 			valid: errors.length === 0,
 			errors,
 		};
+	}
+
+	/**
+	 * T085: Validate MCP server and tool references
+	 * Checks if the referenced MCP server exists and if the tool is available
+	 */
+	async validateMCPServer(
+		serverId: string,
+		toolName: string
+	): Promise<ValidationResult> {
+		const errors: ValidationError[] = [];
+
+		if (!this.mcpDiscoveryService) {
+			// If no discovery service, skip validation (graceful degradation)
+			return { valid: true, errors };
+		}
+
+		try {
+			// Check if server exists
+			const server = await this.mcpDiscoveryService.getServer(serverId);
+
+			if (!server) {
+				errors.push({
+					field: "action.parameters.serverId",
+					message: `MCP server "${serverId}" not found. Please verify the server ID or update the hook configuration.`,
+				});
+				return { valid: false, errors };
+			}
+
+			// T086: Check if server is available (warn but don't fail validation)
+			if (server.status === "unavailable") {
+				this.outputChannel.appendLine(
+					`[HookManager] Warning: MCP server "${serverId}" is currently unavailable`
+				);
+			}
+
+			// Check if tool exists in server
+			const tool = await this.mcpDiscoveryService.getTool(serverId, toolName);
+
+			if (!tool) {
+				errors.push({
+					field: "action.parameters.toolName",
+					message: `MCP tool "${toolName}" not found in server "${serverId}". Please verify the tool name or update the hook configuration.`,
+				});
+				return { valid: false, errors };
+			}
+
+			return { valid: true, errors };
+		} catch (error) {
+			// Graceful degradation - log error but don't fail validation
+			const err = error as Error;
+			this.outputChannel.appendLine(
+				`[HookManager] Warning: Failed to validate MCP server: ${err.message}`
+			);
+
+			// Return valid to allow hook to be saved (execution will fail gracefully)
+			return { valid: true, errors };
+		}
+	}
+
+	/**
+	 * T085: Get all hooks with invalid MCP server references
+	 */
+	async getInvalidMCPHooks(): Promise<
+		Array<{ hook: Hook; errors: ValidationError[] }>
+	> {
+		const invalidHooks: Array<{ hook: Hook; errors: ValidationError[] }> = [];
+
+		for (const hook of this.hooks) {
+			if (hook.action.type === "mcp") {
+				const validation = await this.validateHook(hook);
+				if (!validation.valid) {
+					invalidHooks.push({
+						hook,
+						errors: validation.errors,
+					});
+				}
+			}
+		}
+
+		return invalidHooks;
 	}
 
 	/**

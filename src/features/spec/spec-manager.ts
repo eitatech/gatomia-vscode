@@ -98,23 +98,20 @@ export class SpecManager {
 	}
 
 	/**
-	 * Executes a SpecKit command and fires the appropriate trigger
+	 * Executes a SpecKit command
+	 *
+	 * NOTE: Triggers are now fired automatically by CommandCompletionDetector
+	 * when it detects file changes that indicate command completion.
+	 * This ensures triggers fire AFTER the command completes, not before.
 	 */
 	async executeSpecKitCommand(operation: string): Promise<void> {
 		try {
 			// Send command to Copilot Chat
 			await sendPromptToChat(`/speckit.${operation}`);
 
-			// Fire trigger after command is sent
-			// NOTE: We fire immediately after sending, as we don't have a way
-			// to know when the Copilot agent completes the operation.
-			// This is a best-effort approach for MVP.
-			if (this.triggerRegistry) {
-				this.triggerRegistry.fireTrigger("speckit", operation);
-				this.outputChannel.appendLine(
-					`[SpecManager] Fired trigger: speckit.${operation}`
-				);
-			}
+			this.outputChannel.appendLine(
+				`[SpecManager] Executed command: /speckit.${operation}`
+			);
 		} catch (error) {
 			const message =
 				error instanceof Error
@@ -123,7 +120,6 @@ export class SpecManager {
 			this.outputChannel.appendLine(
 				`[SpecManager] Error executing ${operation}: ${message}`
 			);
-			// Don't fire trigger on error
 			throw error;
 		}
 	}

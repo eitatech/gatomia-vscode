@@ -3,6 +3,8 @@ import {
 	type Event,
 	type OutputChannel,
 	extensions,
+	window,
+	commands,
 } from "vscode";
 import { randomUUID } from "node:crypto";
 import type { HookManager } from "./hook-manager";
@@ -10,6 +12,11 @@ import type { TriggerRegistry } from "./trigger-registry";
 import { AgentActionExecutor } from "./actions/agent-action";
 import { GitActionExecutor } from "./actions/git-action";
 import { GitHubActionExecutor } from "./actions/github-action";
+import { MCPActionExecutor } from "./actions/mcp-action";
+import { MCPClientService } from "./services/mcp-client";
+import { MCPParameterResolver } from "./services/mcp-parameter-resolver";
+import { MCPExecutionPool } from "./services/mcp-execution-pool";
+import type { IMCPDiscoveryService } from "./services/mcp-contracts";
 import type {
 	Hook,
 	ExecutionContext,
@@ -18,6 +25,7 @@ import type {
 	AgentActionParams,
 	GitActionParams,
 	GitHubActionParams,
+	MCPActionParams,
 } from "./types";
 import {
 	MAX_CHAIN_DEPTH,
@@ -101,6 +109,7 @@ export class HookExecutor {
 	private readonly agentExecutor: AgentActionExecutor;
 	private readonly gitExecutor: GitActionExecutor;
 	private readonly githubExecutor: GitHubActionExecutor;
+	private readonly mcpExecutor: MCPActionExecutor;
 	private executionLogs: HookExecutionLog[] = [];
 
 	// Event emitters
@@ -119,7 +128,8 @@ export class HookExecutor {
 	constructor(
 		hookManager: HookManager,
 		triggerRegistry: TriggerRegistry,
-		outputChannel: OutputChannel
+		outputChannel: OutputChannel,
+		mcpDiscoveryService: IMCPDiscoveryService
 	) {
 		this.hookManager = hookManager;
 		this.triggerRegistry = triggerRegistry;
@@ -127,6 +137,19 @@ export class HookExecutor {
 		this.agentExecutor = new AgentActionExecutor();
 		this.gitExecutor = new GitActionExecutor();
 		this.githubExecutor = new GitHubActionExecutor();
+
+		// Initialize MCP executor with all required services
+		const clientService = new MCPClientService(mcpDiscoveryService);
+		const parameterResolver = new MCPParameterResolver();
+		const executionPool = new MCPExecutionPool(5); // Concurrency limit of 5
+
+		this.mcpExecutor = new MCPActionExecutor({
+			discoveryService: mcpDiscoveryService,
+			clientService,
+			parameterResolver,
+			executionPool,
+			logger: outputChannel,
+		});
 	}
 
 	/**
@@ -154,6 +177,7 @@ export class HookExecutor {
 
 	/**
 	 * Execute a single hook
+	 * T087: Prevent execution of invalid hooks
 	 */
 	async executeHook(
 		hook: Hook,
@@ -173,6 +197,56 @@ export class HookExecutor {
 				status: "skipped",
 				duration: Date.now() - startTime,
 			};
+		}
+
+		// T087: Validate MCP hooks before execution
+		if (hook.action.type === "mcp") {
+			try {
+				const validation = await this.hookManager.validateHook(hook);
+				if (!validation.valid) {
+					const errorMessages = validation.errors
+						.map((e) => `${e.field}: ${e.message}`)
+						.join(", ");
+
+					this.outputChannel.appendLine(
+						`[HookExecutor] Skipping invalid MCP hook: ${hook.name} - ${errorMessages}`
+					);
+
+					// T088-T089: Show error notification with actions
+					const mcpParams = hook.action.parameters as MCPActionParams;
+					const action = await window.showErrorMessage(
+						`Hook "${hook.name}" has invalid MCP configuration: ${validation.errors[0]?.message ?? "Unknown error"}`,
+						"Update Hook",
+						"Remove Hook",
+						"Cancel"
+					);
+
+					if (action === "Update Hook") {
+						// Trigger hook edit (command will be implemented in hook view)
+						await commands.executeCommand("gatomia.hooks.editHook", hook.id);
+					} else if (action === "Remove Hook") {
+						await this.hookManager.deleteHook(hook.id);
+						window.showInformationMessage(`Hook "${hook.name}" removed`);
+					}
+
+					return {
+						hookId: hook.id,
+						hookName: hook.name,
+						status: "skipped",
+						duration: Date.now() - startTime,
+						error: {
+							message: errorMessages,
+							code: "InvalidMCPConfiguration",
+						},
+					};
+				}
+			} catch (error) {
+				// Graceful degradation - log error and continue
+				const err = error as Error;
+				this.outputChannel.appendLine(
+					`[HookExecutor] Warning: Failed to validate MCP hook: ${err.message}`
+				);
+			}
 		}
 
 		// Create or use existing context
@@ -213,6 +287,14 @@ export class HookExecutor {
 			// Execute action based on type
 			let actionResult: { success: boolean; error?: Error };
 
+			// T074: Add detailed logging for MCP actions
+			if (hook.action.type === "mcp") {
+				const mcpParams = hook.action.parameters as MCPActionParams;
+				this.outputChannel.appendLine(
+					`[HookExecutor] MCP Action: ${mcpParams.serverId}/${mcpParams.toolName}`
+				);
+			}
+
 			switch (hook.action.type) {
 				case "agent": {
 					// Expand templates in command
@@ -244,6 +326,14 @@ export class HookExecutor {
 					const githubParams = hook.action.parameters as GitHubActionParams;
 					actionResult = await this.executeWithTimeout(
 						() => this.githubExecutor.execute(githubParams, templateContext),
+						ACTION_TIMEOUT_MS
+					);
+					break;
+				}
+				case "mcp": {
+					const mcpParams = hook.action.parameters as MCPActionParams;
+					actionResult = await this.executeWithTimeout(
+						() => this.mcpExecutor.execute(mcpParams, templateContext),
 						ACTION_TIMEOUT_MS
 					);
 					break;
@@ -291,17 +381,48 @@ export class HookExecutor {
 					context: execContext,
 					result,
 				});
+
+				// T076: Show success notification for MCP actions
+				if (hook.action.type === "mcp") {
+					const mcpParams = hook.action.parameters as MCPActionParams;
+					window.showInformationMessage(
+						`MCP Tool "${mcpParams.toolName}" executed successfully (${duration}ms)`
+					);
+				}
 			} else {
 				this._onExecutionFailed.fire({
 					hook,
 					context: execContext,
 					result,
 				});
+
+				// T077: Show error notification for MCP actions
+				if (hook.action.type === "mcp") {
+					const mcpParams = hook.action.parameters as MCPActionParams;
+					const errorMsg = result.error?.message ?? "Unknown error";
+					window.showErrorMessage(
+						`MCP Tool "${mcpParams.toolName}" failed: ${errorMsg}`
+					);
+				}
 			}
 
 			this.outputChannel.appendLine(
 				`[HookExecutor] Hook execution ${result.status}: ${hook.name} (${duration}ms)`
 			);
+
+			// T074: Additional logging for MCP actions
+			if (hook.action.type === "mcp") {
+				const mcpParams = hook.action.parameters as MCPActionParams;
+				if (result.status === "success") {
+					this.outputChannel.appendLine(
+						`[HookExecutor] MCP Tool ${mcpParams.serverId}/${mcpParams.toolName} completed successfully`
+					);
+				} else if (result.error) {
+					this.outputChannel.appendLine(
+						`[HookExecutor] MCP Tool ${mcpParams.serverId}/${mcpParams.toolName} failed: ${result.error.code} - ${result.error.message}`
+					);
+				}
+			}
 
 			return result;
 		} catch (error) {

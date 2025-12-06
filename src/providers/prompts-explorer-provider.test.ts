@@ -5,6 +5,7 @@ import { PromptsExplorerProvider } from "./prompts-explorer-provider";
 import { ConfigManager } from "../utils/config-manager";
 
 vi.mock("os", () => ({
+	default: {},
 	homedir: vi.fn(() => "/home/test"),
 	release: vi.fn(() => "release"),
 	platform: vi.fn(() => "linux"),
