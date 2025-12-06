@@ -1,6 +1,4 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { existsSync } from "fs";
-import { SteeringManager } from "./steering-manager";
 import {
 	workspace,
 	window,
@@ -8,26 +6,16 @@ import {
 	type ExtensionContext,
 	type OutputChannel,
 } from "vscode";
-import type { CopilotProvider } from "../../providers/copilot-provider";
-import { ConfigManager } from "../../utils/config-manager";
-import { sendPromptToChat } from "../../utils/chat-prompt-runner";
 
-// Mock fs module
-vi.mock("fs", () => ({
-	default: {},
-	existsSync: vi.fn(),
-}));
-
-// Mock node:fs module
-vi.mock("node:fs", () => ({
-	default: {},
-	readFileSync: vi.fn(() => ""),
-	readdirSync: vi.fn(() => []),
-	statSync: vi.fn(() => ({ isDirectory: () => false })),
-}));
+// Auto-mock fs modules
+vi.mock("fs");
+vi.mock("node:fs");
 
 // Mock os module
 vi.mock("os", () => ({
+	default: {
+		homedir: vi.fn(() => "/home/testuser"),
+	},
 	homedir: vi.fn(() => "/home/testuser"),
 }));
 
@@ -35,6 +23,13 @@ vi.mock("os", () => ({
 vi.mock("../../utils/chat-prompt-runner", () => ({
 	sendPromptToChat: vi.fn(),
 }));
+
+// biome-ignore lint/performance/noNamespaceImport: Required for vitest mocking with vi.mocked()
+import * as fs from "fs";
+import { SteeringManager } from "./steering-manager";
+import type { CopilotProvider } from "../../providers/copilot-provider";
+import { ConfigManager } from "../../utils/config-manager";
+import { sendPromptToChat } from "../../utils/chat-prompt-runner";
 
 // Mock spec-kit-adapter
 vi.mock("../../utils/spec-kit-adapter", () => ({
@@ -165,7 +160,7 @@ describe("SteeringManager", () => {
 		});
 
 		it("should ask for system choice when no system is detected", async () => {
-			vi.mocked(existsSync).mockReturnValue(false);
+			vi.mocked(fs.existsSync).mockReturnValue(false);
 			vi.mocked(window.showQuickPick).mockResolvedValue(undefined);
 
 			await steeringManager.createProjectDocumentation();
@@ -180,7 +175,7 @@ describe("SteeringManager", () => {
 		});
 
 		it("should create SpecKit constitution when selected", async () => {
-			vi.mocked(existsSync).mockReturnValue(false);
+			vi.mocked(fs.existsSync).mockReturnValue(false);
 			vi.mocked(window.showQuickPick).mockResolvedValue({
 				label: "SpecKit",
 				value: "speckit",
@@ -195,7 +190,7 @@ describe("SteeringManager", () => {
 		});
 
 		it("should create OpenSpec AGENTS.md when selected", async () => {
-			vi.mocked(existsSync).mockReturnValue(false);
+			vi.mocked(fs.existsSync).mockReturnValue(false);
 			vi.mocked(window.showQuickPick).mockResolvedValue({
 				label: "OpenSpec",
 				value: "openspec",
@@ -224,7 +219,7 @@ describe("SteeringManager", () => {
 				mockOutputChannel
 			);
 
-			vi.mocked(existsSync).mockReturnValue(false);
+			vi.mocked(fs.existsSync).mockReturnValue(false);
 			vi.mocked(window.showQuickPick).mockResolvedValue({
 				label: "OpenSpec",
 				value: "openspec",

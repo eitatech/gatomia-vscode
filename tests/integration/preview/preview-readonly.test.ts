@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionContext, OutputChannel } from "vscode";
-import { DocumentPreviewPanel } from "../../../src/panels/document-preview-panel";
 import type { DocumentArtifact } from "../../../src/types/preview";
 
 const mockWebview = {
@@ -17,26 +16,19 @@ const mockPanel = {
 	webview: mockWebview,
 } as any;
 
-let vscodeWindow: any;
-let showWarningMessage: ReturnType<typeof vi.fn>;
-
 vi.mock("vscode", () => {
 	const createUri = (value: string) => ({
 		fsPath: value,
 		toString: () => value,
 	});
 
-	showWarningMessage = vi.fn();
-
-	vscodeWindow = {
-		createWebviewPanel: vi.fn(() => mockPanel),
-		showWarningMessage,
-		showInformationMessage: vi.fn(),
-		activeTextEditor: undefined,
-	};
-
 	return {
-		window: vscodeWindow,
+		window: {
+			createWebviewPanel: vi.fn(() => mockPanel),
+			showWarningMessage: vi.fn(),
+			showInformationMessage: vi.fn(),
+			activeTextEditor: undefined,
+		},
 		ViewColumn: { Active: 1, Beside: 2 },
 		Uri: {
 			joinPath: (_base: any, ...segments: string[]) =>
@@ -50,6 +42,9 @@ vi.mock("vscode", () => {
 vi.mock("../../../src/utils/get-webview-content", () => ({
 	getWebviewContent: vi.fn(() => "<html />"),
 }));
+
+import { DocumentPreviewPanel } from "../../../src/panels/document-preview-panel";
+import { window } from "vscode";
 
 describe("DocumentPreviewPanel read-only guard", () => {
 	let messageHandler: ((message: any) => Promise<void> | void) | undefined;
@@ -71,7 +66,7 @@ describe("DocumentPreviewPanel read-only guard", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		mockWebview.postMessage.mockClear();
-		showWarningMessage.mockClear();
+		vi.mocked(window.showWarningMessage).mockClear();
 
 		mockWebview.onDidReceiveMessage.mockImplementation((handler) => {
 			messageHandler = handler;
@@ -100,7 +95,7 @@ describe("DocumentPreviewPanel read-only guard", () => {
 		});
 
 		expect(onEditAttempt).toHaveBeenCalledWith("test");
-		expect(showWarningMessage).toHaveBeenCalledWith(
+		expect(window.showWarningMessage).toHaveBeenCalledWith(
 			"Document preview is read-only. Use the editor to modify the source."
 		);
 	});
