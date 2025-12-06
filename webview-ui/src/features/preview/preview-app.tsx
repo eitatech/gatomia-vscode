@@ -75,12 +75,8 @@ export const PreviewApp = () => {
 		if (staleReason) {
 			return staleReason;
 		}
-		if (!metadata?.documentType) {
-			return "Select a document to load its preview.";
-		}
-
-		return `Rendering ${metadata.documentType} in Markdown preview.`;
-	}, [metadata, staleReason]);
+		return null;
+	}, [staleReason]);
 
 	const renderedSections = useMemo(() => {
 		const sections = metadata?.sections ?? [];
@@ -182,9 +178,11 @@ export const PreviewApp = () => {
 				<div className="flex items-center justify-between gap-3">
 					<div className="flex flex-col gap-1">
 						<h1 className="font-semibold text-xl">{metadata.title}</h1>
-						<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.65))] text-sm">
-							{description}
-						</p>
+						{description && (
+							<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.65))] text-sm">
+								{description}
+							</p>
+						)}
 					</div>
 					<div className="flex flex-wrap items-center gap-2">
 						<RefineDialog
