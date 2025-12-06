@@ -1,4 +1,4 @@
-# GatomIA (Agentic Lifecycle Management Automation)
+# GatomIA (Agentic Spec-Driven Development Tool)
 
 [![Visual Studio Marketplace](https://img.shields.io/vscode-marketplace/v/EITA.gatomiamia.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=EITA.gatomia)
 [![Downloads](https://img.shields.io/vscode-marketplace/d/EITA.gatomia.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=EITA.gatomia)
@@ -8,8 +8,6 @@
 GatomIA is a VS Code extension that brings Agentic Lifecycle Management Automation to your workflow, leveraging **SpecKit**, **OpenSpec**, and **GitHub Copilot**.
 
 It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.md), and custom prompts, seamlessly integrating with GitHub Copilot Chat to generate high-quality documentation and code.
-
-![Create new Spec](./screenshots/image.png)
 
 ## Features
 
