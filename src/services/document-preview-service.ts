@@ -225,6 +225,12 @@ export class DocumentPreviewService {
 		if (normalized.includes("api")) {
 			return "api";
 		}
+		if (
+			normalized.includes("/checklists/") ||
+			normalized.includes("checklist")
+		) {
+			return "checklist";
+		}
 		return "spec";
 	}
 
