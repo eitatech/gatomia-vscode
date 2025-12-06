@@ -1,4 +1,5 @@
-import { promises } from "fs";
+// biome-ignore lint/performance/noNamespaceImport: Required for testability with vitest mocking
+import * as fs from "fs";
 import { join } from "path";
 import {
 	type ExtensionContext,
@@ -51,7 +52,7 @@ export class CopilotProvider {
 		await workspace.fs.createDirectory(this.context.globalStorageUri);
 
 		const tempFile = join(tempDir, `${prefix}-${Date.now()}.md`);
-		await promises.writeFile(tempFile, content);
+		await fs.promises.writeFile(tempFile, content);
 
 		return this.convertPathIfWsl({ filePath: tempFile });
 	}
@@ -85,7 +86,7 @@ export class CopilotProvider {
 	 */
 	async invokeCopilotSplitView(
 		prompt: string,
-		title = "ALMA for Copilot"
+		title = "GatomIA for Copilot"
 	): Promise<Terminal> {
 		try {
 			// Create temp file with the prompt
@@ -115,7 +116,7 @@ export class CopilotProvider {
 			// Clean up temp files after a delay
 			setTimeout(async () => {
 				try {
-					await promises.unlink(promptFilePath);
+					await fs.promises.unlink(promptFilePath);
 					this.outputChannel.appendLine(
 						`Cleaned up prompt file: ${promptFilePath}`
 					);
@@ -226,7 +227,7 @@ export class CopilotProvider {
 							setTimeout(async () => {
 								terminal.dispose();
 								try {
-									await promises.unlink(promptFilePath);
+									await fs.promises.unlink(promptFilePath);
 									this.outputChannel.appendLine(
 										`[Copilot] Cleaned up temp file: ${promptFilePath}`
 									);
@@ -254,7 +255,7 @@ export class CopilotProvider {
 						terminal.dispose();
 						// Clean up temp file
 						try {
-							await promises.unlink(promptFilePath);
+							await fs.promises.unlink(promptFilePath);
 						} catch (e) {
 							// Ignore cleanup errors
 						}

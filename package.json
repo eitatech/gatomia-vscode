@@ -1,15 +1,15 @@
 {
-  "name": "alma",
-  "displayName": "ALMA",
-  "description": "Agentic Lifecycle Management Automation",
-  "version": "0.10.0",
+  "name": "gatomia",
+  "displayName": "GatomIA",
+  "description": "Agentic Spec-Driven Development Toolkit",
+  "version": "0.25.4",
   "license": "MIT",
   "author": "Italo A. G.",
   "publisher": "EITA",
-  "icon": "icon.png",
+  "icon": "assets/icons/gatomia.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eita/alma-vscode"
+    "url": "https://github.com/eita/gatomia-vscode"
   },
   "engines": {
     "vscode": "^1.84.0"
@@ -49,41 +49,46 @@
   },
   "contributes": {
     "configuration": {
-      "title": "ALMA",
+      "title": "GatomIA",
       "properties": {
-        "alma.views.specs.visible": {
+        "gatomia.views.specs.visible": {
           "type": "boolean",
           "default": true,
           "description": "Controls visibility of the Specs view in the activity bar."
         },
-        "alma.views.prompts.visible": {
+        "gatomia.views.prompts.visible": {
           "type": "boolean",
           "default": true,
           "description": "Controls visibility of the Prompts view in the activity bar."
         },
-        "alma.views.steering.visible": {
+        "gatomia.views.steering.visible": {
           "type": "boolean",
           "default": true,
           "description": "Controls visibility of the Steering view in the activity bar."
         },
-        "alma.views.settings.visible": {
+        "gatomia.views.hooks.visible": {
           "type": "boolean",
           "default": true,
-          "description": "Controls visibility of the Settings view in the activity bar."
+          "description": "Controls visibility of the Hooks view in the activity bar."
         },
-        "alma.copilot.specsPath": {
+        "gatomia.views.quickAccess.visible": {
+          "type": "boolean",
+          "default": true,
+          "description": "Controls visibility of the Quick Access view in the activity bar."
+        },
+        "gatomia.copilot.specsPath": {
           "type": "string",
           "default": "speckit",
           "description": "Path where Copilot specification files are stored.",
           "order": 1
         },
-        "alma.copilot.promptsPath": {
+        "gatomia.copilot.promptsPath": {
           "type": "string",
           "default": ".github/prompts",
           "description": "Path where Copilot prompt files are stored.",
           "order": 2
         },
-        "alma.specSystem": {
+        "gatomia.specSystem": {
           "type": "string",
           "default": "auto",
           "enum": [
@@ -91,10 +96,10 @@
             "openspec",
             "speckit"
           ],
-          "description": "The Spec System to use (OpenSpec or Spec-Kit).",
+          "description": "The Spec System to use (OpenSpec or SpecKit).",
           "order": 3
         },
-        "alma.chatLanguage": {
+        "gatomia.chatLanguage": {
           "type": "string",
           "default": "English",
           "enum": [
@@ -113,56 +118,56 @@
           "description": "The language GitHub Copilot should use for responses.",
           "order": 3
         },
-        "alma.customInstructions.global": {
+        "gatomia.customInstructions.global": {
           "type": "string",
           "default": "",
           "editPresentation": "multilineText",
           "description": "Global custom instructions appended to all prompts.",
           "order": 4
         },
-        "alma.customInstructions.createSpec": {
+        "gatomia.customInstructions.createSpec": {
           "type": "string",
           "default": "",
           "editPresentation": "multilineText",
           "description": "Custom instructions appended when creating a spec.",
           "order": 5
         },
-        "alma.customInstructions.startAllTask": {
+        "gatomia.customInstructions.startAllTask": {
           "type": "string",
           "default": "",
           "editPresentation": "multilineText",
           "description": "Custom instructions appended when starting all tasks.",
           "order": 6
         },
-        "alma.customInstructions.runPrompt": {
+        "gatomia.customInstructions.runPrompt": {
           "type": "string",
           "default": "",
           "editPresentation": "multilineText",
           "description": "Custom instructions appended when running a prompt.",
           "order": 7
         },
-        "alma.speckit.specsPath": {
+        "gatomia.speckit.specsPath": {
           "type": "string",
           "default": "specs",
-          "description": "Path where Spec-Kit specification files are stored.",
+          "description": "Path where SpecKit specification files are stored.",
           "order": 8
         },
-        "alma.speckit.memoryPath": {
+        "gatomia.speckit.memoryPath": {
           "type": "string",
           "default": ".specify/memory",
-          "description": "Path where Spec-Kit memory files are stored.",
+          "description": "Path where SpecKit memory files are stored.",
           "order": 9
         },
-        "alma.speckit.templatesPath": {
+        "gatomia.speckit.templatesPath": {
           "type": "string",
           "default": ".specify/templates",
-          "description": "Path where Spec-Kit template files are stored.",
+          "description": "Path where SpecKit template files are stored.",
           "order": 10
         },
-        "alma.speckit.scriptsPath": {
+        "gatomia.speckit.scriptsPath": {
           "type": "string",
           "default": ".specify/scripts",
-          "description": "Path where Spec-Kit script files are stored.",
+          "description": "Path where SpecKit script files are stored.",
           "order": 11
         }
       }
@@ -170,318 +175,540 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "alma",
-          "title": "ALMA",
-          "icon": "./icons/alma.svg"
+          "id": "gatomia",
+          "title": "GatomIA",
+          "icon": "./assets/icons/gatomia.svg"
         }
       ]
     },
     "views": {
-      "alma": [
+      "gatomia": [
         {
-          "id": "alma.views.specExplorer",
+          "id": "gatomia.views.specExplorer",
           "name": "Specs",
           "icon": "symbol-structure",
-          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.alma.views.specs.visible"
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.specs.visible"
         },
         {
-          "id": "alma.views.promptsExplorer",
+          "id": "gatomia.views.promptsExplorer",
           "name": "Prompts",
           "icon": "terminal",
-          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.alma.views.prompts.visible"
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.prompts.visible"
         },
         {
-          "id": "alma.views.steeringExplorer",
+          "id": "gatomia.views.steeringExplorer",
           "name": "Steering",
           "icon": "symbol-parameter",
-          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.alma.views.steering.visible"
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.steering.visible"
         },
         {
-          "id": "alma.views.overview",
-          "name": "Settings",
-          "icon": "gear",
-          "visibility": "collapsed",
-          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.alma.views.settings.visible"
+          "id": "gatomia.views.hooksExplorer",
+          "name": "Hooks",
+          "icon": "plug",
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.hooks.visible"
+        },
+        {
+          "id": "gatomia.views.overview",
+          "name": "Quick Access",
+          "icon": "zap",
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.quickAccess.visible"
         }
       ]
     },
     "viewsWelcome": [
       {
-        "view": "alma.views.specExplorer",
-        "contents": "Plan features with Specs\n\n[$(plus) Create New Spec](command:alma.spec.create)"
+        "view": "gatomia.views.specExplorer",
+        "contents": "Plan features with Specs\n\n[$(plus) Create New Spec](command:gatomia.spec.create)"
       },
       {
-        "view": "alma.views.promptsExplorer",
-        "contents": "Create and run prompts (.md) under .github/prompts\n\n[$(refresh) Refresh](command:alma.prompts.refresh)"
+        "view": "gatomia.views.promptsExplorer",
+        "contents": "Create and run prompts (.md) under .github/prompts\n\n[$(refresh) Refresh](command:gatomia.prompts.refresh)"
       },
       {
-        "view": "alma.views.steeringExplorer",
-        "contents": "Manage steering rules for Copilot\n\n[$(root-folder) Create Project Rule](command:alma.steering.createProjectRule)\n[$(globe) Create User Rule](command:alma.steering.createUserRule)"
+        "view": "gatomia.views.steeringExplorer",
+        "contents": "Manage steering rules for Copilot\n\n[$(root-folder) Create Project Rule](command:gatomia.steering.createProjectRule)\n[$(globe) Create User Rule](command:gatomia.steering.createUserRule)"
       },
       {
-        "view": "alma.views.overview",
-        "contents": "Configure ALMA\n\n[$(book) Install Spec Kit](command:alma.help.install)\n[$(gear) Open Settings](command:alma.settings.open)\n[$(file-text) Open MCP Config (mcp.json)](command:alma.settings.openGlobalConfig)\n[$(question) Help](command:alma.help.open)"
+        "view": "gatomia.views.hooksExplorer",
+        "contents": "Automate SpecKit/OpenSpec workflows with triggers and actions.\n\n[$(plus) Add Hook](command:gatomia.hooks.addHook)\n[$(eye) View Hook Logs](command:gatomia.hooks.viewLogs)\n[$(refresh) Refresh](command:gatomia.hooks.refresh)"
       }
     ],
     "commands": [
       {
-        "command": "alma.spec.create",
+        "command": "gatomia.spec.create",
         "title": "Create New Spec",
-        "category": "ALMA",
+        "category": "GatomIA",
         "icon": "$(plus)"
       },
       {
-        "command": "alma.spec.refresh",
+        "command": "gatomia.spec.refresh",
         "title": "Refresh Specs",
-        "category": "ALMA",
+        "category": "GatomIA",
         "icon": "$(refresh)"
       },
       {
-        "command": "alma.spec.delete",
+        "command": "gatomia.spec.delete",
         "title": "Delete Spec",
-        "category": "ALMA",
+        "category": "GatomIA",
         "icon": "$(trash)"
       },
       {
-        "command": "alma.spec.archiveChange",
+        "command": "gatomia.spec.archiveChange",
         "title": "Archive Change",
-        "category": "ALMA",
+        "category": "GatomIA",
         "icon": "$(archive)"
       },
       {
-        "command": "alma.spec.implTask",
+        "command": "gatomia.spec.implTask",
         "title": "Implement Task",
-        "category": "ALMA"
+        "category": "GatomIA"
       },
       {
-        "command": "alma.steering.refresh",
-        "title": "Refresh Steering",
-        "category": "ALMA",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "alma.steering.createUserRule",
-        "title": "Create User Rule",
-        "category": "ALMA",
-        "icon": "$(globe)"
-      },
-      {
-        "command": "alma.steering.createProjectRule",
-        "title": "Create Project Rule",
-        "category": "ALMA",
-        "icon": "$(root-folder)"
-      },
-      {
-        "command": "alma.prompts.create",
-        "title": "Create Prompt",
-        "category": "ALMA",
-        "icon": "$(plus)"
-      },
-      {
-        "command": "alma.prompts.createAgentFile",
-        "title": "New Agent File",
-        "category": "ALMA",
-        "icon": "$(robot)"
-      },
-      {
-        "command": "alma.prompts.createInstructions",
-        "title": "New Instructions File",
-        "category": "ALMA",
-        "icon": "$(book)"
-      },
-      {
-        "command": "alma.prompts.createCopilotPrompt",
-        "title": "New Prompt File",
-        "category": "ALMA",
-        "icon": "$(sparkle)"
-      },
-      {
-        "command": "alma.prompts.refresh",
-        "title": "Refresh Prompts",
-        "category": "ALMA",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "alma.prompts.run",
-        "title": "Run Prompt",
-        "category": "ALMA",
+        "command": "gatomia.spec.runTask",
+        "title": "Run Task",
+        "category": "GatomIA",
         "icon": "$(play)"
       },
       {
-        "command": "alma.prompts.rename",
-        "title": "Rename",
-        "category": "ALMA",
-        "icon": "$(edit)"
+        "command": "gatomia.hooks.export",
+        "title": "Export Hooks",
+        "category": "GatomIA",
+        "icon": "$(cloud-upload)"
       },
       {
-        "command": "alma.prompts.delete",
-        "title": "Delete",
-        "category": "ALMA",
+        "command": "gatomia.hooks.import",
+        "title": "Import Hooks",
+        "category": "GatomIA",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "gatomia.hooks.addHook",
+        "title": "Add Hook",
+        "category": "GatomIA",
+        "icon": "$(plus)"
+      },
+      {
+        "command": "gatomia.hooks.viewLogs",
+        "title": "View Hook Logs",
+        "category": "GatomIA",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "gatomia.hooks.refresh",
+        "title": "Refresh Hooks",
+        "category": "GatomIA",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gatomia.hooks.edit",
+        "title": "Edit Hook",
+        "category": "GatomIA",
+        "icon": "$(pencil)"
+      },
+      {
+        "command": "gatomia.hooks.enable",
+        "title": "Enable Hook",
+        "category": "GatomIA",
+        "icon": "$(play)"
+      },
+      {
+        "command": "gatomia.hooks.disable",
+        "title": "Pause Hook",
+        "category": "GatomIA",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "gatomia.hooks.delete",
+        "title": "Delete Hook",
+        "category": "GatomIA",
         "icon": "$(trash)"
       },
       {
-        "command": "alma.settings.open",
-        "title": "ALMA Settings",
-        "category": "ALMA",
+        "command": "gatomia.steering.refresh",
+        "title": "Refresh Steering",
+        "category": "GatomIA",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gatomia.steering.createUserRule",
+        "title": "Create User Rule",
+        "category": "GatomIA",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "gatomia.steering.createProjectRule",
+        "title": "Create Project Rule",
+        "category": "GatomIA",
+        "icon": "$(root-folder)"
+      },
+      {
+        "command": "gatomia.prompts.create",
+        "title": "Create Prompt",
+        "category": "GatomIA",
+        "icon": "$(plus)"
+      },
+      {
+        "command": "gatomia.prompts.createAgentFile",
+        "title": "New Agent File",
+        "category": "GatomIA",
+        "icon": "$(robot)"
+      },
+      {
+        "command": "gatomia.prompts.createInstructions",
+        "title": "New Instructions File",
+        "category": "GatomIA",
+        "icon": "$(book)"
+      },
+      {
+        "command": "gatomia.prompts.createCopilotPrompt",
+        "title": "New Prompt File",
+        "category": "GatomIA",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "gatomia.prompts.refresh",
+        "title": "Refresh Prompts",
+        "category": "GatomIA",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gatomia.prompts.run",
+        "title": "Run Prompt",
+        "category": "GatomIA",
+        "icon": "$(play)"
+      },
+      {
+        "command": "gatomia.prompts.rename",
+        "title": "Rename",
+        "category": "GatomIA",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "gatomia.prompts.delete",
+        "title": "Delete",
+        "category": "GatomIA",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "gatomia.settings.open",
+        "title": "GatomIA Settings",
+        "category": "GatomIA",
         "icon": "$(gear)"
       },
       {
-        "command": "alma.settings.openGlobalConfig",
+        "command": "gatomia.settings.openGlobalConfig",
         "title": "Open MCP Config (mcp.json)",
-        "category": "ALMA",
+        "category": "GatomIA",
         "icon": "$(file-text)"
       },
       {
-        "command": "alma.settings.selectSpecSystem",
+        "command": "gatomia.settings.selectSpecSystem",
         "title": "Select Spec System",
-        "category": "ALMA",
+        "category": "GatomIA",
         "icon": "$(settings-gear)"
       },
       {
-        "command": "alma.help.open",
-        "title": "ALMA Help",
-        "category": "ALMA",
+        "command": "gatomia.help.open",
+        "title": "GatomIA Help",
+        "category": "GatomIA",
         "icon": "$(question)"
       },
       {
-        "command": "alma.speckit.constitution",
+        "command": "gatomia.dependencies.check",
+        "title": "Install Dependencies",
+        "category": "GatomIA",
+        "icon": "$(desktop-download)"
+      },
+      {
+        "command": "gatomia.speckit.constitution",
         "title": "Create Constitution",
-        "category": "ALMA"
+        "category": "GatomIA"
       },
       {
-        "command": "alma.speckit.specify",
+        "command": "gatomia.speckit.specify",
         "title": "Specify Feature",
-        "category": "ALMA"
+        "category": "GatomIA"
       },
       {
-        "command": "alma.speckit.plan",
+        "command": "gatomia.speckit.plan",
         "title": "Plan Feature",
-        "category": "ALMA"
+        "category": "GatomIA"
       },
       {
-        "command": "alma.speckit.unit-test",
+        "command": "gatomia.speckit.unit-test",
         "title": "Create Unit Tests",
-        "category": "ALMA"
+        "category": "GatomIA"
       },
       {
-        "command": "alma.speckit.integration-test",
+        "command": "gatomia.speckit.integration-test",
         "title": "Create Integration Tests",
-        "category": "ALMA"
+        "category": "GatomIA"
       },
       {
-        "command": "alma.speckit.implementation",
+        "command": "gatomia.speckit.implementation",
         "title": "Implement Feature",
-        "category": "ALMA"
+        "category": "GatomIA"
       },
       {
-        "command": "alma.migration.start",
-        "title": "Migrate to Spec-Kit",
-        "category": "ALMA"
+        "command": "gatomia.speckit.clarify",
+        "title": "Clarify Requirements",
+        "category": "GatomIA",
+        "icon": "$(edit)"
       },
       {
-        "command": "alma.migration.generateConstitution",
+        "command": "gatomia.speckit.analyze",
+        "title": "Analyze Spec Quality",
+        "category": "GatomIA",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "gatomia.speckit.checklist",
+        "title": "Run Checklist",
+        "category": "GatomIA",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "gatomia.speckit.tasks",
+        "title": "Generate Tasks",
+        "category": "GatomIA",
+        "icon": "$(tasklist)"
+      },
+      {
+        "command": "gatomia.speckit.taskstoissues",
+        "title": "Convert Tasks to Issues",
+        "category": "GatomIA",
+        "icon": "$(git-pull-request)"
+      },
+      {
+        "command": "gatomia.speckit.research",
+        "title": "Research Feature",
+        "category": "GatomIA",
+        "icon": "$(search)"
+      },
+      {
+        "command": "gatomia.speckit.datamodel",
+        "title": "Define Data Model",
+        "category": "GatomIA",
+        "icon": "$(symbol-array)"
+      },
+      {
+        "command": "gatomia.speckit.design",
+        "title": "Create Design",
+        "category": "GatomIA",
+        "icon": "$(symbol-structure)"
+      },
+      {
+        "command": "gatomia.migration.start",
+        "title": "Migrate to SpecKit",
+        "category": "GatomIA"
+      },
+      {
+        "command": "gatomia.migration.generateConstitution",
         "title": "Generate Constitution from Guidelines",
-        "category": "ALMA"
+        "category": "GatomIA"
       },
       {
-        "command": "alma.migration.createBackup",
+        "command": "gatomia.migration.createBackup",
         "title": "Create OpenSpec Backup",
-        "category": "ALMA"
+        "category": "GatomIA"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "alma.spec.create",
-          "when": "view == alma.views.specExplorer",
+          "command": "gatomia.spec.create",
+          "when": "view == gatomia.views.specExplorer",
           "group": "navigation@1"
         },
         {
-          "command": "alma.spec.refresh",
-          "when": "view == alma.views.specExplorer",
+          "command": "gatomia.spec.refresh",
+          "when": "view == gatomia.views.specExplorer",
           "group": "navigation@2"
         },
         {
-          "command": "alma.steering.refresh",
-          "when": "view == alma.views.steeringExplorer",
+          "command": "gatomia.steering.refresh",
+          "when": "view == gatomia.views.steeringExplorer",
           "group": "navigation@3"
         },
         {
-          "command": "alma.steering.createProjectRule",
-          "when": "view == alma.views.steeringExplorer",
+          "command": "gatomia.steering.createProjectRule",
+          "when": "view == gatomia.views.steeringExplorer",
           "group": "navigation@1"
         },
         {
-          "command": "alma.steering.createUserRule",
-          "when": "view == alma.views.steeringExplorer",
+          "command": "gatomia.steering.createUserRule",
+          "when": "view == gatomia.views.steeringExplorer",
           "group": "navigation@2"
         },
         {
-          "command": "alma.prompts.createAgentFile",
-          "when": "view == alma.views.promptsExplorer",
+          "command": "gatomia.prompts.createAgentFile",
+          "when": "view == gatomia.views.promptsExplorer",
           "group": "navigation@1"
         },
         {
-          "command": "alma.prompts.createInstructions",
-          "when": "view == alma.views.promptsExplorer",
+          "command": "gatomia.prompts.createInstructions",
+          "when": "view == gatomia.views.promptsExplorer",
           "group": "navigation@2"
         },
         {
-          "command": "alma.prompts.createCopilotPrompt",
-          "when": "view == alma.views.promptsExplorer",
+          "command": "gatomia.prompts.createCopilotPrompt",
+          "when": "view == gatomia.views.promptsExplorer",
           "group": "navigation@3"
         },
         {
-          "command": "alma.prompts.refresh",
-          "when": "view == alma.views.promptsExplorer",
+          "command": "gatomia.prompts.refresh",
+          "when": "view == gatomia.views.promptsExplorer",
           "group": "navigation@4"
         },
         {
-          "command": "alma.settings.openGlobalConfig",
-          "when": "view == alma.views.overview",
+          "command": "gatomia.hooks.refresh",
+          "when": "view == gatomia.views.hooksExplorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gatomia.hooks.addHook",
+          "when": "view == gatomia.views.hooksExplorer",
+          "group": "navigation@2"
+        },
+        {
+          "command": "gatomia.hooks.viewLogs",
+          "when": "view == gatomia.views.hooksExplorer",
+          "group": "navigation@3"
+        },
+        {
+          "command": "gatomia.hooks.export",
+          "when": "view == gatomia.views.hooksExplorer",
+          "group": "navigation@4"
+        },
+        {
+          "command": "gatomia.hooks.import",
+          "when": "view == gatomia.views.hooksExplorer",
+          "group": "navigation@5"
+        },
+        {
+          "command": "gatomia.settings.openGlobalConfig",
+          "when": "view == gatomia.views.overview",
           "group": "navigation@2"
         }
       ],
       "view/item/context": [
         {
-          "command": "alma.spec.delete",
-          "when": "view == alma.views.specExplorer && viewItem == spec",
+          "command": "gatomia.spec.delete",
+          "when": "view == gatomia.views.specExplorer && viewItem == spec",
           "group": "7_modification"
         },
         {
-          "command": "alma.spec.archiveChange",
-          "when": "view == alma.views.specExplorer && viewItem == change",
+          "command": "gatomia.spec.archiveChange",
+          "when": "view == gatomia.views.specExplorer && viewItem == change",
           "group": "7_modification"
         },
         {
-          "command": "alma.prompts.run",
-          "when": "view == alma.views.promptsExplorer && viewItem == prompt-runnable",
+          "command": "gatomia.spec.runTask",
+          "when": "view == gatomia.views.specExplorer && viewItem == task-item",
           "group": "inline"
         },
         {
-          "command": "alma.prompts.rename",
-          "when": "view == alma.views.promptsExplorer && (viewItem == prompt || viewItem == prompt-runnable)",
+          "command": "gatomia.prompts.run",
+          "when": "view == gatomia.views.promptsExplorer && viewItem == prompt-runnable",
+          "group": "inline"
+        },
+        {
+          "command": "gatomia.prompts.rename",
+          "when": "view == gatomia.views.promptsExplorer && (viewItem == prompt || viewItem == prompt-runnable)",
           "group": "7_modification@1"
         },
         {
-          "command": "alma.prompts.delete",
-          "when": "view == alma.views.promptsExplorer && (viewItem == prompt || viewItem == prompt-runnable)",
+          "command": "gatomia.prompts.delete",
+          "when": "view == gatomia.views.promptsExplorer && (viewItem == prompt || viewItem == prompt-runnable)",
+          "group": "7_modification@2"
+        },
+        {
+          "command": "gatomia.hooks.disable",
+          "when": "view == gatomia.views.hooksExplorer && viewItem == hook-enabled",
+          "group": "inline@1"
+        },
+        {
+          "command": "gatomia.hooks.enable",
+          "when": "view == gatomia.views.hooksExplorer && viewItem == hook-disabled",
+          "group": "inline@1"
+        },
+        {
+          "command": "gatomia.hooks.delete",
+          "when": "view == gatomia.views.hooksExplorer && (viewItem == hook-enabled || viewItem == hook-disabled)",
+          "group": "inline@2"
+        },
+        {
+          "command": "gatomia.hooks.edit",
+          "when": "view == gatomia.views.hooksExplorer && (viewItem == hook-enabled || viewItem == hook-disabled)",
+          "group": "7_modification@1"
+        },
+        {
+          "command": "gatomia.hooks.viewLogs",
+          "when": "view == gatomia.views.hooksExplorer && (viewItem == hook-enabled || viewItem == hook-disabled)",
           "group": "7_modification@2"
         }
       ],
       "commandPalette": [
         {
-          "command": "alma.spec.create"
+          "command": "gatomia.spec.create"
         },
         {
-          "command": "alma.steering.refresh"
+          "command": "gatomia.steering.refresh"
         },
         {
-          "command": "alma.prompts.create",
+          "command": "gatomia.hooks.export",
           "when": "workspaceFolderCount > 0"
         },
         {
-          "command": "alma.settings.openGlobalConfig"
+          "command": "gatomia.hooks.import",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "gatomia.hooks.addHook",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "gatomia.hooks.viewLogs",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "gatomia.prompts.create",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "gatomia.speckit.clarify",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "gatomia.speckit.analyze",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "gatomia.speckit.checklist",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "gatomia.speckit.tasks",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "gatomia.speckit.taskstoissues",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "gatomia.speckit.research",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "gatomia.speckit.datamodel",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "gatomia.speckit.design",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "gatomia.settings.openGlobalConfig"
         }
       ]
     }
@@ -489,15 +716,23 @@
   "devDependencies": {
     "@biomejs/biome": "^2.3.6",
     "@jest/globals": "^29.7.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^15.0.7",
+    "@testing-library/user-event": "^14.6.1",
     "@types/glob": "^8.1.0",
     "@types/node": "^20.x",
     "@types/vscode": "^1.84.0",
+    "@vitest/coverage-v8": "3.2.4",
     "@vitest/ui": "^3.2.4",
+    "@vscode/codicons": "^0.0.43",
     "concurrently": "^9.2.0",
     "copy-webpack-plugin": "^13.0.0",
     "esbuild": "^0.23.0",
     "husky": "^9.1.7",
     "jest": "^29.7.0",
+    "jsdom": "^27.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "ts-jest": "^29.4.0",
     "ts-loader": "^9.5.2",
     "typescript": "^5.3.0",
@@ -507,6 +742,9 @@
   },
   "dependencies": {
     "gray-matter": "^4.0.3",
-    "handlebars": "^4.7.8"
+    "handlebars": "^4.7.8",
+    "markdown-it": "^14.1.0",
+    "markdown-it-mermaid": "^0.2.5",
+    "markdown-it-plantuml": "^1.4.1"
   }
 }

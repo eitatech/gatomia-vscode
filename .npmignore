@@ -1,0 +1,25 @@
+# Build artifacts
+dist/
+out/
+webview-ui/dist/
+build/
+
+# Dependencies
+node_modules/
+webview-ui/node_modules/
+
+# Tooling & workspace state
+.vscode/
+.idea/
+.DS_Store
+*.log
+.env
+.env.*
+
+# Spec & documentation sources (not needed in published package)
+.specify/
+specs/
+openspec/
+screenshots/
+docs/
+tests/

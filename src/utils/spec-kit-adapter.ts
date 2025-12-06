@@ -18,7 +18,7 @@ import { ConfigManager } from "./config-manager";
 
 /**
  * Spec System Adapter
- * Provides a unified interface for working with both OpenSpec and Spec-Kit
+ * Provides a unified interface for working with both OpenSpec and SpecKit
  * Automatically detects which system is active and adapts accordingly
  */
 
@@ -91,13 +91,13 @@ export class SpecSystemAdapter {
 				const choice = await window.showQuickPick(
 					[
 						{
-							label: "Spec-Kit",
-							description: "Use Spec-Kit system (Recommended)",
+							label: "SpecKit",
+							description: "Use SpecKit system",
 							value: SPEC_SYSTEM_MODE.SPECKIT,
 						},
 						{
 							label: "OpenSpec",
-							description: "Use OpenSpec system (Legacy)",
+							description: "Use OpenSpec system",
 							value: SPEC_SYSTEM_MODE.OPENSPEC,
 						},
 					],
@@ -156,8 +156,8 @@ export class SpecSystemAdapter {
 					value: "auto",
 				},
 				{
-					label: "Spec-Kit",
-					description: "Use Spec-Kit system",
+					label: "SpecKit",
+					description: "Use SpecKit system",
 					value: SPEC_SYSTEM_MODE.SPECKIT,
 				},
 				{
@@ -236,7 +236,7 @@ export class SpecSystemAdapter {
 	}
 
 	/**
-	 * Lists Spec-Kit features (numbered directories)
+	 * Lists SpecKit features (numbered directories)
 	 */
 	private listSpecKitSpecs(): Promise<UnifiedSpec[]> {
 		const config = this.getConfig();
@@ -293,7 +293,7 @@ export class SpecSystemAdapter {
 	}
 
 	/**
-	 * Gets file paths for a Spec-Kit feature
+	 * Gets file paths for a SpecKit feature
 	 */
 	private getSpecKitFeatureFiles(featurePath: string): Record<string, string> {
 		const files: Record<string, string> = {};
@@ -348,7 +348,7 @@ export class SpecSystemAdapter {
 	}
 
 	/**
-	 * Creates a new Spec-Kit feature
+	 * Creates a new SpecKit feature
 	 */
 	private createSpecKitFeature(name: string): Promise<UnifiedSpec> {
 		const config = this.getConfig();
@@ -373,7 +373,7 @@ export class SpecSystemAdapter {
 			});
 		} catch (error) {
 			return Promise.reject(
-				new Error(`Failed to create Spec-Kit feature: ${error}`)
+				new Error(`Failed to create SpecKit feature: ${error}`)
 			);
 		}
 	}
@@ -430,6 +430,35 @@ export class SpecSystemAdapter {
 	}
 
 	/**
+	 * Gets file paths for a specific spec by name
+	 */
+	getSpecFiles(specName: string): Record<string, string> {
+		const config = this.getConfig();
+
+		if (config.system === SPEC_SYSTEM_MODE.SPECKIT) {
+			// Find the feature directory that matches the spec name
+			const features = discoverSpecKitFeatures(config.specsPath);
+			const feature = features.find(
+				(f) => f.slug === specName || f.name === specName
+			);
+
+			if (!feature) {
+				return {};
+			}
+
+			return this.getSpecKitFeatureFiles(feature.path);
+		}
+
+		// OpenSpec format
+		const specsPath = join(config.specsPath, "specs", specName);
+		if (!existsSync(specsPath)) {
+			return {};
+		}
+
+		return this.getOpenSpecFiles(specsPath);
+	}
+
+	/**
 	 * Gets the system-appropriate prompt path
 	 */
 	getPromptPath(promptName: string): string {
@@ -442,13 +471,13 @@ export class SpecSystemAdapter {
 	}
 
 	/**
-	 * Converts OpenSpec spec to Spec-Kit format (future migration support)
+	 * Converts OpenSpec spec to SpecKit format (future migration support)
 	 */
 	migrateSpecToSpecKit(openSpecId: string): Promise<UnifiedSpec | null> {
 		const config = this.getConfig();
 
 		if (config.system !== SPEC_SYSTEM_MODE.OPENSPEC) {
-			console.warn("Migration only works from OpenSpec to Spec-Kit");
+			console.warn("Migration only works from OpenSpec to SpecKit");
 			return Promise.resolve(null);
 		}
 
@@ -456,7 +485,7 @@ export class SpecSystemAdapter {
 		// In a full implementation, this would:
 		// 1. Read files from OpenSpec directory
 		// 2. Convert format/metadata if needed
-		// 3. Create Spec-Kit feature directory
+		// 3. Create SpecKit feature directory
 		// 4. Write converted files
 		// 5. Return the new unified spec
 

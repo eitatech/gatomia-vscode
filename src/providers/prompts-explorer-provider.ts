@@ -18,6 +18,7 @@ import {
 import { addDocumentToCopilotChat } from "../utils/copilot-chat-utils";
 import { ConfigManager } from "../utils/config-manager";
 import { getVSCodeUserDataPath, isWindowsOrWsl } from "../utils/platform-utils";
+import { SPEC_SYSTEM_MODE } from "../constants";
 
 const { joinPath } = Uri;
 
@@ -29,13 +30,38 @@ type PromptSource =
 
 const invalidFileNamePattern = /[\\/:*?"<>|]/;
 
+// Regex patterns for display name formatting
+const PROMPT_MD_PATTERN = /\.prompt\.md$/i;
+const AGENT_MD_PATTERN = /\.agent\.md$/i;
+const MD_PATTERN = /\.md$/i;
+const SEPARATOR_PATTERN = /[.\-_]+/;
+
+// Special term mappings for display name formatting
+const SPECIAL_TERMS: Record<string, string> = {
+	speckit: "SpecKit",
+	"spec-kit": "SpecKit",
+	openspec: "OpenSpec",
+	"open-spec": "OpenSpec",
+	github: "GitHub",
+	mcp: "MCP",
+	api: "API",
+	ui: "UI",
+	cli: "CLI",
+	sdk: "SDK",
+	sdd: "SDD",
+};
+
+// Patterns for filtering prompts by spec system
+const SPECKIT_PROMPT_PATTERN = /^speckit[.-]/i;
+const OPENSPEC_PROMPT_PATTERN = /^openspec[.-]/i;
+
 type TreeEventPayload = PromptItem | undefined | null | void;
 
 export class PromptsExplorerProvider implements TreeDataProvider<PromptItem> {
-	static readonly viewId = "alma.views.promptsExplorer";
-	static readonly createPromptCommandId = "alma.prompts.create";
-	static readonly refreshCommandId = "alma.prompts.refresh";
-	static readonly runPromptCommandId = "alma.prompts.run";
+	static readonly viewId = "gatomia.views.promptsExplorer";
+	static readonly createPromptCommandId = "gatomia.prompts.create";
+	static readonly refreshCommandId = "gatomia.prompts.refresh";
+	static readonly runPromptCommandId = "gatomia.prompts.run";
 
 	private readonly changeEmitter = new EventEmitter<TreeEventPayload>();
 	readonly onDidChangeTreeData: Event<TreeEventPayload> =
@@ -362,7 +388,10 @@ export class PromptsExplorerProvider implements TreeDataProvider<PromptItem> {
 		source: PromptSource
 	): Promise<PromptItem[]> => {
 		const suffix = source === "global" ? "" : ".md";
-		const promptFiles = await this.readMarkdownFiles(rootUri, suffix);
+		const allPromptFiles = await this.readMarkdownFiles(rootUri, suffix);
+
+		// Filter prompts based on the active spec system
+		const promptFiles = this.filterPromptsBySpecSystem(allPromptFiles);
 
 		if (promptFiles.length === 0) {
 			let label: string;
@@ -397,18 +426,86 @@ export class PromptsExplorerProvider implements TreeDataProvider<PromptItem> {
 					arguments: [uri],
 				};
 				const isRunnable = pathString.endsWith(".prompt.md");
-				const contextValue = isRunnable ? "prompt-runnable" : "prompt";
+				const isAgent = pathString.endsWith(".agent.md");
+				const contextValue =
+					isRunnable || isAgent ? "prompt-runnable" : "prompt";
+				const displayName = this.formatDisplayName(basename(pathString));
 				return new PromptItem(
-					basename(pathString),
+					displayName,
 					TreeItemCollapsibleState.None,
 					contextValue,
 					{
 						resourceUri: uri,
 						command,
 						source,
+						isAgent,
 					}
 				);
 			});
+	};
+
+	/**
+	 * Filters prompt files based on the active spec system.
+	 * - SpecKit mode: Shows speckit.* prompts, hides openspec-* prompts
+	 * - OpenSpec mode: Shows openspec-* prompts, hides speckit.* prompts
+	 * - Auto mode: Shows all prompts
+	 */
+	private readonly filterPromptsBySpecSystem = (
+		promptFiles: string[]
+	): string[] => {
+		const specSystem = this.configManager.getSettings().specSystem;
+
+		if (specSystem === SPEC_SYSTEM_MODE.AUTO) {
+			return promptFiles;
+		}
+
+		return promptFiles.filter((filePath) => {
+			const fileName = basename(filePath);
+
+			if (specSystem === SPEC_SYSTEM_MODE.SPECKIT) {
+				// In SpecKit mode, hide OpenSpec prompts
+				return !OPENSPEC_PROMPT_PATTERN.test(fileName);
+			}
+
+			if (specSystem === SPEC_SYSTEM_MODE.OPENSPEC) {
+				// In OpenSpec mode, hide SpecKit prompts
+				return !SPECKIT_PROMPT_PATTERN.test(fileName);
+			}
+
+			return true;
+		});
+	};
+
+	/**
+	 * Formats a file name into a human-readable display name.
+	 * Examples:
+	 * - "speckit.plan.prompt.md" -> "SpecKit Plan"
+	 * - "openspec-apply.prompt.md" -> "OpenSpec Apply"
+	 * - "speckit.analyze.agent.md" -> "SpecKit Analyze"
+	 * - "my-custom-prompt.md" -> "My Custom Prompt"
+	 */
+	private readonly formatDisplayName = (fileName: string): string => {
+		// Remove file extensions (.prompt.md, .agent.md, .md)
+		const name = fileName
+			.replace(PROMPT_MD_PATTERN, "")
+			.replace(AGENT_MD_PATTERN, "")
+			.replace(MD_PATTERN, "");
+
+		// Split by dots, hyphens, or underscores
+		const parts = name.split(SEPARATOR_PATTERN);
+
+		// Capitalize each part with special handling for known terms
+		const formattedParts = parts.map((part) => {
+			const lowerPart = part.toLowerCase();
+			const specialTerm = SPECIAL_TERMS[lowerPart];
+			if (specialTerm) {
+				return specialTerm;
+			}
+			// Default: capitalize first letter
+			return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+		});
+
+		return formattedParts.join(" ");
 	};
 
 	private readonly createLoadingItem = (): PromptItem =>
@@ -531,6 +628,7 @@ interface PromptItemOptions {
 	tooltip?: string;
 	description?: string;
 	source?: PromptSource;
+	isAgent?: boolean;
 }
 
 class PromptItem extends TreeItem {
@@ -603,7 +701,7 @@ class PromptItem extends TreeItem {
 				"Create prompts under the configured prompts directory";
 		},
 		prompt: (item, options) => {
-			item.iconPath = new ThemeIcon("file-code");
+			item.iconPath = new ThemeIcon("code-oss");
 			if (!options) {
 				return;
 			}
@@ -626,7 +724,8 @@ class PromptItem extends TreeItem {
 			item.tooltip = options.tooltip ?? description;
 		},
 		"prompt-runnable": (item, options) => {
-			item.iconPath = new ThemeIcon("file-code");
+			// Use robot icon for agents, code-oss for prompts
+			item.iconPath = new ThemeIcon(options?.isAgent ? "robot" : "code-oss");
 			if (!options) {
 				return;
 			}

@@ -4,6 +4,7 @@ import {
 	type ExtensionContext,
 	type TreeDataProvider,
 	EventEmitter,
+	ThemeColor,
 	ThemeIcon,
 	TreeItem,
 	TreeItemCollapsibleState,
@@ -12,15 +13,25 @@ import {
 import type { SpecManager } from "../features/spec/spec-manager";
 import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../constants";
 import { getSpecSystemAdapter } from "../utils/spec-kit-adapter";
-import { basename } from "node:path";
+import { basename, join } from "node:path";
+import {
+	parseTasksFromFile,
+	getTaskStatusIcon,
+	getTaskStatusTooltip,
+	getGroupStatusIcon,
+	calculateGroupStatus,
+	calculateOverallStatus,
+	type ParsedTask,
+	type TaskStatus,
+} from "../utils/task-parser";
 
 export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
-	static readonly viewId = "alma.views.specExplorer";
+	static readonly viewId = "gatomia.views.specExplorer";
 	static readonly navigateRequirementsCommandId =
-		"alma.spec.navigate.requirements";
-	static readonly navigateDesignCommandId = "alma.spec.navigate.design";
-	static readonly navigateTasksCommandId = "alma.spec.navigate.tasks";
-	static readonly openSpecCommandId = "alma.spec.open";
+		"gatomia.spec.navigate.requirements";
+	static readonly navigateDesignCommandId = "gatomia.spec.navigate.design";
+	static readonly navigateTasksCommandId = "gatomia.spec.navigate.tasks";
+	static readonly openSpecCommandId = "gatomia.spec.open";
 
 	private readonly _onDidChangeTreeData: EventEmitter<
 		SpecItem | undefined | null | void
@@ -47,6 +58,7 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 		return element;
 	}
 
+	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Tree provider maps multiple node types without a simpler branching model.
 	async getChildren(element?: SpecItem): Promise<SpecItem[]> {
 		if (!(workspace.workspaceFolders && this.specManager)) {
 			return [];
@@ -103,11 +115,11 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 		}
 
 		if (element.contextValue === "spec") {
-			// Handle Spec-Kit System
+			// Handle SpecKit System
 			if (element.system === SPEC_SYSTEM_MODE.SPECKIT) {
 				const adapter = getSpecSystemAdapter();
 				// Get files for this spec (returns absolute paths)
-				const files = await adapter.getSpecFiles(element.specName!);
+				const files = adapter.getSpecFiles(element.specName!);
 
 				const items: SpecItem[] = [];
 
@@ -115,7 +127,6 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 				const fileMap: Record<string, { label: string; type: string }> = {
 					"spec.md": { label: "Spec", type: "spec" },
 					"plan.md": { label: "Plan", type: "plan" },
-					"tasks.md": { label: "Tasks", type: "tasks" },
 					"design.md": { label: "Design", type: "design" },
 					"requirements.md": { label: "Requirements", type: "requirements" },
 					"research.md": { label: "Research", type: "research" },
@@ -125,6 +136,32 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 
 				for (const [docType, absolutePath] of Object.entries(files)) {
 					const fileName = basename(absolutePath);
+
+					// Handle tasks.md as a folder with task items
+					if (fileName === "tasks.md") {
+						const relativePath = workspace.asRelativePath(absolutePath);
+						// Calculate overall status for tasks folder
+						const taskGroups = parseTasksFromFile(absolutePath);
+						const overallStatus = calculateOverallStatus(taskGroups);
+						items.push(
+							new SpecItem(
+								"Tasks",
+								TreeItemCollapsibleState.Collapsed,
+								"tasks-folder",
+								this.context,
+								element.specName,
+								"tasks",
+								undefined,
+								relativePath,
+								undefined,
+								element.system,
+								undefined,
+								overallStatus
+							)
+						);
+						continue;
+					}
+
 					const fileInfo = fileMap[fileName] || {
 						label: fileName,
 						type: "file",
@@ -154,7 +191,7 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 				return items;
 			}
 
-			// Handle OpenSpec System (Legacy)
+			// Handle OpenSpec System
 			const specPath = `openspec/specs/${element.specName}/spec.md`;
 			return [
 				new SpecItem(
@@ -172,6 +209,92 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 					specPath
 				),
 			];
+		}
+
+		// Handle tasks folder - show task groups and tasks
+		if (element.contextValue === "tasks-folder") {
+			const tasksFilePath = element.filePath;
+			if (!tasksFilePath) {
+				return [];
+			}
+
+			// Get absolute path
+			const workspaceRoot = workspace.workspaceFolders?.[0].uri.fsPath;
+			if (!workspaceRoot) {
+				return [];
+			}
+
+			const absolutePath = join(workspaceRoot, tasksFilePath);
+			const taskGroups = parseTasksFromFile(absolutePath);
+
+			if (taskGroups.length === 0) {
+				return [];
+			}
+
+			// Return task groups as collapsible items
+			return taskGroups.map((group) => {
+				const groupStatus = calculateGroupStatus(group.tasks);
+				return new SpecItem(
+					group.name,
+					TreeItemCollapsibleState.Collapsed,
+					"task-group",
+					this.context,
+					element.specName,
+					"task-group",
+					undefined,
+					tasksFilePath,
+					group.name,
+					element.system,
+					undefined,
+					groupStatus
+				);
+			});
+		}
+
+		// Handle task group - show individual tasks
+		if (element.contextValue === "task-group") {
+			const tasksFilePath = element.filePath;
+			const groupName = element.parentName;
+			if (!(tasksFilePath && groupName)) {
+				return [];
+			}
+
+			// Get absolute path
+			const workspaceRoot = workspace.workspaceFolders?.[0].uri.fsPath;
+			if (!workspaceRoot) {
+				return [];
+			}
+
+			const absolutePath = join(workspaceRoot, tasksFilePath);
+			const taskGroups = parseTasksFromFile(absolutePath);
+
+			// Find the matching group
+			const group = taskGroups.find((g) => g.name === groupName);
+			if (!group) {
+				return [];
+			}
+
+			// Return individual tasks
+			return group.tasks.map(
+				(task) =>
+					new SpecItem(
+						`${task.id}: ${task.title}`,
+						TreeItemCollapsibleState.None,
+						"task-item",
+						this.context,
+						element.specName,
+						"task",
+						{
+							command: SpecExplorerProvider.openSpecCommandId,
+							title: "Open Tasks",
+							arguments: [tasksFilePath, "tasks", task.line],
+						},
+						tasksFilePath,
+						undefined,
+						element.system,
+						task
+					)
+			);
 		}
 
 		if (element.contextValue === "change") {
@@ -282,9 +405,11 @@ class SpecItem extends TreeItem {
 	readonly specName?: string;
 	readonly documentType?: string;
 	readonly command?: Command;
-	private readonly filePath?: string;
+	readonly filePath?: string;
 	readonly parentName?: string;
 	readonly system?: SpecSystemMode;
+	readonly task?: ParsedTask;
+	readonly groupStatus?: TaskStatus;
 
 	// biome-ignore lint/nursery/useMaxParams: ignore
 	constructor(
@@ -297,7 +422,9 @@ class SpecItem extends TreeItem {
 		command?: Command,
 		filePath?: string,
 		parentName?: string,
-		system?: SpecSystemMode
+		system?: SpecSystemMode,
+		task?: ParsedTask,
+		groupStatus?: TaskStatus
 	) {
 		super(label, collapsibleState);
 		this.label = label;
@@ -310,6 +437,8 @@ class SpecItem extends TreeItem {
 		this.filePath = filePath;
 		this.parentName = parentName;
 		this.system = system;
+		this.task = task;
+		this.groupStatus = groupStatus;
 
 		this.updateIconAndTooltip();
 	}
@@ -331,11 +460,60 @@ class SpecItem extends TreeItem {
 			return;
 		}
 
+		// Handle tasks folder
+		if (this.contextValue === "tasks-folder") {
+			const statusIcon = getGroupStatusIcon(this.groupStatus);
+			const statusColor = this.getTaskStatusColor(this.groupStatus);
+			this.iconPath = new ThemeIcon(statusIcon, statusColor);
+			this.tooltip = "Tasks - Click to expand";
+			return;
+		}
+
+		// Handle task group (phase)
+		if (this.contextValue === "task-group") {
+			const statusIcon = getGroupStatusIcon(this.groupStatus);
+			const statusColor = this.getTaskStatusColor(this.groupStatus);
+			this.iconPath = new ThemeIcon(statusIcon, statusColor);
+			this.tooltip = `Phase: ${this.label}`;
+			return;
+		}
+
+		// Handle individual task item with status icon
+		if (this.contextValue === "task-item" && this.task) {
+			const statusIcon = getTaskStatusIcon(this.task.status);
+			const statusColor = this.getTaskStatusColor(this.task.status);
+			this.iconPath = new ThemeIcon(statusIcon, statusColor);
+
+			const statusText = getTaskStatusTooltip(this.task.status);
+			const priorityText = this.task.priority
+				? ` | Priority: ${this.task.priority}`
+				: "";
+			const complexityText = this.task.complexity
+				? ` | Complexity: ${this.task.complexity}`
+				: "";
+			this.tooltip = `${statusText}${priorityText}${complexityText}\n\nClick to open at line ${this.task.line}`;
+			this.description = statusText;
+			return;
+		}
+
 		if (
 			this.contextValue.startsWith("group-") ||
 			this.contextValue === "change-specs-group"
 		) {
 			this.iconPath = new ThemeIcon("folder");
+		}
+	}
+
+	private getTaskStatusColor(status?: TaskStatus): ThemeColor | undefined {
+		switch (status) {
+			case "completed":
+				return new ThemeColor("terminal.ansiGreen");
+			case "in-progress":
+				return new ThemeColor("terminal.ansiYellow");
+			case "not-started":
+				return new ThemeColor("descriptionForeground");
+			default:
+				return;
 		}
 	}
 
