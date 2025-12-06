@@ -83,6 +83,11 @@ export const PreviewApp = () => {
 		const sections = metadata?.sections ?? [];
 		return sections.map((section) => ({
 			...section,
+			titleHtml: section.title
+				? renderPreviewMarkdown(section.title)
+						.replace(/^<p>/, "")
+						.replace(/<\/p>\s*$/, "")
+				: "",
 			html: section.body ? renderPreviewMarkdown(section.body) : "",
 		}));
 	}, [metadata?.sections]);
@@ -229,7 +234,11 @@ export const PreviewApp = () => {
 			<div className="grid h-full gap-4 md:grid-cols-[240px_1fr]">
 				<DocumentOutline
 					onNavigate={scrollToSection}
-					sections={metadata.sections}
+					sections={renderedSections.map((s) => ({
+						id: s.id,
+						title: s.title,
+						titleHtml: s.titleHtml,
+					}))}
 				/>
 
 				<div className="flex h-full flex-col gap-4 overflow-hidden">
@@ -248,7 +257,11 @@ export const PreviewApp = () => {
 									id={section.id}
 									key={section.id}
 								>
-									<h2 className="font-semibold text-lg">{section.title}</h2>
+									<h2
+										className="font-semibold text-lg"
+										/* biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown is rendered via markdown-it before reaching the webview. */
+										dangerouslySetInnerHTML={{ __html: section.titleHtml }}
+									/>
 									<div
 										className="prose prose-invert max-w-none text-sm"
 										/* biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown is rendered via markdown-it before reaching the webview. */

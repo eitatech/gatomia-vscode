@@ -1,6 +1,7 @@
 export interface OutlineSection {
 	id: string;
 	title: string;
+	titleHtml?: string;
 }
 
 interface DocumentOutlineProps {
@@ -32,7 +33,14 @@ export const DocumentOutline = ({
 							onClick={() => onNavigate?.(section.id)}
 							type="button"
 						>
-							{section.title}
+							{section.titleHtml ? (
+								<span
+									/* biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown is rendered via markdown-it before reaching the webview. */
+									dangerouslySetInnerHTML={{ __html: section.titleHtml }}
+								/>
+							) : (
+								section.title
+							)}
 						</button>
 					</li>
 				))}
