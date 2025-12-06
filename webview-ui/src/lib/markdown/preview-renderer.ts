@@ -1,6 +1,9 @@
 import MarkdownIt from "markdown-it";
-import markdownItMermaid from "markdown-it-mermaid";
-import markdownItPlantuml from "markdown-it-plantuml";
+import { checkboxPlugin } from "./plugins/checkbox-plugin";
+
+// Note: markdown-it-mermaid and markdown-it-plantuml are disabled because they
+// access the DOM during module initialization, which fails in webview contexts.
+// TODO: Implement lazy loading for diagram plugins if needed.
 
 export interface PreviewRendererOptions {
 	markdown?: MarkdownIt.Options;
@@ -22,16 +25,12 @@ export const createPreviewRenderer = (
 ): MarkdownIt => {
 	const md = new MarkdownIt({ ...DEFAULT_OPTIONS, ...options.markdown });
 
-	if (options.enableMermaid !== false) {
-		md.use(
-			(markdownItMermaid as { default?: typeof markdownItMermaid }).default ??
-				markdownItMermaid
-		);
-	}
+	// Add custom checkbox plugin for task lists
+	md.use(checkboxPlugin);
 
-	if (options.enablePlantUML !== false) {
-		md.use(markdownItPlantuml);
-	}
+	// Diagram plugins are disabled - they access document during initialization
+	// if (options.enableMermaid !== false) { ... }
+	// if (options.enablePlantUML !== false) { ... }
 
 	return md;
 };

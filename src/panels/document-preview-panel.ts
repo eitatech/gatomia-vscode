@@ -2,7 +2,6 @@ import type { Disposable, Webview, WebviewPanel } from "vscode";
 import {
 	ViewColumn,
 	window,
-	Uri,
 	type ExtensionContext,
 	type OutputChannel,
 } from "vscode";
@@ -85,11 +84,6 @@ export class DocumentPreviewPanel {
 			return this.panel;
 		}
 
-		const resourceRoots = [
-			Uri.joinPath(this.context.extensionUri, "dist"),
-			Uri.joinPath(this.context.extensionUri, "dist", "webview"),
-		];
-
 		const panel = window.createWebviewPanel(
 			DocumentPreviewPanel.panelType,
 			"Document Preview",
@@ -100,7 +94,7 @@ export class DocumentPreviewPanel {
 			{
 				enableScripts: true,
 				retainContextWhenHidden: true,
-				localResourceRoots: resourceRoots,
+				localResourceRoots: [this.context.extensionUri],
 			}
 		);
 
@@ -139,8 +133,14 @@ export class DocumentPreviewPanel {
 	private async handleWebviewMessage(
 		message: PreviewWebviewMessage
 	): Promise<void> {
+		this.outputChannel.appendLine(
+			`[DocumentPreviewPanel] Received message: ${message?.type ?? "undefined"}`
+		);
 		switch (message?.type) {
 			case "preview/ready":
+				this.outputChannel.appendLine(
+					`[DocumentPreviewPanel] Webview ready, lastArtifact: ${this.lastArtifact ? "present" : "null"}`
+				);
 				this.isWebviewReady = true;
 				await this.flushPendingMessages();
 				if (this.lastArtifact) {
@@ -176,18 +176,30 @@ export class DocumentPreviewPanel {
 	}
 
 	private async postMessage(message: PreviewPanelMessage): Promise<void> {
+		this.outputChannel.appendLine(
+			`[DocumentPreviewPanel] Posting message: ${message.type}, ready: ${this.isWebviewReady}, hasPanel: ${!!this.panel?.webview}`
+		);
 		if (!this.panel?.webview) {
+			this.outputChannel.appendLine(
+				"[DocumentPreviewPanel] No panel webview, queueing message"
+			);
 			this.pendingMessages.push(message);
 			return;
 		}
 
 		if (!this.isWebviewReady) {
+			this.outputChannel.appendLine(
+				"[DocumentPreviewPanel] Webview not ready, queueing message"
+			);
 			this.pendingMessages.push(message);
 			return;
 		}
 
 		try {
 			await this.panel.webview.postMessage(message);
+			this.outputChannel.appendLine(
+				`[DocumentPreviewPanel] Message sent successfully: ${message.type}`
+			);
 		} catch (error) {
 			this.outputChannel.appendLine(
 				`[DocumentPreviewPanel] Failed to post message ${message.type}: ${

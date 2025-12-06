@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -125,4 +126,56 @@ body {
 	body {
 		@apply bg-background text-foreground;
 	}
+}
+
+/* Task list checkbox styles for markdown preview */
+.task-list-item {
+	list-style-type: none;
+	position: relative;
+	margin-left: -1.5em;
+	padding-left: 0;
+}
+
+.task-list-item::before {
+	content: none;
+}
+
+.task-list-checkbox {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 1em;
+	height: 1em;
+	border: 1px solid var(--vscode-checkbox-border, #6b6b6b);
+	border-radius: 3px;
+	background-color: var(--vscode-checkbox-background, transparent);
+	vertical-align: middle;
+	margin-right: 0.5em;
+	cursor: default;
+	position: relative;
+}
+
+.task-list-checkbox:checked {
+	background-color: var(--vscode-checkbox-selectBackground, #0078d4);
+	border-color: var(--vscode-checkbox-selectBorder, #0078d4);
+}
+
+.task-list-checkbox:checked::after {
+	content: "";
+	position: absolute;
+	left: 3px;
+	top: 0;
+	width: 4px;
+	height: 8px;
+	border: solid var(--vscode-checkbox-foreground, #fff);
+	border-width: 0 2px 2px 0;
+	transform: rotate(45deg);
+}
+
+/* Ensure task lists in prose context look good */
+.prose .task-list-item {
+	padding-left: 0.25em;
+}
+
+.prose ul:has(.task-list-item) {
+	padding-left: 1.5em;
 }
