@@ -22,6 +22,9 @@ const ISSUE_TYPE_LABELS: Record<string, string> = {
 	other: "Other",
 };
 
+const PARAGRAPH_OPEN_PATTERN = /^<p>/;
+const PARAGRAPH_CLOSE_PATTERN = /<\/p>\s*$/;
+
 export const PreviewApp = () => {
 	const snapshot = useSyncExternalStore(
 		previewStore.subscribe,
@@ -72,17 +75,18 @@ export const PreviewApp = () => {
 		if (staleReason) {
 			return staleReason;
 		}
-		if (!metadata?.documentType) {
-			return "Select a document to load its preview.";
-		}
-
-		return `Rendering ${metadata.documentType} in Markdown preview.`;
-	}, [metadata, staleReason]);
+		return null;
+	}, [staleReason]);
 
 	const renderedSections = useMemo(() => {
 		const sections = metadata?.sections ?? [];
 		return sections.map((section) => ({
 			...section,
+			titleHtml: section.title
+				? renderPreviewMarkdown(section.title)
+						.replace(PARAGRAPH_OPEN_PATTERN, "")
+						.replace(PARAGRAPH_CLOSE_PATTERN, "")
+				: "",
 			html: section.body ? renderPreviewMarkdown(section.body) : "",
 		}));
 	}, [metadata?.sections]);
@@ -174,9 +178,11 @@ export const PreviewApp = () => {
 				<div className="flex items-center justify-between gap-3">
 					<div className="flex flex-col gap-1">
 						<h1 className="font-semibold text-xl">{metadata.title}</h1>
-						<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.65))] text-sm">
-							{description}
-						</p>
+						{description && (
+							<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.65))] text-sm">
+								{description}
+							</p>
+						)}
 					</div>
 					<div className="flex flex-wrap items-center gap-2">
 						<RefineDialog
@@ -229,7 +235,11 @@ export const PreviewApp = () => {
 			<div className="grid h-full gap-4 md:grid-cols-[240px_1fr]">
 				<DocumentOutline
 					onNavigate={scrollToSection}
-					sections={metadata.sections}
+					sections={renderedSections.map((s) => ({
+						id: s.id,
+						title: s.title,
+						titleHtml: s.titleHtml,
+					}))}
 				/>
 
 				<div className="flex h-full flex-col gap-4 overflow-hidden">
@@ -248,7 +258,11 @@ export const PreviewApp = () => {
 									id={section.id}
 									key={section.id}
 								>
-									<h2 className="font-semibold text-lg">{section.title}</h2>
+									<h2
+										className="font-semibold text-lg"
+										/* biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown is rendered via markdown-it before reaching the webview. */
+										dangerouslySetInnerHTML={{ __html: section.titleHtml }}
+									/>
 									<div
 										className="prose prose-invert max-w-none text-sm"
 										/* biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown is rendered via markdown-it before reaching the webview. */

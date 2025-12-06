@@ -106,14 +106,14 @@ export function RefineDialog({
 
 	return (
 		<>
-			<Button
+			<button
 				aria-haspopup="dialog"
+				className="rounded border border-[color:var(--vscode-button-secondaryBorder,var(--vscode-button-border,transparent))] bg-[color:var(--vscode-button-secondaryBackground,#3a3d41)] px-3 py-1 text-[color:var(--vscode-button-secondaryForeground,#fff)] text-sm hover:bg-[color:var(--vscode-button-secondaryHoverBackground,#45494e)]"
 				onClick={() => handleOpen(true)}
-				size="sm"
-				variant="secondary"
+				type="button"
 			>
 				{triggerLabel}
-			</Button>
+			</button>
 			{isOpen && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,var(--vscode-editor-background)_80%,#000000)]/80 px-4">
 					<section
