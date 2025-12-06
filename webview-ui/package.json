@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
+    "@tailwindcss/typography": "^0.5.19",
     "@vscode/codicons": "^0.0.43",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
