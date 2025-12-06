@@ -24,6 +24,9 @@ const getExtendedPath = (): string => {
 		`${home}/.cargo/bin`, // Rust tools
 		`${home}/.bun/bin`, // Bun
 		`${home}/.deno/bin`, // Deno
+		`${home}/.langflow/uv`, // UV via Langflow installation
+		`${home}/.astral/uv/bin`, // UV via Astral installation
+		`${home}/.uv/bin`, // Alternative UV location
 		"/opt/homebrew/bin", // Homebrew on Apple Silicon
 		"/usr/local/bin", // Homebrew on Intel Mac
 	];
