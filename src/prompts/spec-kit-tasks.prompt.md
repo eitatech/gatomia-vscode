@@ -1,5 +1,5 @@
 ---
-name: Spec-Kit Tasks
+name: SpecKit Tasks
 description: Generate a task list from an implementation plan
 version: 1.0.0
 variables:

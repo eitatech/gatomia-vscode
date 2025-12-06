@@ -16,9 +16,15 @@ import {
 	getSpecSystemAdapter,
 	type SpecSystemAdapter,
 } from "../../utils/spec-kit-adapter";
-import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../../constants";
+import {
+	SPEC_SYSTEM_MODE,
+	SPECKIT_CONFIG,
+	DEFAULT_CONFIG,
+	type SpecSystemMode,
+} from "../../constants";
 import { CreateSpecInputController } from "./create-spec-input-controller";
 import { SpecKitManager } from "./spec-kit-manager";
+import type { TriggerRegistry } from "../hooks/trigger-registry";
 
 export type SpecDocumentType = "requirements" | "design" | "tasks";
 
@@ -29,6 +35,7 @@ export class SpecManager {
 	private createSpecInputController: CreateSpecInputController;
 	private specAdapter: SpecSystemAdapter | null = null;
 	private activeSystem: SpecSystemMode = SPEC_SYSTEM_MODE.AUTO;
+	private triggerRegistry: TriggerRegistry | null = null;
 
 	constructor(context: ExtensionContext, outputChannel: OutputChannel) {
 		this.configManager = ConfigManager.getInstance();
@@ -83,7 +90,42 @@ export class SpecManager {
 	}
 
 	/**
-	 * Gets the active spec system (OpenSpec, Spec-Kit, or Auto)
+	 * Sets the TriggerRegistry for hook integration
+	 */
+	setTriggerRegistry(registry: TriggerRegistry): void {
+		this.triggerRegistry = registry;
+		this.outputChannel.appendLine("[SpecManager] TriggerRegistry connected");
+	}
+
+	/**
+	 * Executes a SpecKit command
+	 *
+	 * NOTE: Triggers are now fired automatically by CommandCompletionDetector
+	 * when it detects file changes that indicate command completion.
+	 * This ensures triggers fire AFTER the command completes, not before.
+	 */
+	async executeSpecKitCommand(operation: string): Promise<void> {
+		try {
+			// Send command to Copilot Chat
+			await sendPromptToChat(`/speckit.${operation}`);
+
+			this.outputChannel.appendLine(
+				`[SpecManager] Executed command: /speckit.${operation}`
+			);
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: `Failed to execute speckit.${operation}`;
+			this.outputChannel.appendLine(
+				`[SpecManager] Error executing ${operation}: ${message}`
+			);
+			throw error;
+		}
+	}
+
+	/**
+	 * Gets the active spec system (OpenSpec, SpecKit, or Auto)
 	 */
 	getActiveSystem(): SpecSystemMode {
 		return this.activeSystem;
@@ -171,18 +213,45 @@ This document has not been created yet.`;
 		await this.openDocument(path, type);
 	}
 
-	async delete(specName: string): Promise<void> {
+	async delete(specName: string, system?: SpecSystemMode): Promise<void> {
 		const workspaceFolder = workspace.workspaceFolders?.[0];
 		if (!workspaceFolder) {
 			window.showErrorMessage("No workspace folder open");
 			return;
 		}
 
-		const specPath = join(
-			workspaceFolder.uri.fsPath,
-			this.getSpecBasePath(),
-			specName
+		// Show confirmation dialog
+		const confirm = await window.showWarningMessage(
+			`Are you sure you want to delete "${specName}"? This action cannot be undone.`,
+			{ modal: true },
+			"Delete"
 		);
+
+		if (confirm !== "Delete") {
+			return;
+		}
+
+		// Use provided system or fall back to active system
+		const targetSystem = system || this.activeSystem;
+
+		// Construct path based on system type
+		let specPath: string;
+		if (targetSystem === SPEC_SYSTEM_MODE.SPECKIT) {
+			// SpecKit path: specs/<specName>
+			specPath = join(
+				workspaceFolder.uri.fsPath,
+				SPECKIT_CONFIG.paths.specs,
+				specName
+			);
+		} else {
+			// OpenSpec path: openspec/specs/<specName>
+			specPath = join(
+				workspaceFolder.uri.fsPath,
+				DEFAULT_CONFIG.paths.specs,
+				"specs",
+				specName
+			);
+		}
 
 		try {
 			await workspace.fs.delete(Uri.file(specPath), {
@@ -284,7 +353,7 @@ This document has not been created yet.`;
 	}
 
 	/**
-	 * Gets all available specs from both OpenSpec and Spec-Kit systems
+	 * Gets all available specs from both OpenSpec and SpecKit systems
 	 * This method unifies spec discovery across both systems
 	 */
 	async getAllSpecsUnified(): Promise<
@@ -322,7 +391,7 @@ This document has not been created yet.`;
 	}
 
 	/**
-	 * Creates a new spec using the appropriate system (OpenSpec or Spec-Kit)
+	 * Creates a new spec using the appropriate system (OpenSpec or SpecKit)
 	 */
 	async createUnified(specName: string): Promise<boolean> {
 		try {
@@ -332,7 +401,7 @@ This document has not been created yet.`;
 				await manager.createFeature(specName);
 
 				this.outputChannel.appendLine(
-					`[SpecManager] Created Spec-Kit feature: ${specName}`
+					`[SpecManager] Created SpecKit feature: ${specName}`
 				);
 				return true;
 			}
