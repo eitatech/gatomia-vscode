@@ -1,14 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-// Mock fs before importing modules that use it
-vi.mock("fs", () => ({
-	default: {},
-	existsSync: vi.fn(),
-	readdirSync: vi.fn(),
-	statSync: vi.fn(),
-}));
+// Auto-mock fs modules
+vi.mock("fs");
+vi.mock("node:fs");
 
-import { existsSync, readdirSync, statSync, type Stats } from "fs";
+// biome-ignore lint/performance/noNamespaceImport: Required for vitest mocking with vi.mocked()
+import * as fs from "fs";
 import {
 	parseSpecKitDirectoryName,
 	convertSlugToName,
@@ -31,13 +28,6 @@ import {
 	validateSpecKitStructure,
 } from "./spec-kit-utilities";
 import { SPEC_SYSTEM_MODE } from "../constants";
-
-// Mock fs module
-vi.mock("fs", () => ({
-	existsSync: vi.fn(),
-	readdirSync: vi.fn(),
-	statSync: vi.fn(),
-}));
 
 describe("spec-kit-utilities", () => {
 	beforeEach(() => {
@@ -226,7 +216,7 @@ describe("spec-kit-utilities", () => {
 
 	describe("detectAvailableSpecSystems", () => {
 		it("should detect SpecKit when .specify and specs exist", () => {
-			vi.mocked(existsSync).mockImplementation((path) => {
+			vi.mocked(fs.existsSync).mockImplementation((path) => {
 				const pathStr = path.toString();
 				return pathStr.includes(".specify") || pathStr.includes("specs");
 			});
@@ -236,7 +226,7 @@ describe("spec-kit-utilities", () => {
 		});
 
 		it("should detect OpenSpec when openspec directory exists", () => {
-			vi.mocked(existsSync).mockImplementation((path) =>
+			vi.mocked(fs.existsSync).mockImplementation((path) =>
 				path.toString().includes("openspec")
 			);
 
@@ -245,7 +235,7 @@ describe("spec-kit-utilities", () => {
 		});
 
 		it("should return empty array when no systems detected", () => {
-			vi.mocked(existsSync).mockReturnValue(false);
+			vi.mocked(fs.existsSync).mockReturnValue(false);
 
 			const systems = detectAvailableSpecSystems("/workspace");
 			expect(systems).toEqual([]);
@@ -254,7 +244,7 @@ describe("spec-kit-utilities", () => {
 
 	describe("detectActiveSpecSystem", () => {
 		it("should return SPECKIT when only SpecKit exists", () => {
-			vi.mocked(existsSync).mockImplementation((path) => {
+			vi.mocked(fs.existsSync).mockImplementation((path) => {
 				const pathStr = path.toString();
 				return pathStr.includes(".specify") || pathStr.includes("specs");
 			});
@@ -264,7 +254,7 @@ describe("spec-kit-utilities", () => {
 		});
 
 		it("should return OPENSPEC when only OpenSpec exists", () => {
-			vi.mocked(existsSync).mockImplementation((path) =>
+			vi.mocked(fs.existsSync).mockImplementation((path) =>
 				path.toString().includes("openspec")
 			);
 
@@ -273,14 +263,14 @@ describe("spec-kit-utilities", () => {
 		});
 
 		it("should prefer SPECKIT when both systems exist", () => {
-			vi.mocked(existsSync).mockReturnValue(true);
+			vi.mocked(fs.existsSync).mockReturnValue(true);
 
 			const system = detectActiveSpecSystem("/workspace");
 			expect(system).toBe(SPEC_SYSTEM_MODE.SPECKIT);
 		});
 
 		it("should return AUTO when no systems detected", () => {
-			vi.mocked(existsSync).mockReturnValue(false);
+			vi.mocked(fs.existsSync).mockReturnValue(false);
 
 			const system = detectActiveSpecSystem("/workspace");
 			expect(system).toBe(SPEC_SYSTEM_MODE.AUTO);
@@ -289,13 +279,13 @@ describe("spec-kit-utilities", () => {
 
 	describe("discoverSpecKitFeatures", () => {
 		it("should discover feature directories", () => {
-			vi.mocked(existsSync).mockReturnValue(true);
-			vi.mocked(readdirSync).mockReturnValue([
+			vi.mocked(fs.existsSync).mockReturnValue(true);
+			vi.mocked(fs.readdirSync).mockReturnValue([
 				"001-user-auth",
 				"002-payment",
 				"invalid-dir",
 			] as unknown as ReturnType<typeof readdirSync>);
-			vi.mocked(statSync).mockReturnValue({
+			vi.mocked(fs.statSync).mockReturnValue({
 				isDirectory: () => true,
 			} as Stats);
 
@@ -307,20 +297,20 @@ describe("spec-kit-utilities", () => {
 		});
 
 		it("should return empty array when specs path doesn't exist", () => {
-			vi.mocked(existsSync).mockReturnValue(false);
+			vi.mocked(fs.existsSync).mockReturnValue(false);
 
 			const features = discoverSpecKitFeatures("/workspace/specs");
 			expect(features).toEqual([]);
 		});
 
 		it("should sort features by number", () => {
-			vi.mocked(existsSync).mockReturnValue(true);
-			vi.mocked(readdirSync).mockReturnValue([
+			vi.mocked(fs.existsSync).mockReturnValue(true);
+			vi.mocked(fs.readdirSync).mockReturnValue([
 				"003-third",
 				"001-first",
 				"002-second",
 			] as unknown as ReturnType<typeof readdirSync>);
-			vi.mocked(statSync).mockReturnValue({
+			vi.mocked(fs.statSync).mockReturnValue({
 				isDirectory: () => true,
 			} as Stats);
 
@@ -334,19 +324,19 @@ describe("spec-kit-utilities", () => {
 
 	describe("generateNextFeatureNumber", () => {
 		it("should return 1 when no features exist", () => {
-			vi.mocked(existsSync).mockReturnValue(false);
+			vi.mocked(fs.existsSync).mockReturnValue(false);
 
 			const nextNumber = generateNextFeatureNumber("/workspace/specs");
 			expect(nextNumber).toBe(1);
 		});
 
 		it("should return next sequential number", () => {
-			vi.mocked(existsSync).mockReturnValue(true);
-			vi.mocked(readdirSync).mockReturnValue([
+			vi.mocked(fs.existsSync).mockReturnValue(true);
+			vi.mocked(fs.readdirSync).mockReturnValue([
 				"001-first",
 				"002-second",
 			] as unknown as ReturnType<typeof readdirSync>);
-			vi.mocked(statSync).mockReturnValue({
+			vi.mocked(fs.statSync).mockReturnValue({
 				isDirectory: () => true,
 			} as Stats);
 
@@ -357,7 +347,7 @@ describe("spec-kit-utilities", () => {
 
 	describe("validateSpecKitStructure", () => {
 		it("should return valid when all required directories exist", () => {
-			vi.mocked(existsSync).mockReturnValue(true);
+			vi.mocked(fs.existsSync).mockReturnValue(true);
 
 			const result = validateSpecKitStructure("/workspace");
 
@@ -366,7 +356,7 @@ describe("spec-kit-utilities", () => {
 		});
 
 		it("should report missing directories", () => {
-			vi.mocked(existsSync).mockReturnValue(false);
+			vi.mocked(fs.existsSync).mockReturnValue(false);
 
 			const result = validateSpecKitStructure("/workspace");
 
@@ -376,7 +366,7 @@ describe("spec-kit-utilities", () => {
 		});
 
 		it("should warn about missing constitution.md", () => {
-			vi.mocked(existsSync).mockImplementation(
+			vi.mocked(fs.existsSync).mockImplementation(
 				(path) => !path.toString().includes("constitution.md")
 			);
 

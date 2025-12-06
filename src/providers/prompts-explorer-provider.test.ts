@@ -5,7 +5,11 @@ import { PromptsExplorerProvider } from "./prompts-explorer-provider";
 import { ConfigManager } from "../utils/config-manager";
 
 vi.mock("os", () => ({
-	default: {},
+	default: {
+		homedir: vi.fn(() => "/home/test"),
+		release: vi.fn(() => "release"),
+		platform: vi.fn(() => "linux"),
+	},
 	homedir: vi.fn(() => "/home/test"),
 	release: vi.fn(() => "release"),
 	platform: vi.fn(() => "linux"),
@@ -90,10 +94,7 @@ describe("PromptsExplorerProvider", () => {
 		const [, projectPromptsGroup] = await provider.getChildren();
 		const projectPrompts = await provider.getChildren(projectPromptsGroup);
 
-		expect(projectPrompts.map((item) => item.label)).toEqual([
-			"alpha.md",
-			"beta.md",
-		]);
+		expect(projectPrompts.map((item) => item.label)).toEqual(["Alpha", "Beta"]);
 		expect(projectPrompts.every((item) => item.contextValue === "prompt")).toBe(
 			true
 		);
@@ -114,7 +115,7 @@ describe("PromptsExplorerProvider", () => {
 		const [, , projectInstructionsGroup] = await provider.getChildren();
 		const instructions = await provider.getChildren(projectInstructionsGroup);
 
-		expect(instructions.map((item) => item.label)).toEqual(["guide.md"]);
+		expect(instructions.map((item) => item.label)).toEqual(["Guide"]);
 		expect(instructions.every((item) => item.contextValue === "prompt")).toBe(
 			true
 		);
@@ -135,7 +136,7 @@ describe("PromptsExplorerProvider", () => {
 		const projectAgentsGroup = rootItems[3];
 		const agents = await provider.getChildren(projectAgentsGroup);
 
-		expect(agents.map((item) => item.label)).toEqual(["agent.md"]);
+		expect(agents.map((item) => item.label)).toEqual(["Agent"]);
 		expect(agents.every((item) => item.contextValue === "prompt")).toBe(true);
 		expect(agents.every((item) => item.source === "project-agents")).toBe(true);
 	});
