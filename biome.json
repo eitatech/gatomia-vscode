@@ -46,12 +46,19 @@
         }
       },
       "complexity": {
-        "noStaticOnlyClass": "off"
+        "noStaticOnlyClass": "off",
+        "noExcessiveCognitiveComplexity": "warn"
       },
       "correctness": {
         "noUnusedFunctionParameters": "off",
         "noUnusedVariables": "off",
         "noUnusedPrivateClassMembers": "off"
+      },
+      "performance": {
+        "useTopLevelRegex": "warn"
+      },
+      "a11y": {
+        "noSvgWithoutTitle": "warn"
       }
     }
   },

@@ -14,7 +14,16 @@ import { sendPromptToChat } from "../../utils/chat-prompt-runner";
 
 // Mock fs module
 vi.mock("fs", () => ({
+	default: {},
 	existsSync: vi.fn(),
+}));
+
+// Mock node:fs module
+vi.mock("node:fs", () => ({
+	default: {},
+	readFileSync: vi.fn(() => ""),
+	readdirSync: vi.fn(() => []),
+	statSync: vi.fn(() => ({ isDirectory: () => false })),
 }));
 
 // Mock os module
@@ -163,17 +172,17 @@ describe("SteeringManager", () => {
 
 			expect(window.showQuickPick).toHaveBeenCalledWith(
 				expect.arrayContaining([
-					expect.objectContaining({ label: "Spec-Kit" }),
+					expect.objectContaining({ label: "SpecKit" }),
 					expect.objectContaining({ label: "OpenSpec" }),
 				]),
 				expect.anything()
 			);
 		});
 
-		it("should create Spec-Kit constitution when selected", async () => {
+		it("should create SpecKit constitution when selected", async () => {
 			vi.mocked(existsSync).mockReturnValue(false);
 			vi.mocked(window.showQuickPick).mockResolvedValue({
-				label: "Spec-Kit",
+				label: "SpecKit",
 				value: "speckit",
 			} as any);
 			vi.mocked(window.showInputBox).mockResolvedValue("Test directives");

@@ -1,4 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+
+// Mock fs before importing modules that use it
+vi.mock("fs", () => ({
+	default: {},
+	existsSync: vi.fn(),
+	readdirSync: vi.fn(),
+	statSync: vi.fn(),
+}));
+
 import { existsSync, readdirSync, statSync, type Stats } from "fs";
 import {
 	parseSpecKitDirectoryName,
@@ -216,7 +225,7 @@ describe("spec-kit-utilities", () => {
 	});
 
 	describe("detectAvailableSpecSystems", () => {
-		it("should detect Spec-Kit when .specify and specs exist", () => {
+		it("should detect SpecKit when .specify and specs exist", () => {
 			vi.mocked(existsSync).mockImplementation((path) => {
 				const pathStr = path.toString();
 				return pathStr.includes(".specify") || pathStr.includes("specs");
@@ -244,7 +253,7 @@ describe("spec-kit-utilities", () => {
 	});
 
 	describe("detectActiveSpecSystem", () => {
-		it("should return SPECKIT when only Spec-Kit exists", () => {
+		it("should return SPECKIT when only SpecKit exists", () => {
 			vi.mocked(existsSync).mockImplementation((path) => {
 				const pathStr = path.toString();
 				return pathStr.includes(".specify") || pathStr.includes("specs");

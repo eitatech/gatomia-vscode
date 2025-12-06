@@ -85,7 +85,7 @@ export class CopilotProvider {
 	 */
 	async invokeCopilotSplitView(
 		prompt: string,
-		title = "ALMA for Copilot"
+		title = "GatomIA for Copilot"
 	): Promise<Terminal> {
 		try {
 			// Create temp file with the prompt

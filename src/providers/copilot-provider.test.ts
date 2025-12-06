@@ -1,15 +1,23 @@
 /** biome-ignore-all lint/style/noMagicNumbers: ignore */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { window, workspace } from "vscode";
-import { CopilotProvider } from "./copilot-provider";
+import type * as fs from "fs";
 
-// Mock dependencies for fs/promises
-vi.mock("fs", () => ({
-	promises: {
-		writeFile: vi.fn().mockResolvedValue(undefined),
-		unlink: vi.fn().mockResolvedValue(undefined),
-	},
-}));
+// Mock fs.promises methods
+vi.mock("fs", async () => {
+	const actual = await vi.importActual<typeof fs>("fs");
+	return {
+		...actual,
+		default: {},
+		promises: {
+			...actual.promises,
+			writeFile: vi.fn().mockResolvedValue(undefined),
+			unlink: vi.fn().mockResolvedValue(undefined),
+		},
+	};
+});
+
+import { CopilotProvider } from "./copilot-provider";
 
 describe("CopilotProvider", () => {
 	let copilotProvider: CopilotProvider;
