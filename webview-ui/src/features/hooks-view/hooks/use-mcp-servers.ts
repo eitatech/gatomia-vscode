@@ -137,6 +137,32 @@ export const useMCPServers = (): UseMCPServersState => {
 	 * Handle incoming messages from extension
 	 */
 	useEffect(() => {
+		const isServersMessage = (type: string | undefined) =>
+			type === "hooks/mcp-servers" || type === "hooks.mcp-servers";
+		const isErrorMessage = (type: string | undefined) =>
+			type === "hooks/mcp-error" || type === "hooks.mcp-error";
+		const extractBody = (payload: Record<string, unknown>) =>
+			(payload as Record<string, unknown>).payload ??
+			(payload as Record<string, unknown>).data;
+
+		const handleServersMessage = (body: Record<string, unknown>) => {
+			const discoveredServers = Array.isArray((body as any).servers)
+				? ((body as any).servers as unknown[])
+				: [];
+			setServers(discoveredServers);
+			setLoading(false);
+			setError(undefined);
+		};
+
+		const handleErrorMessage = (body: Record<string, unknown>) => {
+			const message = (body as MCPDiscoveryError["payload"])?.message;
+			if (!message) {
+				return;
+			}
+			setError(message);
+			setLoading(false);
+		};
+
 		const handleMessage = (
 			event: MessageEvent<
 				MCPDiscoveryResponse | MCPDiscoveryError | Record<string, unknown>
@@ -147,40 +173,16 @@ export const useMCPServers = (): UseMCPServersState => {
 				return;
 			}
 
-			const messageType = payload.type ?? (payload as any).command;
+			const messageType = (payload as any).type ?? (payload as any).command;
+			const body = extractBody(payload as Record<string, unknown>);
 
-			switch (messageType) {
-				case "hooks/mcp-servers":
-				case "hooks.mcp-servers": {
-					const body = (payload as any).payload ?? (payload as any).data;
-					if (!body) {
-						break;
-					}
+			if (isServersMessage(messageType) && body) {
+				handleServersMessage(body as Record<string, unknown>);
+				return;
+			}
 
-					const discoveredServers = Array.isArray(body.servers)
-						? body.servers
-						: [];
-					setServers(discoveredServers);
-					setLoading(false);
-					setError(undefined);
-					break;
-				}
-
-				case "hooks/mcp-error":
-				case "hooks.mcp-error": {
-					const body = (payload as any).payload ?? (payload as any).data;
-					if (!body?.message) {
-						break;
-					}
-
-					setError(body.message);
-					setLoading(false);
-					break;
-				}
-
-				default:
-					// Ignore other message types
-					break;
+			if (isErrorMessage(messageType) && body) {
+				handleErrorMessage(body as Record<string, unknown>);
 			}
 		};
 

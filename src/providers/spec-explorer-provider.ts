@@ -58,6 +58,7 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 		return element;
 	}
 
+	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Tree provider maps multiple node types without a simpler branching model.
 	async getChildren(element?: SpecItem): Promise<SpecItem[]> {
 		if (!(workspace.workspaceFolders && this.specManager)) {
 			return [];

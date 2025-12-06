@@ -6,6 +6,9 @@ import type { CreateSpecDraftState } from "./types";
 import { SPEC_SYSTEM_MODE } from "../../constants";
 import { sendPromptToChat } from "../../utils/chat-prompt-runner";
 
+const CREATE_SPEC_PROMPT_REGEX =
+	/Prompt Template[\s\S]*Key Scenarios \/ Acceptance Criteria:[\s\S]*Feature idea/;
+
 vi.mock("../../utils/chat-prompt-runner", () => ({
 	sendPromptToChat: vi.fn(),
 }));
@@ -225,9 +228,7 @@ describe("CreateSpecInputController", () => {
 		});
 
 		expect(sendPromptToChat).toHaveBeenCalledWith(
-			expect.stringMatching(
-				/Prompt Template[\s\S]*Key Scenarios \/ Acceptance Criteria:[\s\S]*Feature idea/
-			),
+			expect.stringMatching(CREATE_SPEC_PROMPT_REGEX),
 			{ instructionType: "createSpec" }
 		);
 		expect(workspaceStateUpdateMock).toHaveBeenCalledWith(

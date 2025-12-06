@@ -7,6 +7,8 @@ import type { OutputChannel, FileSystemWatcher } from "vscode";
 import { CommandCompletionDetector } from "../../../../../src/features/hooks/services/command-completion-detector";
 import type { TriggerRegistry } from "../../../../../src/features/hooks/trigger-registry";
 
+const FILE_WATCHER_COUNT_REGEX = /\d+ file watchers/;
+
 // Mock vscode workspace
 vi.mock("vscode", () => {
 	const mockWatcher: FileSystemWatcher = {
@@ -85,7 +87,7 @@ describe("CommandCompletionDetector", () => {
 				expect.stringContaining("Initialized")
 			);
 			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
-				expect.stringMatching(/\d+ file watchers/)
+				expect.stringMatching(FILE_WATCHER_COUNT_REGEX)
 			);
 		});
 	});
