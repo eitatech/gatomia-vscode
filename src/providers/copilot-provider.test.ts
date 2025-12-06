@@ -1,15 +1,41 @@
 /** biome-ignore-all lint/style/noMagicNumbers: ignore */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { window, workspace } from "vscode";
-import { CopilotProvider } from "./copilot-provider";
 
-// Mock dependencies for fs/promises
+// Use hoisted mocks to ensure they're available before module loading
+const { mockWriteFile, mockUnlink } = vi.hoisted(() => ({
+	mockWriteFile: vi.fn(),
+	mockUnlink: vi.fn(),
+}));
+
+// Manually mock fs modules with promises object
 vi.mock("fs", () => ({
+	default: {
+		promises: {
+			writeFile: mockWriteFile,
+			unlink: mockUnlink,
+		},
+	},
 	promises: {
-		writeFile: vi.fn().mockResolvedValue(undefined),
-		unlink: vi.fn().mockResolvedValue(undefined),
+		writeFile: mockWriteFile,
+		unlink: mockUnlink,
 	},
 }));
+
+vi.mock("node:fs", () => ({
+	default: {
+		promises: {
+			writeFile: mockWriteFile,
+			unlink: mockUnlink,
+		},
+	},
+	promises: {
+		writeFile: mockWriteFile,
+		unlink: mockUnlink,
+	},
+}));
+
+import { CopilotProvider } from "./copilot-provider";
 
 describe("CopilotProvider", () => {
 	let copilotProvider: CopilotProvider;
@@ -19,8 +45,11 @@ describe("CopilotProvider", () => {
 	const mockOutputChannel = { appendLine: vi.fn() } as any;
 
 	beforeEach(() => {
-		vi.clearAllMocks();
 		vi.useFakeTimers();
+
+		// Reset mock implementations for each test
+		mockWriteFile.mockReset().mockResolvedValue(undefined);
+		mockUnlink.mockReset().mockResolvedValue(undefined);
 
 		// ✅ Ensure workspace.fs.createDirectory resolves
 		vi.spyOn(workspace.fs, "createDirectory").mockResolvedValueOnce(

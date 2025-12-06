@@ -1,50 +1,134 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# GatomIA Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Kebab-Case File Naming (MANDATORY)
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+**Rule**: All source files MUST follow kebab-case naming convention.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+**Rationale**: Ensures consistency across the codebase, prevents linting errors, and maintains compatibility with various file systems and tooling. Files in kebab-case are easier to read, predict, and locate.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+**Enforcement**:
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+- Linter MUST fail on any file not following kebab-case
+- Code reviews MUST reject PRs with non-compliant file names
+- Automated checks MUST validate file naming before merge
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+**Examples**:
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+- ✅ `preview-store.ts`, `document-preview-panel.ts`, `hook-executor.ts`
+- ❌ `previewStore.ts`, `DocumentPreviewPanel.ts`, `hook_executor.ts`
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+**Exceptions**: Configuration files that require specific naming (e.g., `package.json`, `tsconfig.json`, `README.md`)
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### II. TypeScript-First Development
+
+**Rule**: All source code MUST be written in TypeScript with strict type checking enabled.
+
+**Rationale**: Type safety prevents runtime errors, improves code maintainability, enables better IDE support, and serves as living documentation.
+
+**Enforcement**:
+
+- `strict: true` in tsconfig.json is non-negotiable
+- No `any` types without explicit justification in code review
+- All public APIs MUST have complete type definitions
+
+### III. Test-First Development (NON-NEGOTIABLE)
+
+**Rule**: Tests MUST be written and approved BEFORE implementation begins.
+
+**Rationale**: TDD ensures requirements are clear, code is testable, and functionality is verified from the start. It prevents scope creep and reduces debugging time.
+
+**Enforcement**:
+
+- Red-Green-Refactor cycle strictly enforced
+- PRs without corresponding tests are automatically rejected
+- Test coverage MUST not decrease with new changes
+- Integration tests required for new features and contract changes
+
+### IV. Observability & Instrumentation
+
+**Rule**: All significant operations MUST include appropriate telemetry, logging, and error reporting.
+
+**Rationale**: Enables debugging in production, monitors performance targets, and provides insights into user behavior and system health.
+
+**Enforcement**:
+
+- Performance-critical paths MUST include instrumentation
+- Errors MUST be logged with sufficient context for debugging
+- Success criteria from specifications MUST be measurable via telemetry
+
+### V. Simplicity & YAGNI
+
+**Rule**: Implement only what is needed now. Do not add features or abstractions for potential future use.
+
+**Rationale**: Prevents over-engineering, reduces complexity, keeps codebase maintainable, and accelerates delivery.
+
+**Enforcement**:
+
+- Code reviews MUST challenge unnecessary abstractions
+- Features without current use cases are rejected
+- Refactoring happens when patterns emerge (Rule of Three)
+
+## Code Quality Standards
+
+### Formatting & Style
+
+**Requirements**:
+
+- Tab indentation (configured in formatter)
+- Double quotes for strings
+- Semicolons required
+- Formatter (`npm run format`) MUST pass before commit
+- Linter (`npm run lint`) MUST pass before merge
+
+### Documentation
+
+**Requirements**:
+
+- Public APIs MUST include JSDoc comments
+- Complex algorithms MUST include explanatory comments
+- README files MUST be kept up-to-date with feature changes
+- Breaking changes MUST be documented in CHANGELOG
+
+### Error Handling
+
+**Requirements**:
+
+- All async operations MUST handle errors explicitly
+- User-facing errors MUST be actionable and clear
+- Internal errors MUST include sufficient debug context
+- No silent failures
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+### Amendment Process
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Procedure**:
+
+1. Proposed change documented with rationale
+2. Team discussion and approval
+3. Migration plan for existing code (if needed)
+4. Constitution version increment (semantic versioning)
+5. Update LAST_AMENDED_DATE
+
+### Compliance
+
+**Requirements**:
+
+- All PRs MUST verify compliance with constitution principles
+- Violations MUST be justified and documented
+- Repeated violations trigger architecture review
+- Constitution supersedes conflicting practices
+
+### Version History
+
+**Current Version**: 1.0.0
+
+**Ratified**: 2025-12-06
+
+**Last Amended**: 2025-12-06
+
+**Change Log**:
+
+- v1.0.0 (2025-12-06): Initial constitution with kebab-case mandate, TypeScript-first, TDD, observability, and simplicity principles

@@ -151,7 +151,7 @@ export class SpecKitMigration {
 
 ## 3. Workflow
 - All changes must be specified before implementation.
-- Use the Spec-Kit workflow: Specify -> Plan -> Implement.
+- Use the SpecKit workflow: Specify -> Plan -> Implement.
 `;
 		} else {
 			// Merge content from sources
@@ -180,7 +180,7 @@ export class SpecKitMigration {
 	}
 
 	/**
-	 * Migrates all OpenSpec specs to Spec-Kit format
+	 * Migrates all OpenSpec specs to SpecKit format
 	 */
 	async migrateAllSpecs(): Promise<MigrationResult> {
 		const result: MigrationResult = {
@@ -268,7 +268,7 @@ export class SpecKitMigration {
 
 		// Map files
 		// OpenSpec: spec.md, requirements.md, design.md, tasks.md
-		// Spec-Kit: spec.md, plan.md, tasks.md
+		// SpecKit: spec.md, plan.md, tasks.md
 
 		// 1. spec.md -> spec.md
 		if (existsSync(join(sourcePath, "spec.md"))) {
@@ -276,7 +276,7 @@ export class SpecKitMigration {
 		}
 
 		// 2. requirements.md -> appended to spec.md or separate?
-		// Spec-Kit usually puts requirements in spec.md. For now, let's copy it as requirements.md (extra file)
+		// SpecKit usually puts requirements in spec.md. For now, let's copy it as requirements.md (extra file)
 		if (existsSync(join(sourcePath, "requirements.md"))) {
 			copyFileSync(
 				join(sourcePath, "requirements.md"),

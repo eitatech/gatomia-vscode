@@ -2,15 +2,23 @@
 * text=auto eol=lf
 
 # Explicit rules for specific file types
-*.bat text eol=crlf   # Windows batch files should use CRLF
-*.ps1 text eol=crlf   # PowerShell scripts should use CRLF
-*.sh  text eol=lf     # Shell scripts should use LF
-*.ts  text eol=lf     # TypeScript files should use LF
-*.js  text eol=lf     # JavaScript files should use LF
-*.json text eol=lf    # JSON files should use LF
-*.yml  text eol=lf    # YAML files should use LF
-*.yaml text eol=lf    # YAML files should use LF
-*.md   text eol=lf    # Markdown files should use LF
+# Windows batch files should use CRLF
+*.bat text eol=crlf
+# PowerShell scripts should use CRLF
+*.ps1 text eol=crlf
+# Shell scripts should use LF
+*.sh  text eol=lf
+# TypeScript files should use LF
+*.ts  text eol=lf
+# JavaScript files should use LF
+*.js  text eol=lf
+# JSON files should use LF
+*.json text eol=lf
+# YAML files should use LF
+*.yml  text eol=lf
+*.yaml text eol=lf
+# Markdown files should use LF
+*.md   text eol=lf
 
 # Do not perform line ending conversions on binary files
 *.png binary
