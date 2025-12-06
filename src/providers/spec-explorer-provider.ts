@@ -24,6 +24,9 @@ import {
 	type ParsedTask,
 	type TaskStatus,
 } from "../utils/task-parser";
+import { getChecklistStatusFromFile } from "../utils/checklist-parser";
+
+const MARKDOWN_EXTENSION_PATTERN = /\.md$/;
 
 export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 	static readonly viewId = "gatomia.views.specExplorer";
@@ -56,6 +59,50 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 
 	getTreeItem(element: SpecItem): TreeItem {
 		return element;
+	}
+
+	/**
+	 * Calculate aggregate status for all checklists in a folder
+	 */
+	private async calculateChecklistsFolderStatus(
+		folderPath: string
+	): Promise<TaskStatus> {
+		try {
+			const { readdirSync, statSync } = await import("node:fs");
+			const entries = readdirSync(folderPath);
+
+			let totalItems = 0;
+			let completedItems = 0;
+
+			for (const entry of entries) {
+				if (entry.endsWith(".md")) {
+					const filePath = join(folderPath, entry);
+					const stat = statSync(filePath);
+
+					if (stat.isFile()) {
+						const status = getChecklistStatusFromFile(filePath);
+						totalItems += status.total;
+						completedItems += status.completed;
+					}
+				}
+			}
+
+			if (totalItems === 0) {
+				return "not-started";
+			}
+
+			if (completedItems === totalItems) {
+				return "completed";
+			}
+
+			if (completedItems > 0) {
+				return "in-progress";
+			}
+
+			return "not-started";
+		} catch {
+			return "not-started";
+		}
 	}
 
 	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Tree provider maps multiple node types without a simpler branching model.
@@ -93,7 +140,7 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 						spec.id,
 						undefined,
 						undefined,
-						spec.path,
+						undefined,
 						undefined,
 						spec.system
 					)
@@ -157,6 +204,31 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 								element.system,
 								undefined,
 								overallStatus
+							)
+						);
+						continue;
+					}
+
+					// Handle checklists folder
+					if (docType === "checklists") {
+						const relativePath = workspace.asRelativePath(absolutePath);
+						// Calculate overall status for checklists folder
+						const checklistsStatus =
+							await this.calculateChecklistsFolderStatus(absolutePath);
+						items.push(
+							new SpecItem(
+								"Checklists",
+								TreeItemCollapsibleState.Collapsed,
+								"checklists-folder",
+								this.context,
+								element.specName,
+								"checklists",
+								undefined,
+								relativePath,
+								undefined,
+								element.system,
+								undefined,
+								checklistsStatus
 							)
 						);
 						continue;
@@ -295,6 +367,72 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 						task
 					)
 			);
+		}
+
+		// Handle checklists folder - show individual checklist files
+		if (element.contextValue === "checklists-folder") {
+			const checklistsFolderPath = element.filePath;
+			if (!checklistsFolderPath) {
+				return [];
+			}
+
+			// Get absolute path
+			const workspaceRoot = workspace.workspaceFolders?.[0].uri.fsPath;
+			if (!workspaceRoot) {
+				return [];
+			}
+
+			const absolutePath = join(workspaceRoot, checklistsFolderPath);
+
+			try {
+				const { readdirSync, statSync } = await import("node:fs");
+				const entries = readdirSync(absolutePath);
+				const checklistItems: SpecItem[] = [];
+
+				for (const entry of entries) {
+					if (entry.endsWith(".md")) {
+						const filePath = join(absolutePath, entry);
+						const stat = statSync(filePath);
+
+						if (stat.isFile()) {
+							const relativePath = workspace.asRelativePath(filePath);
+							const displayName = entry.replace(MARKDOWN_EXTENSION_PATTERN, "");
+							const formattedName =
+								displayName.charAt(0).toUpperCase() +
+								displayName.slice(1).replace(/-/g, " ");
+
+							// Calculate checklist status for icon
+							const checklistStatus = getChecklistStatusFromFile(filePath);
+
+							checklistItems.push(
+								new SpecItem(
+									formattedName,
+									TreeItemCollapsibleState.None,
+									"checklist-item",
+									this.context,
+									element.specName,
+									"checklist",
+									{
+										command: SpecExplorerProvider.openSpecCommandId,
+										title: `Open ${formattedName}`,
+										arguments: [relativePath, "checklist"],
+									},
+									relativePath,
+									undefined,
+									element.system,
+									undefined,
+									checklistStatus.status
+								)
+							);
+						}
+					}
+				}
+
+				return checklistItems;
+			} catch (error) {
+				console.error("Error reading checklists folder:", error);
+				return [];
+			}
 		}
 
 		if (element.contextValue === "change") {
@@ -444,55 +582,9 @@ class SpecItem extends TreeItem {
 	}
 
 	private updateIconAndTooltip() {
-		if (
-			this.contextValue === "spec" ||
-			this.contextValue === "change" ||
-			this.contextValue === "change-spec"
-		) {
-			this.iconPath = new ThemeIcon("package");
-			const systemLabel = this.system ? ` (${this.system})` : "";
-			this.tooltip = `${this.contextValue}${systemLabel}: ${this.label}`;
-			return;
-		}
-
-		if (this.contextValue === "spec-document") {
-			this.updateDocumentIcon();
-			return;
-		}
-
-		// Handle tasks folder
-		if (this.contextValue === "tasks-folder") {
-			const statusIcon = getGroupStatusIcon(this.groupStatus);
-			const statusColor = this.getTaskStatusColor(this.groupStatus);
-			this.iconPath = new ThemeIcon(statusIcon, statusColor);
-			this.tooltip = "Tasks - Click to expand";
-			return;
-		}
-
-		// Handle task group (phase)
-		if (this.contextValue === "task-group") {
-			const statusIcon = getGroupStatusIcon(this.groupStatus);
-			const statusColor = this.getTaskStatusColor(this.groupStatus);
-			this.iconPath = new ThemeIcon(statusIcon, statusColor);
-			this.tooltip = `Phase: ${this.label}`;
-			return;
-		}
-
-		// Handle individual task item with status icon
-		if (this.contextValue === "task-item" && this.task) {
-			const statusIcon = getTaskStatusIcon(this.task.status);
-			const statusColor = this.getTaskStatusColor(this.task.status);
-			this.iconPath = new ThemeIcon(statusIcon, statusColor);
-
-			const statusText = getTaskStatusTooltip(this.task.status);
-			const priorityText = this.task.priority
-				? ` | Priority: ${this.task.priority}`
-				: "";
-			const complexityText = this.task.complexity
-				? ` | Complexity: ${this.task.complexity}`
-				: "";
-			this.tooltip = `${statusText}${priorityText}${complexityText}\n\nClick to open at line ${this.task.line}`;
-			this.description = statusText;
+		const handler = this.getContextHandler();
+		if (handler) {
+			handler();
 			return;
 		}
 
@@ -502,6 +594,83 @@ class SpecItem extends TreeItem {
 		) {
 			this.iconPath = new ThemeIcon("folder");
 		}
+	}
+
+	private getContextHandler(): (() => void) | undefined {
+		const handlers: Record<string, () => void> = {
+			spec: () => this.handleSpecIcon(),
+			change: () => this.handleSpecIcon(),
+			"change-spec": () => this.handleSpecIcon(),
+			"spec-document": () => this.updateDocumentIcon(),
+			"tasks-folder": () => this.handleTasksFolderIcon(),
+			"task-group": () => this.handleTaskGroupIcon(),
+			"task-item": () => this.handleTaskItemIcon(),
+			"checklists-folder": () => this.handleChecklistsFolderIcon(),
+			"checklist-item": () => this.handleChecklistItemIcon(),
+		};
+
+		return handlers[this.contextValue];
+	}
+
+	private handleSpecIcon(): void {
+		this.iconPath = new ThemeIcon("package");
+		const systemLabel = this.system ? ` (${this.system})` : "";
+		this.tooltip = `${this.contextValue}${systemLabel}: ${this.label}`;
+	}
+
+	private handleTasksFolderIcon(): void {
+		const status = this.groupStatus ?? "not-started";
+		const statusIcon = getGroupStatusIcon(status);
+		const statusColor = this.getTaskStatusColor(status);
+		this.iconPath = new ThemeIcon(statusIcon, statusColor);
+		this.tooltip = "Tasks - Click to expand";
+	}
+
+	private handleTaskGroupIcon(): void {
+		const status = this.groupStatus ?? "not-started";
+		const statusIcon = getGroupStatusIcon(status);
+		const statusColor = this.getTaskStatusColor(status);
+		this.iconPath = new ThemeIcon(statusIcon, statusColor);
+		this.tooltip = `Phase: ${this.label}`;
+	}
+
+	private handleTaskItemIcon(): void {
+		if (!this.task) {
+			return;
+		}
+		const statusIcon = getTaskStatusIcon(this.task.status);
+		const statusColor = this.getTaskStatusColor(this.task.status);
+		this.iconPath = new ThemeIcon(statusIcon, statusColor);
+
+		const statusText = getTaskStatusTooltip(this.task.status);
+		const priorityText = this.task.priority
+			? ` | Priority: ${this.task.priority}`
+			: "";
+		const complexityText = this.task.complexity
+			? ` | Complexity: ${this.task.complexity}`
+			: "";
+		this.tooltip = `${statusText}${priorityText}${complexityText}\n\nClick to open at line ${this.task.line}`;
+		this.description = statusText;
+	}
+
+	private handleChecklistsFolderIcon(): void {
+		const status = this.groupStatus ?? "not-started";
+		const statusIcon = getGroupStatusIcon(status);
+		const statusColor = this.getTaskStatusColor(status);
+		this.iconPath = new ThemeIcon(statusIcon, statusColor);
+		const statusText = getTaskStatusTooltip(status);
+		this.tooltip = `Checklists - ${statusText}`;
+	}
+
+	private handleChecklistItemIcon(): void {
+		const status = this.groupStatus ?? "not-started";
+		const statusIcon = getGroupStatusIcon(status);
+		const statusColor = this.getTaskStatusColor(status);
+		this.iconPath = new ThemeIcon(statusIcon, statusColor);
+
+		const statusText = getTaskStatusTooltip(status);
+		this.tooltip = `Checklist: ${this.label} - ${statusText}`;
+		this.description = statusText;
 	}
 
 	private getTaskStatusColor(status?: TaskStatus): ThemeColor | undefined {

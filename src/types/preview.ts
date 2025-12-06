@@ -5,7 +5,8 @@ export type PreviewDocumentType =
 	| "research"
 	| "dataModel"
 	| "api"
-	| "quickstart";
+	| "quickstart"
+	| "checklist";
 
 export interface PreviewSection {
 	id: string;
