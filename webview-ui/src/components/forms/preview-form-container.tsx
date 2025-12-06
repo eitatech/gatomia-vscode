@@ -100,7 +100,10 @@ export function PreviewFormContainer({
 
 			<div className="flex flex-col gap-4">
 				{readOnly && readOnlyReason && (
-					<p className="rounded border border-[color:var(--vscode-inputValidation-warningBorder,#e5c07b)] bg-[color:var(--vscode-inputValidation-warningBackground,#3b3222)] px-3 py-2 text-[color:var(--vscode-descriptionForeground)] text-xs">
+					<p
+						className="rounded border border-[color:var(--vscode-inputValidation-warningBorder,#e5c07b)] bg-[color:var(--vscode-inputValidation-warningBackground,#3b3222)] px-3 py-2 text-[color:var(--vscode-descriptionForeground)] text-xs"
+						role="alert"
+					>
 						{readOnlyReason}
 					</p>
 				)}
