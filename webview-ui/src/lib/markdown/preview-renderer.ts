@@ -1,4 +1,5 @@
 import MarkdownIt from "markdown-it";
+import hljs from "highlight.js";
 import { checkboxPlugin } from "./plugins/checkbox-plugin";
 
 // Note: markdown-it-mermaid and markdown-it-plantuml are disabled because they
@@ -18,6 +19,23 @@ const DEFAULT_OPTIONS: MarkdownIt.Options = {
 	linkify: true,
 	typographer: true,
 	breaks: false,
+	highlight: (str: string, lang: string): string => {
+		if (lang && hljs.getLanguage(lang)) {
+			try {
+				return hljs.highlight(str, { language: lang, ignoreIllegals: true })
+					.value;
+			} catch {
+				// Fall through to default
+			}
+		}
+		// Use auto-detection for unknown languages
+		try {
+			return hljs.highlightAuto(str).value;
+		} catch {
+			// Fall through to default
+		}
+		return ""; // Use external default escaping
+	},
 };
 
 export const createPreviewRenderer = (
