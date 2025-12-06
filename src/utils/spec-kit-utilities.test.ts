@@ -1,4 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+
+// Mock fs before importing modules that use it
+vi.mock("fs", () => ({
+	default: {},
+	existsSync: vi.fn(),
+	readdirSync: vi.fn(),
+	statSync: vi.fn(),
+}));
+
 import { existsSync, readdirSync, statSync, type Stats } from "fs";
 import {
 	parseSpecKitDirectoryName,

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { OutputChannel } from "vscode";
-import { TriggerRegistry } from "../../../../src/features/hooks/TriggerRegistry";
+import { TriggerRegistry } from "../../../../src/features/hooks/trigger-registry";
 import type { TriggerEvent } from "../../../../src/features/hooks/types";
 
 // Mock OutputChannel

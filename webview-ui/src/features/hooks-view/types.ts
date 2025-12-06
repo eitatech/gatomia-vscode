@@ -26,7 +26,7 @@ export interface TriggerCondition {
 	timing: TriggerTiming;
 }
 
-export type ActionType = "agent" | "git" | "github" | "custom";
+export type ActionType = "agent" | "git" | "github" | "custom" | "mcp";
 
 export interface AgentActionParams {
 	command: string;
@@ -51,11 +51,25 @@ export interface CustomActionParams {
 	arguments?: string;
 }
 
+export interface MCPActionParams {
+	serverId: string;
+	serverName: string;
+	toolName: string;
+	toolDisplayName: string;
+	parameterMappings?: Array<{
+		toolParam: string;
+		source: "context" | "literal" | "template";
+		value: string;
+	}>;
+	timeout?: number;
+}
+
 export type ActionParameters =
 	| AgentActionParams
 	| GitActionParams
 	| GitHubActionParams
-	| CustomActionParams;
+	| CustomActionParams
+	| MCPActionParams;
 
 export interface ActionConfig {
 	type: ActionType;

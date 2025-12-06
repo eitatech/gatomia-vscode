@@ -14,6 +14,7 @@ import { SpecKitMigration } from "./spec-kit-migration";
 
 // Mock fs module
 vi.mock("fs", () => ({
+	default: {},
 	existsSync: vi.fn(),
 	mkdirSync: vi.fn(),
 	readdirSync: vi.fn(),

@@ -9,7 +9,12 @@ import {
 } from "vscode";
 import type { HookManager } from "../features/hooks/hook-manager";
 import type { HookExecutor } from "../features/hooks/hook-executor";
-import type { Hook, HookExecutionLog } from "../features/hooks/types";
+import type {
+	Hook,
+	HookExecutionLog,
+	MCPServer,
+} from "../features/hooks/types";
+import type { IMCPDiscoveryService } from "../features/hooks/services/mcp-contracts";
 import { getWebviewContent } from "../utils/get-webview-content";
 
 /**
@@ -22,7 +27,8 @@ type WebviewMessage =
 	| HookToggleMessage
 	| HookListRequestMessage
 	| HookReadyMessage
-	| HookLogsRequestMessage;
+	| HookLogsRequestMessage
+	| MCPDiscoveryRequestMessage;
 
 interface HookCreateMessage {
 	command?: "hooks.create";
@@ -66,6 +72,13 @@ interface HookLogsRequestMessage {
 	type?: "hooks/logs";
 	data?: { hookId?: string };
 	payload?: { hookId?: string };
+}
+
+interface MCPDiscoveryRequestMessage {
+	command?: "hooks.mcp-discover";
+	type?: "hooks/mcp-discover";
+	data?: { forceRefresh?: boolean };
+	payload?: { forceRefresh?: boolean };
 }
 
 /**
@@ -122,6 +135,18 @@ interface ExecutionLogsMessage {
 	data: { logs: HookExecutionLog[] };
 }
 
+interface MCPServersMessage {
+	command: "hooks.mcp-servers";
+	type: "hooks/mcp-servers";
+	data: { servers: MCPServer[] };
+}
+
+interface MCPErrorMessage {
+	command: "hooks.mcp-error";
+	type: "hooks/mcp-error";
+	data: { message: string };
+}
+
 type ExtensionMessage =
 	| HooksSyncMessage
 	| HookCreatedMessage
@@ -130,6 +155,8 @@ type ExtensionMessage =
 	| ErrorMessage
 	| ExecutionStatusMessage
 	| ExecutionLogsMessage
+	| MCPServersMessage
+	| MCPErrorMessage
 	| ShowFormMessage
 	| ShowLogsPanelMessage;
 
@@ -161,6 +188,7 @@ export class HookViewProvider {
 	private readonly context: ExtensionContext;
 	private readonly hookManager: HookManager;
 	private readonly hookExecutor: HookExecutor;
+	private readonly mcpDiscoveryService: IMCPDiscoveryService;
 	private readonly outputChannel: OutputChannel;
 	private readonly disposables: Disposable[] = [];
 	private readonly executionStatusCache = new Map<
@@ -170,16 +198,18 @@ export class HookViewProvider {
 	private readonly pendingMessages: ExtensionMessage[] = [];
 	private isWebviewReady = false;
 
-	constructor(
-		context: ExtensionContext,
-		hookManager: HookManager,
-		hookExecutor: HookExecutor,
-		outputChannel: OutputChannel
-	) {
-		this.context = context;
-		this.hookManager = hookManager;
-		this.hookExecutor = hookExecutor;
-		this.outputChannel = outputChannel;
+	constructor(options: {
+		context: ExtensionContext;
+		hookManager: HookManager;
+		hookExecutor: HookExecutor;
+		mcpDiscoveryService: IMCPDiscoveryService;
+		outputChannel: OutputChannel;
+	}) {
+		this.context = options.context;
+		this.hookManager = options.hookManager;
+		this.hookExecutor = options.hookExecutor;
+		this.mcpDiscoveryService = options.mcpDiscoveryService;
+		this.outputChannel = options.outputChannel;
 	}
 
 	initialize(): void {
@@ -270,6 +300,9 @@ export class HookViewProvider {
 					this.flushExecutionStatuses();
 					await this.syncHooksToWebview();
 					break;
+				case "hooks.mcp-discover":
+					await this.handleMCPDiscovery(messageData?.forceRefresh ?? false);
+					break;
 				default:
 					this.outputChannel.appendLine(
 						`[HookViewProvider] Unknown command: ${(message as any).command ?? (message as any).type}`
@@ -348,6 +381,39 @@ export class HookViewProvider {
 				code: (error as any).code,
 			},
 		} as ErrorMessage);
+	}
+
+	private async handleMCPDiscovery(forceRefresh: boolean): Promise<void> {
+		try {
+			this.outputChannel.appendLine(
+				`[HookViewProvider] MCP discovery requested (forceRefresh: ${forceRefresh})`
+			);
+
+			const servers =
+				await this.mcpDiscoveryService.discoverServers(forceRefresh);
+
+			await this.sendMessageToWebview({
+				command: "hooks.mcp-servers",
+				type: "hooks/mcp-servers",
+				data: { servers },
+			} as MCPServersMessage);
+
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Sent ${servers.length} MCP servers to webview`
+			);
+		} catch (error) {
+			this.outputChannel.appendLine(
+				`[HookViewProvider] MCP discovery error: ${(error as Error).message}`
+			);
+
+			await this.sendMessageToWebview({
+				command: "hooks.mcp-error",
+				type: "hooks/mcp-error",
+				data: {
+					message: (error as Error).message || "Failed to discover MCP servers",
+				},
+			} as MCPErrorMessage);
+		}
 	}
 
 	private handleExecutionStatus(payload: HookExecutionStatusPayload): void {

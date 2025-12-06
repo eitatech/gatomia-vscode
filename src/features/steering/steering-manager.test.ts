@@ -14,7 +14,16 @@ import { sendPromptToChat } from "../../utils/chat-prompt-runner";
 
 // Mock fs module
 vi.mock("fs", () => ({
+	default: {},
 	existsSync: vi.fn(),
+}));
+
+// Mock node:fs module
+vi.mock("node:fs", () => ({
+	default: {},
+	readFileSync: vi.fn(() => ""),
+	readdirSync: vi.fn(() => []),
+	statSync: vi.fn(() => ({ isDirectory: () => false })),
 }));
 
 // Mock os module

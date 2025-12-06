@@ -7,6 +7,7 @@ import type {
 	CustomActionParams,
 	GitActionParams,
 	GitHubActionParams,
+	MCPActionParams,
 	OperationType,
 	TriggerCondition,
 } from "../types";
@@ -16,6 +17,8 @@ import type {
 	HTMLSelectElement,
 	HTMLTextAreaElement,
 } from "react";
+import { MCPActionPicker, type MCPActionSelection } from "./mcp-action-picker";
+import { useMCPServers } from "../hooks/use-mcp-servers";
 
 interface TriggerActionSelectorProps {
 	trigger: TriggerCondition;
@@ -43,6 +46,13 @@ const getDefaultParameters = (type: ActionType): ActionConfig["parameters"] => {
 			return {
 				agentName: "",
 			} as CustomActionParams;
+		case "mcp":
+			return {
+				serverId: "",
+				serverName: "",
+				toolName: "",
+				toolDisplayName: "",
+			} as MCPActionParams;
 		default:
 			return {
 				command: "",
@@ -93,6 +103,9 @@ export const TriggerActionSelector = ({
 	onActionChange,
 	onClearActionError,
 }: TriggerActionSelectorProps) => {
+	// MCP servers state
+	const { servers, loading: mcpLoading, error: mcpError } = useMCPServers();
+
 	const handleTriggerAgentChange = (event: ChangeEvent<HTMLSelectElement>) => {
 		onTriggerChange({
 			...trigger,
@@ -162,6 +175,27 @@ export const TriggerActionSelector = ({
 					? { pushToRemote: false }
 					: { pushToRemote: params.pushToRemote ?? false }),
 			},
+		});
+		onClearActionError?.();
+	};
+
+	const handleMCPActionSelection = (
+		selection: MCPActionSelection | null
+	): void => {
+		if (!selection) {
+			return;
+		}
+
+		onActionChange({
+			...action,
+			type: "mcp",
+			parameters: {
+				serverId: selection.serverId,
+				serverName: selection.serverName,
+				toolName: selection.toolName,
+				toolDisplayName: selection.toolDisplayName,
+				parameterMappings: [],
+			} as MCPActionParams,
 		});
 		onClearActionError?.();
 	};
@@ -458,6 +492,28 @@ export const TriggerActionSelector = ({
 					</>
 				);
 			}
+			case "mcp": {
+				const params = action.parameters as MCPActionParams;
+				return (
+					<div className="flex flex-col gap-3">
+						<MCPActionPicker
+							disabled={disabled}
+							error={mcpError}
+							loading={mcpLoading}
+							onSelectionChange={handleMCPActionSelection}
+							servers={servers}
+						/>
+						{params.serverId && params.toolName && (
+							<div className="rounded border border-[color:var(--vscode-panel-border)] bg-[color:var(--vscode-editor-background)] px-3 py-2">
+								<div className="text-[color:var(--vscode-descriptionForeground)] text-xs">
+									<strong>Selected:</strong> {params.toolDisplayName} from{" "}
+									{params.serverName}
+								</div>
+							</div>
+						)}
+					</div>
+				);
+			}
 			default:
 				return null;
 		}
@@ -534,6 +590,7 @@ export const TriggerActionSelector = ({
 						<option value="git">Git Operation</option>
 						<option value="github">GitHub Operation</option>
 						<option value="custom">Custom Agent</option>
+						<option value="mcp">MCP Action</option>
 					</select>
 				</div>
 				{renderActionParameters()}

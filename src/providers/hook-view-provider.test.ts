@@ -82,12 +82,21 @@ describe("HookViewProvider (panel)", () => {
 		(window as any).createWebviewPanel = vi.fn().mockReturnValue(mockPanel);
 		createPanelSpy = vi.spyOn(window as any, "createWebviewPanel");
 
-		provider = new HookViewProvider(
-			mockContext,
-			mockHookManager,
-			mockHookExecutor,
-			mockOutputChannel
-		);
+		const mockMCPDiscovery = {
+			discoverServers: vi.fn().mockResolvedValue([]),
+			getServer: vi.fn().mockResolvedValue(undefined),
+			getTool: vi.fn().mockResolvedValue(undefined),
+			clearCache: vi.fn(),
+			isCacheFresh: vi.fn().mockReturnValue(true),
+		};
+
+		provider = new HookViewProvider({
+			context: mockContext,
+			hookManager: mockHookManager,
+			hookExecutor: mockHookExecutor,
+			mcpDiscoveryService: mockMCPDiscovery,
+			outputChannel: mockOutputChannel,
+		});
 		provider.initialize();
 	});
 
@@ -136,12 +145,22 @@ describe("HookViewProvider (panel)", () => {
 		const localSpy = vi
 			.spyOn(window as any, "createWebviewPanel")
 			.mockReturnValue(localPanel as any);
-		const localProvider = new HookViewProvider(
-			mockContext,
-			mockHookManager,
-			mockHookExecutor,
-			mockOutputChannel
-		);
+
+		const mockMCPDiscovery = {
+			discoverServers: vi.fn().mockResolvedValue([]),
+			getServer: vi.fn().mockResolvedValue(undefined),
+			getTool: vi.fn().mockResolvedValue(undefined),
+			clearCache: vi.fn(),
+			isCacheFresh: vi.fn().mockReturnValue(true),
+		};
+
+		const localProvider = new HookViewProvider({
+			context: mockContext,
+			hookManager: mockHookManager,
+			hookExecutor: mockHookExecutor,
+			mcpDiscoveryService: mockMCPDiscovery,
+			outputChannel: mockOutputChannel,
+		});
 		await localProvider.showLogsPanel("hook-1");
 		expect(localSpy).toHaveBeenCalled();
 		localSpy.mockRestore();

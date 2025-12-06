@@ -599,7 +599,7 @@ describe("HookManager", () => {
 				createTestHook({ name: "Valid Hook" })
 			);
 
-			const result = manager.validateHook(created);
+			const result = await manager.validateHook(created);
 			expect(result.valid).toBe(true);
 			expect(result.errors).toHaveLength(0);
 		});
@@ -611,7 +611,7 @@ describe("HookManager", () => {
 			);
 			const invalidHook = { ...created, name: "" };
 
-			const result = manager.validateHook(invalidHook);
+			const result = await manager.validateHook(invalidHook);
 			expect(result.valid).toBe(false);
 			expect(result.errors.some((e) => e.field === "name")).toBe(true);
 		});
@@ -622,7 +622,7 @@ describe("HookManager", () => {
 			);
 			const invalidHook = { ...created, name: "x".repeat(101) }; // Exceeds MAX_HOOK_NAME_LENGTH (100)
 
-			const result = manager.validateHook(invalidHook);
+			const result = await manager.validateHook(invalidHook);
 			expect(result.valid).toBe(false);
 			expect(result.errors.some((e) => e.field === "name")).toBe(true);
 		});

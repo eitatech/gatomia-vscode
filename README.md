@@ -37,6 +37,14 @@ It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.
 
 - **Migrate to SpecKit**: Easily migrate existing OpenSpec projects to the modern SpecKit structure using the `GatomIA: Migrate to SpecKit` command.
 
+### Hooks & Automation
+
+- **MCP Hooks Integration**: Automate workflows by creating hooks that trigger MCP (Model Context Protocol) actions when agent operations complete.
+- **Browse MCP Servers**: Discover available MCP servers and tools configured in your GitHub Copilot setup.
+- **Configure Actions**: Set up hooks to execute MCP tools automatically (e.g., create GitHub issues, send Slack notifications) after operations like spec generation or task completion.
+- **Execution Tracking**: View execution logs and monitor hook performance in real-time.
+- **Error Handling**: Graceful degradation when MCP servers are unavailable, with automatic retry logic for transient failures.
+
 ## Installation
 
 ### Prerequisites
@@ -102,6 +110,19 @@ Search for "GatomIA" in the VS Code Marketplace and install the extension.
 3. Select **SpecKit**.
 4. Enter your directives (e.g., "Focus on clean code").
 5. Copilot will generate your `constitution.md`.
+
+### 4. Automate with Hooks
+
+1. Open the **Hooks** view in the Activity Bar.
+2. Click **Create New Hook**.
+3. Configure the trigger (e.g., after "plan" operation in "speckit" agent).
+4. Select an action type (MCP, Agent, Git, GitHub, or Custom).
+5. For MCP actions:
+   - Browse available MCP servers and tools
+   - Map parameters using context variables or literal values
+   - Save and enable the hook
+6. Execute operations that match your trigger.
+7. View execution logs in the Hooks view to monitor automation.
 
 ## Configuration
 

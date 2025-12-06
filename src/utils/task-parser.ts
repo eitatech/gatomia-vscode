@@ -316,7 +316,7 @@ export function getGroupStatusIcon(status: TaskStatus): string {
 		case "completed":
 			return "pass"; // All tasks completed
 		case "in-progress":
-			return "color-mode"; // Some tasks completed
+			return "sync~spin"; // Some tasks completed
 		case "not-started":
 			return "record"; // No tasks completed
 		default:
