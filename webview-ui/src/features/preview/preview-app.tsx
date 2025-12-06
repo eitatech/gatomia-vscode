@@ -22,6 +22,9 @@ const ISSUE_TYPE_LABELS: Record<string, string> = {
 	other: "Other",
 };
 
+const PARAGRAPH_OPEN_PATTERN = /^<p>/;
+const PARAGRAPH_CLOSE_PATTERN = /<\/p>\s*$/;
+
 export const PreviewApp = () => {
 	const snapshot = useSyncExternalStore(
 		previewStore.subscribe,
@@ -85,8 +88,8 @@ export const PreviewApp = () => {
 			...section,
 			titleHtml: section.title
 				? renderPreviewMarkdown(section.title)
-						.replace(/^<p>/, "")
-						.replace(/<\/p>\s*$/, "")
+						.replace(PARAGRAPH_OPEN_PATTERN, "")
+						.replace(PARAGRAPH_CLOSE_PATTERN, "")
 				: "",
 			html: section.body ? renderPreviewMarkdown(section.body) : "",
 		}));
