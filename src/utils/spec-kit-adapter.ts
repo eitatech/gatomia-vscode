@@ -314,6 +314,12 @@ export class SpecSystemAdapter {
 			}
 		}
 
+		// Check for checklists folder
+		const checklistsPath = join(featurePath, "checklists");
+		if (existsSync(checklistsPath) && statSync(checklistsPath).isDirectory()) {
+			files.checklists = checklistsPath;
+		}
+
 		return files;
 	}
 
