@@ -227,21 +227,18 @@ describe("SpecManager", () => {
 			);
 		});
 
-		it("should fire trigger after successful SpecKit command execution", async () => {
+		it("should execute SpecKit command successfully", async () => {
 			specManager.setTriggerRegistry(mockTriggerRegistry as any);
 
 			await specManager.executeSpecKitCommand("specify");
 
-			expect(mockTriggerRegistry.fireTrigger).toHaveBeenCalledWith(
-				"speckit",
-				"specify"
-			);
+			// NOTE: Triggers are now fired by CommandCompletionDetector, not by SpecManager
 			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
-				"[SpecManager] Fired trigger: speckit.specify"
+				"[SpecManager] Executed command: /speckit.specify"
 			);
 		});
 
-		it("should fire triggers for all SpecKit operations", async () => {
+		it("should execute all SpecKit operations successfully", async () => {
 			specManager.setTriggerRegistry(mockTriggerRegistry as any);
 
 			const operations = [
@@ -255,28 +252,23 @@ describe("SpecManager", () => {
 
 			for (const operation of operations) {
 				await specManager.executeSpecKitCommand(operation);
-				expect(mockTriggerRegistry.fireTrigger).toHaveBeenCalledWith(
-					"speckit",
-					operation
+				expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
+					`[SpecManager] Executed command: /speckit.${operation}`
 				);
 			}
-
-			expect(mockTriggerRegistry.fireTrigger).toHaveBeenCalledTimes(
-				operations.length
-			);
 		});
 
-		it("should not fire trigger when TriggerRegistry is not set", async () => {
+		it("should execute command when TriggerRegistry is not set", async () => {
 			// Don't set trigger registry
 			await specManager.executeSpecKitCommand("specify");
 
-			// Should not throw, just skip trigger firing
-			expect(mockOutputChannel.appendLine).not.toHaveBeenCalledWith(
-				expect.stringContaining("Fired trigger")
+			// Should execute normally without errors
+			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
+				"[SpecManager] Executed command: /speckit.specify"
 			);
 		});
 
-		it("should not fire trigger on command execution error", async () => {
+		it("should handle command execution errors gracefully", async () => {
 			const { sendPromptToChat } = await import(
 				"../../utils/chat-prompt-runner"
 			);
@@ -290,8 +282,10 @@ describe("SpecManager", () => {
 				specManager.executeSpecKitCommand("specify")
 			).rejects.toThrow("Command failed");
 
-			// Trigger should not fire on error
-			expect(mockTriggerRegistry.fireTrigger).not.toHaveBeenCalled();
+			// Should log the error
+			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
+				expect.stringContaining("Error executing specify")
+			);
 		});
 	});
 });

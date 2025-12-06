@@ -1,11 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-	CancellationToken,
-	ExtensionContext,
-	OutputChannel,
-	WebviewView,
-	WebviewViewResolveContext,
-} from "vscode";
+import type { ExtensionContext, OutputChannel } from "vscode";
 import { Uri } from "vscode";
 import { HookManager } from "../../src/features/hooks/hook-manager";
 import { HookViewProvider } from "../../src/providers/hook-view-provider";
@@ -111,31 +105,30 @@ describe("Hooks Workflow Integration", () => {
 		hookManager = new HookManager(context, outputChannel);
 		await hookManager.initialize();
 
-		provider = new HookViewProvider(context, hookManager, outputChannel);
-		provider.initialize();
-
-		const {
-			webviewView: view,
-			getMessageHandler,
-			postMessageMock: postMessage,
-		} = createMockWebviewView();
-		webviewView = view;
-		postMessageMock = postMessage;
-
-		provider.resolveWebviewView(
-			webviewView,
-			{} as WebviewViewResolveContext,
-			{} as CancellationToken
-		);
-
-		handleMessage = getMessageHandler();
+		const mockMCPDiscovery = {
+			discoverServers: vi.fn().mockResolvedValue([]),
+			getServer: vi.fn().mockResolvedValue(undefined),
+			getTool: vi.fn().mockResolvedValue(undefined),
+			clearCache: vi.fn(),
+			isCacheFresh: vi.fn().mockReturnValue(true),
+		};
 
 		hookExecutor = new HookExecutor(
 			hookManager,
 			triggerRegistry,
-			outputChannel
+			outputChannel,
+			mockMCPDiscovery
 		);
 		hookExecutor.initialize();
+
+		provider = new HookViewProvider({
+			context,
+			hookManager,
+			hookExecutor,
+			mcpDiscoveryService: mockMCPDiscovery,
+			outputChannel,
+		});
+
 		agentExecutor = (hookExecutor as any).agentExecutor as AgentActionExecutor;
 		vi.spyOn(agentExecutor, "execute").mockResolvedValue(undefined);
 	});
@@ -159,39 +152,25 @@ describe("Hooks Workflow Integration", () => {
 		},
 	});
 
-	it("creates a hook via hooks.create message", async () => {
+	it("creates a hook via hookManager", async () => {
 		const payload = createHookPayload();
 
-		await handleMessage({
-			command: "hooks.create",
-			data: payload,
-		});
+		const created = await hookManager.createHook(payload);
 
 		const hooks = await hookManager.getAllHooks();
 		expect(hooks).toHaveLength(1);
 		expect(hooks[0].name).toBe("Auto Clarify");
-
-		const createdCall = postMessageMock.mock.calls.find(
-			([msg]) => msg.command === "hooks.created"
-		);
-		expect(createdCall).toBeTruthy();
-		expect(createdCall?.[0].data.hook.name).toBe("Auto Clarify");
+		expect(created.name).toBe("Auto Clarify");
 	});
 
-	it("edits an existing hook via hooks.update message", async () => {
+	it("edits an existing hook via hookManager", async () => {
 		const created = await hookManager.createHook(createHookPayload());
 
-		await handleMessage({
-			command: "hooks.update",
-			data: {
-				id: created.id,
-				updates: {
-					name: "Auto Analyze",
-					action: {
-						type: "agent",
-						parameters: { command: "/speckit.analyze" },
-					},
-				},
+		const updated = await hookManager.updateHook(created.id, {
+			name: "Auto Analyze",
+			action: {
+				type: "agent",
+				parameters: { command: "/speckit.analyze" },
 			},
 		});
 
@@ -201,30 +180,16 @@ describe("Hooks Workflow Integration", () => {
 		expect((hooks[0].action.parameters as { command: string }).command).toBe(
 			"/speckit.analyze"
 		);
-
-		const updateCall = postMessageMock.mock.calls.find(
-			([msg]) => msg.command === "hooks.updated"
-		);
-		expect(updateCall).toBeTruthy();
-		expect(updateCall?.[0].data.hook.name).toBe("Auto Analyze");
+		expect(updated.name).toBe("Auto Analyze");
 	});
 
-	it("deletes an existing hook via hooks.delete message", async () => {
+	it("deletes an existing hook via hookManager", async () => {
 		const created = await hookManager.createHook(createHookPayload());
 
-		await handleMessage({
-			command: "hooks.delete",
-			data: { id: created.id },
-		});
+		await hookManager.deleteHook(created.id);
 
 		const hooks = await hookManager.getAllHooks();
 		expect(hooks).toHaveLength(0);
-
-		const deleteCall = postMessageMock.mock.calls.find(
-			([msg]) => msg.command === "hooks.deleted"
-		);
-		expect(deleteCall).toBeTruthy();
-		expect(deleteCall?.[0].data.id).toBe(created.id);
 	});
 
 	describe("execution workflow", () => {

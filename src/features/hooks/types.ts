@@ -100,6 +100,7 @@ export type ActionType =
 	| "agent" // Execute SpecKit/OpenSpec command
 	| "git" // Git commit/push operation
 	| "github" // GitHub via MCP Server
+	| "mcp" // MCP server tool execution
 	| "custom"; // Custom agent invocation
 
 /**
@@ -109,6 +110,7 @@ export type ActionParameters =
 	| AgentActionParams
 	| GitActionParams
 	| GitHubActionParams
+	| MCPActionParams
 	| CustomActionParams;
 
 // ============================================================================
@@ -162,6 +164,72 @@ export type GitHubOperation =
 export interface CustomActionParams {
 	agentName: string; // Custom agent identifier
 	arguments?: string; // Arguments to pass to agent
+}
+
+/**
+ * MCPActionParams - Parameters for MCP server tool execution
+ */
+export interface MCPActionParams {
+	serverId: string; // MCP server identifier
+	toolName: string; // Tool to execute
+	parameterMappings: ParameterMapping[]; // How to map parameters
+	timeout?: number; // Optional timeout override (1000-300000ms)
+}
+
+/**
+ * ParameterMapping - Maps hook context to MCP tool parameters
+ */
+export interface ParameterMapping {
+	toolParam: string; // Parameter name in tool's input schema
+	source: "context" | "literal" | "template"; // Where to get the value
+	value: string; // Template string or literal value
+}
+
+/**
+ * ServerStatus - Status of an MCP server
+ */
+export type ServerStatus = "available" | "unavailable" | "unknown";
+
+/**
+ * MCPServer - Represents an MCP server configured in Copilot
+ */
+export interface MCPServer {
+	id: string; // Server identifier
+	name: string; // Display name
+	description?: string; // Optional description
+	status: ServerStatus; // Current availability
+	tools: MCPTool[]; // Available tools/actions
+	lastDiscovered: number; // Unix timestamp (milliseconds)
+}
+
+/**
+ * MCPTool - Represents a tool/action provided by an MCP server
+ */
+export interface MCPTool {
+	name: string; // Tool identifier
+	displayName: string; // Human-readable name
+	description: string; // What the tool does
+	inputSchema: JSONSchema; // Parameter definition
+	serverId: string; // Parent server reference
+}
+
+/**
+ * JSONSchema - JSON Schema definition for MCP tool parameters
+ */
+export interface JSONSchema {
+	type: string; // Schema type (e.g., 'object')
+	properties?: Record<string, JSONSchemaProperty>; // Parameter definitions
+	required?: string[]; // Required parameter names
+}
+
+/**
+ * JSONSchemaProperty - Individual parameter schema
+ */
+export interface JSONSchemaProperty {
+	type: string; // Parameter type (string, number, boolean, etc.)
+	description?: string; // Parameter description
+	enum?: unknown[]; // Allowed values (if applicable)
+	default?: unknown; // Default value (if applicable)
 }
 
 // ============================================================================
@@ -266,6 +334,15 @@ export const LOGS_STORAGE_KEY = "gatomia.hooks.execution-logs";
 // Trigger History
 export const MAX_TRIGGER_HISTORY = 50;
 
+// MCP-specific limits
+export const MCP_DISCOVERY_CACHE_TTL = 300_000; // 5 minutes
+export const MCP_DEFAULT_TIMEOUT = 30_000; // 30 seconds
+export const MCP_MIN_TIMEOUT = 1000; // 1 second
+export const MCP_MAX_TIMEOUT = 300_000; // 5 minutes
+export const MCP_MAX_CONCURRENT_ACTIONS = 5; // Concurrency pool size
+export const MAX_SERVER_NAME_LENGTH = 100;
+export const MAX_TOOL_NAME_LENGTH = 100;
+
 // ============================================================================
 // Type Guards
 // ============================================================================
@@ -285,6 +362,11 @@ const REPOSITORY_PATTERN = /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/;
  * Agent name pattern (alphanumeric and hyphens)
  */
 const AGENT_NAME_PATTERN = /^[a-zA-Z0-9-]+$/;
+
+/**
+ * MCP tool name pattern (alphanumeric and underscores)
+ */
+const TOOL_NAME_PATTERN = /^[a-zA-Z0-9_]+$/;
 
 /**
  * Check if a string is a valid UUID v4
@@ -357,6 +439,8 @@ export function isValidAction(obj: unknown): obj is ActionConfig {
 			return isValidGitParams(action.parameters);
 		case "github":
 			return isValidGitHubParams(action.parameters);
+		case "mcp":
+			return isValidMCPParams(action.parameters);
 		case "custom":
 			return isValidCustomParams(action.parameters);
 		default:
@@ -534,5 +618,97 @@ export function isValidTriggerEvent(obj: unknown): obj is TriggerEvent {
 		SUPPORTED_SPECKIT_OPERATIONS.includes(event.operation as OperationType) &&
 		typeof event.timestamp === "number" &&
 		event.timestamp > 0
+	);
+}
+
+/**
+ * Validate MCP action parameters
+ */
+export function isValidMCPParams(obj: unknown): obj is MCPActionParams {
+	if (typeof obj !== "object" || obj === null) {
+		return false;
+	}
+	const params = obj as MCPActionParams;
+
+	return (
+		typeof params.serverId === "string" &&
+		params.serverId.length > 0 &&
+		typeof params.toolName === "string" &&
+		params.toolName.length > 0 &&
+		Array.isArray(params.parameterMappings) &&
+		params.parameterMappings.every(isValidParameterMapping) &&
+		(params.timeout === undefined ||
+			(typeof params.timeout === "number" &&
+				params.timeout >= MCP_MIN_TIMEOUT &&
+				params.timeout <= MCP_MAX_TIMEOUT))
+	);
+}
+
+/**
+ * Validate parameter mapping
+ */
+export function isValidParameterMapping(obj: unknown): obj is ParameterMapping {
+	if (typeof obj !== "object" || obj === null) {
+		return false;
+	}
+	const mapping = obj as ParameterMapping;
+
+	const validSources = ["context", "literal", "template"];
+
+	return (
+		typeof mapping.toolParam === "string" &&
+		mapping.toolParam.length > 0 &&
+		typeof mapping.source === "string" &&
+		validSources.includes(mapping.source) &&
+		typeof mapping.value === "string"
+	);
+}
+
+/**
+ * Validate MCP server
+ */
+export function isValidMCPServer(obj: unknown): obj is MCPServer {
+	if (typeof obj !== "object" || obj === null) {
+		return false;
+	}
+	const server = obj as MCPServer;
+
+	const validStatuses: ServerStatus[] = ["available", "unavailable", "unknown"];
+
+	return (
+		typeof server.id === "string" &&
+		server.id.length > 0 &&
+		typeof server.name === "string" &&
+		server.name.length > 0 &&
+		server.name.length <= MAX_SERVER_NAME_LENGTH &&
+		typeof server.status === "string" &&
+		validStatuses.includes(server.status) &&
+		Array.isArray(server.tools) &&
+		typeof server.lastDiscovered === "number" &&
+		server.lastDiscovered > 0
+	);
+}
+
+/**
+ * Validate MCP tool
+ */
+export function isValidMCPTool(obj: unknown): obj is MCPTool {
+	if (typeof obj !== "object" || obj === null) {
+		return false;
+	}
+	const tool = obj as MCPTool;
+
+	return (
+		typeof tool.name === "string" &&
+		tool.name.length > 0 &&
+		TOOL_NAME_PATTERN.test(tool.name) &&
+		typeof tool.displayName === "string" &&
+		tool.displayName.length > 0 &&
+		tool.displayName.length <= MAX_TOOL_NAME_LENGTH &&
+		typeof tool.description === "string" &&
+		typeof tool.inputSchema === "object" &&
+		tool.inputSchema !== null &&
+		typeof tool.serverId === "string" &&
+		tool.serverId.length > 0
 	);
 }

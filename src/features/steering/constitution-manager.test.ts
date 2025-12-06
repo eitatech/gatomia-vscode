@@ -6,8 +6,11 @@ import { workspace, type Uri, window, ViewColumn } from "vscode";
 
 // Mock fs module
 vi.mock("fs", () => ({
+	default: {},
 	existsSync: vi.fn(),
 	readFileSync: vi.fn(),
+	readdirSync: vi.fn(() => []),
+	statSync: vi.fn(() => ({ isDirectory: () => false })),
 }));
 
 describe("ConstitutionManager", () => {
