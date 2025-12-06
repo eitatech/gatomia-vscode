@@ -4,6 +4,7 @@ import { InteractiveView } from "./features/interactive-view";
 import { SimpleView } from "./features/simple-view";
 import { HooksView } from "./features/hooks-view";
 import { DependenciesView } from "./features/dependencies-view";
+import { PreviewApp } from "./features/preview/preview-app";
 
 export type SupportedPage =
 	| "simple"
@@ -11,7 +12,8 @@ export type SupportedPage =
 	| "create-spec"
 	| "create-steering"
 	| "hooks"
-	| "dependencies";
+	| "dependencies"
+	| "document-preview";
 
 const pageRenderers = {
 	simple: () => <SimpleView />,
@@ -20,6 +22,7 @@ const pageRenderers = {
 	"create-steering": () => <CreateSteeringView />,
 	hooks: () => <HooksView />,
 	dependencies: () => <DependenciesView />,
+	"document-preview": () => <PreviewApp />,
 } satisfies Record<SupportedPage, () => JSX.Element>;
 
 export const getPageRenderer = (pageName: string) => {

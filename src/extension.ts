@@ -9,7 +9,10 @@ import {
 	type ExtensionContext,
 	languages,
 	type OutputChannel,
+	Position,
+	Range,
 	RelativePattern,
+	Selection,
 	Uri,
 	window,
 	workspace,
@@ -37,6 +40,10 @@ import { MCPDiscoveryService } from "./features/hooks/services/mcp-discovery";
 import { HookViewProvider } from "./providers/hook-view-provider";
 import { HooksExplorerProvider } from "./providers/hooks-explorer-provider";
 import { DependenciesViewProvider } from "./providers/dependencies-view-provider";
+import { DocumentPreviewPanel } from "./panels/document-preview-panel";
+import { DocumentPreviewService } from "./services/document-preview-service";
+import { RefinementGateway } from "./services/refinement-gateway";
+import type { DocumentArtifact } from "./types/preview";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -48,6 +55,10 @@ let commandCompletionDetector: CommandCompletionDetector;
 let mcpDiscoveryService: MCPDiscoveryService;
 let hookViewProvider: HookViewProvider;
 let dependenciesViewProvider: DependenciesViewProvider;
+let documentPreviewPanel: DocumentPreviewPanel;
+let documentPreviewService: DocumentPreviewService;
+let refinementGateway: RefinementGateway;
+let activePreviewUri: Uri | undefined;
 type HookCommandTarget = { hookId?: string } | string;
 export let outputChannel: OutputChannel;
 
@@ -149,6 +160,56 @@ export async function activate(context: ExtensionContext) {
 		context,
 		outputChannel
 	);
+
+	documentPreviewService = new DocumentPreviewService(outputChannel);
+	refinementGateway = new RefinementGateway(outputChannel);
+	documentPreviewPanel = new DocumentPreviewPanel(context, outputChannel, {
+		onReloadRequested: async () => {
+			if (activePreviewUri) {
+				await renderPreviewForUri(activePreviewUri);
+			}
+		},
+		onEditAttempt: () => {
+			outputChannel.appendLine("[Preview] Prevented raw document edit request");
+		},
+		onOpenInEditor: () => openActivePreviewInEditor(),
+		onFormSubmit: async (payload) => {
+			if (!documentPreviewService) {
+				return { status: "error", message: "Preview service not ready" };
+			}
+
+			try {
+				await documentPreviewService.persistFormSubmission(payload);
+				outputChannel.appendLine(
+					`[Preview] Form submission received for ${payload.documentId}`
+				);
+				return { status: "success" as const };
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				outputChannel.appendLine(
+					`[Preview] Failed to persist form submission: ${message}`
+				);
+				return { status: "error" as const, message };
+			}
+		},
+		onRefineSubmit: async (payload) => {
+			if (!refinementGateway) {
+				return {
+					status: "error" as const,
+					message: "Refinement gateway not ready",
+				};
+			}
+
+			try {
+				return await refinementGateway.submitRequest(payload);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				outputChannel.appendLine(`[RefinementGateway] Failed: ${message}`);
+				return { status: "error" as const, message };
+			}
+		},
+	});
+	setupDocumentPreviewWatchers(context);
 
 	// Register tree data providers
 	const quickAccessExplorer = new QuickAccessExplorerProvider();
@@ -327,10 +388,28 @@ function registerCommands({
 
 		commands.registerCommand(
 			"gatomia.spec.open",
-			async (relativePath: string, type: string) => {
+			async (relativePath: string, type: string, line?: number) => {
+				const uri = resolveWorkspaceRelativeUri(relativePath);
+				if (uri) {
+					const artifact = await renderPreviewForUri(uri);
+					if (artifact) {
+						return;
+					}
+				}
 				await specManager.openDocument(relativePath, type);
+				if (uri && typeof line === "number") {
+					await openDocumentInEditor(uri, line);
+				}
 			}
 		),
+		commands.registerCommand("gatomia.preview.openActiveDocument", async () => {
+			const editor = window.activeTextEditor;
+			if (!editor) {
+				window.showErrorMessage("Open a document to preview.");
+				return;
+			}
+			await renderPreviewForUri(editor.document.uri);
+		}),
 		// biome-ignore lint/suspicious/useAwait: ignore
 		commands.registerCommand("gatomia.spec.refresh", async () => {
 			outputChannel.appendLine("[Manual Refresh] Refreshing spec explorer...");
@@ -1073,3 +1152,81 @@ async function handleHooksImport(): Promise<void> {
 
 // biome-ignore lint/suspicious/noEmptyBlockStatements: ignore
 export function deactivate() {}
+
+function setupDocumentPreviewWatchers(context: ExtensionContext) {
+	const watcher = workspace.createFileSystemWatcher("**/*.md");
+
+	const handleChange = async (uri: Uri) => {
+		if (!activePreviewUri || uri.fsPath !== activePreviewUri.fsPath) {
+			return;
+		}
+		documentPreviewService?.markDocumentChanged(uri);
+		await documentPreviewPanel?.markDocumentStale(
+			"Document changed outside the preview. Reload to view the latest version."
+		);
+		window
+			.showWarningMessage(
+				"Document changed outside the preview.",
+				"Reload Preview"
+			)
+			.then(async (selection) => {
+				if (selection === "Reload Preview" && activePreviewUri) {
+					await renderPreviewForUri(activePreviewUri);
+				}
+			});
+	};
+
+	watcher.onDidChange(handleChange);
+	watcher.onDidDelete(handleChange);
+	context.subscriptions.push(watcher);
+}
+
+async function renderPreviewForUri(
+	uri: Uri
+): Promise<DocumentArtifact | undefined> {
+	if (!(documentPreviewService && documentPreviewPanel)) {
+		window.showErrorMessage(
+			"Document preview infrastructure is not ready yet."
+		);
+		return;
+	}
+
+	try {
+		const artifact = await documentPreviewService.loadDocument(uri);
+		activePreviewUri = uri;
+		await documentPreviewPanel.renderDocument(artifact);
+		return artifact;
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		window.showErrorMessage(`Failed to open document preview: ${message}`);
+		outputChannel.appendLine(`[Preview] Failed to open document: ${message}`);
+	}
+}
+
+function resolveWorkspaceRelativeUri(relativePath: string): Uri | undefined {
+	const workspaceFolder = workspace.workspaceFolders?.[0];
+	if (!workspaceFolder) {
+		return;
+	}
+
+	return Uri.joinPath(workspaceFolder.uri, relativePath);
+}
+
+async function openDocumentInEditor(uri: Uri, line?: number): Promise<void> {
+	const doc = await workspace.openTextDocument(uri);
+	const editor = await window.showTextDocument(doc, { preview: false });
+	if (typeof line === "number" && line >= 0) {
+		const position = new Position(line, 0);
+		editor.selection = new Selection(position, position);
+		editor.revealRange(new Range(position, position));
+	}
+}
+
+async function openActivePreviewInEditor(): Promise<void> {
+	if (!activePreviewUri) {
+		window.showInformationMessage("No preview is currently active.");
+		return;
+	}
+
+	await openDocumentInEditor(activePreviewUri);
+}

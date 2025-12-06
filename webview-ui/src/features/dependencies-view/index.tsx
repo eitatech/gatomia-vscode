@@ -21,6 +21,63 @@ export const DependenciesView = () => {
 
 	// Handle incoming messages from extension
 	useEffect(() => {
+		type StatusMessage = Extract<
+			DependenciesExtensionMessage,
+			{ type: "dependencies/status" }
+		>;
+		type UpdatedMessage = Extract<
+			DependenciesExtensionMessage,
+			{ type: "dependencies/updated" }
+		>;
+		type CheckingMessage = Extract<
+			DependenciesExtensionMessage,
+			{ type: "dependencies/checking" }
+		>;
+		type ErrorMessage = Extract<
+			DependenciesExtensionMessage,
+			{ type: "dependencies/error" }
+		>;
+		type ActionMessage = Extract<
+			DependenciesExtensionMessage,
+			{ type: "dependencies/action-result" }
+		>;
+
+		const handleStatusMessage = (message: StatusMessage) => {
+			setDependencies(message.payload.dependencies);
+			setSteps(message.payload.steps);
+			setIsLoading(false);
+			setCheckingName(undefined);
+			setError(undefined);
+		};
+
+		const handleUpdatedMessage = (message: UpdatedMessage) => {
+			const updated = message.payload;
+			setDependencies((prev) =>
+				prev.map((dep) => (dep.name === updated.name ? updated : dep))
+			);
+			setCheckingName(undefined);
+		};
+
+		const handleCheckingMessage = (message: CheckingMessage) => {
+			setCheckingName(message.payload.name);
+			if (!message.payload.name) {
+				setIsLoading(true);
+			}
+		};
+
+		const handleErrorMessage = (message: ErrorMessage) => {
+			setError(message.payload.message);
+			setIsLoading(false);
+			setCheckingName(undefined);
+		};
+
+		const handleActionResult = (message: ActionMessage) => {
+			if (message.payload.success && message.payload.message) {
+				setActionMessage(message.payload.message);
+				setTimeout(() => setActionMessage(undefined), 3000);
+			}
+		};
+
 		const handleMessage = (
 			event: MessageEvent<DependenciesExtensionMessage>
 		) => {
@@ -31,40 +88,22 @@ export const DependenciesView = () => {
 
 			switch (payload.type) {
 				case "dependencies/status":
-					setDependencies(payload.payload.dependencies);
-					setSteps(payload.payload.steps);
-					setIsLoading(false);
-					setCheckingName(undefined);
-					setError(undefined);
-					break;
-				case "dependencies/updated": {
-					const updated = payload.payload;
-					setDependencies((prev) =>
-						prev.map((dep) => (dep.name === updated.name ? updated : dep))
-					);
-					setCheckingName(undefined);
-					break;
-				}
+					handleStatusMessage(payload);
+					return;
+				case "dependencies/updated":
+					handleUpdatedMessage(payload);
+					return;
 				case "dependencies/checking":
-					setCheckingName(payload.payload.name);
-					if (!payload.payload.name) {
-						setIsLoading(true);
-					}
-					break;
+					handleCheckingMessage(payload);
+					return;
 				case "dependencies/error":
-					setError(payload.payload.message);
-					setIsLoading(false);
-					setCheckingName(undefined);
-					break;
+					handleErrorMessage(payload);
+					return;
 				case "dependencies/action-result":
-					if (payload.payload.success && payload.payload.message) {
-						setActionMessage(payload.payload.message);
-						setTimeout(() => setActionMessage(undefined), 3000);
-					}
-					break;
+					handleActionResult(payload);
+					return;
 				default:
-					// Ignore unknown message types
-					break;
+					return;
 			}
 		};
 

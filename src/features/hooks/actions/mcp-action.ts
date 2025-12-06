@@ -258,6 +258,7 @@ export class MCPActionExecutor {
 	 * Execute the MCP tool with concurrency control via execution pool
 	 * T092: Includes automatic retry logic for transient failures
 	 */
+	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Retry orchestration requires multiple guarded branches for reliability.
 	private async executeToolWithPool(
 		serverId: string,
 		toolName: string,

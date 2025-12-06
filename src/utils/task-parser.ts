@@ -85,6 +85,7 @@ export function parseTasksFromFile(filePath: string): TaskGroup[] {
 /**
  * Parse tasks from content string
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Task parsing mirrors the markdown spec format and needs multiple guard branches.
 export function parseTasksContent(content: string): TaskGroup[] {
 	const lines = content.split("\n");
 	const groups: TaskGroup[] = [];
@@ -95,6 +96,7 @@ export function parseTasksContent(content: string): TaskGroup[] {
 	let inAcceptanceCriteria = false;
 	let acceptanceCriteriaItems: { checked: boolean; text: string }[] = [];
 
+	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Finalizer considers validation, status, and metadata extraction in one pass.
 	const finalizeTask = () => {
 		if (currentTask && currentGroup) {
 			// Determine task status based on acceptance criteria (only for header-style tasks)

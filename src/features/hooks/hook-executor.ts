@@ -179,6 +179,7 @@ export class HookExecutor {
 	 * Execute a single hook
 	 * T087: Prevent execution of invalid hooks
 	 */
+	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: The hook pipeline coordinates validation, execution, logging, and retries within a single flow.
 	async executeHook(
 		hook: Hook,
 		context?: ExecutionContext
