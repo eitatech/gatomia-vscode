@@ -259,7 +259,11 @@ export const PreviewApp = () => {
 						)}
 
 						{staleReason && (
-							<div className="flex flex-col gap-2 rounded border border-[color:var(--vscode-inputValidation-warningBorder,#e5c07b)] bg-[color:var(--vscode-inputValidation-warningBackground,#3b3222)] px-3 py-2 text-sm">
+							<div
+								aria-live="polite"
+								className="flex flex-col gap-2 rounded border border-[color:var(--vscode-inputValidation-warningBorder,#e5c07b)] bg-[color:var(--vscode-inputValidation-warningBackground,#3b3222)] px-3 py-2 text-sm"
+								role="alert"
+							>
 								<strong>{staleReason}</strong>
 								<button
 									className="self-start rounded border border-[color:var(--vscode-button-border,transparent)] bg-[color:var(--vscode-button-background)] px-3 py-1 text-[color:var(--vscode-button-foreground)]"
