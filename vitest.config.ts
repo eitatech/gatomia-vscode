@@ -4,7 +4,12 @@ import path from "node:path";
 export default defineConfig({
 	test: {
 		environment: "jsdom",
-		include: ["src/**/*.test.ts", "tests/**/*.test.ts", "tests/**/*.test.tsx"],
+		include: [
+			"src/**/*.test.ts",
+			"tests/**/*.test.ts",
+			"tests/**/*.test.tsx",
+			"webview-ui/tests/**/*.spec.tsx",
+		],
 		setupFiles: ["./vitest.setup.ts"],
 		coverage: { reporter: ["text", "lcov", "html"], provider: "v8" },
 	},

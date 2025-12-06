@@ -41,3 +41,10 @@
 - Do not commit secrets or tokens; VS Code uses user-level settings for credentials.
 - Keep `node_modules/` and build artifacts out of commits; rely on scripts above to regenerate outputs.
 - Validate spec-related changes with the SpecKit/OpenSpec workflows documented in `README.md` to avoid drift between prompts, specs, and UI.
+
+## Active Technologies
+- TypeScript 5.x (extension + React webview) + VS Code Extension API, React 18, Vite tooling, Markdown-it + diagram plugins, existing SpecKit document services (001-document-preview)
+- Local workspace files plus existing SpecKit metadata (no new datastore) (001-document-preview)
+
+## Recent Changes
+- 001-document-preview: Added TypeScript 5.x (extension + React webview) + VS Code Extension API, React 18, Vite tooling, Markdown-it + diagram plugins, existing SpecKit document services

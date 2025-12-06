@@ -3,6 +3,8 @@ import { isValidCustomParams } from "../types";
 import { expandTemplate } from "../template-utils";
 import { sendPromptToChat } from "../../../utils/chat-prompt-runner";
 
+const VALID_AGENT_NAME_PATTERN = /^[a-zA-Z0-9-]+$/;
+
 /**
  * Result of a custom action execution
  */
@@ -132,8 +134,7 @@ export class CustomActionExecutor {
 		}
 
 		// Agent name must be alphanumeric with hyphens only
-		const validPattern = /^[a-zA-Z0-9-]+$/;
-		if (!validPattern.test(agentName)) {
+		if (!VALID_AGENT_NAME_PATTERN.test(agentName)) {
 			throw new CustomActionValidationError(
 				"Agent name must contain only alphanumeric characters and hyphens"
 			);
