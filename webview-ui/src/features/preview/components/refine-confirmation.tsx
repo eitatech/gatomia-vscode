@@ -16,7 +16,10 @@ export function RefineConfirmation({
 	onDismiss,
 }: RefineConfirmationProps) {
 	return (
-		<section className="rounded border border-[color:var(--vscode-inputValidation-infoBorder,#1a85ff)] bg-[color:var(--vscode-inputValidation-infoBackground,#051526)] px-4 py-3 text-[color:var(--vscode-foreground)] text-sm">
+		<output
+			aria-live="polite"
+			className="block rounded border border-[color:var(--vscode-inputValidation-infoBorder,#1a85ff)] bg-[color:var(--vscode-inputValidation-infoBackground,#051526)] px-4 py-3 text-[color:var(--vscode-foreground)] text-sm"
+		>
 			<div className="flex items-start justify-between gap-3">
 				<div>
 					<h3 className="font-semibold text-base">Refinement submitted</h3>
@@ -27,6 +30,7 @@ export function RefineConfirmation({
 				</div>
 				{onDismiss && (
 					<button
+						aria-label="Dismiss refinement confirmation"
 						className="text-[color:var(--vscode-descriptionForeground)] text-xs hover:underline"
 						onClick={onDismiss}
 						type="button"
@@ -58,6 +62,6 @@ export function RefineConfirmation({
 					{descriptionPreview}
 				</div>
 			)}
-		</section>
+		</output>
 	);
 }

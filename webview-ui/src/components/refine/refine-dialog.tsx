@@ -106,22 +106,36 @@ export function RefineDialog({
 
 	return (
 		<>
-			<Button onClick={() => handleOpen(true)} size="sm" variant="secondary">
+			<Button
+				aria-haspopup="dialog"
+				onClick={() => handleOpen(true)}
+				size="sm"
+				variant="secondary"
+			>
 				{triggerLabel}
 			</Button>
 			{isOpen && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,var(--vscode-editor-background)_80%,#000000)]/80 px-4">
-					<section className="w-full max-w-xl rounded border border-[color:var(--vscode-input-border,#3c3c3c)] bg-[color:var(--vscode-editor-background)] p-5 shadow-lg">
+					<section
+						aria-labelledby="refine-dialog-title"
+						aria-modal="true"
+						className="w-full max-w-xl rounded border border-[color:var(--vscode-input-border,#3c3c3c)] bg-[color:var(--vscode-editor-background)] p-5 shadow-lg"
+						role="dialog"
+					>
 						<header className="mb-4 flex items-start justify-between gap-4">
 							<div>
 								<p className="text-[color:var(--vscode-descriptionForeground)] text-xs uppercase tracking-wide">
 									Refine
 								</p>
-								<h2 className="font-semibold text-[color:var(--vscode-foreground)] text-lg">
+								<h2
+									className="font-semibold text-[color:var(--vscode-foreground)] text-lg"
+									id="refine-dialog-title"
+								>
 									{documentTitle}
 								</h2>
 							</div>
 							<button
+								aria-label="Close refinement dialog"
 								className="rounded px-2 py-1 text-[color:var(--vscode-descriptionForeground)] text-sm hover:bg-[color:var(--vscode-editor-selectionBackground)]"
 								onClick={() => handleOpen(false)}
 								type="button"
@@ -135,6 +149,10 @@ export function RefineDialog({
 									Issue Type
 								</span>
 								<select
+									aria-describedby={
+										errors.issueType ? "issue-type-error" : undefined
+									}
+									aria-invalid={errors.issueType ? "true" : undefined}
 									className={cn(
 										"rounded border bg-[color:var(--vscode-dropdown-background)] px-3 py-2 text-[color:var(--vscode-dropdown-foreground)]",
 										errors.issueType &&
@@ -155,7 +173,10 @@ export function RefineDialog({
 									))}
 								</select>
 								{errors.issueType && (
-									<span className="text-[color:var(--vscode-inputValidation-errorForeground,#f48771)] text-xs">
+									<span
+										className="text-[color:var(--vscode-inputValidation-errorForeground,#f48771)] text-xs"
+										id="issue-type-error"
+									>
 										{errors.issueType}
 									</span>
 								)}
@@ -184,6 +205,10 @@ export function RefineDialog({
 									Describe what needs refinement
 								</span>
 								<textarea
+									aria-describedby={
+										errors.description ? "description-error" : undefined
+									}
+									aria-invalid={errors.description ? "true" : undefined}
 									className={cn(
 										"min-h-[120px] resize-none rounded border bg-[color:var(--vscode-input-background)] px-3 py-2 text-[color:var(--vscode-input-foreground)]",
 										errors.description &&
@@ -194,7 +219,10 @@ export function RefineDialog({
 									value={description}
 								/>
 								{errors.description && (
-									<span className="text-[color:var(--vscode-inputValidation-errorForeground,#f48771)] text-xs">
+									<span
+										className="text-[color:var(--vscode-inputValidation-errorForeground,#f48771)] text-xs"
+										id="description-error"
+									>
 										{errors.description}
 									</span>
 								)}
