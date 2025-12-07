@@ -1025,7 +1025,7 @@ function registerCommands({
 		// biome-ignore lint/suspicious/useAwait: ignore
 		commands.registerCommand("gatomia.help.open", async () => {
 			outputChannel.appendLine("Opening GatomIA help...");
-			const helpUrl = "https://github.com/eita/gatomia-vscode#readme";
+			const helpUrl = "https://github.com/eitatech/gatomia-vscode#readme";
 			env.openExternal(Uri.parse(helpUrl));
 		}),
 
