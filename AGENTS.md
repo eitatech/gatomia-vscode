@@ -46,6 +46,8 @@
 ## Active Technologies
 - TypeScript 5.x (extension + React webview) + VS Code Extension API, React 18, Vite tooling, Markdown-it + diagram plugins, existing SpecKit document services (001-document-preview)
 - Local workspace files plus existing SpecKit metadata (no new datastore) (001-document-preview)
+- TypeScript 5.x (extension + React webview) + VS Code Extension API, React 18, Vite build, Zustand/store utilities, Vitest + Testing Library (001-spec-review-flow)
+- Local workspace specs + in-memory stores (no external DB) (001-spec-review-flow)
 
 ## Recent Changes
 - 001-document-preview: Added TypeScript 5.x (extension + React webview) + VS Code Extension API, React 18, Vite tooling, Markdown-it + diagram plugins, existing SpecKit document services
