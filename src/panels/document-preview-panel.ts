@@ -26,6 +26,8 @@ interface DocumentPreviewPanelOptions {
 		status?: "success" | "error";
 		message?: string;
 	} | void> | void;
+	onExecuteTaskGroup?: (groupName: string) => Promise<void> | void;
+	onOpenFile?: (filePath: string) => Promise<void> | void;
 }
 
 /**
@@ -168,6 +170,12 @@ export class DocumentPreviewPanel {
 			case "preview/refine/submit":
 				await this.handleRefineSubmission(message.payload);
 				return;
+			case "preview/execute-task-group":
+				await this.handleExecuteTaskGroup(message.payload);
+				return;
+			case "preview/open-file":
+				await this.options.onOpenFile?.(message.payload?.filePath);
+				return;
 			default:
 				this.outputChannel.appendLine(
 					`[DocumentPreviewPanel] Unknown message received: ${message?.type ?? "undefined"}`
@@ -283,6 +291,25 @@ export class DocumentPreviewPanel {
 							: "Failed to submit refinement request",
 				},
 			});
+		}
+	}
+
+	private async handleExecuteTaskGroup(
+		payload: { groupName: string } | undefined
+	): Promise<void> {
+		if (!payload?.groupName) {
+			return;
+		}
+
+		try {
+			await this.options.onExecuteTaskGroup?.(payload.groupName);
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Failed to execute task group";
+			this.outputChannel.appendLine(
+				`[DocumentPreviewPanel] Error executing task group: ${message}`
+			);
+			window.showErrorMessage(`Failed to execute task group: ${message}`);
 		}
 	}
 }

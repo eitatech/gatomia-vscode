@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type { FileSystemWatcher } from "vscode";
 import {
 	commands,
@@ -31,6 +31,7 @@ import { sendPromptToChat } from "./utils/chat-prompt-runner";
 import { ConfigManager } from "./utils/config-manager";
 import { getVSCodeUserDataPath } from "./utils/platform-utils";
 import { getSpecSystemAdapter } from "./utils/spec-kit-adapter";
+import { parseTasksFromFile, getTasksFilePath } from "./utils/task-parser";
 import { SpecKitMigration } from "./utils/spec-kit-migration";
 import { TriggerRegistry } from "./features/hooks/trigger-registry";
 import { HookManager } from "./features/hooks/hook-manager";
@@ -60,6 +61,12 @@ let documentPreviewService: DocumentPreviewService;
 let refinementGateway: RefinementGateway;
 let activePreviewUri: Uri | undefined;
 type HookCommandTarget = { hookId?: string } | string;
+
+/**
+ * Pattern to match spec names in file paths (e.g., "001-document-preview")
+ */
+const SPEC_NAME_PATTERN = /^\d{3}-/;
+
 export let outputChannel: OutputChannel;
 
 export async function activate(context: ExtensionContext) {
@@ -206,6 +213,125 @@ export async function activate(context: ExtensionContext) {
 				const message = error instanceof Error ? error.message : String(error);
 				outputChannel.appendLine(`[RefinementGateway] Failed: ${message}`);
 				return { status: "error" as const, message };
+			}
+		},
+		onExecuteTaskGroup: async (groupName: string) => {
+			// Get the current active preview URI
+			if (!activePreviewUri) {
+				window.showErrorMessage(
+					"No document is currently previewed. Open a spec document first."
+				);
+				return;
+			}
+
+			try {
+				// Extract spec name from URI (e.g., "001-document-preview")
+				const pathParts = activePreviewUri.fsPath.split("/");
+				const specName = pathParts.find((part) =>
+					part.match(SPEC_NAME_PATTERN)
+				);
+				if (!specName) {
+					window.showErrorMessage(
+						"Could not identify spec name from current document."
+					);
+					return;
+				}
+
+				// Get the tasks file path and parse tasks
+				const tasksFilePath = getTasksFilePath(specName);
+				if (!tasksFilePath) {
+					window.showErrorMessage(
+						`Could not find tasks.md for spec: ${specName}`
+					);
+				}
+
+				const taskGroups = parseTasksFromFile(tasksFilePath);
+
+				// Find matching group (e.g., "Phase 1: Foundation & Core Types")
+				// The groupName from the button will be like "Phase 1: Foundation & Core Types"
+				const matchingGroup = taskGroups.find(
+					(group) =>
+						group.name.includes(groupName) || groupName.includes(group.name)
+				);
+
+				if (!matchingGroup || matchingGroup.tasks.length === 0) {
+					window.showErrorMessage(`No tasks found for group: ${groupName}`);
+					return;
+				}
+
+				// Aggregate task IDs
+				const taskDescriptions = matchingGroup.tasks
+					.map((t) => `${t.id}: ${t.title}`)
+					.join("\n- ");
+
+				// Send to Copilot with all task IDs
+				const prompt = `/speckit.implement ${groupName}\n\nTasks:\n- ${taskDescriptions}`;
+				await sendPromptToChat(prompt);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				window.showErrorMessage(`Failed to execute task group: ${message}`);
+				outputChannel.appendLine(`[Execute Task Group] Failed: ${message}`);
+			}
+		},
+		onOpenFile: async (filePath: string) => {
+			if (!filePath) {
+				return;
+			}
+
+			try {
+				// Get workspace root
+				const workspaceRoot = workspace.workspaceFolders?.[0].uri.fsPath;
+				if (!workspaceRoot) {
+					window.showErrorMessage("No workspace open.");
+					return;
+				}
+
+				let absolutePath: Uri;
+
+				outputChannel.appendLine(
+					`[Open File] Processing: ${filePath}, activePreviewUri: ${activePreviewUri?.fsPath}`
+				);
+
+				// If the path is absolute, use it directly
+				if (filePath.startsWith("/")) {
+					absolutePath = Uri.file(filePath);
+				} else if (activePreviewUri) {
+					// Get the directory of the currently previewed file
+					const currentFileDir = dirname(activePreviewUri.fsPath);
+
+					// Resolve relative path from the current file's directory
+					const resolvedPath = join(currentFileDir, filePath);
+					absolutePath = Uri.file(resolvedPath);
+
+					outputChannel.appendLine(
+						`[Open File] Resolved relative path: ${filePath} -> ${resolvedPath}`
+					);
+				} else {
+					// Fallback: try to resolve from workspace root
+					absolutePath = Uri.file(join(workspaceRoot, filePath));
+					outputChannel.appendLine(
+						`[Open File] Using workspace root fallback: ${absolutePath.fsPath}`
+					);
+				}
+
+				// Check if file exists
+				try {
+					await workspace.fs.stat(absolutePath);
+				} catch {
+					const suggestion = `Path: ${absolutePath.fsPath}`;
+					outputChannel.appendLine(`[Open File] File not found: ${suggestion}`);
+					window.showErrorMessage(
+						`File not found: ${filePath}\n\nResolved to: ${absolutePath.fsPath}`
+					);
+					return;
+				}
+
+				// Render the file in the preview
+				await renderPreviewForUri(absolutePath);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				window.showErrorMessage(`Failed to open file: ${message}`);
+				outputChannel.appendLine(`[Open File] Failed: ${message}`);
 			}
 		},
 	});
@@ -382,6 +508,30 @@ function registerCommands({
 						error instanceof Error ? error.message : String(error);
 					window.showErrorMessage(`Failed to run task: ${message}`);
 					outputChannel.appendLine(`[Run Task] Failed: ${message}`);
+				}
+			}
+		),
+
+		commands.registerCommand(
+			"gatomia.spec.runTaskGroup",
+			async (args?: { parentName?: string; filePath?: string }) => {
+				if (!args?.parentName) {
+					window.showErrorMessage("Select a task group to run.");
+					return;
+				}
+
+				const groupName = args.parentName;
+				outputChannel.appendLine(
+					`[Run Task Group] Triggering speckit.implement for group: ${groupName}`
+				);
+
+				try {
+					await sendPromptToChat(`/speckit.implement ${groupName}`);
+				} catch (error) {
+					const message =
+						error instanceof Error ? error.message : String(error);
+					window.showErrorMessage(`Failed to run task group: ${message}`);
+					outputChannel.appendLine(`[Run Task Group] Failed: ${message}`);
 				}
 			}
 		),

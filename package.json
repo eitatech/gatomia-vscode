@@ -270,6 +270,12 @@
         "icon": "$(play)"
       },
       {
+        "command": "gatomia.spec.runTaskGroup",
+        "title": "Run Task Group",
+        "category": "GatomIA",
+        "icon": "$(play)"
+      },
+      {
         "command": "gatomia.hooks.export",
         "title": "Export Hooks",
         "category": "GatomIA",
@@ -605,6 +611,11 @@
         {
           "command": "gatomia.spec.runTask",
           "when": "view == gatomia.views.specExplorer && viewItem == task-item",
+          "group": "inline"
+        },
+        {
+          "command": "gatomia.spec.runTaskGroup",
+          "when": "view == gatomia.views.specExplorer && viewItem == task-group",
           "group": "inline"
         },
         {

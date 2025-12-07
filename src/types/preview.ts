@@ -72,6 +72,7 @@ export interface DocumentArtifact {
 	documentId: string;
 	documentType: PreviewDocumentType;
 	title: string;
+	filePath?: string;
 	version?: string;
 	owner?: string;
 	updatedAt?: string;
