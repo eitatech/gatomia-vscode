@@ -2,14 +2,14 @@
   "name": "gatomia",
   "displayName": "GatomIA",
   "description": "Agentic Spec-Driven Development Toolkit",
-  "version": "0.25.5",
+  "version": "0.25.6",
   "license": "MIT",
   "author": "Italo A. G.",
   "publisher": "EITA",
   "icon": "assets/icons/gatomia.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eita/gatomia-vscode"
+    "url": "https://github.com/eitatech/gatomia-vscode"
   },
   "engines": {
     "vscode": "^1.84.0"
@@ -34,7 +34,7 @@
     "build": "npm run build-prompts && npm run build:ext && npm run build:webview",
     "vscode:prepublish": "npm run build",
     "compile": "npm run build && npm run package",
-    "watch": "concurrently \"tsc -w -p ./\" \"npm:watch:webview\"",
+    "watch": "concurrently \"tsc -w -p ./\" \"npm run watch:webview\"",
     "package": "vsce package",
     "lint": "ultracite lint",
     "fix": "ultracite fix",
