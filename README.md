@@ -56,10 +56,16 @@ It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.
 
 GatomIA works best with [SpecKit](https://github.com/github/spec-kit).
 
+1. Install the Specify CLI globally:
+
+   ```shell
+   uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+   ```
+
 1. Initialize SpecKit in your project:
 
    ```shell
-   npx spec-kit init
+   specify init --here --ai copilot
    ```
 
 ### OpenSpec
