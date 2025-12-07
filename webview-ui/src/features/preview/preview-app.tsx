@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSyncExternalStore } from "react";
 import { vscode } from "@/bridge/vscode";
 import { renderPreviewMarkdown } from "@/lib/markdown/preview-renderer";
+import { toFriendlyName } from "@/lib/document-title-utils";
 import { DocumentOutline } from "@/components/preview/document-outline";
 import { PreviewFormContainer } from "@/components/forms/preview-form-container";
 import { submitForm } from "@/features/preview/api/form-bridge";
@@ -25,6 +26,62 @@ const ISSUE_TYPE_LABELS: Record<string, string> = {
 const PARAGRAPH_OPEN_PATTERN = /^<p>/;
 const PARAGRAPH_CLOSE_PATTERN = /<\/p>\s*$/;
 
+// Handler for window messages from extension
+const handleExtensionMessage = (
+	event: MessageEvent<PreviewExtensionMessage>
+) => {
+	const payload = event.data;
+	if (!payload || typeof payload !== "object") {
+		return;
+	}
+
+	switch (payload.type) {
+		case "preview/load-document":
+			previewStore.setDocument(payload.payload);
+			break;
+		case "preview/show-placeholder":
+			previewStore.markStale(payload.payload?.reason);
+			break;
+		default:
+			break;
+	}
+};
+
+// Handler for task group button clicks
+const handleTaskGroupClick = (event: MouseEvent) => {
+	const target = event.target as HTMLElement;
+	if (
+		target.tagName === "BUTTON" &&
+		target.hasAttribute("data-execute-task-group")
+	) {
+		const groupName = target.getAttribute("data-execute-task-group");
+		if (groupName) {
+			const message: PreviewWebviewMessage = {
+				type: "preview/execute-task-group",
+				payload: { groupName },
+			};
+			vscode.postMessage(message);
+		}
+	}
+};
+
+// Handler for file link clicks
+const handleLinkClick = (event: MouseEvent) => {
+	const target = event.target as HTMLElement;
+	if (target.tagName === "A") {
+		const href = target.getAttribute("href");
+		if (href && !href.startsWith("http") && href.endsWith(".md")) {
+			event.preventDefault();
+			const message: PreviewWebviewMessage = {
+				type: "preview/open-file",
+				payload: { filePath: href },
+			};
+			vscode.postMessage(message);
+		}
+	}
+};
+
+// biome-ignore lint: Component requires multiple hooks and state management
 export const PreviewApp = () => {
 	const snapshot = useSyncExternalStore(
 		previewStore.subscribe,
@@ -42,27 +99,14 @@ export const PreviewApp = () => {
 	} | null>(null);
 
 	useEffect(() => {
-		const handler = (event: MessageEvent<PreviewExtensionMessage>) => {
-			const payload = event.data;
-			if (!payload || typeof payload !== "object") {
-				return;
-			}
+		window.addEventListener("message", handleExtensionMessage);
+		document.addEventListener("click", handleTaskGroupClick);
+		document.addEventListener("click", handleLinkClick);
 
-			switch (payload.type) {
-				case "preview/load-document":
-					previewStore.setDocument(payload.payload);
-					break;
-				case "preview/show-placeholder":
-					previewStore.markStale(payload.payload?.reason);
-					break;
-				default:
-					break;
-			}
-		};
-
-		window.addEventListener("message", handler);
 		return () => {
-			window.removeEventListener("message", handler);
+			window.removeEventListener("message", handleExtensionMessage);
+			document.removeEventListener("click", handleTaskGroupClick);
+			document.removeEventListener("click", handleLinkClick);
 		};
 	}, []);
 
@@ -177,7 +221,14 @@ export const PreviewApp = () => {
 			<header className="flex flex-col gap-1">
 				<div className="flex items-center justify-between gap-3">
 					<div className="flex flex-col gap-1">
-						<h1 className="font-semibold text-xl">{metadata.title}</h1>
+						<h1 className="font-semibold text-xl">
+							{toFriendlyName(metadata.title)}
+						</h1>
+						{metadata.filePath && (
+							<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.65))] text-xs">
+								{metadata.filePath}
+							</p>
+						)}
 						{description && (
 							<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.65))] text-sm">
 								{description}
