@@ -23,6 +23,7 @@
 - TypeScript-first with React for UI; prefer interfaces over types when shaping contracts.
 - Formatter enforces tab indentation, double quotes, and required semicolons—run `npm run format` before committing.
 - Name React components and classes in PascalCase; utilities and hooks in camelCase (e.g., `useSpecStore`).
+- File names in kebab-case (e.g., `change-request-form.tsx`).
 - Keep modules focused; favor small files over multi-purpose modules. Place shared helpers in `src/utils/` and `webview-ui/src/lib/`.
 
 ## Testing Guidelines

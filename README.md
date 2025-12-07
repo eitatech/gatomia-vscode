@@ -1,6 +1,6 @@
 # GatomIA (Agentic Spec-Driven Development Tool)
 
-[![Visual Studio Marketplace](https://img.shields.io/vscode-marketplace/v/EITA.gatomiamia.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=EITA.gatomia)
+[![Visual Studio Marketplace](https://img.shields.io/vscode-marketplace/v/EITA.gatomia.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=EITA.gatomia)
 [![Downloads](https://img.shields.io/vscode-marketplace/d/EITA.gatomia.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=EITA.gatomia)
 [![GitHub stars](https://img.shields.io/github/stars/eitatech/gatomia-vscode.svg?style=flat-square)](https://github.com/eitatech/gatomia-vscode/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/eitatech/gatomia-vscode.svg?style=flat-square)](https://github.com/eitatech/gatomia-vscode/issues)

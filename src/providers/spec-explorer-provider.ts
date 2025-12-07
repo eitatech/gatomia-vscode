@@ -12,6 +12,7 @@ import {
 } from "vscode";
 import type { SpecManager } from "../features/spec/spec-manager";
 import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../constants";
+import { getSpecState } from "../features/spec/review-flow/state";
 import { getSpecSystemAdapter } from "../utils/spec-kit-adapter";
 import { basename, join } from "node:path";
 import {
@@ -114,15 +115,21 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 		if (!element) {
 			return [
 				new SpecItem(
-					"Changes",
-					TreeItemCollapsibleState.Expanded,
-					"group-changes",
-					this.context
-				),
-				new SpecItem(
 					"Current Specs",
 					TreeItemCollapsibleState.Expanded,
 					"group-specs",
+					this.context
+				),
+				new SpecItem(
+					"Ready to Review",
+					TreeItemCollapsibleState.Expanded,
+					"group-ready-to-review",
+					this.context
+				),
+				new SpecItem(
+					"Changes",
+					TreeItemCollapsibleState.Expanded,
+					"group-changes",
 					this.context
 				),
 			];
@@ -147,16 +154,45 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 			);
 		}
 
-		if (element.contextValue === "group-changes") {
-			const changes = await this.specManager.getChanges();
-			return changes.map(
-				(name) =>
+		if (element.contextValue === "group-ready-to-review") {
+			const unifiedSpecs = await this.specManager.getAllSpecsUnified();
+			const readyToReviewSpecs = unifiedSpecs.filter((spec) => {
+				const state = getSpecState(spec.id);
+				return state?.status === "readyToReview";
+			});
+
+			return readyToReviewSpecs.map(
+				(spec) =>
 					new SpecItem(
-						name,
+						spec.name,
 						TreeItemCollapsibleState.Collapsed,
-						"change",
+						"spec",
 						this.context,
-						name
+						spec.id,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						spec.system
+					)
+			);
+		}
+
+		if (element.contextValue === "group-changes") {
+			const activeChangeRequests =
+				await this.specManager.getActiveChangeRequests();
+			return activeChangeRequests.map(
+				({ specId, specTitle, changeRequest }) =>
+					new SpecItem(
+						changeRequest.title,
+						TreeItemCollapsibleState.None,
+						"change-request",
+						this.context,
+						specId,
+						undefined,
+						undefined,
+						undefined,
+						changeRequest.id
 					)
 			);
 		}
