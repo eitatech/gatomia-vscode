@@ -28,13 +28,13 @@
     "ui"
   ],
   "scripts": {
-    "install:all": "npm install && cd webview-ui && npm install",
+    "install:all": "npm install && cd webview-ui && npminstall",
     "build-prompts": "node scripts/build-prompts.js",
     "build:ext": "esbuild src/extension.ts --bundle --platform=node --target=node16 --external:vscode --outfile=dist/extension.js",
     "build": "npm run build-prompts && npm run build:ext && npm run build:webview",
     "vscode:prepublish": "npm run build",
     "compile": "npm run build && npm run package",
-    "watch": "concurrently \"tsc -w -p ./\" \"npm:watch:webview\"",
+    "watch": "concurrently \"tsc -w -p ./\" \"npm run watch:webview\"",
     "package": "vsce package",
     "lint": "ultracite lint",
     "fix": "ultracite fix",
