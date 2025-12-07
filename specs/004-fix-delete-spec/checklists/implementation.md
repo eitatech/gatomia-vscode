@@ -123,10 +123,10 @@
 
 ## Post-Implementation
 
-- [ ] CHK071 - Specification marked as "Implemented" [Closure]
-- [ ] CHK072 - Branch merged to main [Closure]
-- [ ] CHK073 - Release notes updated if applicable [Closure]
-- [ ] CHK074 - Feature removed from active development queue [Closure]
+- [x] CHK071 - Specification marked as "Implemented" [Closure]
+- [x] CHK072 - Branch merged to main [Closure]
+- [x] CHK073 - Release notes updated if applicable [Closure]
+- [x] CHK074 - Feature removed from active development queue [Closure]
 
 ---
 

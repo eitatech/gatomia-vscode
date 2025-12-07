@@ -302,6 +302,43 @@ This document has not been created yet.`;
 		return changes.filter((name) => name !== "archive");
 	}
 
+	/**
+	 * Get active change requests from review flow state (non-addressed)
+	 */
+	async getActiveChangeRequests(): Promise<
+		Array<{
+			specId: string;
+			specTitle: string;
+			changeRequest: import("./review-flow/types").ChangeRequest;
+		}>
+	> {
+		const { getSpecState } = await import("./review-flow/state");
+		const unifiedSpecs = await this.getAllSpecsUnified();
+
+		const activeRequests: Array<{
+			specId: string;
+			specTitle: string;
+			changeRequest: import("./review-flow/types").ChangeRequest;
+		}> = [];
+
+		for (const spec of unifiedSpecs) {
+			const state = getSpecState(spec.id);
+			if (state?.changeRequests) {
+				for (const cr of state.changeRequests) {
+					if (cr.status !== "addressed") {
+						activeRequests.push({
+							specId: spec.id,
+							specTitle: spec.name,
+							changeRequest: cr,
+						});
+					}
+				}
+			}
+		}
+
+		return activeRequests;
+	}
+
 	async getSpecList(): Promise<string[]> {
 		// For backward compatibility, return specs
 		return await this.getSpecs();
