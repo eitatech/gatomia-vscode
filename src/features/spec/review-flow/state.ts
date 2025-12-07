@@ -17,8 +17,21 @@ import type {
 	TaskLink,
 } from "./types";
 import { workspace } from "vscode";
-import { join } from "path";
-import { logSpecStatusChange, logChangeRequestStatusChange } from "./telemetry";
+import { join, dirname } from "path";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
+import {
+	serializeSpecification,
+	deserializeSpecification,
+	type PersistedSpecification,
+} from "./storage";
+import {
+	logSpecStatusChange,
+	logChangeRequestStatusChange,
+	logSendToReviewAction,
+	logSendToArchivedAction,
+	logSpecUnarchived,
+	logSpecReopenedFromChangeRequest,
+} from "./telemetry";
 
 // In-memory cache of spec states (synced with workspace persistence)
 const specStateCache: Map<string, Specification> = new Map();
@@ -50,20 +63,21 @@ function loadStateCache(): void {
 	}
 
 	try {
-		const fileUri = workspace.workspaceFolders?.[0]?.uri;
-		if (!fileUri?.path) {
-			cacheInitialized = true;
-			return;
+		const raw = readFileSync(filePath, "utf8");
+		const parsed = JSON.parse(raw) as {
+			specStates?: Record<string, PersistedSpecification>;
+		};
+		specStateCache.clear();
+		if (parsed.specStates) {
+			for (const [specId, persisted] of Object.entries(parsed.specStates)) {
+				specStateCache.set(specId, deserializeSpecification(persisted));
+			}
 		}
-
-		const stateUri = fileUri.with({
-			path: join(fileUri.path, ".vscode", "gatomia", "spec-review-state.json"),
-		});
-
-		// TODO: Read from workspace file system (requires vscode.workspace.fs or extension storage)
-		// For now, initialize as empty; will be populated on first state change
 	} catch (error) {
-		console.error("[ReviewFlow State] Failed to load state cache:", error);
+		const nodeError = error as NodeJS.ErrnoException;
+		if (nodeError.code !== "ENOENT") {
+			console.error("[ReviewFlow State] Failed to load state cache:", error);
+		}
 	}
 
 	cacheInitialized = true;
@@ -78,8 +92,21 @@ function persistStateCache(): void {
 		return;
 	}
 
-	// TODO: Persist specStateCache to workspace file system
-	// Structure: { specStates: { [specId]: Specification } }
+	const payload: Record<string, PersistedSpecification> = {};
+	for (const [specId, spec] of specStateCache.entries()) {
+		payload[specId] = serializeSpecification(spec);
+	}
+
+	try {
+		mkdirSync(dirname(filePath), { recursive: true });
+		writeFileSync(
+			filePath,
+			JSON.stringify({ specStates: payload }, null, 2),
+			"utf8"
+		);
+	} catch (error) {
+		console.error("[ReviewFlow State] Failed to persist state cache:", error);
+	}
 }
 
 /**
@@ -89,13 +116,30 @@ function validateStatusTransition(
 	currentStatus: SpecStatus,
 	newStatus: SpecStatus
 ): boolean {
+	const normalizedCurrent = normalizeStatus(currentStatus);
+	const normalizedNext = normalizeStatus(newStatus);
+
 	const validTransitions: Record<SpecStatus, SpecStatus[]> = {
-		current: ["readyToReview"],
-		readyToReview: ["reopened"],
-		reopened: ["readyToReview"],
+		current: ["review"],
+		readyToReview: ["reopened", "review"],
+		review: ["reopened", "archived"],
+		reopened: ["review"],
+		archived: ["reopened"],
 	};
 
-	return validTransitions[currentStatus]?.includes(newStatus) ?? false;
+	return validTransitions[normalizedCurrent]?.includes(normalizedNext) ?? false;
+}
+
+function normalizeStatus(status: SpecStatus): SpecStatus {
+	if (status === "readyToReview") {
+		return "review";
+	}
+	return status;
+}
+
+function isReviewStatus(status: SpecStatus): boolean {
+	const normalized = normalizeStatus(status);
+	return normalized === "review";
 }
 
 /**
@@ -119,7 +163,7 @@ export function getSpecState(specId: string): Specification | null {
 /**
  * Update spec status and persist
  * @param specId Spec identifier
- * @param newStatus New status (current | readyToReview | reopened)
+ * @param newStatus New status (current | review | reopened | archived)
  * @returns Updated Specification
  */
 export function updateSpecStatus(
@@ -134,21 +178,29 @@ export function updateSpecStatus(
 		return null;
 	}
 
+	const normalizedCurrent = normalizeStatus(spec.status);
+	const normalizedTarget = normalizeStatus(newStatus);
+
 	// Validate FSM transition
-	if (!validateStatusTransition(spec.status, newStatus)) {
+	if (!validateStatusTransition(normalizedCurrent, normalizedTarget)) {
 		console.error(
 			`[ReviewFlow State] Invalid transition: ${spec.status} → ${newStatus}`
 		);
 		return null;
 	}
 
-	const oldStatus = spec.status;
-	spec.status = newStatus;
+	const oldStatus = normalizedCurrent;
+	spec.status = normalizedTarget;
 	spec.updatedAt = new Date();
 
-	// Set completedAt when first transitioning to readyToReview
-	if (newStatus === "readyToReview" && !spec.completedAt) {
+	// Set completedAt and reviewEnteredAt when first transitioning to review
+	if (normalizedTarget === "review") {
 		spec.completedAt = new Date();
+		spec.reviewEnteredAt = spec.reviewEnteredAt ?? spec.completedAt;
+	}
+
+	if (normalizedTarget === "archived") {
+		spec.archivedAt = new Date();
 	}
 
 	// Persist and update cache
@@ -156,7 +208,14 @@ export function updateSpecStatus(
 	persistStateCache();
 
 	// Telemetry
-	logSpecStatusChange(specId, oldStatus, newStatus);
+	logSpecStatusChange(specId, oldStatus, normalizedTarget);
+	if (normalizedTarget === "review" && oldStatus === "current") {
+		logSendToReviewAction({
+			specId,
+			pendingTasks: spec.pendingTasks ?? 0,
+			pendingChecklistItems: spec.pendingChecklistItems ?? 0,
+		});
+	}
 
 	return spec;
 }
@@ -186,10 +245,14 @@ export function addChangeRequest(
 	spec.changeRequests.push(changeRequest);
 	spec.updatedAt = new Date();
 
-	// Transition to reopened if in readyToReview
-	if (spec.status === "readyToReview") {
+	// Transition to reopened if in review
+	if (isReviewStatus(spec.status)) {
 		spec.status = "reopened";
-		logSpecStatusChange(specId, "readyToReview", "reopened");
+		logSpecStatusChange(specId, "review", "reopened");
+		logSpecReopenedFromChangeRequest({
+			specId,
+			changeRequestId: changeRequest.id,
+		});
 	}
 
 	// Persist
@@ -244,9 +307,9 @@ export function updateChangeRequestStatus(
 	// Telemetry
 	logChangeRequestStatusChange(changeRequestId, oldStatus, newStatus);
 
-	// Check if spec should return to readyToReview
-	if (newStatus === "addressed" && shouldReturnToReadyToReview(specId)) {
-		returnSpecToReadyToReview(specId);
+	// Check if spec should return to review
+	if (newStatus === "addressed" && shouldReturnToReview(specId)) {
+		returnSpecToReview(specId);
 	}
 
 	return changeRequest;
@@ -255,9 +318,9 @@ export function updateChangeRequestStatus(
 /**
  * Check if all change requests on a spec are addressed and all tasks are done
  * @param specId Spec identifier
- * @returns True if spec should return to readyToReview
+ * @returns True if spec should return to review
  */
-export function shouldReturnToReadyToReview(specId: string): boolean {
+export function shouldReturnToReview(specId: string): boolean {
 	const spec = getSpecState(specId);
 	if (!spec?.changeRequests || spec.changeRequests.length === 0) {
 		return false;
@@ -276,24 +339,25 @@ export function shouldReturnToReadyToReview(specId: string): boolean {
 		cr.tasks.every((task) => task.status === "done")
 	);
 
-	return allTasksDone;
+	const pendingTasks = spec.pendingTasks ?? 0;
+	const pendingChecklistItems = spec.pendingChecklistItems ?? 0;
+
+	return allTasksDone && pendingTasks === 0 && pendingChecklistItems === 0;
 }
 
 /**
  * Return spec to Ready to Review after all change requests are addressed
  * @param specId Spec identifier
- * @returns Updated Specification with readyToReview status
+ * @returns Updated Specification with review status
  */
-export function returnSpecToReadyToReview(
-	specId: string
-): Specification | null {
+export function returnSpecToReview(specId: string): Specification | null {
 	const spec = getSpecState(specId);
 	if (!spec) {
 		console.warn("[ReviewFlow State] Spec not found:", specId);
 		return null;
 	}
 
-	if (spec.status !== "reopened") {
+	if (normalizeStatus(spec.status) !== "reopened") {
 		console.warn(
 			"[ReviewFlow State] Spec not in reopened status:",
 			specId,
@@ -302,7 +366,7 @@ export function returnSpecToReadyToReview(
 		return null;
 	}
 
-	return updateSpecStatus(specId, "readyToReview");
+	return updateSpecStatus(specId, "review");
 }
 
 /**
@@ -311,6 +375,92 @@ export function returnSpecToReadyToReview(
  */
 export function __testInitSpec(spec: Specification): void {
 	specStateCache.set(spec.id, spec);
+}
+
+/**
+ * Update pending task/checklist counts for a spec.
+ */
+export function updatePendingSummary(
+	specId: string,
+	pendingTasks: number,
+	pendingChecklistItems: number
+): Specification | null {
+	const spec = getSpecState(specId);
+	if (!spec) {
+		return null;
+	}
+
+	spec.pendingTasks = Math.max(0, pendingTasks);
+	spec.pendingChecklistItems = Math.max(0, pendingChecklistItems);
+	spec.updatedAt = new Date();
+	specStateCache.set(specId, spec);
+	persistStateCache();
+	return spec;
+}
+
+function hasBlockingChangeRequests(spec: Specification): boolean {
+	return (
+		spec.changeRequests?.some(
+			(cr) =>
+				cr.status !== "addressed" || cr.tasks.some((t) => t.status !== "done")
+		) ?? false
+	);
+}
+
+/**
+ * Archive a spec once all blockers are cleared.
+ */
+export function archiveSpec(specId: string): Specification | null {
+	const spec = getSpecState(specId);
+	if (!(spec && isReviewStatus(spec.status))) {
+		return null;
+	}
+
+	const pendingTasks = spec.pendingTasks ?? 0;
+	const pendingChecklistItems = spec.pendingChecklistItems ?? 0;
+	if (
+		pendingTasks > 0 ||
+		pendingChecklistItems > 0 ||
+		hasBlockingChangeRequests(spec)
+	) {
+		return null;
+	}
+
+	const updated = updateSpecStatus(specId, "archived");
+	if (updated) {
+		logSendToArchivedAction({
+			specId,
+			blockerChangeRequestIds: [],
+		});
+	}
+	return updated;
+}
+
+/**
+ * Unarchive a spec when new blockers emerge.
+ */
+export function unarchiveSpec(
+	specId: string,
+	options?: { initiatedBy?: string; reason?: string }
+): Specification | null {
+	const spec = getSpecState(specId);
+	if (!spec || normalizeStatus(spec.status) !== "archived") {
+		return null;
+	}
+
+	spec.status = "reopened";
+	spec.archivedAt = null;
+	spec.updatedAt = new Date();
+	specStateCache.set(specId, spec);
+	persistStateCache();
+
+	logSpecUnarchived({
+		specId,
+		initiatedBy: options?.initiatedBy ?? "unknown",
+		reason: options?.reason ?? "manual-unarchive",
+	});
+	logSpecStatusChange(specId, "archived", "reopened");
+	return spec;
 }
 
 /**

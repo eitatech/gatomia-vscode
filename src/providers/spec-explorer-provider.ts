@@ -10,6 +10,7 @@ import {
 	TreeItemCollapsibleState,
 	workspace,
 } from "vscode";
+import type { Specification } from "../features/spec/review-flow/types";
 import type { SpecManager } from "../features/spec/spec-manager";
 import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../constants";
 import { getSpecState } from "../features/spec/review-flow/state";
@@ -48,6 +49,78 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 
 	constructor(context: ExtensionContext) {
 		this.context = context;
+	}
+
+	private createSpecItem(
+		label: string,
+		specId: string,
+		system?: SpecSystemMode
+	): SpecItem {
+		return new SpecItem(
+			label,
+			TreeItemCollapsibleState.Collapsed,
+			"spec",
+			this.context,
+			specId,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			system
+		);
+	}
+
+	private createReviewSpecItem(
+		label: string,
+		specId: string,
+		system?: SpecSystemMode
+	): SpecItem {
+		const item = this.createSpecItem(label, specId, system);
+		const state = getSpecState(specId);
+		if (state) {
+			item.description = this.describeReviewSpec(state);
+		} else {
+			item.description = "Awaiting review metadata";
+		}
+		return item;
+	}
+
+	private createArchivedSpecItem(
+		label: string,
+		specId: string,
+		system?: SpecSystemMode
+	): SpecItem {
+		const item = this.createSpecItem(label, specId, system);
+		const state = getSpecState(specId);
+		if (state?.archivedAt) {
+			item.description = `Archived ${state.archivedAt.toLocaleDateString()}`;
+		} else {
+			item.description = "Archived";
+		}
+		return item;
+	}
+
+	private describeReviewSpec(state: Specification): string {
+		const pendingTasks = state.pendingTasks ?? 0;
+		const pendingChecklistItems = state.pendingChecklistItems ?? 0;
+		const openChangeRequests =
+			state.changeRequests?.filter((cr) => cr.status !== "addressed").length ??
+			0;
+		const parts: string[] = [];
+		if (pendingTasks > 0) {
+			parts.push(`${pendingTasks} task${pendingTasks === 1 ? "" : "s"}`);
+		}
+		if (pendingChecklistItems > 0) {
+			parts.push(
+				`${pendingChecklistItems} checklist item${pendingChecklistItems === 1 ? "" : "s"}`
+			);
+		}
+		if (openChangeRequests > 0) {
+			parts.push(
+				`${openChangeRequests} change request${openChangeRequests === 1 ? "" : "s"}`
+			);
+		}
+		return parts.length > 0 ? parts.join(" | ") : "Ready for reviewers";
 	}
 
 	setSpecManager(specManager: SpecManager) {
@@ -117,13 +190,19 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 				new SpecItem(
 					"Current Specs",
 					TreeItemCollapsibleState.Expanded,
-					"group-specs",
+					"group-current-specs",
 					this.context
 				),
 				new SpecItem(
-					"Ready to Review",
+					"Review",
 					TreeItemCollapsibleState.Expanded,
-					"group-ready-to-review",
+					"group-review-specs",
+					this.context
+				),
+				new SpecItem(
+					"Archived",
+					TreeItemCollapsibleState.Expanded,
+					"group-archived-specs",
 					this.context
 				),
 				new SpecItem(
@@ -135,47 +214,33 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 			];
 		}
 
-		if (element.contextValue === "group-specs") {
-			const unifiedSpecs = await this.specManager.getAllSpecsUnified();
-			return unifiedSpecs.map(
-				(spec) =>
-					new SpecItem(
-						spec.name,
-						TreeItemCollapsibleState.Collapsed,
-						"spec",
-						this.context,
-						spec.id,
-						undefined,
-						undefined,
-						undefined,
-						undefined,
-						spec.system
-					)
-			);
+		const unifiedSpecs = await this.specManager.getAllSpecsUnified();
+
+		if (element.contextValue === "group-current-specs") {
+			return unifiedSpecs
+				.filter((spec) => {
+					const state = getSpecState(spec.id);
+					return (
+						!state || state.status === "current" || state.status === "reopened"
+					);
+				})
+				.map((spec) => this.createSpecItem(spec.name, spec.id, spec.system));
 		}
 
-		if (element.contextValue === "group-ready-to-review") {
-			const unifiedSpecs = await this.specManager.getAllSpecsUnified();
-			const readyToReviewSpecs = unifiedSpecs.filter((spec) => {
-				const state = getSpecState(spec.id);
-				return state?.status === "readyToReview";
-			});
+		if (element.contextValue === "group-review-specs") {
+			return unifiedSpecs
+				.filter((spec) => getSpecState(spec.id)?.status === "review")
+				.map((spec) =>
+					this.createReviewSpecItem(spec.name, spec.id, spec.system)
+				);
+		}
 
-			return readyToReviewSpecs.map(
-				(spec) =>
-					new SpecItem(
-						spec.name,
-						TreeItemCollapsibleState.Collapsed,
-						"spec",
-						this.context,
-						spec.id,
-						undefined,
-						undefined,
-						undefined,
-						undefined,
-						spec.system
-					)
-			);
+		if (element.contextValue === "group-archived-specs") {
+			return unifiedSpecs
+				.filter((spec) => getSpecState(spec.id)?.status === "archived")
+				.map((spec) =>
+					this.createArchivedSpecItem(spec.name, spec.id, spec.system)
+				);
 		}
 
 		if (element.contextValue === "group-changes") {
