@@ -9,7 +9,7 @@
   "icon": "assets/icons/gatomia.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eita/gatomia-vscode"
+    "url": "https://github.com/eitatech/gatomia-vscode"
   },
   "engines": {
     "vscode": "^1.84.0"
