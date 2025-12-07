@@ -9,8 +9,6 @@ GatomIA is a VS Code extension that brings Agentic Lifecycle Management Automati
 
 It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.md), and custom prompts, seamlessly integrating with GitHub Copilot Chat to generate high-quality documentation and code.
 
-![Create new Spec](./screenshots/image.png)
-
 ## Features
 
 ### Spec Management
