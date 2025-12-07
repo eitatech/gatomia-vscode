@@ -16,6 +16,7 @@ import type {
 	PreviewDocumentType,
 	PreviewSection,
 } from "../types/preview";
+import { getRelativePath } from "../utils/document-title-utils";
 
 export interface LoadDocumentOptions {
 	documentType?: PreviewDocumentType;
@@ -50,6 +51,10 @@ export class DocumentPreviewService {
 		const forms = this.parseForms(parsed.data?.forms);
 		const permissions = this.parsePermissions(parsed.data?.permissions);
 
+		// Get workspace root for relative path calculation
+		const workspaceRoot = workspace.workspaceFolders?.[0].uri.fsPath;
+		const filePath = getRelativePath(uri.fsPath, workspaceRoot);
+
 		const artifact: DocumentArtifact = {
 			documentId: uri.toString(),
 			documentType,
@@ -57,6 +62,7 @@ export class DocumentPreviewService {
 				options.titleOverride ||
 				(parsed.data?.title as string | undefined) ||
 				basename(uri.fsPath),
+			filePath,
 			version: parsed.data?.version as string | undefined,
 			owner: parsed.data?.owner as string | undefined,
 			updatedAt:

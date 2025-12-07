@@ -1,6 +1,7 @@
 import MarkdownIt from "markdown-it";
 import hljs from "highlight.js";
 import { checkboxPlugin } from "./plugins/checkbox-plugin";
+import { taskGroupPlugin } from "./plugins/task-group-plugin";
 
 // Note: markdown-it-mermaid and markdown-it-plantuml are disabled because they
 // access the DOM during module initialization, which fails in webview contexts.
@@ -45,6 +46,9 @@ export const createPreviewRenderer = (
 
 	// Add custom checkbox plugin for task lists
 	md.use(checkboxPlugin);
+
+	// Add task group button plugin
+	md.use(taskGroupPlugin);
 
 	// Diagram plugins are disabled - they access document during initialization
 	// if (options.enableMermaid !== false) { ... }

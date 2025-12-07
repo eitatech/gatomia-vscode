@@ -2,7 +2,7 @@
   "name": "gatomia",
   "displayName": "GatomIA",
   "description": "Agentic Spec-Driven Development Toolkit",
-  "version": "0.25.4",
+  "version": "0.25.5",
   "license": "MIT",
   "author": "Italo A. G.",
   "publisher": "EITA",
@@ -266,6 +266,12 @@
       {
         "command": "gatomia.spec.runTask",
         "title": "Run Task",
+        "category": "GatomIA",
+        "icon": "$(play)"
+      },
+      {
+        "command": "gatomia.spec.runTaskGroup",
+        "title": "Run Task Group",
         "category": "GatomIA",
         "icon": "$(play)"
       },
@@ -605,6 +611,11 @@
         {
           "command": "gatomia.spec.runTask",
           "when": "view == gatomia.views.specExplorer && viewItem == task-item",
+          "group": "inline"
+        },
+        {
+          "command": "gatomia.spec.runTaskGroup",
+          "when": "view == gatomia.views.specExplorer && viewItem == task-group",
           "group": "inline"
         },
         {
