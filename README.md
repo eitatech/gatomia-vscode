@@ -1,6 +1,6 @@
 # GatomIA (Agentic Lifecycle Management Automation)
 
-[![Visual Studio Marketplace](https://img.shields.io/vscode-marketplace/v/eita.gatomiamia.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=eita.gatomia)
+[![Visual Studio Marketplace](https://img.shields.io/vscode-marketplace/v/EITA.gatomia.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=EITA.gatomia)
 [![Downloads](https://img.shields.io/vscode-marketplace/d/EITA.gatomia.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=EITA.gatomia)
 [![GitHub stars](https://img.shields.io/github/stars/eitatech/gatomia-vscode.svg?style=flat-square)](https://github.com/eitatech/gatomia-vscode/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/eitatech/gatomia-vscode.svg?style=flat-square)](https://github.com/eitatech/gatomia-vscode/issues)
