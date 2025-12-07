@@ -30,6 +30,7 @@ export interface PreviewDocumentPayload {
 	documentId: string;
 	documentType: string;
 	title: string;
+	filePath?: string;
 	version?: string;
 	owner?: string;
 	updatedAt?: string;
@@ -86,4 +87,6 @@ export type PreviewWebviewMessage =
 	| { type: "preview/open-in-editor" }
 	| { type: "preview/edit-attempt"; payload?: { reason?: string } }
 	| { type: "preview/forms/submit"; payload: PreviewFormSubmissionPayload }
-	| { type: "preview/refine/submit"; payload: PreviewRefinementPayload };
+	| { type: "preview/refine/submit"; payload: PreviewRefinementPayload }
+	| { type: "preview/execute-task-group"; payload: { groupName: string } }
+	| { type: "preview/open-file"; payload: { filePath: string } };
