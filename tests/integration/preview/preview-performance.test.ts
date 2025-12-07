@@ -364,11 +364,13 @@ describe("Preview Performance Harness", () => {
 			clearTelemetry();
 
 			// Simulate realistic scenario: 50 documents with varying diagrams
+			// Use deterministic values to ensure test stability
 			for (let i = 0; i < 50; i++) {
 				const docType: DocumentType = ["spec", "plan", "research"][
 					i % 3
 				] as DocumentType;
-				const diagramCount = Math.floor(Math.random() * 5);
+				// Deterministic diagram count based on index
+				const diagramCount = i % 5;
 
 				// Track preview load
 				const previewTracker = new PreviewLoadTracker(
@@ -377,11 +379,13 @@ describe("Preview Performance Harness", () => {
 				);
 				previewTracker.setMetadata({
 					diagramCount,
-					formFieldCount: Math.floor(Math.random() * 8),
-					sectionCount: Math.floor(Math.random() * 12) + 5,
+					formFieldCount: i % 8,
+					sectionCount: (i % 12) + 5,
 				});
 
-				const loadTime = 800 + Math.random() * 2000; // Most under 3s
+				// Ensure 96% of loads are under 3s (48 out of 50)
+				// Only docs 0 and 25 take more than 3s
+				const loadTime = i === 0 || i === 25 ? 3500 : 800 + i * 40;
 				const loadStartTime = Date.now() - loadTime;
 				(previewTracker as any).startTime = loadStartTime;
 
@@ -396,12 +400,13 @@ describe("Preview Performance Harness", () => {
 						diagramType
 					);
 
-					const renderTime = 50 + Math.random() * 300;
+					const renderTime = 50 + d * 30;
 					const renderStartTime = Date.now() - renderTime;
 					(diagramTracker as any).startTime = renderStartTime;
 
-					// 92% success rate for diagrams
-					const success = Math.random() > 0.08;
+					// Deterministic: fail only every 12th diagram (>91% success rate)
+					const globalDiagramIndex = i * 5 + d;
+					const success = globalDiagramIndex % 12 !== 0;
 					diagramTracker.complete(
 						success,
 						success ? undefined : "Render error"
