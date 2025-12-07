@@ -313,7 +313,11 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 					this.context,
 					element.specName,
 					"task-group",
-					undefined,
+					{
+						command: "gatomia.spec.runTaskGroup",
+						title: "Run Task Group",
+						arguments: [{ parentName: group.name, filePath: tasksFilePath }],
+					},
 					tasksFilePath,
 					group.name,
 					element.system,
@@ -631,7 +635,7 @@ class SpecItem extends TreeItem {
 		const statusIcon = getGroupStatusIcon(status);
 		const statusColor = this.getTaskStatusColor(status);
 		this.iconPath = new ThemeIcon(statusIcon, statusColor);
-		this.tooltip = `Phase: ${this.label}`;
+		this.tooltip = `${this.label} - Click to expand or run /speckit.implement`;
 	}
 
 	private handleTaskItemIcon(): void {
