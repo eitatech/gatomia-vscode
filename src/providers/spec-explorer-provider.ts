@@ -13,7 +13,10 @@ import {
 import type { Specification } from "../features/spec/review-flow/types";
 import type { SpecManager } from "../features/spec/spec-manager";
 import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../constants";
-import { getSpecState } from "../features/spec/review-flow/state";
+import {
+	getSpecState,
+	onReviewFlowStateChange,
+} from "../features/spec/review-flow/state";
 import { getSpecSystemAdapter } from "../utils/spec-kit-adapter";
 import { basename, join } from "node:path";
 import {
@@ -49,6 +52,13 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 
 	constructor(context: ExtensionContext) {
 		this.context = context;
+		// Listen for review flow state changes (e.g. status updates, change requests)
+		// and refresh the tree view to reflect the new state.
+		context.subscriptions.push(
+			onReviewFlowStateChange(() => {
+				this.refresh();
+			})
+		);
 	}
 
 	private createSpecItem(
@@ -247,8 +257,8 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 			const activeChangeRequests =
 				await this.specManager.getActiveChangeRequests();
 			return activeChangeRequests.map(
-				({ specId, specTitle, changeRequest }) =>
-					new SpecItem(
+				({ specId, specTitle, changeRequest }) => {
+					const item = new SpecItem(
 						changeRequest.title,
 						TreeItemCollapsibleState.None,
 						"change-request",
@@ -258,7 +268,12 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 						undefined,
 						undefined,
 						changeRequest.id
-					)
+					);
+					// Pass the change request and spec title for enhanced display
+					item.changeRequest = changeRequest;
+					item.specTitle = specTitle;
+					return item;
+				}
 			);
 		}
 
@@ -653,6 +668,8 @@ class SpecItem extends TreeItem {
 	readonly system?: SpecSystemMode;
 	readonly task?: ParsedTask;
 	readonly groupStatus?: TaskStatus;
+	changeRequest?: import("../features/spec/review-flow/types").ChangeRequest;
+	specTitle?: string;
 
 	// biome-ignore lint/nursery/useMaxParams: ignore
 	constructor(
@@ -712,6 +729,7 @@ class SpecItem extends TreeItem {
 			"task-item": () => this.handleTaskItemIcon(),
 			"checklists-folder": () => this.handleChecklistsFolderIcon(),
 			"checklist-item": () => this.handleChecklistItemIcon(),
+			"change-request": () => this.handleChangeRequestIcon(),
 		};
 
 		return handlers[this.contextValue];
@@ -776,6 +794,49 @@ class SpecItem extends TreeItem {
 		const statusText = getTaskStatusTooltip(status);
 		this.tooltip = `Checklist: ${this.label} - ${statusText}`;
 		this.description = statusText;
+	}
+
+	private handleChangeRequestIcon(): void {
+		if (!this.changeRequest) {
+			return;
+		}
+
+		// Icon based on severity
+		const severityIcons = {
+			critical: "error",
+			high: "warning",
+			medium: "info",
+			low: "circle-outline",
+		};
+		const icon = severityIcons[this.changeRequest.severity];
+
+		// Color based on severity
+		const severityColors = {
+			critical: new ThemeColor("errorForeground"),
+			high: new ThemeColor("editorWarning.foreground"),
+			medium: new ThemeColor("editorInfo.foreground"),
+			low: new ThemeColor("descriptionForeground"),
+		};
+		const color = severityColors[this.changeRequest.severity];
+
+		this.iconPath = new ThemeIcon(icon, color);
+
+		// Build tooltip with details
+		const statusEmoji = {
+			open: "🔴",
+			inProgress: "🟡",
+			addressed: "✅",
+		};
+		const emoji = statusEmoji[this.changeRequest.status];
+
+		const blockerText = this.changeRequest.archivalBlocker
+			? " [BLOCKS ARCHIVAL]"
+			: "";
+
+		this.tooltip = `${emoji} ${this.changeRequest.title}\n\nSpec: ${this.specTitle}\nSeverity: ${this.changeRequest.severity}\nStatus: ${this.changeRequest.status}${blockerText}\nSubmitted: ${this.changeRequest.createdAt.toLocaleString()}\nSubmitter: ${this.changeRequest.submitter}`;
+
+		// Set description to show spec name and severity
+		this.description = `${this.specTitle} | ${this.changeRequest.severity}`;
 	}
 
 	private getTaskStatusColor(status?: TaskStatus): ThemeColor | undefined {

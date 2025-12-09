@@ -4,6 +4,7 @@
  */
 
 import type React from "react";
+import { ChangeRequestActions } from "./change-request-actions";
 
 // Local type aliases matching extension types
 export type ChangeRequestStatus =
@@ -47,7 +48,8 @@ export interface ChangesListItem {
 interface ChangesListProps {
 	items: ChangesListItem[];
 	onSelectChangeRequest?: (changeRequestId: string, specId: string) => void;
-	onRetry?: (changeRequestId: string) => void;
+	onDispatch?: (changeRequestId: string) => Promise<void>;
+	onRetry?: (changeRequestId: string) => Promise<void>;
 	emptyMessage?: string;
 }
 
@@ -68,6 +70,7 @@ const statusLabels: Record<ChangeRequest["status"], string> = {
 const ChangesList: React.FC<ChangesListProps> = ({
 	items,
 	onSelectChangeRequest,
+	onDispatch,
 	onRetry,
 	emptyMessage = "No active change requests",
 }) => {
@@ -78,58 +81,60 @@ const ChangesList: React.FC<ChangesListProps> = ({
 	return (
 		<div className="changes-list">
 			{items.map(({ spec, changeRequest }) => (
-				<button
+				<div
 					className={`change-request-item status-${changeRequest.status}`}
 					key={changeRequest.id}
-					onClick={() => onSelectChangeRequest?.(changeRequest.id, spec.id)}
-					type="button"
 				>
-					<div className="change-request-header">
-						<h4 className="change-request-title">{changeRequest.title}</h4>
-						<span
-							className={`severity-badge severity-${changeRequest.severity}`}
-						>
-							{severityLabels[changeRequest.severity]}
-						</span>
-					</div>
+					<button
+						className="change-request-content-button"
+						onClick={() => onSelectChangeRequest?.(changeRequest.id, spec.id)}
+						type="button"
+					>
+						<div className="change-request-header">
+							<h4 className="change-request-title">{changeRequest.title}</h4>
 
-					<div className="change-request-meta">
-						<span className="spec-link" title={spec.links.specPath}>
-							Spec: {spec.title}
-						</span>
-						<span className={`status-badge status-${changeRequest.status}`}>
-							{statusLabels[changeRequest.status]}
-						</span>
-					</div>
-
-					<p className="change-request-description">
-						{changeRequest.description}
-					</p>
-
-					{changeRequest.tasks.length > 0 && (
-						<div className="change-request-tasks">
-							<span className="tasks-count">
-								{changeRequest.tasks.filter((t) => t.status === "done").length}/
-								{changeRequest.tasks.length} tasks completed
+							<span
+								className={`severity-badge severity-${changeRequest.severity}`}
+							>
+								{severityLabels[changeRequest.severity]}
 							</span>
 						</div>
-					)}
 
-					{changeRequest.status === "blocked" && onRetry && (
-						<div className="change-request-actions">
-							<button
-								className="btn btn-retry"
-								onClick={(e) => {
-									e.stopPropagation();
-									onRetry(changeRequest.id);
-								}}
-								type="button"
-							>
-								Retry dispatch
-							</button>
+						<div className="change-request-meta">
+							<span className="spec-link" title={spec.links.specPath}>
+								Spec: {spec.title}
+							</span>
+
+							<span className={`status-badge status-${changeRequest.status}`}>
+								{statusLabels[changeRequest.status]}
+							</span>
 						</div>
-					)}
-				</button>
+
+						<p className="change-request-description">
+							{changeRequest.description}
+						</p>
+
+						{changeRequest.tasks.length > 0 && (
+							<div className="change-request-tasks">
+								<span className="tasks-count">
+									{
+										changeRequest.tasks.filter((t) => t.status === "done")
+											.length
+									}
+									/{changeRequest.tasks.length} tasks completed
+								</span>
+							</div>
+						)}
+					</button>
+
+					<div className="change-request-footer">
+						<ChangeRequestActions
+							changeRequest={changeRequest}
+							onDispatch={async (id) => onDispatch?.(id)}
+							onRetry={async (id) => onRetry?.(id)}
+						/>
+					</div>
+				</div>
 			))}
 		</div>
 	);

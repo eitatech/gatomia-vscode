@@ -261,3 +261,22 @@ export function logSpecReopenedFromChangeRequest(options: {
 	};
 	console.log("[ReviewFlow Telemetry] Spec reopened:", event);
 }
+
+/**
+ * Log outstanding blocker counts when a spec status changes.
+ * Tracks how many change requests are blocking archival.
+ */
+export function logOutstandingBlockerCount(options: {
+	specId: string;
+	status: SpecStatus;
+	totalChangeRequests: number;
+	openChangeRequests: number;
+	blockingChangeRequests: number;
+}): void {
+	const event = {
+		type: "review.blocker_count",
+		timestamp: new Date().toISOString(),
+		...options,
+	};
+	console.log("[ReviewFlow Telemetry] Outstanding blocker count:", event);
+}

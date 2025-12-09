@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## MANDATORY ACTIONS
+
+- Always run `npm run check` before mark any task as complete. This ensures code quality and formatting standards are met.
+
 ## Quick Start: Common Commands
 
 ```bash
