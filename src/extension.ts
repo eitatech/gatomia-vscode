@@ -45,6 +45,16 @@ import { DocumentPreviewPanel } from "./panels/document-preview-panel";
 import { DocumentPreviewService } from "./services/document-preview-service";
 import { RefinementGateway } from "./services/refinement-gateway";
 import type { DocumentArtifact } from "./types/preview";
+import {
+	SEND_TO_REVIEW_COMMAND_ID,
+	handleSendToReview,
+} from "./features/spec/review-flow/commands/send-to-review-command";
+import {
+	SEND_TO_ARCHIVED_COMMAND_ID,
+	UNARCHIVE_COMMAND_ID,
+	handleSendToArchived,
+	handleUnarchive,
+} from "./features/spec/review-flow/commands/send-to-archived-command";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -564,6 +574,21 @@ function registerCommands({
 		commands.registerCommand("gatomia.spec.refresh", async () => {
 			outputChannel.appendLine("[Manual Refresh] Refreshing spec explorer...");
 			specExplorer.refresh();
+		}),
+		commands.registerCommand(
+			SEND_TO_REVIEW_COMMAND_ID,
+			async (specId: string) => {
+				await handleSendToReview(specId, () => specExplorer.refresh());
+			}
+		),
+		commands.registerCommand(
+			SEND_TO_ARCHIVED_COMMAND_ID,
+			async (specId: string) => {
+				await handleSendToArchived(specId, () => specExplorer.refresh());
+			}
+		),
+		commands.registerCommand(UNARCHIVE_COMMAND_ID, async (specId: string) => {
+			await handleUnarchive(specId, () => specExplorer.refresh());
 		}),
 		commands.registerCommand("gatomia.hooks.export", async () => {
 			if (!hookManager) {

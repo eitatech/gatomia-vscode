@@ -2,7 +2,7 @@
 
 ## Core Principles
 
-### I. Kebab-Case File Naming (MANDATORY)
+### I. Kebab-Case File Naming (NON-NEGOTIABLE, MANDATORY)
 
 **Rule**: All source files MUST follow kebab-case naming convention.
 

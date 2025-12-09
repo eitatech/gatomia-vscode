@@ -6,7 +6,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { logTasksDispatchSuccess } from "../../../../src/features/spec/review-flow/telemetry";
 import type * as TelemetryModule from "../../../../src/features/spec/review-flow/telemetry";
-import { dispatchToTasksPrompt } from "../../../../src/features/spec/review-flow/tasks-dispatch";
+import {
+	dispatchToTasksPrompt,
+	buildTasksPromptPayload,
+} from "../../../../src/features/spec/review-flow/tasks-dispatch";
 import type {
 	Specification,
 	ChangeRequest,
@@ -32,7 +35,7 @@ describe("Review Flow Telemetry", () => {
 		id: "spec-001",
 		title: "Test Spec",
 		owner: "user",
-		status: "readyToReview",
+		status: "review",
 		completedAt: new Date(),
 		updatedAt: new Date(),
 		links: { specPath: "/path/to/spec.md" },
@@ -59,12 +62,13 @@ describe("Review Flow Telemetry", () => {
 
 	describe("Tasks Dispatch Telemetry Integration", () => {
 		it("should log success event on successful dispatch", async () => {
-			await dispatchToTasksPrompt(MOCK_SPEC, MOCK_CHANGE_REQUEST);
+			const payload = buildTasksPromptPayload(MOCK_SPEC, MOCK_CHANGE_REQUEST);
+			await dispatchToTasksPrompt(payload);
 
 			expect(logTasksDispatchSuccess).toHaveBeenCalledWith(
 				MOCK_SPEC.id,
 				MOCK_CHANGE_REQUEST.id,
-				1, // Mock response returns 1 task
+				2, // Mock response returns 2 tasks
 				expect.any(Number) // roundtripMs
 			);
 		});
