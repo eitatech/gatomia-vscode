@@ -1,5 +1,5 @@
 {
-  "name": "alma-webview-ui",
+  "name": "gatomia-webview-ui",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -10,15 +10,22 @@
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
+    "@tailwindcss/typography": "^0.5.19",
+    "@vscode/codicons": "^0.0.43",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "highlight.js": "^11.11.1",
     "lucide-react": "^0.544.0",
+    "markdown-it": "^14.1.0",
+    "markdown-it-mermaid": "^0.2.5",
+    "markdown-it-plantuml": "^1.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.13",
+    "@types/markdown-it": "^14.1.2",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.3.4",

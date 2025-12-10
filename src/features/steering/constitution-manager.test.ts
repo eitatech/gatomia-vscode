@@ -1,14 +1,14 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { existsSync } from "fs";
 import path from "node:path";
-import { ConstitutionManager } from "./constitution-manager";
 import { workspace, type Uri, window, ViewColumn } from "vscode";
 
-// Mock fs module
-vi.mock("fs", () => ({
-	existsSync: vi.fn(),
-	readFileSync: vi.fn(),
-}));
+// Mock fs module BEFORE importing anything that uses it
+vi.mock("fs");
+vi.mock("node:fs");
+
+// biome-ignore lint/performance/noNamespaceImport: Required for vitest mocking with vi.mocked()
+import * as fs from "fs";
+import { ConstitutionManager } from "./constitution-manager";
 
 describe("ConstitutionManager", () => {
 	const mockWorkspaceRoot = "/test/workspace";
@@ -31,7 +31,7 @@ describe("ConstitutionManager", () => {
 
 	describe("ensureConstitutionExists", () => {
 		it("should return true when constitution file exists", () => {
-			vi.mocked(existsSync).mockReturnValue(true);
+			vi.mocked(fs.existsSync).mockReturnValue(true);
 
 			const result = manager.ensureConstitutionExists();
 
@@ -39,7 +39,7 @@ describe("ConstitutionManager", () => {
 		});
 
 		it("should return false when constitution file does not exist", () => {
-			vi.mocked(existsSync).mockReturnValue(false);
+			vi.mocked(fs.existsSync).mockReturnValue(false);
 
 			const result = manager.ensureConstitutionExists();
 
@@ -49,7 +49,7 @@ describe("ConstitutionManager", () => {
 
 	describe("openConstitution", () => {
 		it("should open existing constitution file", async () => {
-			vi.mocked(existsSync).mockReturnValue(true);
+			vi.mocked(fs.existsSync).mockReturnValue(true);
 			vi.mocked(workspace.openTextDocument).mockResolvedValue({} as any);
 			vi.mocked(window.showTextDocument).mockResolvedValue({} as any);
 
@@ -66,7 +66,7 @@ describe("ConstitutionManager", () => {
 		});
 
 		it("should offer to create constitution when it does not exist", async () => {
-			vi.mocked(existsSync).mockReturnValue(false);
+			vi.mocked(fs.existsSync).mockReturnValue(false);
 			vi.mocked(window.showInformationMessage).mockResolvedValue(undefined);
 
 			await manager.openConstitution();
@@ -79,7 +79,7 @@ describe("ConstitutionManager", () => {
 		});
 
 		it("should create constitution when user confirms", async () => {
-			vi.mocked(existsSync).mockReturnValue(false);
+			vi.mocked(fs.existsSync).mockReturnValue(false);
 			vi.mocked(window.showInformationMessage).mockResolvedValue("Yes" as any);
 			vi.mocked(workspace.openTextDocument).mockResolvedValue({} as any);
 			vi.mocked(window.showTextDocument).mockResolvedValue({} as any);
@@ -92,7 +92,7 @@ describe("ConstitutionManager", () => {
 		});
 
 		it("should not create constitution when user declines", async () => {
-			vi.mocked(existsSync).mockReturnValue(false);
+			vi.mocked(fs.existsSync).mockReturnValue(false);
 			vi.mocked(window.showInformationMessage).mockResolvedValue("No" as any);
 
 			await manager.openConstitution();

@@ -57,7 +57,7 @@ describe("ConfigManager", () => {
 				specs: { visible: DEFAULT_VIEW_VISIBILITY.specs },
 				steering: { visible: DEFAULT_VIEW_VISIBILITY.steering },
 				prompts: { visible: DEFAULT_VIEW_VISIBILITY.prompts },
-				settings: { visible: DEFAULT_VIEW_VISIBILITY.settings },
+				quickAccess: { visible: DEFAULT_VIEW_VISIBILITY.quickAccess },
 			},
 			chatLanguage: "English",
 			customInstructions: {

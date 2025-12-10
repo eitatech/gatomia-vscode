@@ -2,6 +2,38 @@
 
 ---
 
+## v0.26.0 2025-12-05
+
+### Added
+
+- **MCP Hooks Integration**: Complete implementation of Model Context Protocol (MCP) server integration for hooks automation
+  - Browse and select MCP servers and tools configured in GitHub Copilot
+  - Configure hooks to execute MCP actions automatically after agent operations
+  - Visual indicators for server availability (green/red/gray badges)
+  - Parameter mapping with context variables, literals, and templates
+  - Automatic retry logic for transient failures (1 retry with 2s delay)
+  - Large payload truncation (>1MB) with warnings
+  - Graceful error handling with detailed logging
+  - Pre-execution validation to prevent invalid hook execution
+  - Error notifications with "Update Hook" and "Remove Hook" actions
+  - Comprehensive test coverage (40 unit tests, 16 integration tests)
+  - Complete documentation in README.md and quickstart guide
+
+### Changed
+
+- Enhanced hook validation to async for MCP server verification
+- Improved error handling across all MCP services
+- Updated HookManager to support MCP discovery service integration
+- Optimized cache TTL to 5 minutes for MCP server discovery
+
+### Fixed
+
+- Server availability checks with graceful degradation
+- Hook stability when MCP servers become unavailable
+- Parameter validation with detailed error messages
+
+---
+
 ## v0.3.3 2025-11-23
 
 ### Added

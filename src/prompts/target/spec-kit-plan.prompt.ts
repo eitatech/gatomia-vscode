@@ -2,7 +2,7 @@
 // DO NOT EDIT MANUALLY
 
 export const frontmatter = {
-  "name": "Spec-Kit Plan",
+  "name": "SpecKit Plan",
   "description": "Generate an implementation plan from a specification",
   "version": "1.0.0",
   "variables": {
