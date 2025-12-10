@@ -15,6 +15,8 @@ import {
 } from "vscode";
 import type { SteeringManager } from "../features/steering/steering-manager";
 import { getConstitutionPath } from "../utils/spec-kit-utilities";
+import { ConfigManager } from "../utils/config-manager";
+import { SPEC_SYSTEM_MODE } from "../constants";
 
 import { homedir } from "os";
 import { getVSCodeUserDataPath, isWindowsOrWsl } from "../utils/platform-utils";
@@ -24,10 +26,10 @@ const { joinPath } = Uri;
 export class SteeringExplorerProvider
 	implements TreeDataProvider<SteeringItem>
 {
-	static readonly viewId = "alma.views.steeringExplorer";
-	static readonly createUserRuleCommandId = "alma.steering.createUserRule";
+	static readonly viewId = "gatomia.views.steeringExplorer";
+	static readonly createUserRuleCommandId = "gatomia.steering.createUserRule";
 	static readonly createProjectRuleCommandId =
-		"alma.steering.createProjectRule";
+		"gatomia.steering.createProjectRule";
 	private readonly _onDidChangeTreeData: EventEmitter<
 		SteeringItem | undefined | null | void
 	> = new EventEmitter<SteeringItem | undefined | null | void>();
@@ -36,9 +38,11 @@ export class SteeringExplorerProvider
 
 	private steeringManager!: SteeringManager;
 	private readonly context: ExtensionContext;
+	private readonly configManager: ConfigManager;
 
 	constructor(context: ExtensionContext) {
 		this.context = context;
+		this.configManager = ConfigManager.getInstance();
 	}
 
 	setSteeringManager(steeringManager: SteeringManager) {
@@ -135,6 +139,7 @@ export class SteeringExplorerProvider
 
 			if (workspace.workspaceFolders) {
 				const workspaceRoot = workspace.workspaceFolders[0].uri.fsPath;
+				const specSystem = this.configManager.getSettings().specSystem;
 
 				// Check if any project instruction files exist
 				const projectCopilotMd = join(
@@ -142,20 +147,29 @@ export class SteeringExplorerProvider
 					".github",
 					"copilot-instructions.md"
 				);
+				// OpenSpec-specific: only show when OpenSpec is explicitly selected
 				const agentsMd = join(workspaceRoot, "openspec", "AGENTS.md");
+				const showOpenSpecAgents =
+					specSystem === SPEC_SYSTEM_MODE.OPENSPEC && existsSync(agentsMd);
+
 				const rootAgentsMd = join(workspaceRoot, "AGENTS.md");
+				// SpecKit-specific: constitution only shown in SpecKit or Auto mode
 				const constitutionMd = getConstitutionPath(workspaceRoot);
+				const showConstitution =
+					(specSystem === SPEC_SYSTEM_MODE.SPECKIT ||
+						specSystem === SPEC_SYSTEM_MODE.AUTO) &&
+					existsSync(constitutionMd);
 
 				const hasProjectInstructions =
 					existsSync(projectCopilotMd) ||
-					existsSync(agentsMd) ||
+					showOpenSpecAgents ||
 					existsSync(rootAgentsMd) ||
-					existsSync(constitutionMd);
+					showConstitution;
 
 				if (hasProjectInstructions) {
 					items.push(
 						new SteeringItem(
-							"AGENTS",
+							"Agents",
 							TreeItemCollapsibleState.Expanded,
 							"project-instructions-group",
 							"",
@@ -178,9 +192,11 @@ export class SteeringExplorerProvider
 					);
 				}
 
-				// Project Spec Group
+				// Project Spec Group - only show when OpenSpec is explicitly selected
 				const projectSpecMd = join(workspaceRoot, "openspec", "project.md");
-				if (existsSync(projectSpecMd)) {
+				const showProjectSpec =
+					specSystem === SPEC_SYSTEM_MODE.OPENSPEC && existsSync(projectSpecMd);
+				if (showProjectSpec) {
 					items.push(
 						new SteeringItem(
 							"Project Spec",
@@ -226,6 +242,7 @@ export class SteeringExplorerProvider
 			const items: SteeringItem[] = [];
 			if (workspace.workspaceFolders) {
 				const workspaceRoot = workspace.workspaceFolders[0].uri.fsPath;
+				const specSystem = this.configManager.getSettings().specSystem;
 
 				const projectCopilotMd = join(
 					workspaceRoot,
@@ -249,8 +266,10 @@ export class SteeringExplorerProvider
 					);
 				}
 
+				// OpenSpec AGENTS.md - only show when OpenSpec is explicitly selected
 				const agentsMd = join(workspaceRoot, "openspec", "AGENTS.md");
-				if (existsSync(agentsMd)) {
+				const showOpenSpecAgents = specSystem === SPEC_SYSTEM_MODE.OPENSPEC;
+				if (showOpenSpecAgents && existsSync(agentsMd)) {
 					items.push(
 						new SteeringItem(
 							"Agent Instructions",
@@ -285,8 +304,12 @@ export class SteeringExplorerProvider
 					);
 				}
 
+				// SpecKit constitution - only show in SpecKit or Auto mode
+				const showConstitution =
+					specSystem === SPEC_SYSTEM_MODE.SPECKIT ||
+					specSystem === SPEC_SYSTEM_MODE.AUTO;
 				const constitutionMd = getConstitutionPath(workspaceRoot);
-				if (existsSync(constitutionMd)) {
+				if (showConstitution && existsSync(constitutionMd)) {
 					items.push(
 						new SteeringItem(
 							"Constitution",

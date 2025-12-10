@@ -1,12 +1,14 @@
 node_modules/
 dist/
 out/
+build/
 *.vsix
 .vscode-test/
 *.log
 .DS_Store
 .env
 .env.local
+.env.*
 .vscode/*
 !.vscode/extensions.json
 !.vscode/launch.json
@@ -23,3 +25,5 @@ repomix-output*
 
 .serena
 .codex
+.vscode/
+.envrc
