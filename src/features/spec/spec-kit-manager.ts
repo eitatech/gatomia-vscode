@@ -19,7 +19,7 @@ export class SpecKitManager {
 	}
 
 	/**
-	 * Creates a new Spec-Kit feature with the necessary files
+	 * Creates a new SpecKit feature with the necessary files
 	 */
 	async createFeature(
 		name: string,

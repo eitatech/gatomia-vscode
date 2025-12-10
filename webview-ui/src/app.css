@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "highlight.js/styles/vs2015.css";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -125,4 +127,196 @@ body {
 	body {
 		@apply bg-background text-foreground;
 	}
+}
+
+/* Task list checkbox styles for markdown preview */
+.task-list-item {
+	list-style-type: none;
+	position: relative;
+	margin-left: -1.5em;
+	padding-left: 0;
+}
+
+.task-list-item::before {
+	content: none;
+}
+
+.task-list-checkbox {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 1em;
+	height: 1em;
+	border: 1px solid var(--vscode-checkbox-border, #6b6b6b);
+	border-radius: 3px;
+	background-color: var(--vscode-checkbox-background, transparent);
+	vertical-align: middle;
+	margin-right: 0.5em;
+	cursor: default;
+	position: relative;
+}
+
+.task-list-checkbox:checked {
+	background-color: var(--vscode-checkbox-selectBackground, #0078d4);
+	border-color: var(--vscode-checkbox-selectBorder, #0078d4);
+}
+
+.task-list-checkbox:checked::after {
+	content: "";
+	position: absolute;
+	left: 3px;
+	top: 0;
+	width: 4px;
+	height: 8px;
+	border: solid var(--vscode-checkbox-foreground, #fff);
+	border-width: 0 2px 2px 0;
+	transform: rotate(45deg);
+}
+
+/* Ensure task lists in prose context look good */
+.prose .task-list-item {
+	padding-left: 0.25em;
+}
+
+.prose ul:has(.task-list-item) {
+	padding-left: 1.5em;
+}
+/* Inline code styling for markdown preview */
+.prose code {
+	background-color: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.1));
+	color: var(--vscode-editor-foreground, inherit);
+	padding: 0.125em 0.375em;
+	border-radius: 3px;
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 0.875em;
+}
+
+/* Only apply nowrap to inline code, not code blocks */
+.prose p code,
+.prose li code,
+.prose td code,
+.prose th code {
+	white-space: nowrap;
+}
+
+.prose code::before,
+.prose code::after {
+	content: none;
+}
+
+/* Code block styling for markdown preview */
+.prose pre {
+	background-color: var(--vscode-editor-background, rgba(0, 0, 0, 0.3));
+	border: 1px solid var(--vscode-input-border, #3c3c3c);
+	border-radius: 4px;
+	padding: 1em;
+	overflow-x: auto;
+}
+
+.prose pre code {
+	background-color: transparent;
+	padding: 0;
+	border-radius: 0;
+	font-size: 0.875em;
+	white-space: pre;
+}
+
+/* Strong/bold text styling for markdown preview */
+.prose strong,
+.prose b {
+	font-weight: 700 !important;
+	color: inherit;
+}
+
+/* Emphasis/italic text styling for markdown preview */
+.prose em,
+.prose i {
+	font-style: italic !important;
+	color: inherit;
+}
+
+/* Ensure emphasis works in headings too */
+.prose h1 em,
+.prose h1 i,
+.prose h2 em,
+.prose h2 i,
+.prose h3 em,
+.prose h3 i,
+.prose h4 em,
+.prose h4 i,
+.prose h5 em,
+.prose h5 i,
+.prose h6 em,
+.prose h6 i {
+	font-style: italic !important;
+}
+
+/* Ensure bold works in headings too */
+.prose h1 strong,
+.prose h1 b,
+.prose h2 strong,
+.prose h2 b,
+.prose h3 strong,
+.prose h3 b,
+.prose h4 strong,
+.prose h4 b,
+.prose h5 strong,
+.prose h5 b,
+.prose h6 strong,
+.prose h6 b {
+	font-weight: 700 !important;
+}
+
+@layer components {
+	/* Override Tailwind prose em/strong styles */
+	.prose :where(em):not(:where([class~="not-prose"] *)) {
+		font-style: italic !important;
+		font-weight: inherit;
+	}
+
+	.prose :where(i):not(:where([class~="not-prose"] *)) {
+		font-style: italic !important;
+		font-weight: inherit;
+	}
+
+	.prose :where(strong):not(:where([class~="not-prose"] *)) {
+		font-weight: 700 !important;
+		font-style: inherit;
+	}
+
+	.prose :where(b):not(:where([class~="not-prose"] *)) {
+		font-weight: 700 !important;
+		font-style: inherit;
+	}
+}
+
+/* Ultra-specific selectors to override Tailwind */
+.prose h2 em,
+.prose h2 i {
+	font-style: italic !important;
+	letter-spacing: 0 !important;
+	text-decoration: none !important;
+	font-weight: inherit !important;
+	color: inherit !important;
+	opacity: 1 !important;
+	transform: none !important;
+}
+
+.prose h2 strong,
+.prose h2 b {
+	font-weight: 700 !important;
+	font-style: inherit !important;
+	letter-spacing: 0 !important;
+	text-decoration: none !important;
+	color: inherit !important;
+	opacity: 1 !important;
+	transform: none !important;
+}
+
+/* Global em/strong override */
+em, i {
+	font-style: italic !important;
+}
+
+strong, b {
+	font-weight: 700 !important;
 }

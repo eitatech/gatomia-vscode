@@ -153,3 +153,7 @@ export class EventEmitter<T> {
 		this.listeners.length = 0;
 	});
 }
+
+export const env = {
+	machineId: "test-machine",
+};
