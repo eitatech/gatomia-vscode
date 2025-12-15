@@ -178,7 +178,7 @@ export async function activate(context: ExtensionContext) {
 		outputChannel
 	);
 
-	documentPreviewService = new DocumentPreviewService(outputChannel);
+	documentPreviewService = new DocumentPreviewService(outputChannel, context);
 	refinementGateway = new RefinementGateway(outputChannel);
 	documentPreviewPanel = new DocumentPreviewPanel(context, outputChannel, {
 		onReloadRequested: async () => {

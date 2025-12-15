@@ -26,7 +26,9 @@ export type PreviewRefinementIssueType =
 	| "missingAsset"
 	| "other";
 
-export interface PreviewDocumentPayload {
+export type PreviewRefinementActionType = "refine" | "update";
+
+export interface DocumentArtifact {
 	documentId: string;
 	documentType: string;
 	title: string;
@@ -36,11 +38,21 @@ export interface PreviewDocumentPayload {
 	updatedAt?: string;
 	renderStandard?: string;
 	rawContent?: string;
-	sections?: PreviewSectionPayload[];
 	sessionId?: string;
+	isOutdated?: boolean;
+	outdatedInfo?: {
+		outdatedSince: number;
+		changedDependencies: Array<{
+			documentId: string;
+			documentType: string;
+		}>;
+	};
+	sections?: PreviewSectionPayload[];
 	forms?: PreviewFormField[];
 	permissions?: PreviewDocumentPermissions;
 }
+
+export interface PreviewDocumentPayload extends DocumentArtifact {}
 
 export interface PreviewRefinementPayload {
 	requestId: string;
@@ -51,6 +63,11 @@ export interface PreviewRefinementPayload {
 	issueType: PreviewRefinementIssueType;
 	description: string;
 	submittedAt: string;
+	actionType?: PreviewRefinementActionType;
+	changedDependencies?: Array<{
+		documentId: string;
+		documentType: string;
+	}>;
 }
 
 export interface PreviewFormSubmissionPayload {

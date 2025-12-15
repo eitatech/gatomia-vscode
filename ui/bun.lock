@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "spec-ui-for-copilot-webview-ui",
+      "name": "spec-ui-for-copilot-ui",
       "dependencies": {
         "@radix-ui/react-slot": "^1.2.3",
         "class-variance-authority": "^0.7.1",

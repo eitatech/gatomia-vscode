@@ -141,7 +141,7 @@ resolveWebviewView(
         enableScripts: true,
         localResourceRoots: [
             Uri.joinPath(this._extensionUri, 'dist'),
-            Uri.joinPath(this._extensionUri, 'webview-ui/dist')
+            Uri.joinPath(this._extensionUri, 'ui/dist')
         ]
     };
     
@@ -316,10 +316,10 @@ private async sendError(error: Error): Promise<void> {
 ```typescript
 private getHtmlForWebview(webview: Webview): string {
     const scriptUri = webview.asWebviewUri(
-        Uri.joinPath(this._extensionUri, 'webview-ui', 'dist', 'hooks-view.js')
+        Uri.joinPath(this._extensionUri, 'ui', 'dist', 'hooks-view.js')
     );
     const styleUri = webview.asWebviewUri(
-        Uri.joinPath(this._extensionUri, 'webview-ui', 'dist', 'hooks-view.css')
+        Uri.joinPath(this._extensionUri, 'ui', 'dist', 'hooks-view.css')
     );
     
     return `<!DOCTYPE html>

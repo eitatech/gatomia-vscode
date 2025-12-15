@@ -22,10 +22,10 @@ export function RefineConfirmation({
 		>
 			<div className="flex items-start justify-between gap-3">
 				<div>
-					<h3 className="font-semibold text-base">Refinement submitted</h3>
+					<h3 className="font-semibold text-base">Refinement sent to agent</h3>
 					<p className="text-[color:var(--vscode-descriptionForeground)]">
 						{message ??
-							"We captured your feedback and queued it for processing."}
+							"Your refinement request has been sent to the appropriate agent for processing."}
 					</p>
 				</div>
 				{onDismiss && (

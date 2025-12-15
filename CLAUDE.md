@@ -32,7 +32,7 @@ npm run package      # Create VSIX file for VS Code Marketplace
 npm run compile      # Build then package (used for CI/CD)
 
 # Webview development
-npm --prefix webview-ui run dev  # Run webview dev server in isolation
+npm --prefix ui run dev  # Run webview dev server in isolation
 
 # Launch the extension
 Press F5 in VS Code to launch the Extension debug host

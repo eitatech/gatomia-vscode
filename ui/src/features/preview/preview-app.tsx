@@ -10,6 +10,7 @@ import {
 	RefineDialog,
 	type RefineDialogValues,
 } from "@/components/refine/refine-dialog";
+import { UpdateDocumentButton } from "@/components/refine/update-document-button";
 import { submitRefinement } from "@/features/preview/api/refine-bridge";
 import type { PreviewExtensionMessage, PreviewWebviewMessage } from "./types";
 import { PreviewFallback } from "./states/preview-fallback";
@@ -177,6 +178,7 @@ export const PreviewApp = () => {
 				sectionRef: values.sectionRef,
 				issueType: values.issueType,
 				description: values.description,
+				actionType: "refine", // Manual refinement
 			});
 			const sectionLabel =
 				values.sectionRef &&
@@ -187,6 +189,40 @@ export const PreviewApp = () => {
 				issueType: values.issueType,
 				sectionLabel: sectionLabel ?? values.sectionRef,
 				description: values.description,
+				message: result.message,
+			});
+		},
+		[metadata]
+	);
+
+	const handleDocumentUpdate = useCallback(
+		async (additionalContext?: string) => {
+			if (!metadata) {
+				throw new Error("Document metadata unavailable");
+			}
+
+			// Format changed dependencies for the prompt
+			const changedDeps =
+				metadata.outdatedInfo?.changedDependencies.map((dep) => ({
+					documentId: dep.documentId,
+					documentType: dep.documentType,
+				})) || [];
+
+			const result = await submitRefinement({
+				documentId: metadata.documentId,
+				documentType: metadata.documentType,
+				documentVersion: metadata.version,
+				issueType: "other", // Not a manual issue, but dependency sync
+				description:
+					additionalContext || "Synchronizing with updated dependencies",
+				actionType: "update", // Dependency-triggered update
+				changedDependencies: changedDeps,
+			});
+
+			setLastRefinement({
+				requestId: result.requestId,
+				issueType: "other",
+				description: `Document updated based on ${changedDeps.length} dependency change(s)`,
 				message: result.message,
 			});
 		},
@@ -282,6 +318,14 @@ export const PreviewApp = () => {
 					</div>
 				</dl>
 			</header>
+
+			{/* Show update banner if document is outdated */}
+			{metadata.isOutdated && (
+				<UpdateDocumentButton
+					document={metadata}
+					onUpdate={handleDocumentUpdate}
+				/>
+			)}
 
 			<div className="grid h-full gap-4 md:grid-cols-[240px_1fr]">
 				<DocumentOutline

@@ -70,7 +70,7 @@ src/
 └── utils/
     └── copilot-mcp-utils.ts            # [NEW] Copilot MCP config access
 
-webview-ui/
+ui/
 └── src/
     └── features/
         └── hooks-view/
@@ -187,8 +187,8 @@ Run `/speckit.tasks` to generate the detailed implementation checklist based on 
 7. `src/features/hooks/types.ts` - [EXTEND] Add MCP types
 
 **UI Components** (2 files):
-1. `webview-ui/src/features/hooks-view/components/mcp-action-picker.tsx` - Server/tool tree
-2. `webview-ui/src/features/hooks-view/hooks/use-mcp-servers.ts` - State management
+1. `ui/src/features/hooks-view/components/mcp-action-picker.tsx` - Server/tool tree
+2. `ui/src/features/hooks-view/hooks/use-mcp-servers.ts` - State management
 
 **Tests** (6 files):
 1. `tests/unit/features/hooks/actions/mcp-action.test.ts`
