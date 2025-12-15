@@ -1,10 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { ExecutionLogsList } from "../../../../webview-ui/src/features/hooks-view/components/execution-logs-list";
+import { ExecutionLogsList } from "../../../../ui/src/features/hooks-view/components/execution-logs-list";
 import type {
 	Hook,
 	HookExecutionLog,
-} from "../../../../webview-ui/src/features/hooks-view/types";
+} from "../../../../ui/src/features/hooks-view/types";
 
 const NO_LOGS_REGEX = /No execution logs yet/i;
 const AUTO_CLARIFY_REGEX = /Auto Clarify/;

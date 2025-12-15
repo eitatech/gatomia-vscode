@@ -429,11 +429,7 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 					this.context,
 					element.specName,
 					"task-group",
-					{
-						command: "gatomia.spec.runTaskGroup",
-						title: "Run Task Group",
-						arguments: [{ parentName: group.name, filePath: tasksFilePath }],
-					},
+					undefined, // No command - clicking only expands/collapses
 					tasksFilePath,
 					group.name,
 					element.system,

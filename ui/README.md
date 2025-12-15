@@ -5,13 +5,13 @@ This package hosts the React application that powers the VS Code webview surface
 ### Getting Started
 
 - `npm install` (at repo root) – installs all root and workspace dependencies.
-- `npm run dev --workspace webview-ui` – launches the Vite dev server.
-- `npm run build --workspace webview-ui` – generates production assets under `dist/webview/app`.
+- `npm run dev --workspace ui` – launches the Vite dev server.
+- `npm run build --workspace ui` – generates production assets under `dist/webview/app`.
 
 ### Project Structure
 
 ```
-webview-ui/
+ui/
 ├── src/
 │   ├── components/        # Shared visual components reused across features
 │   │   └── ui/            # shadcn/ui component library

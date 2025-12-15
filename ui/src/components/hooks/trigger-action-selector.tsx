@@ -2,7 +2,7 @@ import {
 	VSCodeButton,
 	VSCodeDropdown,
 	VSCodeOption,
-} from "@vscode/webview-ui-toolkit/react";
+} from "@vscode/ui-toolkit/react";
 import { useState, useEffect, useCallback } from "react";
 import type { HookTrigger, HookAction } from "../../types/hooks";
 import "./trigger-action-selector.css";

@@ -8,7 +8,7 @@ export default defineConfig({
 			"src/**/*.test.ts",
 			"tests/**/*.test.ts",
 			"tests/**/*.test.tsx",
-			"webview-ui/tests/**/*.spec.tsx",
+			"ui/tests/**/*.spec.tsx",
 		],
 		setupFiles: ["./vitest.setup.ts"],
 		coverage: { reporter: ["text", "lcov", "html"], provider: "v8" },
@@ -16,7 +16,7 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			vscode: path.resolve(__dirname, "tests/__mocks__/vscode.ts"),
-			"@": path.resolve(__dirname, "webview-ui/src"),
+			"@": path.resolve(__dirname, "ui/src"),
 			react: path.resolve(__dirname, "node_modules/react"),
 			"react-dom": path.resolve(__dirname, "node_modules/react-dom"),
 		},

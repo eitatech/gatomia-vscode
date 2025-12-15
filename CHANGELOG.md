@@ -2,6 +2,52 @@
 
 ---
 
+## v0.26.2 2025-12-15
+
+### Added
+
+- **Document Dependency Tracking**: Intelligent system to detect when documents need updates based on changes in their dependencies
+  - Automatic dependency detection based on document type hierarchy (spec → plan → tasks → checklist)
+  - Version tracking with content hashing to detect real changes vs. progress updates
+  - Structural hash for tasks/checklists that ignores checkbox state changes (detects only content modifications)
+  - "Update Document" button appears automatically when dependencies change
+  - Formatted prompts sent to appropriate agents with context about changed dependencies
+  - Visual indicators showing which dependencies changed and when
+  - Optional additional context field for user-specific update instructions
+  - Persistent tracking across workspace sessions
+  - 14 comprehensive unit tests ensuring reliability
+
+**Dependency Hierarchy**:
+- `spec.md` (base) → no dependencies
+- `plan.md` → depends on `spec.md`
+- `tasks.md` → depends on `spec.md` + `plan.md`
+- `checklist.md` → depends on `tasks.md`
+- `data-model.md` → depends on `spec.md`
+- `api.md` → depends on `spec.md` + `data-model.md`
+- `quickstart.md` → depends on `spec.md` + `plan.md`
+- `research.md` → independent (supports spec but no hard dependency)
+
+---
+
+## v0.26.1 2025-12-15
+
+### Fixed
+
+- **Document Refinement**: Refinement requests now properly send feedback to the appropriate agent instead of just creating annotations
+  - Refinement requests are sent to the correct SpecKit/OpenSpec agent based on document type (spec → `/speckit.specify`, plan → `/speckit.plan`, etc.)
+  - Formatted prompts include document ID, section reference, issue type, and detailed description
+  - Status messages now accurately reflect what happens ("Refinement sent to agent" instead of fictitious "queued" messages)
+  - Added comprehensive logging for all refinement operations
+  - Error handling with detailed feedback when agent communication fails
+  - 10 new unit tests to ensure reliability
+
+- **Task Group Navigation**: Fixed bug where clicking on phase headers (e.g., "Phase 1: Foundation & Core Types") would incorrectly trigger task execution
+  - Phase headers now only expand/collapse when clicked (expected behavior)
+  - Task execution only happens via the dedicated inline button (intended behavior)
+  - Maintains proper separation between navigation and execution actions
+
+---
+
 ## v0.26.0 2025-12-05
 
 ### Added
