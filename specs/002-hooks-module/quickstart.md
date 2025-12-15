@@ -82,7 +82,7 @@ The Hooks Module enables users to automate SDD workflow sequences by configuring
 
 ### Webview Side (React + TypeScript)
 
-5. **HooksView** (`webview-ui/src/features/hooks-view/index.tsx`)
+5. **HooksView** (`ui/src/features/hooks-view/index.tsx`)
    - **What**: Main hooks configuration UI
    - **Why**: User-facing interface for hook management
    - **Components**: `HooksList`, `HookForm`, `HookListItem`
@@ -162,7 +162,7 @@ src/
 └── services/
     └── HookService.ts               # Extension-level coordination
 
-webview-ui/src/features/
+ui/src/features/
 └── hooks-view/
     ├── index.tsx                    # Main view
     ├── types.ts                     # UI types
@@ -240,12 +240,12 @@ tests/
 
 2. **Dev server** (hot reload):
    ```bash
-   npm --prefix webview-ui run dev
+   npm --prefix ui run dev
    ```
 
 3. **View in browser** (isolated development):
    - Open `http://localhost:5173`
-   - Edit components in `webview-ui/src/features/hooks-view/`
+   - Edit components in `ui/src/features/hooks-view/`
    - See changes live
 
 ### Testing
@@ -449,4 +449,4 @@ Defined in `src/features/hooks/types.ts`:
 
 - Check specification docs in this directory
 - Review existing feature code (`src/features/spec/`, `src/features/steering/`)
-- Look at existing webview patterns (`webview-ui/src/features/create-steering-view/`)
+- Look at existing webview patterns (`ui/src/features/create-steering-view/`)

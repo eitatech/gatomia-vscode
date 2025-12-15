@@ -24,7 +24,7 @@ GatomIA for Copilot is a Visual Studio Code extension that gives GitHub Copilot 
 - Spec and steering flows live in `src/features/spec` and `src/features/steering`, with managers responsible for reading/writing `openspec` assets and coordinating Copilot interactions.
 - Providers under `src/providers` expose tree views and CodeLens integrations that call manager methods, keeping UI logic thin and declarative.
 - Prompt ingestion goes through `PromptLoader` (`src/services/prompt-loader.ts`), which compiles Markdown templates into TypeScript modules consumed by the extension.
-- The `webview-ui/` React project (Vite build) renders modal workflows; compiled assets ship in `dist/webview/app` and are loaded via the extension runtime.
+- The `ui/` React project (Vite build) renders modal workflows; compiled assets ship in `dist/webview/app` and are loaded via the extension runtime.
 
 ### Testing Strategy
 - Use Vitest (`npm test`, `npm run test:watch`, `npm run test:coverage`) for unit and integration coverage of managers, providers, and utilities.

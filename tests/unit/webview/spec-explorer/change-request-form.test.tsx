@@ -5,7 +5,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import ChangeRequestForm from "../../../../webview-ui/src/components/spec-explorer/change-request-form";
+import ChangeRequestForm from "../../../../ui/src/components/spec-explorer/change-request-form";
 
 const LABEL_TITLE = /Title/i;
 const LABEL_DESCRIPTION = /Description/i;

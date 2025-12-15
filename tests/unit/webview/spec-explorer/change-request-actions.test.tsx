@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { ChangeRequestActions } from "../../../../webview-ui/src/components/spec-explorer/change-request-actions";
+import { ChangeRequestActions } from "../../../../ui/src/components/spec-explorer/change-request-actions";
 
 // Test constants
 const BUTTON_DISPATCH = "Dispatch to Tasks";
