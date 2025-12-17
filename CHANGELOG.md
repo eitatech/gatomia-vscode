@@ -2,6 +2,19 @@
 
 ---
 
+## v0.27.0 2025-12-17
+
+### Added
+
+- add continuous delivery workflow
+
+### Changed
+
+- fix issues
+
+---
+
+
 ## v0.26.2 2025-12-15
 
 ### Added
@@ -161,4 +174,3 @@
 ## v0.1.7 2025-11-21
 
 - Initial implementation of Spec UI for Copilot features.
-
