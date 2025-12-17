@@ -245,7 +245,7 @@ This document breaks down the Hooks Module implementation into prioritized, test
 **Description**: Create main React component for hooks configuration.
 
 **Deliverables**:
-- `webview-ui/src/features/hooks-view/index.tsx` with:
+- `ui/src/features/hooks-view/index.tsx` with:
   - State management (hooks array)
   - Message listener for extension messages
   - Message sender to extension
@@ -273,7 +273,7 @@ This document breaks down the Hooks Module implementation into prioritized, test
 **Description**: Create component to display list of hooks.
 
 **Deliverables**:
-- `webview-ui/src/features/hooks-view/components/HooksList.tsx` with:
+- `ui/src/features/hooks-view/components/HooksList.tsx` with:
   - Render list of `HookListItem` components
   - Empty state message ("No hooks configured")
   - Loading state
@@ -296,7 +296,7 @@ This document breaks down the Hooks Module implementation into prioritized, test
 **Description**: Create component for individual hook row with actions.
 
 **Deliverables**:
-- `webview-ui/src/features/hooks-view/components/HookListItem.tsx` with:
+- `ui/src/features/hooks-view/components/HookListItem.tsx` with:
   - Display hook name, trigger, action
   - Enable/disable toggle
   - Edit button (opens form)
@@ -324,7 +324,7 @@ This document breaks down the Hooks Module implementation into prioritized, test
 **Description**: Create form for creating/editing hooks.
 
 **Deliverables**:
-- `webview-ui/src/features/hooks-view/components/hook-form.tsx` with:
+- `ui/src/features/hooks-view/components/hook-form.tsx` with:
   - Form fields: name, trigger (agent, operation), action (type, parameters)
   - Validation (name required, unique, trigger required, action required)
   - Dynamic parameter fields based on action type
@@ -354,7 +354,7 @@ This document breaks down the Hooks Module implementation into prioritized, test
 **Description**: Create dropdown components for trigger and action selection.
 
 **Deliverables**:
-- `webview-ui/src/features/hooks-view/components/trigger-action-selector.tsx` with:
+- `ui/src/features/hooks-view/components/trigger-action-selector.tsx` with:
   - Agent dropdown (SpecKit, OpenSpec)
   - Operation dropdown (specify, clarify, plan, analyze, checklist)
   - Action type dropdown (agent, git, github, custom)

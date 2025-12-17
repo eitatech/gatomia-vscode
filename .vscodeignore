@@ -24,7 +24,7 @@ AGENTS.md
 .tmp/**
 scripts/**
 tests/**
-webview-ui/**
+ui/**
 *.test.ts
 *.test.js
 jest.config.js
