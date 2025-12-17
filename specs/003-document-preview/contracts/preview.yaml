@@ -1,0 +1,216 @@
+openapi: 3.0.1
+info:
+  title: Document Preview Service
+  version: 1.0.0
+  description: Contracts between the VS Code extension host and SpecKit services for preview rendering, form persistence, and refinement submission.
+servers:
+  - url: https://specstudio.local/api
+paths:
+  /previews/{documentId}:
+    get:
+      summary: Fetch rendered preview payload for a document artifact
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: includeForms
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Preview payload with metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewPayload'
+        '404':
+          description: Document not found
+        '409':
+          description: Requested version outdated relative to server copy
+  /previews/{documentId}/forms:
+    post:
+      summary: Persist structured form input originating from the preview
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FormSubmission'
+      responses:
+        '202':
+          description: Submission accepted and routed to document pipeline
+        '400':
+          description: Validation failure
+        '423':
+          description: Document locked or user lacks edit rights
+  /refinements:
+    post:
+      summary: Submit a refinement request triggered from the preview CTA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefinementRequest'
+      responses:
+        '201':
+          description: Refinement request created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  status:
+                    type: string
+                    enum: [queued, in-progress, completed]
+        '409':
+          description: Duplicate request already open for this section
+components:
+  schemas:
+    PreviewPayload:
+      type: object
+      required:
+        - documentId
+        - documentType
+        - title
+        - version
+        - metadata
+        - sections
+        - diagrams
+        - forms
+      properties:
+        documentId:
+          type: string
+        documentType:
+          type: string
+          enum: [task, spec, plan, research, dataModel, api, quickstart]
+        title:
+          type: string
+        version:
+          type: string
+        metadata:
+          type: object
+          properties:
+            owner:
+              type: string
+            updatedAt:
+              type: string
+              format: date-time
+        sections:
+          type: array
+          items:
+            type: object
+            properties:
+              anchor:
+                type: string
+              html:
+                type: string
+        diagrams:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagramBlock'
+        forms:
+          type: array
+          items:
+            $ref: '#/components/schemas/FormField'
+    DiagramBlock:
+      type: object
+      required: [diagramId, language, rawSource]
+      properties:
+        diagramId:
+          type: string
+        language:
+          type: string
+          enum: [mermaid, c4, plantuml]
+        rawSource:
+          type: string
+        renderStandard:
+          type: string
+        checksum:
+          type: string
+    FormField:
+      type: object
+      required: [fieldId, type, label]
+      properties:
+        fieldId:
+          type: string
+        type:
+          type: string
+          enum: [checkbox, dropdown, text, textarea, multiselect]
+        label:
+          type: string
+        required:
+          type: boolean
+        options:
+          type: array
+          items:
+            type: string
+        value:
+          type: string
+        validationRules:
+          type: object
+    FormSubmission:
+      type: object
+      required: [documentId, sessionId, fields]
+      properties:
+        documentId:
+          type: string
+        sessionId:
+          type: string
+        fields:
+          type: array
+          items:
+            type: object
+            properties:
+              fieldId:
+                type: string
+              value:
+                type: string
+              dirty:
+                type: boolean
+        submittedAt:
+          type: string
+          format: date-time
+    RefinementRequest:
+      type: object
+      required: [documentId, documentType, reporterId, description, issueType]
+      properties:
+        documentId:
+          type: string
+        documentType:
+          type: string
+        documentVersion:
+          type: string
+        reporterId:
+          type: string
+        sectionRef:
+          type: string
+        issueType:
+          type: string
+          enum: [missingDetail, incorrectInfo, missingAsset, other]
+        description:
+          type: string
+        attachments:
+          type: array
+          items:
+            type: string
+        submittedAt:
+          type: string
+          format: date-time

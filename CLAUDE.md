@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## MANDATORY ACTIONS
+
+- Always run `npm run check` before mark any task as complete. This ensures code quality and formatting standards are met.
+
 ## Quick Start: Common Commands
 
 ```bash
@@ -28,7 +32,7 @@ npm run package      # Create VSIX file for VS Code Marketplace
 npm run compile      # Build then package (used for CI/CD)
 
 # Webview development
-npm --prefix webview-ui run dev  # Run webview dev server in isolation
+npm --prefix ui run dev  # Run webview dev server in isolation
 
 # Launch the extension
 Press F5 in VS Code to launch the Extension debug host
