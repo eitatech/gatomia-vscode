@@ -43,7 +43,7 @@ jobs:
             ]
           git_tag: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.EITA_PAT_TOKEN }}
 
       - name: Read package.json version
         id: pkg
