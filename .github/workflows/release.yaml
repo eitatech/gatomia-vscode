@@ -33,12 +33,12 @@ jobs:
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
-            webview-ui/package-lock.json
+            ui/package-lock.json
           
       - name: Install dependencies (root)
         run: npm ci
-      - name: Install dependencies (webview-ui)
-        run: npm --prefix webview-ui ci
+      - name: Install dependencies (ui)
+        run: npm --prefix ui ci
         
       - name: Build Project
         run: npm run build
@@ -128,7 +128,7 @@ jobs:
       - name: Publish to Open VSX
         uses: HaaLeo/publish-vscode-extension@v2
         with:
-          pat: ${{ secrets.OPEN_VSX_TOKEN }}
+          pat: ${{ secrets.OPENVSX_PAT }}
           registryUrl: https://open-vsx.org
           dependencies: false
           skipDuplicate: true

@@ -2,14 +2,14 @@
   "name": "gatomia",
   "displayName": "GatomIA",
   "description": "Agentic Spec-Driven Development Toolkit",
-  "version": "0.25.4",
+  "version": "0.25.6",
   "license": "MIT",
   "author": "Italo A. G.",
   "publisher": "EITA",
   "icon": "assets/icons/gatomia.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eita/gatomia-vscode"
+    "url": "https://github.com/eitatech/gatomia-vscode"
   },
   "engines": {
     "vscode": "^1.84.0"
@@ -28,13 +28,13 @@
     "ui"
   ],
   "scripts": {
-    "install:all": "npm install && cd webview-ui && npm install",
+    "install:all": "npm install && cd ui && npm install",
     "build-prompts": "node scripts/build-prompts.js",
     "build:ext": "esbuild src/extension.ts --bundle --platform=node --target=node16 --external:vscode --outfile=dist/extension.js",
     "build": "npm run build-prompts && npm run build:ext && npm run build:webview",
     "vscode:prepublish": "npm run build",
     "compile": "npm run build && npm run package",
-    "watch": "concurrently \"tsc -w -p ./\" \"npm:watch:webview\"",
+    "watch": "concurrently \"tsc -w -p ./\" \"npm run watch:webview\"",
     "package": "vsce package",
     "lint": "ultracite lint",
     "fix": "ultracite fix",
@@ -44,8 +44,8 @@
     "test:watch": "vitest --pool threads --watch",
     "test:coverage": "vitest --pool threads --coverage",
     "prepare": "husky",
-    "build:webview": "npm --prefix webview-ui run build",
-    "watch:webview": "npm --prefix webview-ui run dev"
+    "build:webview": "npm --prefix ui run build",
+    "watch:webview": "npm --prefix ui run dev"
   },
   "contributes": {
     "configuration": {
@@ -266,6 +266,12 @@
       {
         "command": "gatomia.spec.runTask",
         "title": "Run Task",
+        "category": "GatomIA",
+        "icon": "$(play)"
+      },
+      {
+        "command": "gatomia.spec.runTaskGroup",
+        "title": "Run Task Group",
         "category": "GatomIA",
         "icon": "$(play)"
       },
@@ -608,6 +614,11 @@
           "group": "inline"
         },
         {
+          "command": "gatomia.spec.runTaskGroup",
+          "when": "view == gatomia.views.specExplorer && viewItem == task-group",
+          "group": "inline"
+        },
+        {
           "command": "gatomia.prompts.run",
           "when": "view == gatomia.views.promptsExplorer && viewItem == prompt-runnable",
           "group": "inline"
@@ -737,8 +748,7 @@
     "ts-loader": "^9.5.2",
     "typescript": "^5.3.0",
     "ultracite": "^6.3.4",
-    "vitest": "^3.2.4",
-    "vsce": "^2.15.0"
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "gray-matter": "^4.0.3",
