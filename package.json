@@ -28,7 +28,7 @@
     "ui"
   ],
   "scripts": {
-    "install:all": "npm install && cd webview-ui && npm install",
+    "install:all": "npm install && cd ui && npm install",
     "build-prompts": "node scripts/build-prompts.js",
     "build:ext": "esbuild src/extension.ts --bundle --platform=node --target=node16 --external:vscode --outfile=dist/extension.js",
     "build": "npm run build-prompts && npm run build:ext && npm run build:webview",
@@ -44,8 +44,8 @@
     "test:watch": "vitest --pool threads --watch",
     "test:coverage": "vitest --pool threads --coverage",
     "prepare": "husky",
-    "build:webview": "npm --prefix webview-ui run build",
-    "watch:webview": "npm --prefix webview-ui run dev"
+    "build:webview": "npm --prefix ui run build",
+    "watch:webview": "npm --prefix ui run dev"
   },
   "contributes": {
     "configuration": {
@@ -748,8 +748,7 @@
     "ts-loader": "^9.5.2",
     "typescript": "^5.3.0",
     "ultracite": "^6.3.4",
-    "vitest": "^3.2.4",
-    "vsce": "^2.15.0"
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "gray-matter": "^4.0.3",

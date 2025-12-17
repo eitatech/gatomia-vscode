@@ -46,6 +46,8 @@ export type RefinementIssueType =
 	| "missingAsset"
 	| "other";
 
+export type RefinementActionType = "refine" | "update";
+
 export interface RefinementRequestPayload {
 	requestId: string;
 	documentId: string;
@@ -55,6 +57,11 @@ export interface RefinementRequestPayload {
 	issueType: RefinementIssueType;
 	description: string;
 	submittedAt: string;
+	actionType?: RefinementActionType; // "refine" for manual refinement, "update" for dependency sync
+	changedDependencies?: Array<{
+		documentId: string;
+		documentType: PreviewDocumentType;
+	}>; // Documents that changed and triggered this update
 }
 
 export interface RefinementResultPayload {
@@ -78,6 +85,14 @@ export interface DocumentArtifact {
 	updatedAt?: string;
 	renderStandard: string;
 	sessionId: string;
+	isOutdated?: boolean; // True if dependencies have changed
+	outdatedInfo?: {
+		outdatedSince: number;
+		changedDependencies: Array<{
+			documentId: string;
+			documentType: PreviewDocumentType;
+		}>;
+	};
 	sections: PreviewSection[];
 	diagrams: DiagramBlock[];
 	forms: FormField[];
