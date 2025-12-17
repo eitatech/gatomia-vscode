@@ -17,7 +17,7 @@ This feature adds a rich preview webview to the VS Code extension that:
 ## Prerequisites
 
 - VS Code 1.84+ with GatomIA workspace open
-- `npm run install:all` completed (root + `webview-ui`)
+- `npm run install:all` completed (root + `ui`)
 - Sample SpecKit documents covering specs, plans, research, and data models
 
 ## Run the development loop
@@ -58,7 +58,7 @@ The preview webview includes comprehensive accessibility support:
 ## Run tests
 
 1. `npm run test -- --filter preview` for extension-side preview logic.
-2. `cd webview-ui && npm run test -- preview` for React components.
+2. `cd ui && npm run test -- preview` for React components.
 3. `npm run lint && npm run check` to satisfy gating quality checks before raising a PR.
 
 ## Monitor performance metrics
@@ -156,7 +156,7 @@ const metrics = exportMetrics();
 - `src/services/refinementGateway.ts`: Submits refinement requests to `/refinements` endpoint
 - `src/extension.ts`: Command registration, file watchers, message passing bridge
 
-### Webview UI (webview-ui/src/)
+### Webview UI (ui/src/)
 
 - `features/preview/preview-app.tsx`: Main preview container with metadata header, outline, content rendering
 - `components/preview/document-outline.tsx`: Navigation sidebar with section anchors
@@ -164,14 +164,14 @@ const metrics = exportMetrics();
 - `components/refine/refine-dialog.tsx`: Modal dialog for refinement request submission
 - `lib/markdown/preview-renderer.ts`: Markdown-it configuration with diagram plugin support
 
-### Stores (webview-ui/src/features/preview/stores/)
+### Stores (ui/src/features/preview/stores/)
 
 - `preview-store.ts`: Document state, stale notifications, session management
 - `form-store.ts`: Form field state, validation, dirty tracking, submission payload
 
 ### Testing
 
-- Unit tests: `tests/unit/features/documents/`, `webview-ui/tests/preview/`
+- Unit tests: `tests/unit/features/documents/`, `ui/tests/preview/`
 - Integration tests: `tests/integration/preview/` (webview, readonly, performance)
 - Performance harness: `tests/integration/preview/preview-performance.test.ts` validates SC-001/SC-002
 

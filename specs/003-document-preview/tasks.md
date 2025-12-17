@@ -12,9 +12,9 @@
 **Purpose**: Initialize preview-specific scaffolding and dependencies
 
 - [X] T001 Scaffold preview panel module at `src/panels/document-preview-panel.ts`
-- [X] T002 Add Markdown-it diagram plugins to root `package.json` and `webview-ui/package.json`
-- [X] T003 [P] Establish preview feature folder `webview-ui/src/features/preview/` with base index file
-- [X] T004 [P] Configure shared Markdown renderer utilities at `webview-ui/src/lib/markdown/preview-renderer.ts`
+- [X] T002 Add Markdown-it diagram plugins to root `package.json` and `ui/package.json`
+- [X] T003 [P] Establish preview feature folder `ui/src/features/preview/` with base index file
+- [X] T004 [P] Configure shared Markdown renderer utilities at `ui/src/lib/markdown/preview-renderer.ts`
 
 ---
 
@@ -26,7 +26,7 @@
 - [X] T006 [P] Define preview messaging contracts and types in `src/types/preview.ts`
 - [X] T007 Wire VS Code message passing + persistence bridge in `src/extension.ts`
 - [X] T008 [P] Register workspace file watchers + stale-session banner dispatcher in `src/extension.ts`
-- [X] T009 Create shared preview state store bootstrapper at `webview-ui/src/features/preview/stores/preview-store.ts`
+- [X] T009 Create shared preview state store bootstrapper at `ui/src/features/preview/stores/preview-store.ts`
 - [X] T010 Add preview edit guard that blocks raw Markdown edits from the webview in `src/extension.ts`
 
 **Checkpoint**: Extension ↔ webview contract ready; user stories can start.
@@ -43,10 +43,10 @@
 
 - [X] T011 [US1] Connect spec tree selection to preview command in `src/extension.ts`
 - [X] T012 [P] [US1] Build webview HTML host + resource loading in `src/panels/document-preview-panel.ts`
-- [X] T013 [P] [US1] Implement PreviewApp shell with metadata header in `webview-ui/src/features/preview/preview-app.tsx`
-- [X] T014 [P] [US1] Render Markdown + Mermaid/C4 diagrams via `webview-ui/src/lib/markdown/preview-renderer.ts`
-- [X] T015 [US1] Add outline/nav aids + section anchors in `webview-ui/src/components/preview/document-outline.tsx`
-- [X] T016 [US1] Handle error/unsupported-state UI plus fallback editor CTA in `webview-ui/src/features/preview/states/preview-fallback.tsx`
+- [X] T013 [P] [US1] Implement PreviewApp shell with metadata header in `ui/src/features/preview/preview-app.tsx`
+- [X] T014 [P] [US1] Render Markdown + Mermaid/C4 diagrams via `ui/src/lib/markdown/preview-renderer.ts`
+- [X] T015 [US1] Add outline/nav aids + section anchors in `ui/src/components/preview/document-outline.tsx`
+- [X] T016 [US1] Handle error/unsupported-state UI plus fallback editor CTA in `ui/src/features/preview/states/preview-fallback.tsx`
 - [X] T017 [US1] Add integration test covering preview command in `tests/integration/preview/preview-webview.test.ts`
 - [X] T018 [US1] Add regression test ensuring preview stays read-only in `tests/integration/preview/preview-readonly.test.ts`
 
@@ -62,12 +62,12 @@
 
 ### Implementation
 
-- [X] T019 [US2] Create form state manager in `webview-ui/src/features/preview/stores/form-store.ts`
-- [X] T020 [P] [US2] Build reusable PreviewFormField components in `webview-ui/src/components/forms/preview-form-field.tsx`
-- [X] T021 [US2] Implement validation + error messaging in `webview-ui/src/features/preview/hooks/use-form-validation.ts`
-- [X] T022 [US2] Persist form deltas to the extension via `webview-ui/src/features/preview/api/form-bridge.ts`
-- [X] T023 [US2] Enforce read-only rendering for restricted users inside `webview-ui/src/components/forms/preview-form-field.tsx`
-- [X] T024 [US2] Add Vitest coverage for form flows in `webview-ui/tests/preview/forms.spec.tsx`
+- [X] T019 [US2] Create form state manager in `ui/src/features/preview/stores/form-store.ts`
+- [X] T020 [P] [US2] Build reusable PreviewFormField components in `ui/src/components/forms/preview-form-field.tsx`
+- [X] T021 [US2] Implement validation + error messaging in `ui/src/features/preview/hooks/use-form-validation.ts`
+- [X] T022 [US2] Persist form deltas to the extension via `ui/src/features/preview/api/form-bridge.ts`
+- [X] T023 [US2] Enforce read-only rendering for restricted users inside `ui/src/components/forms/preview-form-field.tsx`
+- [X] T024 [US2] Add Vitest coverage for form flows in `ui/tests/preview/forms.spec.tsx`
 
 **Checkpoint**: Structured forms editable (or read-only when required) entirely inside the preview.
 
@@ -81,10 +81,10 @@
 
 ### Implementation
 
-- [X] T025 [US3] Create Refine CTA + dialog components in `webview-ui/src/components/refine/refine-dialog.tsx`
-- [X] T026 [P] [US3] Implement refine payload builder + validations in `webview-ui/src/features/preview/api/refine-bridge.ts`
+- [X] T025 [US3] Create Refine CTA + dialog components in `ui/src/components/refine/refine-dialog.tsx`
+- [X] T026 [P] [US3] Implement refine payload builder + validations in `ui/src/features/preview/api/refine-bridge.ts`
 - [X] T027 [US3] Add refinement gateway wrapper calling `/refinements` contract in `src/services/refinement-gateway.ts`
-- [X] T028 [US3] Display confirmation + request ID messaging in `webview-ui/src/features/preview/components/refine-confirmation.tsx`
+- [X] T028 [US3] Display confirmation + request ID messaging in `ui/src/features/preview/components/refine-confirmation.tsx`
 - [X] T029 [US3] Add unit test for refine submission happy path in `tests/unit/features/documents/refine-request.test.ts`
 
 **Checkpoint**: Users can submit feedback directly from the preview with captured metadata.
@@ -97,7 +97,7 @@
 
 - [X] T030 Add preview load-time + diagram success metrics instrumentation in `src/utils/telemetry.ts`
 - [X] T031 [P] Build performance harness asserting SC-001/SC-002 targets in `tests/integration/preview/preview-performance.test.ts`
-- [X] T032 [P] Audit accessibility (ARIA labels, focus traps) in `webview-ui/src/components/preview/`
+- [X] T032 [P] Audit accessibility (ARIA labels, focus traps) in `ui/src/components/preview/`
 - [X] T033 [P] Refresh quickstart and docs with preview instructions in `specs/001-document-preview/quickstart.md`
 - [X] T034 Run lint, type-check, and regression tests (`npm run lint`, `npm run check`, `npm run test`)
 

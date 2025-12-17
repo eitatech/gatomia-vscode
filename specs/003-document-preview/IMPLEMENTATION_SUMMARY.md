@@ -42,7 +42,7 @@ Successfully implemented a rich document preview webview for the GatomIA VS Code
 - `src/services/refinementGateway.ts` - Refinement submission
 - `src/utils/telemetry.ts` - Performance metrics tracking (28/28 tests ✓)
 
-### Webview UI (webview-ui/src/)
+### Webview UI (ui/src/)
 - `features/preview/preview-app.tsx` - Main container with metadata, outline, content
 - `components/preview/document-outline.tsx` - Navigation sidebar
 - `components/forms/preview-form-container.tsx` - Form rendering with validation
@@ -52,7 +52,7 @@ Successfully implemented a rich document preview webview for the GatomIA VS Code
 ### Testing (tests/)
 - `tests/integration/preview/preview-performance.test.ts` - 11/11 tests ✓
 - `tests/integration/preview/preview-webview.test.ts` - 3/3 tests ✓
-- `webview-ui/tests/preview/forms.spec.tsx` - 2/2 tests ✓
+- `ui/tests/preview/forms.spec.tsx` - 2/2 tests ✓
 - `tests/unit/features/documents/refine-request.test.ts` - 1/1 tests ✓
 - `src/utils/telemetry.test.ts` - 28/28 tests ✓
 
@@ -113,7 +113,7 @@ npm run check
 
 ### Testing
 ```bash
-npm test tests/integration/preview/ webview-ui/tests/preview/ tests/unit/features/documents/
+npm test tests/integration/preview/ ui/tests/preview/ tests/unit/features/documents/
 ```
 ✅ **17/17 tests passing**
 - Performance: 11/11 ✓
@@ -155,7 +155,7 @@ src/
 └── utils/
     └── telemetry.ts                 # Performance tracking
 
-webview-ui/src/
+ui/src/
 ├── components/
 │   ├── preview/
 │   │   └── document-outline.tsx     # Navigation
@@ -189,7 +189,7 @@ tests/
 │   └── refine-request.test.ts       # Refinement logic
 └── __mocks__/                       # VS Code API mocks
 
-webview-ui/tests/preview/
+ui/tests/preview/
 └── forms.spec.tsx                   # Form component tests
 ```
 
