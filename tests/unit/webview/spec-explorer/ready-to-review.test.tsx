@@ -11,7 +11,7 @@ import type { Specification } from "../../../../src/features/spec/review-flow/ty
 const LONG_TITLE_REGEX = /This is a very long/;
 
 // TODO: Import ReadyToReviewList component once created in T012
-// import ReadyToReviewList from '../../../../webview-ui/src/components/spec-explorer/ReadyToReviewList';
+// import ReadyToReviewList from '../../../../ui/src/components/spec-explorer/ReadyToReviewList';
 
 // Mock component for testing structure
 const MockReadyToReviewList = ({ specs, onFileChangeRequest }: any) => (

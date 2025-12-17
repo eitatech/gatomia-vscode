@@ -1,15 +1,12 @@
 /**
- * Tasks prompt dispatch service
- * Handles sending change requests to tasks prompt and processing responses
+ * Service for dispatching change requests to the tasks prompt.
+ * Simulates API interaction with latency and error handling.
  */
 
-import type { ChangeRequest, Specification, TaskLink } from "./types";
-import { logTasksDispatchFailed, logTasksDispatchSuccess } from "./telemetry";
+import { logTasksDispatchSuccess, logTasksDispatchFailed } from "./telemetry";
+import type { Specification, ChangeRequest, TaskLink } from "./types";
 
-/**
- * Payload structure for tasks prompt
- */
-interface TasksPromptPayload {
+export interface TasksPromptPayload {
 	specId: string;
 	specTitle: string;
 	specPath: string;
@@ -25,21 +22,32 @@ interface TasksPromptPayload {
 	notes?: string;
 }
 
-/**
- * Response from tasks prompt
- */
-interface TasksPromptResponse {
-	success: boolean;
+export interface TasksPromptResponse {
 	tasks: Array<{
 		taskId: string;
 		title: string;
 		description: string;
 	}>;
+	success: boolean;
 	message?: string;
 }
 
 /**
- * Build structured payload for tasks prompt from spec and change request
+ * Converts API response tasks to TaskLink objects for storage.
+ */
+export function convertResponseToTaskLinks(
+	response: TasksPromptResponse
+): TaskLink[] {
+	return response.tasks.map((t) => ({
+		taskId: t.taskId,
+		source: "tasksPrompt",
+		status: "open",
+		createdAt: new Date(),
+	}));
+}
+
+/**
+ * Builds the payload for the tasks prompt from spec and change request.
  */
 export function buildTasksPromptPayload(
 	spec: Specification,
@@ -56,89 +64,72 @@ export function buildTasksPromptPayload(
 		submitter: changeRequest.submitter,
 		context: {
 			specLink: spec.links.docUrl || spec.links.specPath,
-			changeRequestLink: undefined,
 		},
 		notes: changeRequest.notes,
 	};
 }
 
 /**
- * Dispatch change request to tasks prompt
- * @param spec Specification context
- * @param changeRequest Change request to dispatch
- * @returns Promise with tasks or error
+ * Dispatches a change request to the tasks prompt.
+ * Currently a mock implementation simulating network latency and potential failures.
  */
-export function dispatchToTasksPrompt(
-	spec: Specification,
-	changeRequest: ChangeRequest
+export async function dispatchToTasksPrompt(
+	payload: TasksPromptPayload
 ): Promise<TasksPromptResponse> {
-	const payload = buildTasksPromptPayload(spec, changeRequest);
 	const startTime = Date.now();
 
-	try {
-		// TODO: Integrate with actual tasks prompt API
-		// For now, simulate a successful response
-		// const response = await callTasksPromptAPI(payload);
+	// Simulate network latency (500-1500ms)
+	const latency = 500 + Math.random() * 1000;
+	await new Promise((resolve) => setTimeout(resolve, latency));
 
-		// Simulated response for testing
-		const mockResponse: TasksPromptResponse = {
+	try {
+		// Mock logic: 10% chance of failure to test error handling
+		// In production, this would be a real API call
+		// For demo/dev purposes, we might want to control this via config or environment
+		const shouldFail = Math.random() < 0.1;
+
+		if (shouldFail) {
+			throw new Error("Tasks prompt service unavailable (simulated)");
+		}
+
+		// Mock successful response
+		const response: TasksPromptResponse = {
 			success: true,
 			tasks: [
 				{
-					taskId: `task-${changeRequest.id}-001`,
-					title: `Address: ${changeRequest.title}`,
-					description: changeRequest.description,
+					taskId: `task-${Date.now()}-1`,
+					title: `Fix: ${payload.changeRequestTitle}`,
+					description: `Address the feedback: ${payload.changeRequestDescription}`,
+				},
+				{
+					taskId: `task-${Date.now()}-2`,
+					title: "Verify changes",
+					description: "Verify that the changes meet the requirements",
 				},
 			],
 		};
 
-		const roundtripMs = Date.now() - startTime;
 		logTasksDispatchSuccess(
-			spec.id,
-			changeRequest.id,
-			mockResponse.tasks.length,
-			roundtripMs
+			payload.specId,
+			payload.changeRequestId,
+			response.tasks.length,
+			Date.now() - startTime
 		);
 
-		return Promise.resolve(mockResponse);
-	} catch (error) {
-		const errorMessage =
-			error instanceof Error
-				? error.message
-				: "Tasks prompt service unavailable";
+		return response;
+	} catch (error: any) {
+		const errorMessage = error.message || "Unknown error";
+		logTasksDispatchFailed(
+			payload.specId,
+			payload.changeRequestId,
+			errorMessage,
+			true // retryable
+		);
 
-		logTasksDispatchFailed(spec.id, changeRequest.id, errorMessage, true);
-
-		// Handle network errors, timeouts, etc.
-		return Promise.resolve({
+		return {
 			success: false,
 			tasks: [],
 			message: errorMessage,
-		});
+		};
 	}
-}
-
-/**
- * Convert tasks prompt response to TaskLink array
- */
-export function convertResponseToTaskLinks(
-	response: TasksPromptResponse
-): TaskLink[] {
-	if (!response.success) {
-		return [];
-	}
-
-	return response.tasks.map((task) => ({
-		taskId: task.taskId,
-		source: "tasksPrompt" as const,
-		status: "open" as const,
-		createdAt: new Date(),
-	}));
-}
-
-/**
- * Check if change request can be retried (is in blocked state)
- */
-export function canRetry(changeRequest: ChangeRequest): boolean {
-	return changeRequest.status === "blocked";
 }

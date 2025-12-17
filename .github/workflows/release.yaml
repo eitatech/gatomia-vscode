@@ -33,12 +33,12 @@ jobs:
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
-            webview-ui/package-lock.json
+            ui/package-lock.json
           
       - name: Install dependencies (root)
         run: npm ci
-      - name: Install dependencies (webview-ui)
-        run: npm --prefix webview-ui ci
+      - name: Install dependencies (ui)
+        run: npm --prefix ui ci
         
       - name: Build Project
         run: npm run build

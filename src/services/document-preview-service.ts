@@ -7,6 +7,7 @@ import {
 	type Uri,
 	type OutputChannel,
 	workspace,
+	type ExtensionContext,
 } from "vscode";
 import type {
 	DocumentArtifact,
@@ -17,6 +18,7 @@ import type {
 	PreviewSection,
 } from "../types/preview";
 import { getRelativePath } from "../utils/document-title-utils";
+import { DocumentDependencyTracker } from "./document-dependency-tracker";
 
 export interface LoadDocumentOptions {
 	documentType?: PreviewDocumentType;
@@ -30,10 +32,14 @@ export class DocumentPreviewService {
 	private readonly changeEmitter = new EventEmitter<Uri>();
 	readonly onDidChangeDocument: Event<Uri>;
 	private readonly outputChannel: OutputChannel;
+	private readonly dependencyTracker: DocumentDependencyTracker | null = null;
 
-	constructor(outputChannel: OutputChannel) {
+	constructor(outputChannel: OutputChannel, context?: ExtensionContext) {
 		this.outputChannel = outputChannel;
 		this.onDidChangeDocument = this.changeEmitter.event;
+		if (context) {
+			this.dependencyTracker = DocumentDependencyTracker.getInstance(context);
+		}
 	}
 
 	async loadDocument(
@@ -55,6 +61,35 @@ export class DocumentPreviewService {
 		const workspaceRoot = workspace.workspaceFolders?.[0].uri.fsPath;
 		const filePath = getRelativePath(uri.fsPath, workspaceRoot);
 
+		// Check if document is outdated due to dependency changes
+		let isOutdated = false;
+		let outdatedInfo: DocumentArtifact["outdatedInfo"];
+
+		if (this.dependencyTracker) {
+			const documentId = filePath || uri.toString();
+
+			// Record current version
+			await this.dependencyTracker.recordDocumentVersion(
+				documentId,
+				documentType,
+				content
+			);
+
+			// Check if outdated
+			const outdatedResult = this.dependencyTracker.isDocumentOutdated(
+				documentId,
+				documentType
+			);
+
+			if (outdatedResult) {
+				isOutdated = true;
+				outdatedInfo = {
+					outdatedSince: outdatedResult.outdatedSince,
+					changedDependencies: outdatedResult.changedDependencies,
+				};
+			}
+		}
+
 		const artifact: DocumentArtifact = {
 			documentId: uri.toString(),
 			documentType,
@@ -71,6 +106,8 @@ export class DocumentPreviewService {
 			renderStandard:
 				(parsed.data?.renderStandard as string | undefined) || "markdown",
 			sessionId: randomUUID(),
+			isOutdated,
+			outdatedInfo,
 			sections,
 			diagrams: [],
 			forms,

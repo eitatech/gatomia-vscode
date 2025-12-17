@@ -539,4 +539,348 @@ describe("tasks dispatch service", () => {
 			expect(isComplete).toBe(false);
 		});
 	});
+
+	describe("FSM transitions - reopen→review flow", () => {
+		it("should keep spec in reopened status when tasks are pending", () => {
+			// Arrange
+			const SPEC_WITH_PENDING_TASKS: Specification = {
+				...MOCK_SPEC,
+				status: "reopened",
+				changeRequests: [
+					{
+						...MOCK_CHANGE_REQUEST,
+						status: "inProgress",
+						tasks: [
+							{
+								taskId: "task-001",
+								source: "tasksPrompt",
+								status: "open",
+								createdAt: new Date(),
+							},
+						],
+					},
+				],
+			};
+
+			const canReturnToReview = (spec: Specification): boolean => {
+				if (!spec.changeRequests || spec.changeRequests.length === 0) {
+					return false;
+				}
+
+				// All change requests must be addressed
+				const allAddressed = spec.changeRequests.every(
+					(cr) => cr.status === "addressed"
+				);
+				if (!allAddressed) {
+					return false;
+				}
+
+				// All tasks must be done
+				const allTasksDone = spec.changeRequests.every((cr) =>
+					cr.tasks.every((task) => task.status === "done")
+				);
+
+				return allTasksDone;
+			};
+
+			// Act
+			const canReturn = canReturnToReview(SPEC_WITH_PENDING_TASKS);
+
+			// Assert
+			expect(canReturn).toBe(false);
+		});
+
+		it("should transition to review when all tasks complete and CR addressed", () => {
+			// Arrange
+			const SPEC_WITH_COMPLETED_TASKS: Specification = {
+				...MOCK_SPEC,
+				status: "reopened",
+				changeRequests: [
+					{
+						...MOCK_CHANGE_REQUEST,
+						status: "addressed",
+						tasks: [
+							{
+								taskId: "task-001",
+								source: "tasksPrompt",
+								status: "done",
+								createdAt: new Date(),
+							},
+							{
+								taskId: "task-002",
+								source: "tasksPrompt",
+								status: "done",
+								createdAt: new Date(),
+							},
+						],
+					},
+				],
+			};
+
+			const shouldTransitionToReview = (spec: Specification): boolean => {
+				if (!spec.changeRequests || spec.changeRequests.length === 0) {
+					return false;
+				}
+
+				const allAddressed = spec.changeRequests.every(
+					(cr) => cr.status === "addressed"
+				);
+				const allTasksDone = spec.changeRequests.every((cr) =>
+					cr.tasks.every((task) => task.status === "done")
+				);
+
+				return allAddressed && allTasksDone;
+			};
+
+			// Act
+			const shouldTransition = shouldTransitionToReview(
+				SPEC_WITH_COMPLETED_TASKS
+			);
+
+			// Assert
+			expect(shouldTransition).toBe(true);
+		});
+
+		it("should handle multiple change requests with mixed task states", () => {
+			// Arrange
+			const SPEC_WITH_MULTIPLE_CRS: Specification = {
+				...MOCK_SPEC,
+				status: "reopened",
+				changeRequests: [
+					{
+						...MOCK_CHANGE_REQUEST,
+						id: "cr-001",
+						status: "addressed",
+						tasks: [
+							{
+								taskId: "task-001",
+								source: "tasksPrompt",
+								status: "done",
+								createdAt: new Date(),
+							},
+						],
+					},
+					{
+						...MOCK_CHANGE_REQUEST,
+						id: "cr-002",
+						status: "addressed",
+						tasks: [
+							{
+								taskId: "task-002",
+								source: "tasksPrompt",
+								status: "inProgress",
+								createdAt: new Date(),
+							},
+						],
+					},
+				],
+			};
+
+			const allTasksComplete = (spec: Specification): boolean =>
+				spec.changeRequests?.every((cr) =>
+					cr.tasks.every((task) => task.status === "done")
+				) ?? false;
+
+			// Act
+			const isComplete = allTasksComplete(SPEC_WITH_MULTIPLE_CRS);
+
+			// Assert
+			expect(isComplete).toBe(false);
+		});
+
+		it("should allow review transition when all CRs have completed tasks", () => {
+			// Arrange
+			const SPEC_ALL_COMPLETE: Specification = {
+				...MOCK_SPEC,
+				status: "reopened",
+				changeRequests: [
+					{
+						...MOCK_CHANGE_REQUEST,
+						id: "cr-001",
+						status: "addressed",
+						tasks: [
+							{
+								taskId: "task-001",
+								source: "tasksPrompt",
+								status: "done",
+								createdAt: new Date(),
+							},
+						],
+					},
+					{
+						...MOCK_CHANGE_REQUEST,
+						id: "cr-002",
+						status: "addressed",
+						tasks: [
+							{
+								taskId: "task-002",
+								source: "tasksPrompt",
+								status: "done",
+								createdAt: new Date(),
+							},
+						],
+					},
+				],
+			};
+
+			const canTransition = (spec: Specification): boolean => {
+				const allAddressed =
+					spec.changeRequests?.every((cr) => cr.status === "addressed") ??
+					false;
+				const allTasksDone =
+					spec.changeRequests?.every((cr) =>
+						cr.tasks.every((task) => task.status === "done")
+					) ?? false;
+
+				return allAddressed && allTasksDone;
+			};
+
+			// Act
+			const shouldTransition = canTransition(SPEC_ALL_COMPLETE);
+
+			// Assert
+			expect(shouldTransition).toBe(true);
+		});
+
+		it("should block review transition if any CR is not addressed", () => {
+			// Arrange
+			const SPEC_WITH_OPEN_CR: Specification = {
+				...MOCK_SPEC,
+				status: "reopened",
+				changeRequests: [
+					{
+						...MOCK_CHANGE_REQUEST,
+						id: "cr-001",
+						status: "addressed",
+						tasks: [
+							{
+								taskId: "task-001",
+								source: "tasksPrompt",
+								status: "done",
+								createdAt: new Date(),
+							},
+						],
+					},
+					{
+						...MOCK_CHANGE_REQUEST,
+						id: "cr-002",
+						status: "inProgress",
+						tasks: [
+							{
+								taskId: "task-002",
+								source: "tasksPrompt",
+								status: "done",
+								createdAt: new Date(),
+							},
+						],
+					},
+				],
+			};
+
+			const canTransition = (spec: Specification): boolean =>
+				spec.changeRequests?.every((cr) => cr.status === "addressed") ?? false;
+
+			// Act
+			const shouldBlock = !canTransition(SPEC_WITH_OPEN_CR);
+
+			// Assert
+			expect(shouldBlock).toBe(true);
+		});
+	});
+
+	describe("retry mechanics", () => {
+		it("should allow dispatching tasks to blocked change request", () => {
+			// Arrange
+			const BLOCKED_CR: ChangeRequest = {
+				...MOCK_CHANGE_REQUEST,
+				status: "blocked",
+			};
+
+			const canRetryDispatch = (cr: ChangeRequest): boolean =>
+				cr.status === "blocked";
+
+			// Act
+			const canRetry = canRetryDispatch(BLOCKED_CR);
+
+			// Assert
+			expect(canRetry).toBe(true);
+		});
+
+		it("should replace tasks on retry dispatch", () => {
+			// Arrange
+			const CR_WITH_FAILED_TASKS: ChangeRequest = {
+				...MOCK_CHANGE_REQUEST,
+				status: "blocked",
+				tasks: [
+					{
+						taskId: "task-failed-001",
+						source: "tasksPrompt",
+						status: "open",
+						createdAt: new Date(),
+					},
+				],
+			};
+
+			const retryWithNewTasks = (
+				cr: ChangeRequest,
+				newTasks: TaskLink[]
+			): ChangeRequest => ({
+				...cr,
+				tasks: newTasks,
+				status: "inProgress",
+				sentToTasksAt: new Date(),
+				updatedAt: new Date(),
+			});
+
+			const NEW_TASKS: TaskLink[] = [
+				{
+					taskId: "task-retry-001",
+					source: "tasksPrompt",
+					status: "open",
+					createdAt: new Date(),
+				},
+				{
+					taskId: "task-retry-002",
+					source: "tasksPrompt",
+					status: "open",
+					createdAt: new Date(),
+				},
+			];
+
+			// Act
+			const updated = retryWithNewTasks(CR_WITH_FAILED_TASKS, NEW_TASKS);
+
+			// Assert
+			expect(updated.tasks).toHaveLength(2);
+			expect(updated.tasks[0].taskId).toBe("task-retry-001");
+			expect(updated.status).toBe("inProgress");
+		});
+
+		it("should track retry count for telemetry", () => {
+			// Arrange
+			interface RetryMetadata {
+				changeRequestId: string;
+				attemptNumber: number;
+				timestamp: Date;
+			}
+
+			const trackRetry = (
+				cr: ChangeRequest,
+				attemptNumber: number
+			): RetryMetadata => ({
+				changeRequestId: cr.id,
+				attemptNumber,
+				timestamp: new Date(),
+			});
+
+			// Act
+			const firstRetry = trackRetry(MOCK_CHANGE_REQUEST, 1);
+			const secondRetry = trackRetry(MOCK_CHANGE_REQUEST, 2);
+
+			// Assert
+			expect(firstRetry.attemptNumber).toBe(1);
+			expect(secondRetry.attemptNumber).toBe(2);
+			expect(firstRetry.changeRequestId).toBe("cr-001");
+		});
+	});
 });
