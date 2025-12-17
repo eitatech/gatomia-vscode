@@ -2,14 +2,14 @@
 
 ## Project Structure & Module Organization
 - `src/`: VS Code extension source (TypeScript) compiled to `dist/extension.js`.
-- `webview-ui/`: React + Vite webview; outputs to `webview-ui/dist` and is pulled into the extension build.
+- `ui/`: React + Vite webview; outputs to `ui/dist` and is pulled into the extension build.
 - `scripts/`: Build helpers (e.g., prompt bundling).
 - `tests/`: Vitest suites (`unit/`, `integration/`) with shared mocks in `__mocks__/`.
 - `specs/` and `openspec/`: Example spec assets for SpecKit/OpenSpec workflows; keep in sync with extension behaviors.
 - `dist/`, `icons/`, `screenshots/`: Generated or static assets—avoid manual edits in `dist/`.
 
 ## Build, Test, and Development Commands
-- `npm run install:all`: Install root + `webview-ui` dependencies.
+- `npm run install:all`: Install root + `ui` dependencies.
 - `npm run build`: Build prompts, extension, and webview for publishing.
 - `npm run watch`: Dev loop; TypeScript watch plus webview dev server.
 - `npm run build:webview`: Rebuild only the React webview bundle.
@@ -23,7 +23,8 @@
 - TypeScript-first with React for UI; prefer interfaces over types when shaping contracts.
 - Formatter enforces tab indentation, double quotes, and required semicolons—run `npm run format` before committing.
 - Name React components and classes in PascalCase; utilities and hooks in camelCase (e.g., `useSpecStore`).
-- Keep modules focused; favor small files over multi-purpose modules. Place shared helpers in `src/utils/` and `webview-ui/src/lib/`.
+- File names in kebab-case (e.g., `change-request-form.tsx`).
+- Keep modules focused; favor small files over multi-purpose modules. Place shared helpers in `src/utils/` and `ui/src/lib/`.
 
 ## Testing Guidelines
 - Vitest with React Testing Library powers unit and integration coverage; mirror fixtures in `tests/__mocks__/` when stubbing VS Code APIs.
@@ -45,6 +46,8 @@
 ## Active Technologies
 - TypeScript 5.x (extension + React webview) + VS Code Extension API, React 18, Vite tooling, Markdown-it + diagram plugins, existing SpecKit document services (001-document-preview)
 - Local workspace files plus existing SpecKit metadata (no new datastore) (001-document-preview)
+- TypeScript 5.x (extension + React webview) + VS Code Extension API, React 18, Vite build, Zustand/store utilities, Vitest + Testing Library (001-spec-review-flow)
+- Local workspace specs + in-memory stores (no external DB) (001-spec-review-flow)
 
 ## Recent Changes
 - 001-document-preview: Added TypeScript 5.x (extension + React webview) + VS Code Extension API, React 18, Vite tooling, Markdown-it + diagram plugins, existing SpecKit document services

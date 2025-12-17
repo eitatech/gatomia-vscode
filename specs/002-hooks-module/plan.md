@@ -38,9 +38,9 @@ The Hooks Module enables users to automate SDD workflow sequences by configuring
 - Future: May add prompts for template variable expansion in hook actions
 
 ### Webview Isolation ✅
-- Hooks UI components will reside in `webview-ui/src/features/hooks-view/`
+- Hooks UI components will reside in `ui/src/features/hooks-view/`
 - Will follow existing feature pattern (similar to `create-steering-view`)
-- Can be developed in isolation via `npm --prefix webview-ui run dev`
+- Can be developed in isolation via `npm --prefix ui run dev`
 
 ### Extension Packaging ✅
 - No packaging changes required
@@ -88,7 +88,7 @@ src/
     └── HookService.ts               # Extension-level hook coordination
 
 # Webview (Frontend/UI)
-webview-ui/src/features/
+ui/src/features/
 └── hooks-view/
     ├── index.tsx                    # Main Hooks view component
     ├── types.ts                     # UI-specific types
@@ -118,9 +118,9 @@ tests/
 
 This VS Code extension uses a dual-component architecture:
 - **Extension (src/)**: TypeScript logic running in Node.js context, handles hook storage, execution engine, and agent event listening
-- **Webview (webview-ui/)**: React UI running in webview context, handles hook configuration UI below Steering section
+- **Webview (ui/)**: React UI running in webview context, handles hook configuration UI below Steering section
 
-The hooks feature follows the existing pattern established by `create-steering-view`, with backend logic in `src/features/hooks/` and frontend UI in `webview-ui/src/features/hooks-view/`. Communication between extension and webview uses VSCode's message passing API.
+The hooks feature follows the existing pattern established by `create-steering-view`, with backend logic in `src/features/hooks/` and frontend UI in `ui/src/features/hooks-view/`. Communication between extension and webview uses VSCode's message passing API.
 
 ## Complexity Tracking
 

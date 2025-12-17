@@ -23,7 +23,7 @@ Extension (src/) - Node.js Context
 ├── Providers (VS Code UI integration)
 └── Services (shared utilities)
 
-Webview (webview-ui/) - Browser Context
+Webview (ui/) - Browser Context
 └── Features (React components)
     ├── create-spec-view/
     ├── create-steering-view/
@@ -37,7 +37,7 @@ Webview (webview-ui/) - Browser Context
 **Reference**: 
 - `/src/providers/interactive-view-provider.ts` lines 38-51
 - `/src/features/spec/create-spec-input-controller.ts` lines 189-284
-- `/webview-ui/src/bridge/vscode.ts`
+- `/ui/src/bridge/vscode.ts`
 
 ### 2. Event System Patterns
 
@@ -146,7 +146,7 @@ export async function sendPromptToChat(
 **Existing Pattern**: Feature-specific view components
 
 ```
-webview-ui/src/features/create-steering-view/
+ui/src/features/create-steering-view/
 ├── index.tsx           # Main view component
 ├── types.ts            # UI-specific types
 └── components/         # Sub-components

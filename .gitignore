@@ -25,3 +25,5 @@ repomix-output*
 
 .serena
 .codex
+.vscode/
+.envrc

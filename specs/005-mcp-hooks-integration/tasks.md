@@ -83,8 +83,8 @@ description: "Implementation tasks for MCP Hooks Integration"
 
 ### Implementation for User Story 1
 
-- [X] T037 [P] [US1] Create MCPActionPicker React component skeleton at webview-ui/src/features/hooks-view/components/mcp-action-picker.tsx
-- [X] T038 [P] [US1] Create useMCPServers custom hook at webview-ui/src/features/hooks-view/hooks/use-mcp-servers.ts
+- [X] T037 [P] [US1] Create MCPActionPicker React component skeleton at ui/src/features/hooks-view/components/mcp-action-picker.tsx
+- [X] T038 [P] [US1] Create useMCPServers custom hook at ui/src/features/hooks-view/hooks/use-mcp-servers.ts
 - [X] T039 [US1] Implement server discovery call in useMCPServers hook using VS Code webview message API
 - [X] T040 [US1] Add state management for servers, loading, error states in useMCPServers hook
 - [X] T041 [US1] Implement tree view structure in MCPActionPicker with servers as parent nodes
@@ -93,7 +93,7 @@ description: "Implementation tasks for MCP Hooks Integration"
 - [X] T044 [US1] Implement server/tool selection handler in MCPActionPicker emitting selection event
 - [X] T045 [US1] Add visual indicator for server status (available/unavailable/unknown) in MCPActionPicker
 - [X] T046 [US1] Style MCPActionPicker using shadcn/ui components (Tree, Input, Badge)
-- [X] T047 [US1] Integrate MCPActionPicker into hook configuration form in webview-ui/src/features/hooks-view/
+- [X] T047 [US1] Integrate MCPActionPicker into hook configuration form in ui/src/features/hooks-view/
 - [X] T048 [US1] Add message handler in hook-view-provider.ts to respond to MCP server discovery requests
 - [X] T049 [US1] Connect message handler to mcp-discovery service in hook-view-provider.ts
 - [X] T050 [US1] Implement hook save logic to persist MCP action configuration in hook-manager.ts
