@@ -16,7 +16,7 @@
 - [X] T004 Persist new status fields, pending counts, timestamps, multi-request enforcement, and unarchive hooks in the SpecExplorer state store in `src/features/spec/review-flow/state.ts`
 - [X] T005 [P] Update storage serialization/deserialization helpers for specs and change requests in `src/features/spec/review-flow/storage.ts`
 - [X] T006 [P] Broadcast Review and Archived lanes plus blocker metadata through the provider in `src/features/spec/providers/spec-explorer-provider.ts`
-- [X] T007 [P] Add matching data structures and actions in the webview store at `webview-ui/src/stores/spec-explorer-store.ts`
+- [X] T007 [P] Add matching data structures and actions in the webview store at `ui/src/stores/spec-explorer-store.ts`
 
 ---
 
@@ -36,7 +36,7 @@
 - [X] T011 [US1] Implement `canSendToReview` gating + status update with timestamps in `src/features/spec/review-flow/state.ts`
 - [X] T012 [US1] Register a VS Code command to invoke Send to Review logic in `src/features/spec/review-flow/commands/send-to-review-command.ts`
 - [X] T013 [US1] Refresh provider messaging so Current Specs removes the item and Review list receives it in `src/providers/spec-explorer-provider.ts` (already implemented)
-- [X] T014 [US1] Build the Send to Review button + blocker tooltip UI in `webview-ui/src/components/spec-explorer/review-list/send-to-review-button.tsx`
+- [X] T014 [US1] Build the Send to Review button + blocker tooltip UI in `ui/src/components/spec-explorer/review-list/send-to-review-button.tsx`
 - [X] T015 [US1] Emit structured telemetry/logs for send-to-review actions in `src/features/spec/review-flow/telemetry.ts` (already implemented)
 
 **Checkpoint**: MVP ready—Review lane shows only fully completed specs with accurate gating. ✅ **COMPLETED**
@@ -58,8 +58,8 @@
 
 - [X] T019 [US2] Enhance `change-requests-service` to capture review context, set `archivalBlocker`, track multi-change-request blockers, and mark specs reopened in `src/features/spec/review-flow/change-requests-service.ts`
 - [X] T020 [US2] Update provider/webview messaging to push change requests into the Changes lane in `src/features/spec/providers/spec-explorer-provider.ts`
-- [X] T021 [US2] Update the change-request form component with Review metadata + duplicate surfacing in `webview-ui/src/components/spec-explorer/change-request-form.tsx`
-- [X] T022 [US2] Render blocker highlights + edit affordances (including counts when multiple blockers exist) in `webview-ui/src/components/spec-explorer/changes-list.tsx`
+- [X] T021 [US2] Update the change-request form component with Review metadata + duplicate surfacing in `ui/src/components/spec-explorer/change-request-form.tsx`
+- [X] T022 [US2] Render blocker highlights + edit affordances (including counts when multiple blockers exist) in `ui/src/components/spec-explorer/changes-list.tsx`
 - [X] T023 [US2] Emit telemetry/log entries for change-request submissions, reopen events, and outstanding-blocker counts in `src/features/spec/review-flow/telemetry.ts`
 
 **Checkpoint**: Reviewers can document issues without leaving Review, and specs re-enter Current Specs automatically.
@@ -81,8 +81,8 @@
 
 - [X] T027 [US3] Implement archive transition logic with logging + audit trail, including checks for multi-change-request blockers, in `src/features/spec/review-flow/state.ts`
 - [X] T028 [US3] Register archive and unarchive commands plus provider events in `src/features/spec/review-flow/commands/send-to-archived-command.ts`
-- [X] T029 [US3] Build the archived lane and read-only panel (with Unarchive action) in `webview-ui/src/components/spec-explorer/archived-list.tsx`
-- [X] T030 [US3] Add archive button + gating indicators to the Review list UI at `webview-ui/src/components/spec-explorer/review-list/archive-button.tsx`
+- [X] T029 [US3] Build the archived lane and read-only panel (with Unarchive action) in `ui/src/components/spec-explorer/archived-list.tsx`
+- [X] T030 [US3] Add archive button + gating indicators to the Review list UI at `ui/src/components/spec-explorer/review-list/archive-button.tsx`
 - [X] T031 [US3] Emit telemetry/log entries for archive success/failure and unarchive actions in `src/features/spec/review-flow/telemetry.ts`
 
 **Checkpoint**: Review stays lean; archived specs remain accessible without polluting active queues.
@@ -105,7 +105,7 @@
 - [X] T035 [US4] Implement contract-compliant tasks prompt wrapper with latency/error tracking in `src/features/spec/review-flow/tasks-dispatch.ts`
 - [X] T036 [US4] Attach tasks, set `archivalBlocker`, and detect completion → Review transitions in `src/features/spec/review-flow/state.ts`
 - [X] T037 [US4] Update provider to broadcast task/CR status updates in `src/features/spec/providers/spec-explorer-provider.ts`
-- [X] T038 [US4] Build UI actions for dispatch/retry/status badges in `webview-ui/src/components/spec-explorer/change-request-actions.tsx`
+- [X] T038 [US4] Build UI actions for dispatch/retry/status badges in `ui/src/components/spec-explorer/change-request-actions.tsx`
 - [X] T039 [US4] Emit telemetry/metrics for dispatch successes, failures, and durations in `src/features/spec/review-flow/telemetry.ts`
 
 **Checkpoint**: End-to-end remediation loop complete—specs reopen until tasks resolve and return to Review automatically.
