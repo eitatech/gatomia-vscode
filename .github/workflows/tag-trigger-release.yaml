@@ -1,4 +1,4 @@
-name: Release Only (Tag and Trigger)
+name: Tag and Trigger Release
 
 on:
   workflow_dispatch:
