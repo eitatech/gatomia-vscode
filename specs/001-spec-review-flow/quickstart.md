@@ -60,7 +60,7 @@ npm run test:coverage     # Generate coverage report
 
 - State: `src/features/spec/review-flow/state.ts` (`canSendToReview`, `sendToReview`)
 - Provider: `src/providers/spec-explorer-provider.ts` (Review lane)
-- UI: `webview-ui/src/components/spec-explorer/review-list/send-to-review-button.tsx`
+- UI: `ui/src/components/spec-explorer/review-list/send-to-review-button.tsx`
 - Tests: `tests/unit/features/spec/review-flow-send-to-review.test.ts`
 
 ---
@@ -94,8 +94,8 @@ npm run test:coverage     # Generate coverage report
 - Service: `src/features/spec/review-flow/change-requests-service.ts`
 - State: `src/features/spec/review-flow/state.ts` (`addChangeRequest()`)
 - Duplicate Guard: `src/features/spec/review-flow/duplicate-guard.ts`
-- Form UI: `webview-ui/src/components/spec-explorer/change-request-form.tsx`
-- Changes Lane: `webview-ui/src/components/spec-explorer/changes-list.tsx`
+- Form UI: `ui/src/components/spec-explorer/change-request-form.tsx`
+- Changes Lane: `ui/src/components/spec-explorer/changes-list.tsx`
 - Tests: `tests/unit/features/spec/review-flow-change-requests.test.ts`
 
 ---
@@ -160,7 +160,7 @@ npm run test:coverage     # Generate coverage report
 
 - Dispatch Service: `src/features/spec/review-flow/tasks-dispatch.ts`
 - State Updates: `src/features/spec/review-flow/state.ts` (`attachTasksToChangeRequest()`, `shouldReturnToReview()`)
-- Actions UI: `webview-ui/src/components/spec-explorer/change-request-actions.tsx`
+- Actions UI: `ui/src/components/spec-explorer/change-request-actions.tsx`
 - Tests: `tests/unit/features/spec/review-flow-tasks-dispatch.test.ts`, `tests/integration/spec-explorer/review-flow.test.ts`
 
 ---
@@ -238,8 +238,8 @@ open → inProgress → done
 **Implementation files:**
 
 - State: `src/features/spec/review-flow/state.ts` (`canArchive`, `archiveSpec`)
-- UI: `webview-ui/src/components/spec-explorer/review-list/archive-button.tsx`
-- Lane/View: `webview-ui/src/components/spec-explorer/archived-list.tsx`
+- UI: `ui/src/components/spec-explorer/review-list/archive-button.tsx`
+- Lane/View: `ui/src/components/spec-explorer/archived-list.tsx`
 - Tests: `tests/unit/features/spec/review-flow-archive.test.ts`, `tests/integration/spec-explorer/archive-flow.test.ts`
 - Reopened specs display linked change request count badge
 

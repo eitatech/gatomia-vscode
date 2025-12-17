@@ -74,7 +74,7 @@ src/
 ├── utils/
 └── webview/
 
-webview-ui/
+ui/
 ├── src/
 │   ├── components/spec-explorer/
 │   │   ├── review-list/
@@ -90,7 +90,7 @@ tests/
 └── webview/
 ```
 
-**Structure Decision**: Single VS Code extension project with a React webview bundle. Backend logic (extension host) lives in `src/` while UI resides in `webview-ui/`. Tests follow existing Vitest layout under `tests/`.
+**Structure Decision**: Single VS Code extension project with a React webview bundle. Backend logic (extension host) lives in `src/` while UI resides in `ui/`. Tests follow existing Vitest layout under `tests/`.
 
 ## Complexity Tracking
 
@@ -157,6 +157,6 @@ tests/
 
 1. **Extension state updates**: Extend spec state machine, add `canSendToReview/Archive/Unarchive` helpers, persist timestamps, multi-change-request enforcement, and emit telemetry. Cover with unit tests in `tests/unit/features/spec/review-flow-*.test.ts`.
 2. **Commands & providers**: Implement Send to Review/Archived/Unarchive commands plus providers that refresh lanes, ensuring multi-spec concurrency safety.
-3. **Webview UI**: Add gated buttons, Archived lane component, unarchive action, blocker messaging, and optimistic disable/enable feedback using Zustand stores. Include component/unit tests in `webview-ui/src/components/spec-explorer/__tests__`.
+3. **Webview UI**: Add gated buttons, Archived lane component, unarchive action, blocker messaging, and optimistic disable/enable feedback using Zustand stores. Include component/unit tests in `ui/src/components/spec-explorer/__tests__`.
 4. **Change request integration**: Wire `archivalBlocker` updates when change requests open/close; ensure reopen flows bring specs back to Current Specs automatically even when archived/unarchived.
 5. **Observability & QA**: Emit telemetry/logs for actions, add integration tests validating transitions, and verify success criteria metrics via mocked timers plus telemetry dashboards that track send/transition latency.

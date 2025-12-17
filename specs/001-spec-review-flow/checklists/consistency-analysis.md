@@ -13,7 +13,7 @@
 - **Terminology**: Consistent across spec, data model, and contracts (Current Specs, Ready to Review, Reopened, Changes, ChangeRequest, TaskLink).
 - **Status FSM**: Unified state transitions defined and replicated across spec (FR-007/FR-008), data-model (State Transitions), contracts (enums), and tasks (T004).
 - **Requirements → Tasks mapping**: All 11 FRs covered by at least one task; acceptance scenarios drive test design (T008–T009, T014–T015, T021–T022).
-- **File paths**: Consistent with project structure (src/features/spec/review-flow, webview-ui/src/components/spec-explorer, tests/).
+- **File paths**: Consistent with project structure (src/features/spec/review-flow, ui/src/components/spec-explorer, tests/).
 
 ### Issues Found: 0 critical, 0 high, 1 low
 
@@ -110,7 +110,7 @@
 **Project Structure (from Plan)**:
 ```
 src/features/spec/review-flow/         # State + services
-webview-ui/src/components/spec-explorer/  # UI
+ui/src/components/spec-explorer/  # UI
 tests/unit/features/spec/              # Unit tests
 tests/integration/spec-explorer/       # Integration tests
 ```
@@ -120,7 +120,7 @@ tests/integration/spec-explorer/       # Integration tests
 - `src/features/spec/review-flow/state.ts` (T004, T010, T024, T025)
 - `src/features/spec/review-flow/duplicate-guard.ts` (T005)
 - `src/features/spec/review-flow/telemetry.ts` (T006, T013, T020, T028)
-- `webview-ui/src/components/spec-explorer/ReadyToReviewList.tsx` (T012)
+- `ui/src/components/spec-explorer/ReadyToReviewList.tsx` (T012)
 - `tests/unit/features/spec/review-flow-status.test.ts` (T008)
 - `tests/integration/spec-explorer/review-flow.test.ts` (T022)
 
