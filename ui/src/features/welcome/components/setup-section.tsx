@@ -53,18 +53,34 @@ export const SetupSection = ({
 				system (SpecKit or OpenSpec) to work properly. Let's verify your setup.
 			</p>
 
-			{/* Dependency Cards Grid */}
-			<DependenciesGrid
-				dependencies={dependencies}
-				onInstallDependency={onInstallDependency}
-			/>
+			<div
+				className="welcome-section"
+				style={{
+					marginTop: "0px",
+					marginBottom: "0px",
+					backgroundColor:
+						"color-mix(in srgb, var(--vscode-editor-inactiveSelectionBackground) 30%, transparent)",
+				}}
+			>
+				{/* Dependency Cards Grid */}
+				<DependenciesGrid
+					dependencies={dependencies}
+					onInstallDependency={onInstallDependency}
+				/>
+			</div>
 
 			{/* Setup Guidance */}
 			<div
 				className="welcome-section"
-				style={{ borderTop: "1px solid var(--vscode-panel-border)" }}
+				style={{
+					marginTop: "0px",
+					marginBottom: "0px",
+					backgroundColor:
+						"color-mix(in srgb, var(--vscode-editor-inactiveSelectionBackground) 30%, transparent)",
+				}}
 			>
 				<h3 className="welcome-section-title">What You Need</h3>
+				<br />
 				<ul
 					style={{
 						listStyle: "none",
@@ -106,7 +122,6 @@ export const SetupSection = ({
 					justifyContent: "center",
 					marginTop: "32px",
 					paddingTop: "24px",
-					borderTop: "1px solid var(--vscode-panel-border)",
 				}}
 			>
 				{allRequirementsMet ? (
@@ -309,7 +324,8 @@ const SpecSystemGuidance = ({
 		<div
 			className="welcome-section"
 			style={{
-				borderTop: "1px solid var(--vscode-panel-border)",
+				marginTop: "0px",
+				marginBottom: "0px",
 				backgroundColor:
 					"color-mix(in srgb, var(--vscode-editor-inactiveSelectionBackground) 30%, transparent)",
 			}}
@@ -317,6 +333,7 @@ const SpecSystemGuidance = ({
 			<h3 className="welcome-section-title">
 				Next Steps: Initialize Your Spec System
 			</h3>
+			<br />
 
 			{speckitReady && (
 				<div
