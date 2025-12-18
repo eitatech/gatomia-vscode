@@ -56,8 +56,10 @@ export const SetupSection = ({
 			<div
 				className="welcome-section"
 				style={{
-					marginTop: "0px",
-					marginBottom: "0px",
+					marginTop: "12px",
+					marginBottom: "12px",
+					paddingTop: "16px",
+					paddingBottom: "16px",
 					backgroundColor:
 						"color-mix(in srgb, var(--vscode-editor-inactiveSelectionBackground) 30%, transparent)",
 				}}
@@ -73,8 +75,10 @@ export const SetupSection = ({
 			<div
 				className="welcome-section"
 				style={{
-					marginTop: "0px",
-					marginBottom: "0px",
+					marginTop: "12px",
+					marginBottom: "12px",
+					paddingTop: "16px",
+					paddingBottom: "16px",
 					backgroundColor:
 						"color-mix(in srgb, var(--vscode-editor-inactiveSelectionBackground) 30%, transparent)",
 				}}
@@ -120,8 +124,8 @@ export const SetupSection = ({
 				style={{
 					display: "flex",
 					justifyContent: "center",
-					marginTop: "32px",
-					paddingTop: "24px",
+					marginTop: "22px",
+					paddingTop: "10px",
 				}}
 			>
 				{allRequirementsMet ? (
@@ -324,8 +328,10 @@ const SpecSystemGuidance = ({
 		<div
 			className="welcome-section"
 			style={{
-				marginTop: "0px",
-				marginBottom: "0px",
+				marginTop: "12px",
+				marginBottom: "12px",
+				paddingTop: "16px",
+				paddingBottom: "16px",
 				backgroundColor:
 					"color-mix(in srgb, var(--vscode-editor-inactiveSelectionBackground) 30%, transparent)",
 			}}
