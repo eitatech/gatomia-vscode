@@ -202,7 +202,7 @@ export function StatusSection({
 					onClick={(e) => {
 						e.preventDefault();
 						const url =
-							"https://github.com/gatomia/gatomia-vscode/blob/main/CHANGELOG.md";
+							"https://github.com/eitatech/gatomia-vscode/blob/main/CHANGELOG.md";
 						if (onOpenExternal) {
 							onOpenExternal(url);
 						} else if (vscode) {

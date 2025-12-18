@@ -49,6 +49,7 @@ import { LearningResources } from "../services/learning-resources";
 import {
 	hasShownWelcomeBefore,
 	getDontShowOnStartup,
+	setDontShowOnStartup,
 } from "../utils/workspace-state";
 import type { WelcomeScreenPanel } from "../panels/welcome-screen-panel";
 
@@ -624,11 +625,8 @@ export class WelcomeScreenProvider {
 				this.outputChannel.appendLine(
 					`[WelcomeScreenProvider] Update preference: ${preference} = ${value}`
 				);
-				// Store preference in workspace state
-				await this.context.workspaceState.update(
-					"gatomia.welcomeScreen.dontShowOnStartup",
-					value
-				);
+				// Store preference in workspace state using setDontShowOnStartup utility
+				await setDontShowOnStartup(this.context, value);
 			},
 			// T129: Handle welcome/navigate-section message for telemetry
 			onNavigateSection: (section: string) => {
