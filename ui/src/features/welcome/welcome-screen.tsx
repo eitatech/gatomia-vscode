@@ -300,19 +300,18 @@ export const WelcomeScreen = () => {
 					)}
 				</div>
 				<p>An Agentic Spec-Driven Development Toolkit</p>
-				{/* <div className="header-actions">
-					<input
-						aria-label="Show welcome screen on startup"
-						checked={dontShowOnStartup}
-						className={`getting-started-checkbox ${dontShowOnStartup ? "checked" : ""}`}
-						id="showOnStartup"
-						onChange={(e) => handlePreferenceChange(e.currentTarget.checked)}
-						type="checkbox"
-					/>
+				<div className="header-actions">
 					<label className="checkbox-label" htmlFor="showOnStartup">
+						<input
+							checked={dontShowOnStartup}
+							className="welcome-checkbox"
+							id="showOnStartup"
+							onChange={(e) => handlePreferenceChange(e.currentTarget.checked)}
+							type="checkbox"
+						/>
 						<span>Show on startup</span>
 					</label>
-				</div> */}
+				</div>
 			</header>
 
 			<nav aria-label="Welcome screen sections" className="welcome-nav">
