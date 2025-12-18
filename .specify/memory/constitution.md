@@ -82,6 +82,7 @@
 - Formatter (`npm run format`) MUST pass before commit
 - Linter (`npm run lint`) MUST pass before merge
 - Validation (`npm run check`) MUST pass before mark the task as completed
+- Never use emoji in source code files (from global user instructions).
 
 ### Documentation
 
