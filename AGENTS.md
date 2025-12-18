@@ -25,6 +25,8 @@
 - Name React components and classes in PascalCase; utilities and hooks in camelCase (e.g., `useSpecStore`).
 - File names in kebab-case (e.g., `change-request-form.tsx`).
 - Keep modules focused; favor small files over multi-purpose modules. Place shared helpers in `src/utils/` and `ui/src/lib/`.
+- Always run `npm run check` before mark any task as complete. This ensures code quality and formatting standards are met.
+
 
 ## Testing Guidelines
 - Vitest with React Testing Library powers unit and integration coverage; mirror fixtures in `tests/__mocks__/` when stubbing VS Code APIs.
@@ -48,6 +50,3 @@
 - Local workspace files plus existing SpecKit metadata (no new datastore) (001-document-preview)
 - TypeScript 5.x (extension + React webview) + VS Code Extension API, React 18, Vite build, Zustand/store utilities, Vitest + Testing Library (001-spec-review-flow)
 - Local workspace specs + in-memory stores (no external DB) (001-spec-review-flow)
-
-## Recent Changes
-- 001-document-preview: Added TypeScript 5.x (extension + React webview) + VS Code Extension API, React 18, Vite tooling, Markdown-it + diagram plugins, existing SpecKit document services
