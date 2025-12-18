@@ -1,5 +1,4 @@
 import { exec } from "node:child_process";
-import { homedir } from "node:os";
 import { promisify } from "node:util";
 import {
 	type Disposable,
@@ -13,33 +12,9 @@ import {
 	window,
 } from "vscode";
 import { getWebviewContent } from "../utils/get-webview-content";
+import { getExtendedPath, extractVersion } from "../utils/cli-detector";
 
 const execAsync = promisify(exec);
-
-// Extended PATH for common CLI tool locations
-const getExtendedPath = (): string => {
-	const home = homedir();
-	const additionalPaths = [
-		`${home}/.local/bin`, // UV tools (specify)
-		`${home}/.cargo/bin`, // Rust tools
-		`${home}/.bun/bin`, // Bun
-		`${home}/.deno/bin`, // Deno
-		`${home}/.langflow/uv`, // UV via Langflow installation
-		`${home}/.astral/uv/bin`, // UV via Astral installation
-		`${home}/.uv/bin`, // Alternative UV location
-		"/opt/homebrew/bin", // Homebrew on Apple Silicon
-		"/usr/local/bin", // Homebrew on Intel Mac
-	];
-	const currentPath = process.env.PATH || "";
-	return [...additionalPaths, currentPath].join(":");
-};
-
-// Version extraction patterns - defined at module level for performance
-const VERSION_PATTERNS = [
-	/v?(\d+\.\d+\.\d+)/i,
-	/version\s+(\d+\.\d+\.\d+)/i,
-	/(\d+\.\d+\.\d+)/,
-] as const;
 
 /**
  * Dependency check result
@@ -397,7 +372,7 @@ export class DependenciesViewProvider {
 			});
 
 			const output = stdout.trim() || stderr.trim();
-			const version = this.extractVersion(output);
+			const version = extractVersion(output);
 
 			this.outputChannel.appendLine(
 				`[DependenciesViewProvider] ${name}: ${version || output}`
@@ -423,18 +398,6 @@ export class DependenciesViewProvider {
 				command,
 			};
 		}
-	}
-
-	private extractVersion(output: string): string | undefined {
-		// Use module-level patterns for performance
-		for (const pattern of VERSION_PATTERNS) {
-			const match = output.match(pattern);
-			if (match) {
-				return match[1];
-			}
-		}
-
-		return;
 	}
 
 	private async copyCommand(command: string): Promise<void> {

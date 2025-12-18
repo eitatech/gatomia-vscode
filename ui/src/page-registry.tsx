@@ -5,6 +5,10 @@ import { SimpleView } from "./features/simple-view";
 import { HooksView } from "./features/hooks-view";
 import { DependenciesView } from "./features/dependencies-view";
 import { PreviewApp } from "./features/preview/preview-app";
+import {
+	WelcomeScreen,
+	ErrorBoundary as WelcomeErrorBoundary,
+} from "./features/welcome/welcome-screen";
 
 export type SupportedPage =
 	| "simple"
@@ -13,7 +17,8 @@ export type SupportedPage =
 	| "create-steering"
 	| "hooks"
 	| "dependencies"
-	| "document-preview";
+	| "document-preview"
+	| "welcome-screen";
 
 const pageRenderers = {
 	simple: () => <SimpleView />,
@@ -23,6 +28,11 @@ const pageRenderers = {
 	hooks: () => <HooksView />,
 	dependencies: () => <DependenciesView />,
 	"document-preview": () => <PreviewApp />,
+	"welcome-screen": () => (
+		<WelcomeErrorBoundary>
+			<WelcomeScreen />
+		</WelcomeErrorBoundary>
+	),
 } satisfies Record<SupportedPage, () => JSX.Element>;
 
 export const getPageRenderer = (pageName: string) => {
