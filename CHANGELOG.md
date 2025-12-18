@@ -2,6 +2,25 @@
 
 ---
 
+## v0.27.1 2025-12-18
+
+### Added
+
+- Implement Welcome Screen with Zustand state management and VS Code integration
+
+### Changed
+
+- Merge pull request #13 from eitatech/welcome-screen
+- Update zustand package source URL
+- Merge branch 'main' into 006-welcome-screen
+- eitatech/gatomia-vscode
+- Removes redundant English version marker
+
+### Fixed
+
+- Comment out header actions in Welcome Screen for future implementation
+- change docs and structure
+
 ## v0.27.0 2025-12-17
 
 ### Added
