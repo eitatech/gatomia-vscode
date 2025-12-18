@@ -1,0 +1,2692 @@
+
+> gatomia@0.27.0 test
+> vitest --pool threads --run
+
+
+ RUN  v3.2.4 /Users/t798157/Projects/lab/gatomia-vscode
+
+ ❯ tests/integration/welcome/welcome-first-time.test.ts (14 tests | 6 failed) 11ms
+   × Welcome Screen - First-Time Display (Integration) > First-Time Activation Flow > should display welcome screen on first workspace activation 4ms
+     → expected undefined to be false // Object.is equality
+   ✓ Welcome Screen - First-Time Display (Integration) > First-Time Activation Flow > should not display welcome screen on second activation 1ms
+   ✓ Welcome Screen - First-Time Display (Integration) > First-Time Activation Flow > should respect user opt-out preference 0ms
+   ✓ Welcome Screen - First-Time Display (Integration) > Welcome Screen State Initialization > should initialize with setup view for first-time users 0ms
+   ✓ Welcome Screen - First-Time Display (Integration) > Welcome Screen State Initialization > should check dependencies on initialization 0ms
+   ✓ Welcome Screen - First-Time Display (Integration) > Welcome Screen State Initialization > should load configuration on initialization 1ms
+   ✓ Welcome Screen - First-Time Display (Integration) > Welcome Screen State Initialization > should load learning resources on initialization 0ms
+   ✓ Welcome Screen - First-Time Display (Integration) > Welcome Screen Persistence > should mark welcome as shown after display 0ms
+   ✓ Welcome Screen - First-Time Display (Integration) > Welcome Screen Persistence > should persist across extension reload 0ms
+   × Welcome Screen - First-Time Display (Integration) > Welcome Screen Persistence > should allow manual reset of welcome state 0ms
+     → expected undefined to be false // Object.is equality
+   × Welcome Screen - First-Time Display (Integration) > Error Scenarios > should handle missing workspace state gracefully 1ms
+     → expected 'undefined' to be 'boolean' // Object.is equality
+   × Welcome Screen - First-Time Display (Integration) > Error Scenarios > should handle extension activation errors 1ms
+     → expected true to be false // Object.is equality
+   × Welcome Screen - First-Time Display (Integration) > Multi-Workspace Behavior > should track welcome state per workspace 0ms
+     → expected undefined to be false // Object.is equality
+   × Welcome Screen - First-Time Display (Integration) > Multi-Workspace Behavior > should show welcome in new workspace even if shown in another 0ms
+     → expected undefined to be false // Object.is equality
+ ❯ tests/unit/utils/workspace-state.test.ts (33 tests | 6 failed) 13ms
+   × workspace-state utilities > hasShownWelcomeBefore > should return false for first-time workspace (no state) 4ms
+     → expected undefined to be false // Object.is equality
+   ✓ workspace-state utilities > hasShownWelcomeBefore > should return true when welcome has been shown before 0ms
+   ✓ workspace-state utilities > hasShownWelcomeBefore > should return false when explicitly set to false 0ms
+   × workspace-state utilities > hasShownWelcomeBefore > should call workspaceState.get with correct key 2ms
+     → expected "spy" to be called with arguments: [ 'gatomia.welcomeScreen.hasShown' ][90m
+
+Received: 
+
+[1m  1st spy call:
+
+[22m[2m  [[22m
+[2m    "gatomia.welcomeScreen.hasShown",[22m
+[31m+   false,[90m
+[2m  ][22m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+   ✓ workspace-state utilities > markWelcomeAsShown > should set hasShown flag to true 0ms
+   ✓ workspace-state utilities > markWelcomeAsShown > should call workspaceState.update with correct arguments 0ms
+   ✓ workspace-state utilities > markWelcomeAsShown > should persist across multiple calls 0ms
+   × workspace-state utilities > getDontShowOnStartup > should return false by default (user has not opted out) 0ms
+     → expected undefined to be false // Object.is equality
+   ✓ workspace-state utilities > getDontShowOnStartup > should return true when user has opted out 0ms
+   ✓ workspace-state utilities > getDontShowOnStartup > should return false when explicitly set to false 0ms
+   × workspace-state utilities > getDontShowOnStartup > should call workspaceState.get with correct key 0ms
+     → expected "spy" to be called with arguments: [ 'gatomia.welcomeScreen.dontShow' ][90m
+
+Received: 
+
+[1m  1st spy call:
+
+[22m[2m  [[22m
+[2m    "gatomia.welcomeScreen.dontShow",[22m
+[31m+   false,[90m
+[2m  ][22m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+   ✓ workspace-state utilities > setDontShowOnStartup > should set dontShow flag to true when user opts out 0ms
+   ✓ workspace-state utilities > setDontShowOnStartup > should set dontShow flag to false when user opts in 0ms
+   ✓ workspace-state utilities > setDontShowOnStartup > should call workspaceState.update with correct arguments 0ms
+   ✓ workspace-state utilities > setDontShowOnStartup > should allow toggling preference 0ms
+   ✓ workspace-state utilities > shouldShowWelcomeAutomatically > should return true for first-time workspace (not shown, not opted out) 0ms
+   ✓ workspace-state utilities > shouldShowWelcomeAutomatically > should return false when user has opted out (even if first time) 0ms
+   ✓ workspace-state utilities > shouldShowWelcomeAutomatically > should return false when already shown before 0ms
+   ✓ workspace-state utilities > shouldShowWelcomeAutomatically > should return false when both shown before AND opted out 0ms
+   ✓ workspace-state utilities > shouldShowWelcomeAutomatically > should prioritize opt-out over first-time status 0ms
+   ✓ workspace-state utilities > resetWelcomeState > should clear both hasShown and dontShow flags 0ms
+   ✓ workspace-state utilities > resetWelcomeState > should call workspaceState.update with undefined to clear 0ms
+   ✓ workspace-state utilities > resetWelcomeState > should restore first-time behavior after reset 0ms
+   ✓ workspace-state utilities > getWelcomeState > should return default state for fresh workspace 0ms
+   ✓ workspace-state utilities > getWelcomeState > should return current state when welcome has been shown 0ms
+   ✓ workspace-state utilities > getWelcomeState > should return current state when user has opted out 0ms
+   ✓ workspace-state utilities > getWelcomeState > should return both flags when both are set 0ms
+   ✓ workspace-state utilities > WelcomeStateKeys constant > should have correct key for HAS_SHOWN 0ms
+   ✓ workspace-state utilities > WelcomeStateKeys constant > should have correct key for DONT_SHOW 0ms
+   × workspace-state utilities > integration scenarios > scenario: first-time user completes welcome flow 1ms
+     → expected undefined to be false // Object.is equality
+   ✓ workspace-state utilities > integration scenarios > scenario: user opts out during first-time welcome 0ms
+   ✓ workspace-state utilities > integration scenarios > scenario: user re-enables automatic display 0ms
+   × workspace-state utilities > integration scenarios > scenario: admin resets extension state 0ms
+     → expected undefined to be false // Object.is equality
+ ✓ tests/unit/features/spec/review-flow-telemetry.test.ts (8 tests) 640ms
+   ✓ Review Flow Telemetry > Tasks Dispatch Telemetry Integration > should log success event on successful dispatch  629ms
+ ✓ tests/integration/welcome/welcome-performance.test.ts (6 tests) 2356ms
+   ✓ Welcome Screen Performance (T130-T131) > T130: Welcome screen load performance > should load welcome state within 2 seconds  589ms
+   ✓ Welcome Screen Performance (T130-T131) > T130: Welcome screen load performance > should handle multiple getWelcomeState calls efficiently  560ms
+   ✓ Welcome Screen Performance (T130-T131) > T131: UI update performance > should refresh dependencies within 500ms  412ms
+   ✓ Welcome Screen Performance (T130-T131) > T131: UI update performance > should handle rapid state queries efficiently  352ms
+   ✓ Welcome Screen Performance (T130-T131) > Memory efficiency > should not cause memory leaks with repeated calls  442ms
+ ✓ tests/unit/features/hooks/services/mcp-execution-pool.test.ts (31 tests) 1780ms
+ ✓ tests/integration/welcome/welcome-config-persist.test.ts (15 tests) 593ms
+   ✓ Welcome Screen Configuration Persistence Integration (T056) > configuration reload after persistence > should reflect changes in subsequent getWelcomeState calls  580ms
+ ✓ tests/unit/services/dependency-checker.test.ts (11 tests) 3577ms
+   ✓ DependencyChecker > Caching Behavior > should use cached results within 60s TTL  628ms
+   ✓ DependencyChecker > Caching Behavior > should invalidate cache when explicitly requested  996ms
+   ✓ DependencyChecker > Caching Behavior > should force re-check when forceRefresh is true  921ms
+   ✓ DependencyChecker > checkAll() aggregation > should return combined status for all dependencies  541ms
+   ✓ DependencyChecker > checkAll() aggregation > should set lastChecked timestamp  484ms
+ ✓ ui/tests/preview/forms.spec.tsx (2 tests) 408ms
+   ✓ Preview form container > submits dirty fields with validation  400ms
+ ✓ tests/unit/features/hooks/actions/mcp-action.test.ts (20 tests) 4023ms
+   ✓ MCPActionExecutor > timeout handling > should handle execution timeout  2002ms
+   ✓ MCPActionExecutor > Error Handling (User Story 3) > should retry transient failures with delay  2001ms
+ ✓ tests/integration/welcome/welcome-actions.test.ts (35 tests) 4508ms
+   ✓ Welcome Screen - Feature Action Execution (Integration) > Feature Action State > should retrieve feature actions with correct command IDs  607ms
+   ✓ Welcome Screen - Feature Action Execution (Integration) > Feature Action State > should have all feature actions enabled by default  609ms
+   ✓ Welcome Screen - Feature Action Execution (Integration) > Feature Action State > should group feature actions by area  497ms
+   ✓ Welcome Screen - Feature Action Execution (Integration) > Feature Action State > should have correct number of actions per area  421ms
+   ✓ Welcome Screen - Feature Action Execution (Integration) > Feature Action State > should include action metadata (id, label, description, icon)  470ms
+   ✓ Welcome Screen - Feature Action Execution (Integration) > Integration with Webview > should post initial state with feature actions to webview  587ms
+   ✓ Welcome Screen - Feature Action Execution (Integration) > Integration with Webview > should include feature actions in welcome state  645ms
+   ✓ Welcome Screen - Feature Action Execution (Integration) > Integration with Webview > should provide feature actions with all required properties  635ms
+ ✓ tests/unit/webview/spec-explorer/change-request-form.test.tsx (12 tests) 571ms
+ ✓ tests/unit/webview/spec-explorer/change-request-actions.test.tsx (20 tests) 468ms
+ ✓ tests/unit/utils/cli-detector.test.ts (14 tests) 175ms
+ ✓ tests/unit/webview/spec-explorer/archive-button.test.tsx (21 tests) 154ms
+ ✓ tests/unit/webview/hooks-view/execution-logs-list.test.tsx (3 tests) 402ms
+   ✓ ExecutionLogsList > invokes handlers for refresh, close, and filter change  322ms
+ ✓ tests/unit/webview/spec-explorer/ready-to-review.test.tsx (11 tests) 93ms
+stdout | tests/integration/spec-explorer/change-requests-from-review.test.ts > Change Requests from Review - Integration > Review to Reopened workflow > transitions spec from review to reopened when change request is created
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:41.995Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:41.996Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'f262f705-1d0d-4da2-9085-17c93ff796e2'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.003Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'f262f705-1d0d-4da2-9085-17c93ff796e2'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m15[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/integration/spec-explorer/change-requests-from-review.test.ts > Change Requests from Review - Integration > Review to Reopened workflow > keeps spec in reopened when multiple change requests are created
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.005Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.005Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'11212f36-2cd2-49f7-a50e-24d351ff4d34'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.005Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'11212f36-2cd2-49f7-a50e-24d351ff4d34'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m15[39m,
+  submitter: [32m'reviewer1@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.007Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'b4464166-8b4e-4e66-8df8-cd6e13650808'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m16[39m,
+  submitter: [32m'reviewer2@example.com'[39m
+}
+
+stdout | tests/integration/spec-explorer/change-requests-from-review.test.ts > Change Requests from Review - Integration > Review to Reopened workflow > sets archivalBlocker flag on all new change requests
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.008Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.008Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'8792e13b-2f3f-44fe-b40b-fbf13d578565'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.008Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'8792e13b-2f3f-44fe-b40b-fbf13d578565'[39m,
+  severity: [32m'low'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.008Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'c2989046-c74a-455f-8de4-56789abc5e03'[39m,
+  severity: [32m'critical'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/integration/spec-explorer/change-requests-from-review.test.ts > Change Requests from Review - Integration > Review to Reopened workflow > preserves original completedAt timestamp when transitioning to reopened
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.009Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.009Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'cfc0dc49-dd04-4253-aa29-bf0c6f8dfbfb'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.009Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'cfc0dc49-dd04-4253-aa29-bf0c6f8dfbfb'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m5[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/integration/spec-explorer/change-requests-from-review.test.ts > Change Requests from Review - Integration > Review to Reopened workflow > updates updatedAt timestamp when change request is created
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.009Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.009Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'd33f2936-372b-4fd4-a27b-2e45fb4f8748'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.010Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'd33f2936-372b-4fd4-a27b-2e45fb4f8748'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m5[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/integration/spec-explorer/change-requests-from-review.test.ts > Change Requests from Review - Integration > Concurrent change requests > handles multiple reviewers submitting change requests concurrently
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.010Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.010Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'67f4df69-c14a-46e8-9356-ef6990e6e898'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.010Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'67f4df69-c14a-46e8-9356-ef6990e6e898'[39m,
+  severity: [32m'critical'[39m,
+  titleLength: [33m14[39m,
+  submitter: [32m'reviewer1@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.010Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'f6365e5f-c339-4ac8-870b-588fcbfe5d19'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m17[39m,
+  submitter: [32m'reviewer2@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.011Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'e7c57ee5-0c3b-4f0b-a1e5-060d293054ab'[39m,
+  severity: [32m'low'[39m,
+  titleLength: [33m8[39m,
+  submitter: [32m'reviewer3@example.com'[39m
+}
+
+stdout | tests/integration/spec-explorer/change-requests-from-review.test.ts > Change Requests from Review - Integration > Concurrent change requests > tracks multiple change requests with different severities
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.012Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.012Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'8622517b-3eaf-4171-a007-595e2a011925'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.012Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'8622517b-3eaf-4171-a007-595e2a011925'[39m,
+  severity: [32m'critical'[39m,
+  titleLength: [33m14[39m,
+  submitter: [32m'security@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.013Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'348a8118-d6c7-4e57-bac8-2875abc64a8d'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m10[39m,
+  submitter: [32m'perf@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.013Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'21ce5f35-a782-4b98-91f0-fdbb33c3c231'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m12[39m,
+  submitter: [32m'qa@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.014Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'0774b5c9-5e39-4a4d-b376-a1e62db3e719'[39m,
+  severity: [32m'low'[39m,
+  titleLength: [33m9[39m,
+  submitter: [32m'dev@example.com'[39m
+}
+
+stdout | tests/integration/spec-explorer/change-requests-from-review.test.ts > Change Requests from Review - Integration > Change request lifecycle > transitions change request from open to inProgress to addressed
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.014Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.014Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'433f687e-00b7-443a-bc52-64d84d968dec'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.014Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'433f687e-00b7-443a-bc52-64d84d968dec'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m12[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.015Z'[39m,
+  changeRequestId: [32m'433f687e-00b7-443a-bc52-64d84d968dec'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'inProgress'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.015Z'[39m,
+  changeRequestId: [32m'433f687e-00b7-443a-bc52-64d84d968dec'[39m,
+  fromStatus: [32m'inProgress'[39m,
+  toStatus: [32m'addressed'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.015Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  fromStatus: [32m'reopened'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Outstanding blocker count: {
+  type: [32m'review.blocker_count'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.015Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  status: [32m'review'[39m,
+  totalChangeRequests: [33m1[39m,
+  openChangeRequests: [33m0[39m,
+  blockingChangeRequests: [33m0[39m
+}
+
+stdout | tests/integration/spec-explorer/change-requests-from-review.test.ts > Change Requests from Review - Integration > Change request lifecycle > allows spec to return to review when all change requests are addressed
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.016Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.016Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'f83ec683-88be-4f8a-9928-ad9a05fd5aca'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.017Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'f83ec683-88be-4f8a-9928-ad9a05fd5aca'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.017Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'f73fe8c5-c50f-4499-8d8d-0a7e274069f6'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.017Z'[39m,
+  changeRequestId: [32m'f83ec683-88be-4f8a-9928-ad9a05fd5aca'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'addressed'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.018Z'[39m,
+  changeRequestId: [32m'f73fe8c5-c50f-4499-8d8d-0a7e274069f6'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'addressed'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.018Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  fromStatus: [32m'reopened'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Outstanding blocker count: {
+  type: [32m'review.blocker_count'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.018Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  status: [32m'review'[39m,
+  totalChangeRequests: [33m2[39m,
+  openChangeRequests: [33m0[39m,
+  blockingChangeRequests: [33m0[39m
+}
+
+stdout | tests/integration/spec-explorer/change-requests-from-review.test.ts > Change Requests from Review - Integration > Change request lifecycle > keeps spec reopened if any change request is not addressed
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.019Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.019Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'efcb5bed-5a2d-487c-b587-5d2d472f0462'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.019Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'efcb5bed-5a2d-487c-b587-5d2d472f0462'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.019Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'53b34efc-3f56-4053-8a1c-1af44eeec027'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.020Z'[39m,
+  changeRequestId: [32m'efcb5bed-5a2d-487c-b587-5d2d472f0462'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'addressed'[39m
+}
+
+stdout | tests/integration/spec-explorer/change-requests-from-review.test.ts > Change Requests from Review - Integration > Edge cases > handles change request creation for spec not in review
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.021Z'[39m,
+  specId: [32m'spec-current-001'[39m,
+  changeRequestId: [32m'8b5a2e31-008c-4d65-9ab1-c93b3ee00cc4'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m5[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/integration/spec-explorer/change-requests-from-review.test.ts > Change Requests from Review - Integration > Edge cases > maintains change request order by creation time
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.021Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.021Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'4660b42a-2aef-4594-a593-b310fe6367bf'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.022Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'4660b42a-2aef-4594-a593-b310fe6367bf'[39m,
+  severity: [32m'low'[39m,
+  titleLength: [33m5[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.022Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'aef69aa0-8030-4dd1-ad04-269b114cf1db'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m6[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.023Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'9bedac7f-3c9a-47a8-be48-77cd908241c4'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m5[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/integration/spec-explorer/change-requests-from-review.test.ts > Change Requests from Review - Integration > Edge cases > prevents duplicate change requests with same title
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.023Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.023Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'3f3ea2bf-8bc9-4a18-be3d-37e8d7f71690'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.024Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'3f3ea2bf-8bc9-4a18-be3d-37e8d7f71690'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m14[39m,
+  submitter: [32m'reviewer1@example.com'[39m
+}
+
+stdout | tests/integration/spec-explorer/change-requests-from-review.test.ts > Change Requests from Review - Integration > Edge cases > prevents duplicate change requests with case-insensitive matching
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.025Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.025Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'9e1eb267-171c-4b7b-bb22-a8f6aeb71132'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:42.025Z'[39m,
+  specId: [32m'spec-integration-cr-001'[39m,
+  changeRequestId: [32m'9e1eb267-171c-4b7b-bb22-a8f6aeb71132'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m14[39m,
+  submitter: [32m'reviewer1@example.com'[39m
+}
+
+ ✓ tests/integration/spec-explorer/change-requests-from-review.test.ts (14 tests) 34ms
+ ✓ tests/unit/webview/hooks-view/hook-form.test.tsx (29 tests) 5564ms
+   ✓ HookForm > Create Mode > validates name length (max 100 characters)  641ms
+   ✓ HookForm > Create Mode > creates hook with valid data  363ms
+   ✓ HookForm > Agent Action Type > validates command length (max 200 characters)  964ms
+   ✓ HookForm > Custom Action Type > validates agent name length (max 50 characters)  433ms
+ ✓ src/features/spec/create-spec-input-controller.test.ts (9 tests) 22ms
+ ✓ tests/unit/features/hooks/hook-executor.test.ts (36 tests) 97ms
+ ✓ tests/integration/welcome/welcome-install-deps.test.ts (19 tests) 125ms
+ ✓ tests/integration/welcome/welcome-learning.test.ts (29 tests) 6545ms
+   ✓ Welcome Screen - Learning Resources Display (Integration) (US4 - T077) > Learning Resources Loading > should load learning resources in getWelcomeState()  535ms
+   ✓ Welcome Screen - Learning Resources Display (Integration) (US4 - T077) > Learning Resources Loading > should include all 15 learning resources  619ms
+   ✓ Welcome Screen - Learning Resources Display (Integration) (US4 - T077) > Learning Resources Loading > should include Getting Started resources (5 items)  452ms
+   ✓ Welcome Screen - Learning Resources Display (Integration) (US4 - T077) > Learning Resources Loading > should include Advanced Features resources (6 items)  404ms
+   ✓ Welcome Screen - Learning Resources Display (Integration) (US4 - T077) > Learning Resources Loading > should include Troubleshooting resources (4 items)  422ms
+   ✓ Welcome Screen - Learning Resources Display (Integration) (US4 - T077) > Learning Resources Loading > should sort resources by category order  498ms
+   ✓ Welcome Screen - Learning Resources Display (Integration) (US4 - T077) > Learning Resources Loading > should include all required properties for each resource  557ms
+   ✓ Welcome Screen - Learning Resources Display (Integration) (US4 - T077) > Resource Display Properties > should include title for each resource  518ms
+   ✓ Welcome Screen - Learning Resources Display (Integration) (US4 - T077) > Resource Display Properties > should include description for each resource  556ms
+   ✓ Welcome Screen - Learning Resources Display (Integration) (US4 - T077) > Resource Display Properties > should include category for each resource  512ms
+   ✓ Welcome Screen - Learning Resources Display (Integration) (US4 - T077) > Resource Display Properties > should include estimated time for applicable resources  421ms
+   ✓ Welcome Screen - External Link Opening (Integration) (US4 - T078) > Resource URL Validation > should ensure all resource URLs are HTTPS  503ms
+   ✓ Welcome Screen - External Link Opening (Integration) (US4 - T078) > Resource URL Validation > should be able to open any resource URL  528ms
+ ✓ tests/unit/features/hooks/trigger-registry.test.ts (23 tests) 21ms
+ ✓ tests/unit/webview/spec-explorer/send-to-review-button.test.tsx (15 tests) 74ms
+ ✓ src/services/document-dependency-tracker.test.ts (14 tests) 61ms
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > change request creation > creates a change request from a spec in review
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.262Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.263Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'35bf00db-49ba-4de8-a3a5-7bc0af022d6a'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.269Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'35bf00db-49ba-4de8-a3a5-7bc0af022d6a'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m20[39m,
+  submitter: [32m'bob@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > change request creation > assigns unique ID to each change request
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.271Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.271Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'182090da-b118-47c4-9ca5-70f385aeb3a0'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.272Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'182090da-b118-47c4-9ca5-70f385aeb3a0'[39m,
+  severity: [32m'low'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer1@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.274Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'6650a436-8bd8-482a-81d0-55b2c852af06'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer2@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > change request creation > sets archivalBlocker flag to true for new change requests
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.275Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.276Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'ee24e330-d9d4-4332-8f3c-587ef9820020'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.276Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'ee24e330-d9d4-4332-8f3c-587ef9820020'[39m,
+  severity: [32m'critical'[39m,
+  titleLength: [33m14[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > change request creation > initializes change request with empty tasks array
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.277Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.277Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'547c023e-3bd4-46eb-9fa9-a7d073c9b7bd'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.278Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'547c023e-3bd4-46eb-9fa9-a7d073c9b7bd'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m5[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > change request creation > sets timestamps correctly on creation
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.279Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.279Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'b3ebe439-5387-4f05-9eb9-8ce9d76c36ec'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.279Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'b3ebe439-5387-4f05-9eb9-8ce9d76c36ec'[39m,
+  severity: [32m'low'[39m,
+  titleLength: [33m5[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > spec reopen on change request submission > transitions spec from review to reopened when change request is created
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.303Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.304Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'75fd8a5a-4781-4a2c-b4a4-b77cd504bf12'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.304Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'75fd8a5a-4781-4a2c-b4a4-b77cd504bf12'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m5[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > spec reopen on change request submission > keeps spec in reopened with multiple change requests
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.305Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.305Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'5bcb36db-686f-44d3-a990-ec031be1aece'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.306Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'5bcb36db-686f-44d3-a990-ec031be1aece'[39m,
+  severity: [32m'low'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer1@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.309Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'64924ffa-7b71-466f-b8b5-3a9a4ebb99b5'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer2@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > duplicate change request guard > detects duplicate change request with same title and spec
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.310Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.310Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'4a3254ad-ec1b-4bf2-a988-1c46cd46c06a'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.310Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'4a3254ad-ec1b-4bf2-a988-1c46cd46c06a'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m14[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > duplicate change request guard > allows change request with different title on same spec
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.311Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.311Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'eff74a43-4e20-4ea2-8ae4-411a1f789028'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.311Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'eff74a43-4e20-4ea2-8ae4-411a1f789028'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m14[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > duplicate change request guard > allows change request with same title on different spec
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.311Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.311Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'f8d38372-c686-4882-9876-c962bdfd5c2a'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.311Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'f8d38372-c686-4882-9876-c962bdfd5c2a'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m14[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > duplicate change request guard > is case-insensitive when checking duplicates
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.311Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.311Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'24085d10-0b2e-4f11-b98e-9120403b0b0b'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.312Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'24085d10-0b2e-4f11-b98e-9120403b0b0b'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m14[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > duplicate change request guard > only considers open change requests as duplicates
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.312Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.312Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'ebfad91d-5851-48aa-bfb8-5088152a2a02'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.313Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'ebfad91d-5851-48aa-bfb8-5088152a2a02'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m14[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > retrieving change requests > returns all change requests for a spec
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.313Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.313Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'73c254cc-fad0-412c-914f-36a539313cdc'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.314Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'73c254cc-fad0-412c-914f-36a539313cdc'[39m,
+  severity: [32m'low'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer1@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.314Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'caba2cf8-e553-4d77-b5d3-b654a96afa25'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer2@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > retrieving change requests > returns only change requests for the specified spec
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.316Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.316Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'183bc0a4-baa1-4080-b828-dc722c88fc58'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.316Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'183bc0a4-baa1-4080-b828-dc722c88fc58'[39m,
+  severity: [32m'low'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.316Z'[39m,
+  specId: [32m'spec-002'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.316Z'[39m,
+  specId: [32m'spec-002'[39m,
+  changeRequestId: [32m'dee17043-2bde-48b7-b2d5-12c02b314d69'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.317Z'[39m,
+  specId: [32m'spec-002'[39m,
+  changeRequestId: [32m'dee17043-2bde-48b7-b2d5-12c02b314d69'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > edge cases > handles empty title gracefully
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.319Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.319Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'1787047c-a1ff-4fa2-b151-fd9b3572d555'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.319Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'1787047c-a1ff-4fa2-b151-fd9b3572d555'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m0[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > edge cases > handles empty description gracefully
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.345Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.345Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'39cea194-7cd5-4fe4-a98b-0c790e781f24'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.345Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'39cea194-7cd5-4fe4-a98b-0c790e781f24'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m5[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-request-from-review.test.ts > Change Request from Review - Creation and Reopening > edge cases > handles very long titles and descriptions
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.346Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.346Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'bc2967d1-7b95-4033-895a-aa9a8e214ad8'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:43.346Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'bc2967d1-7b95-4033-895a-aa9a8e214ad8'[39m,
+  severity: [32m'low'[39m,
+  titleLength: [33m500[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+ ✓ tests/unit/features/spec/review-flow-change-request-from-review.test.ts (19 tests) 86ms
+ ✓ src/utils/spec-kit-utilities.test.ts (38 tests) 24ms
+ ✓ tests/unit/webview/hooks-view/hooks-list.test.tsx (2 tests) 36ms
+ ✓ src/utils/telemetry.test.ts (28 tests) 9ms
+ ✓ tests/integration/welcome/welcome-status.test.ts (18 tests) 7604ms
+   ✓ Welcome Screen Status Integration (US5) > Status Display in Welcome State (T096) > should include diagnostics array in welcome state  572ms
+   ✓ Welcome Screen Status Integration (US5) > Status Display in Welcome State (T096) > should return empty diagnostics array initially  658ms
+   ✓ Welcome Screen Status Integration (US5) > Status Display in Welcome State (T096) > should include diagnostic with all properties  468ms
+   ✓ Welcome Screen Status Integration (US5) > Status Display in Welcome State (T096) > should include multiple diagnostics in state  415ms
+   ✓ Welcome Screen Status Integration (US5) > Status Display in Welcome State (T096) > should order diagnostics by most recent first  522ms
+   ✓ Welcome Screen Status Integration (US5) > Status Display in Welcome State (T096) > should include both errors and warnings  473ms
+   ✓ Welcome Screen Status Integration (US5) > Status Display in Welcome State (T096) > should respect 5-entry limit in state  545ms
+   ✓ Welcome Screen Status Integration (US5) > Status Display in Welcome State (T096) > should filter diagnostics older than 24 hours  624ms
+   ✓ Welcome Screen Status Integration (US5) > Status Display in Welcome State (T096) > should include diagnostics from different sources  641ms
+   ✓ Welcome Screen Status Integration (US5) > Status Display in Welcome State (T096) > should include suggested actions when provided  404ms
+   ✓ Welcome Screen Status Integration (US5) > Real-Time Diagnostic Updates (T097) > should handle rapid diagnostic recording  368ms
+   ✓ Welcome Screen Status Integration (US5) > Real-Time Diagnostic Updates (T097) > should maintain diagnostic order after recording  476ms
+   ✓ Welcome Screen Status Integration (US5) > Health Status Indicators (T097) > should indicate healthy state with no diagnostics  489ms
+   ✓ Welcome Screen Status Integration (US5) > Health Status Indicators (T097) > should indicate degraded state with warnings  503ms
+   ✓ Welcome Screen Status Integration (US5) > Health Status Indicators (T097) > should indicate error state with errors  442ms
+stdout | tests/integration/spec-explorer/send-to-review-flow.test.ts > Send to Review Flow (Integration) > successful transition from Current Specs to Review > moves spec from current to review with all metadata intact
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.042Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'current'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Send to Review: {
+  type: [32m'review.send_to_review'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.042Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  pendingTasks: [33m0[39m,
+  pendingChecklistItems: [33m0[39m
+}
+
+stdout | tests/integration/spec-explorer/send-to-review-flow.test.ts > Send to Review Flow (Integration) > successful transition from Current Specs to Review > sets completedAt and reviewEnteredAt timestamps on transition
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.044Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'current'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Send to Review: {
+  type: [32m'review.send_to_review'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.045Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  pendingTasks: [33m0[39m,
+  pendingChecklistItems: [33m0[39m
+}
+
+stdout | tests/integration/spec-explorer/send-to-review-flow.test.ts > Send to Review Flow (Integration) > successful transition from Current Specs to Review > persists the transition and can be retrieved
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.046Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'current'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Send to Review: {
+  type: [32m'review.send_to_review'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.047Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  pendingTasks: [33m0[39m,
+  pendingChecklistItems: [33m0[39m
+}
+
+stdout | tests/integration/spec-explorer/send-to-review-flow.test.ts > Send to Review Flow (Integration) > successful transition from Current Specs to Review > removes spec from current specs list (status check)
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.049Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'current'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Send to Review: {
+  type: [32m'review.send_to_review'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.049Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  pendingTasks: [33m0[39m,
+  pendingChecklistItems: [33m0[39m
+}
+
+stdout | tests/integration/spec-explorer/send-to-review-flow.test.ts > Send to Review Flow (Integration) > successful transition from Current Specs to Review > spec appears in review list (status check)
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.050Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'current'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Send to Review: {
+  type: [32m'review.send_to_review'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.050Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  pendingTasks: [33m0[39m,
+  pendingChecklistItems: [33m0[39m
+}
+
+stdout | tests/integration/spec-explorer/send-to-review-flow.test.ts > Send to Review Flow (Integration) > blocked transitions > allows transition only after all blockers are cleared
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.056Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'current'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Send to Review: {
+  type: [32m'review.send_to_review'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.056Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  pendingTasks: [33m0[39m,
+  pendingChecklistItems: [33m0[39m
+}
+
+ ✓ tests/unit/features/hooks/hook-manager.test.ts (40 tests) 37ms
+stdout | tests/integration/spec-explorer/send-to-review-flow.test.ts > Send to Review Flow (Integration) > reopened spec transitions > transitions reopened spec back to review
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.059Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'reopened'[39m,
+  toStatus: [32m'review'[39m
+}
+
+stdout | tests/integration/spec-explorer/send-to-review-flow.test.ts > Send to Review Flow (Integration) > reopened spec transitions > preserves original completedAt when returning from reopened
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.061Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'reopened'[39m,
+  toStatus: [32m'review'[39m
+}
+
+stdout | tests/integration/spec-explorer/send-to-review-flow.test.ts > Send to Review Flow (Integration) > edge cases > handles multiple send attempts idempotently
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.062Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'current'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Send to Review: {
+  type: [32m'review.send_to_review'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.062Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  pendingTasks: [33m0[39m,
+  pendingChecklistItems: [33m0[39m
+}
+
+stdout | tests/integration/spec-explorer/send-to-review-flow.test.ts > Send to Review Flow (Integration) > edge cases > maintains spec integrity through transition
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.063Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'current'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Send to Review: {
+  type: [32m'review.send_to_review'[39m,
+  timestamp: [32m'2025-12-18T02:02:44.063Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  pendingTasks: [33m0[39m,
+  pendingChecklistItems: [33m0[39m
+}
+
+ ✓ tests/integration/spec-explorer/send-to-review-flow.test.ts (14 tests) 30ms
+ ✓ tests/integration/hooks-workflow.test.ts (4 tests) 6ms
+ ✓ tests/integration/welcome/welcome-command.test.ts (26 tests) 23ms
+ ✓ tests/unit/extension.test.ts (13 tests) 17ms
+ ✓ tests/unit/webview/hooks-view/hook-list-item.test.tsx (3 tests) 87ms
+ ✓ tests/unit/features/hooks/services/mcp-discovery.test.ts (20 tests) 5ms
+ ✓ ui/tests/markdown/task-group-plugin.spec.tsx (8 tests) 24ms
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Archive workflow > archives spec from Review and removes it from Review lane
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.034Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.034Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Archive workflow > sets archivedAt timestamp when archiving
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.036Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.036Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Archive workflow > preserves completedAt and reviewEnteredAt when archiving
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.036Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.037Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Archive workflow > can archive spec with addressed change requests and completed tasks
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.041Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Outstanding blocker count: {
+  type: [32m'review.blocker_count'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.041Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  status: [32m'archived'[39m,
+  totalChangeRequests: [33m1[39m,
+  openChangeRequests: [33m0[39m,
+  blockingChangeRequests: [33m0[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.041Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Unarchive workflow > unarchives spec and moves to reopened status
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.043Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.043Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Unarchive workflow > unarchives spec and moves to reopened status
+[ReviewFlow Telemetry] Spec unarchived: {
+  type: [32m'review.spec_unarchived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.044Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  initiatedBy: [32m'unknown'[39m,
+  reason: [32m'manual-unarchive'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.044Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'archived'[39m,
+  toStatus: [32m'reopened'[39m
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Unarchive workflow > clears archivedAt timestamp when unarchiving
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.045Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.045Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Unarchive workflow > clears archivedAt timestamp when unarchiving
+[ReviewFlow Telemetry] Spec unarchived: {
+  type: [32m'review.spec_unarchived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.047Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  initiatedBy: [32m'unknown'[39m,
+  reason: [32m'manual-unarchive'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.047Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'archived'[39m,
+  toStatus: [32m'reopened'[39m
+}
+
+stdout | tests/integration/spec-explorer/tasks-dispatch-flow.test.ts > Tasks Dispatch Flow (Integration) > complete dispatch → completion → return flow > dispatches tasks, completes them, and returns spec to review
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.041Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.042Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  changeRequestId: [32m'b9db900d-ecf6-4d58-97f4-682a7de6c362'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.046Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  changeRequestId: [32m'b9db900d-ecf6-4d58-97f4-682a7de6c362'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m15[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.047Z'[39m,
+  changeRequestId: [32m'b9db900d-ecf6-4d58-97f4-682a7de6c362'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'inProgress'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.048Z'[39m,
+  changeRequestId: [32m'b9db900d-ecf6-4d58-97f4-682a7de6c362'[39m,
+  fromStatus: [32m'inProgress'[39m,
+  toStatus: [32m'addressed'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.048Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  fromStatus: [32m'reopened'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Outstanding blocker count: {
+  type: [32m'review.blocker_count'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.048Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  status: [32m'review'[39m,
+  totalChangeRequests: [33m1[39m,
+  openChangeRequests: [33m0[39m,
+  blockingChangeRequests: [33m0[39m
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Unarchive workflow > updates updatedAt timestamp when unarchiving
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.050Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.050Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Unarchive workflow > updates updatedAt timestamp when unarchiving
+[ReviewFlow Telemetry] Spec unarchived: {
+  type: [32m'review.spec_unarchived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.050Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  initiatedBy: [32m'unknown'[39m,
+  reason: [32m'manual-unarchive'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.050Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'archived'[39m,
+  toStatus: [32m'reopened'[39m
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Unarchive workflow > accepts initiatedBy and reason options
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.051Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.051Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Unarchive workflow > accepts initiatedBy and reason options
+[ReviewFlow Telemetry] Spec unarchived: {
+  type: [32m'review.spec_unarchived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.051Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  initiatedBy: [32m'admin@example.com'[39m,
+  reason: [32m'change-request-filed'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.051Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'archived'[39m,
+  toStatus: [32m'reopened'[39m
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Unarchive workflow > cannot unarchive spec that is not archived
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.051Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.051Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Unarchive workflow > cannot unarchive spec that is not archived
+[ReviewFlow Telemetry] Spec unarchived: {
+  type: [32m'review.spec_unarchived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.051Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  initiatedBy: [32m'unknown'[39m,
+  reason: [32m'manual-unarchive'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.051Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'archived'[39m,
+  toStatus: [32m'reopened'[39m
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Unarchive workflow > preserves completedAt and reviewEnteredAt when unarchiving
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.052Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.052Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Unarchive workflow > preserves completedAt and reviewEnteredAt when unarchiving
+[ReviewFlow Telemetry] Spec unarchived: {
+  type: [32m'review.spec_unarchived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.052Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  initiatedBy: [32m'unknown'[39m,
+  reason: [32m'manual-unarchive'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.052Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'archived'[39m,
+  toStatus: [32m'reopened'[39m
+}
+
+ ✓ tests/integration/mcp-hooks-integration.test.ts (16 tests) 23ms
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Complete round-trip workflow > completes full workflow: Review → Archived → Reopened → Review
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.053Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.054Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  blockerChangeRequestIds: []
+}
+[ReviewFlow Telemetry] Spec unarchived: {
+  type: [32m'review.spec_unarchived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.055Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  initiatedBy: [32m'unknown'[39m,
+  reason: [32m'manual-unarchive'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.055Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'archived'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.055Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'reopened'[39m,
+  toStatus: [32m'review'[39m
+}
+
+stdout | tests/integration/spec-explorer/tasks-dispatch-flow.test.ts > Tasks Dispatch Flow (Integration) > complete dispatch → completion → return flow > blocks return to review when tasks are incomplete
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.050Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.051Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  changeRequestId: [32m'bc14d750-bcce-4f38-87de-30a500b50989'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.054Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  changeRequestId: [32m'bc14d750-bcce-4f38-87de-30a500b50989'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m19[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.054Z'[39m,
+  changeRequestId: [32m'bc14d750-bcce-4f38-87de-30a500b50989'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'inProgress'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.055Z'[39m,
+  changeRequestId: [32m'bc14d750-bcce-4f38-87de-30a500b50989'[39m,
+  fromStatus: [32m'inProgress'[39m,
+  toStatus: [32m'addressed'[39m
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Complete round-trip workflow > handles multiple change requests as blockers
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.055Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Outstanding blocker count: {
+  type: [32m'review.blocker_count'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.055Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  status: [32m'archived'[39m,
+  totalChangeRequests: [33m2[39m,
+  openChangeRequests: [33m0[39m,
+  blockingChangeRequests: [33m0[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.056Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Edge cases > handles archiving spec with no change requests
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.057Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.057Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/integration/spec-explorer/archive-flow.test.ts > Archive Flow (Integration) > Edge cases > handles archiving spec with undefined change requests
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.059Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.059Z'[39m,
+  specId: [32m'spec-archive-flow-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/integration/spec-explorer/tasks-dispatch-flow.test.ts > Tasks Dispatch Flow (Integration) > complete dispatch → completion → return flow > handles multiple change requests with tasks
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.055Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.055Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  changeRequestId: [32m'37dbbd3b-f9f3-4f9b-95a5-e233478e2fed'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.056Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  changeRequestId: [32m'37dbbd3b-f9f3-4f9b-95a5-e233478e2fed'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer1@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.057Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  changeRequestId: [32m'dcf7230b-c6da-48e2-b58f-96bc0b89c4de'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m7[39m,
+  submitter: [32m'reviewer2@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.059Z'[39m,
+  changeRequestId: [32m'37dbbd3b-f9f3-4f9b-95a5-e233478e2fed'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'inProgress'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.059Z'[39m,
+  changeRequestId: [32m'dcf7230b-c6da-48e2-b58f-96bc0b89c4de'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'inProgress'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.059Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  fromStatus: [32m'reopened'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Outstanding blocker count: {
+  type: [32m'review.blocker_count'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.059Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  status: [32m'review'[39m,
+  totalChangeRequests: [33m2[39m,
+  openChangeRequests: [33m0[39m,
+  blockingChangeRequests: [33m0[39m
+}
+
+stdout | tests/integration/spec-explorer/tasks-dispatch-flow.test.ts > Tasks Dispatch Flow (Integration) > retry flow > allows retrying task dispatch after failure
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.060Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.060Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  changeRequestId: [32m'76771d20-2d26-4e17-958d-7a0a2af334a9'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.060Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  changeRequestId: [32m'76771d20-2d26-4e17-958d-7a0a2af334a9'[39m,
+  severity: [32m'low'[39m,
+  titleLength: [33m11[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.061Z'[39m,
+  changeRequestId: [32m'76771d20-2d26-4e17-958d-7a0a2af334a9'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'inProgress'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.061Z'[39m,
+  changeRequestId: [32m'76771d20-2d26-4e17-958d-7a0a2af334a9'[39m,
+  fromStatus: [32m'inProgress'[39m,
+  toStatus: [32m'inProgress'[39m
+}
+
+stdout | tests/integration/spec-explorer/tasks-dispatch-flow.test.ts > Tasks Dispatch Flow (Integration) > edge cases > handles spec with pending tasks blocking return to review
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.061Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.061Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  changeRequestId: [32m'814c6292-4d29-4b84-92f5-24947584fe72'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.062Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  changeRequestId: [32m'814c6292-4d29-4b84-92f5-24947584fe72'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m5[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.062Z'[39m,
+  changeRequestId: [32m'814c6292-4d29-4b84-92f5-24947584fe72'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'inProgress'[39m
+}
+
+stdout | tests/integration/spec-explorer/tasks-dispatch-flow.test.ts > Tasks Dispatch Flow (Integration) > edge cases > handles empty tasks array
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.063Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.063Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  changeRequestId: [32m'2a866d95-e8f7-40af-a73a-c08b03ed8515'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.064Z'[39m,
+  specId: [32m'spec-dispatch-flow-001'[39m,
+  changeRequestId: [32m'2a866d95-e8f7-40af-a73a-c08b03ed8515'[39m,
+  severity: [32m'low'[39m,
+  titleLength: [33m5[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.065Z'[39m,
+  changeRequestId: [32m'2a866d95-e8f7-40af-a73a-c08b03ed8515'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'inProgress'[39m
+}
+
+ ✓ tests/integration/spec-explorer/tasks-dispatch-flow.test.ts (6 tests) 27ms
+ ✓ tests/integration/spec-explorer/archive-flow.test.ts (21 tests) 36ms
+stdout | tests/unit/features/spec/review-flow-state.test.ts > Spec Review Flow - State Management > current → review transition > moves spec to review and sets completed timestamps
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.132Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'current'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Send to Review: {
+  type: [32m'review.send_to_review'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.133Z'[39m,
+  specId: [32m'spec-001'[39m,
+  pendingTasks: [33m0[39m,
+  pendingChecklistItems: [33m0[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-state.test.ts > Spec Review Flow - State Management > current → review transition > preserves metadata across transition
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.141Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'current'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Send to Review: {
+  type: [32m'review.send_to_review'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.141Z'[39m,
+  specId: [32m'spec-001'[39m,
+  pendingTasks: [33m0[39m,
+  pendingChecklistItems: [33m0[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-state.test.ts > Spec Review Flow - State Management > review → reopened > reopens spec when change request added
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.141Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.141Z'[39m,
+  specId: [32m'spec-001'[39m,
+  changeRequestId: [32m'cr-001'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-state.test.ts > Spec Review Flow - State Management > archiving lifecycle > archives spec when no blockers remain
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.144Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.144Z'[39m,
+  specId: [32m'spec-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/unit/features/spec/review-flow-state.test.ts > Spec Review Flow - State Management > archiving lifecycle > unarchives spec back to reopened
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.145Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.145Z'[39m,
+  specId: [32m'spec-001'[39m,
+  blockerChangeRequestIds: []
+}
+[ReviewFlow Telemetry] Spec unarchived: {
+  type: [32m'review.spec_unarchived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.145Z'[39m,
+  specId: [32m'spec-001'[39m,
+  initiatedBy: [32m'tests'[39m,
+  reason: [32m'new blocker'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.146Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'archived'[39m,
+  toStatus: [32m'reopened'[39m
+}
+
+ ✓ tests/unit/features/spec/review-flow-state.test.ts (9 tests) 24ms
+ ✓ src/features/steering/steering-manager.test.ts (8 tests) 16ms
+stdout | tests/integration/spec-explorer/review-flow.test.ts > review flow integration > change request dispatch to return to Review > should complete full cycle: dispatch → tasks → addressed → return
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.277Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.277Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  changeRequestId: [32m'cr-int-001'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.293Z'[39m,
+  changeRequestId: [32m'cr-int-001'[39m,
+  fromStatus: [32m'inProgress'[39m,
+  toStatus: [32m'inProgress'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.295Z'[39m,
+  changeRequestId: [32m'cr-int-001'[39m,
+  fromStatus: [32m'inProgress'[39m,
+  toStatus: [32m'addressed'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.296Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'reopened'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Outstanding blocker count: {
+  type: [32m'review.blocker_count'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.297Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  status: [32m'review'[39m,
+  totalChangeRequests: [33m1[39m,
+  openChangeRequests: [33m0[39m,
+  blockingChangeRequests: [33m0[39m
+}
+
+stdout | tests/integration/spec-explorer/review-flow.test.ts > review flow integration > change request dispatch to return to Review > should handle multiple change requests before returning
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.297Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.297Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  changeRequestId: [32m'cr-multi-001'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.298Z'[39m,
+  changeRequestId: [32m'cr-multi-001'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'inProgress'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.298Z'[39m,
+  changeRequestId: [32m'cr-multi-001'[39m,
+  fromStatus: [32m'inProgress'[39m,
+  toStatus: [32m'addressed'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.298Z'[39m,
+  changeRequestId: [32m'cr-multi-002'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'inProgress'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.299Z'[39m,
+  changeRequestId: [32m'cr-multi-002'[39m,
+  fromStatus: [32m'inProgress'[39m,
+  toStatus: [32m'addressed'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.299Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'reopened'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Outstanding blocker count: {
+  type: [32m'review.blocker_count'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.299Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  status: [32m'review'[39m,
+  totalChangeRequests: [33m2[39m,
+  openChangeRequests: [33m0[39m,
+  blockingChangeRequests: [33m0[39m
+}
+
+stdout | tests/integration/spec-explorer/review-flow.test.ts > review flow integration > change request dispatch to return to Review > should remain reopened if any task is incomplete
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.299Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.299Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  changeRequestId: [32m'cr-incomplete-001'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.299Z'[39m,
+  changeRequestId: [32m'cr-incomplete-001'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'inProgress'[39m
+}
+
+stdout | tests/integration/spec-explorer/review-flow.test.ts > review flow integration > change request dispatch to return to Review > should handle tasks prompt failure with retry
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.299Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.300Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  changeRequestId: [32m'cr-blocked-001'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.300Z'[39m,
+  changeRequestId: [32m'cr-blocked-001'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'blocked'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.300Z'[39m,
+  changeRequestId: [32m'cr-blocked-001'[39m,
+  fromStatus: [32m'blocked'[39m,
+  toStatus: [32m'inProgress'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.300Z'[39m,
+  changeRequestId: [32m'cr-blocked-001'[39m,
+  fromStatus: [32m'inProgress'[39m,
+  toStatus: [32m'addressed'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.300Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'reopened'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Outstanding blocker count: {
+  type: [32m'review.blocker_count'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.300Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  status: [32m'review'[39m,
+  totalChangeRequests: [33m1[39m,
+  openChangeRequests: [33m0[39m,
+  blockingChangeRequests: [33m0[39m
+}
+
+stdout | tests/integration/spec-explorer/review-flow.test.ts > review flow integration > shouldReturnToReview helper > should return true when all change requests addressed and tasks done
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.301Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.301Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  changeRequestId: [32m'cr-helper-001'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.301Z'[39m,
+  changeRequestId: [32m'cr-helper-001'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'addressed'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.301Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'reopened'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Outstanding blocker count: {
+  type: [32m'review.blocker_count'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.301Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  status: [32m'review'[39m,
+  totalChangeRequests: [33m1[39m,
+  openChangeRequests: [33m0[39m,
+  blockingChangeRequests: [33m0[39m
+}
+
+stdout | tests/integration/spec-explorer/review-flow.test.ts > review flow integration > shouldReturnToReview helper > should return false when change request not addressed
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.301Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.301Z'[39m,
+  specId: [32m'spec-integration-001'[39m,
+  changeRequestId: [32m'cr-notdone-001'[39m
+}
+[ReviewFlow Telemetry] Change request status change: {
+  type: [32m'change_request.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.302Z'[39m,
+  changeRequestId: [32m'cr-notdone-001'[39m,
+  fromStatus: [32m'open'[39m,
+  toStatus: [32m'inProgress'[39m
+}
+
+ ✓ tests/integration/spec-explorer/review-flow.test.ts (6 tests) 32ms
+ ✓ src/providers/copilot-provider.test.ts (3 tests) 30ms
+stdout | tests/unit/features/spec/review-flow-change-requests.test.ts > Spec Review Flow - Change Requests > creates a change request and reopens the spec
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.558Z'[39m,
+  specId: [32m'spec-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.558Z'[39m,
+  specId: [32m'spec-cr-001'[39m,
+  changeRequestId: [32m'c3d6c7f6-e0df-4c65-b954-74787eee2fc4'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.565Z'[39m,
+  specId: [32m'spec-cr-001'[39m,
+  changeRequestId: [32m'c3d6c7f6-e0df-4c65-b954-74787eee2fc4'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m18[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-requests.test.ts > Spec Review Flow - Change Requests > rejects duplicate change requests by normalized title for the same spec
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.568Z'[39m,
+  specId: [32m'spec-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.568Z'[39m,
+  specId: [32m'spec-cr-001'[39m,
+  changeRequestId: [32m'55562018-0a4b-428d-bdb0-c03be5809069'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.569Z'[39m,
+  specId: [32m'spec-cr-001'[39m,
+  changeRequestId: [32m'55562018-0a4b-428d-bdb0-c03be5809069'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m16[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-requests.test.ts > Spec Review Flow - Change Requests > allows a new change request when previous one is addressed
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.571Z'[39m,
+  specId: [32m'spec-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.572Z'[39m,
+  specId: [32m'spec-cr-001'[39m,
+  changeRequestId: [32m'433b4530-dfcc-4ff7-9188-2a127d6402b3'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.573Z'[39m,
+  specId: [32m'spec-cr-001'[39m,
+  changeRequestId: [32m'433b4530-dfcc-4ff7-9188-2a127d6402b3'[39m,
+  severity: [32m'low'[39m,
+  titleLength: [33m16[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.573Z'[39m,
+  specId: [32m'spec-cr-001'[39m,
+  changeRequestId: [32m'406ae1d3-5da7-4066-836f-1dfd6392177f'[39m,
+  severity: [32m'high'[39m,
+  titleLength: [33m16[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-change-requests.test.ts > Spec Review Flow - Change Requests > keeps completedAt unchanged when reopening from readyToReview
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.578Z'[39m,
+  specId: [32m'spec-cr-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'reopened'[39m
+}
+[ReviewFlow Telemetry] Spec reopened: {
+  type: [32m'review.spec_reopened'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.578Z'[39m,
+  specId: [32m'spec-cr-001'[39m,
+  changeRequestId: [32m'c4dbcba4-28ff-4cc5-994e-1247a58d5aa1'[39m
+}
+[ReviewFlow Telemetry] Change request created: {
+  type: [32m'change_request.created'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.578Z'[39m,
+  specId: [32m'spec-cr-001'[39m,
+  changeRequestId: [32m'c4dbcba4-28ff-4cc5-994e-1247a58d5aa1'[39m,
+  severity: [32m'medium'[39m,
+  titleLength: [33m21[39m,
+  submitter: [32m'reviewer@example.com'[39m
+}
+
+ ✓ tests/unit/features/spec/review-flow-change-requests.test.ts (4 tests) 24ms
+stdout | tests/unit/features/spec/review-flow-archive.test.ts > Archive Spec (Unit) > archiveSpec > transitions spec from review to archived
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.656Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.656Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/unit/features/spec/review-flow-archive.test.ts > Archive Spec (Unit) > archiveSpec > sets archivedAt timestamp
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.658Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.658Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/unit/features/spec/review-flow-archive.test.ts > Archive Spec (Unit) > archiveSpec > updates updatedAt timestamp
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.660Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.660Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/unit/features/spec/review-flow-archive.test.ts > Archive Spec (Unit) > archiveSpec > preserves completedAt and reviewEnteredAt timestamps
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.661Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.661Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+stdout | tests/unit/features/spec/review-flow-archive.test.ts > Archive Spec (Unit) > unarchiveSpec > transitions spec from archived to reopened
+[ReviewFlow Telemetry] Spec unarchived: {
+  type: [32m'review.spec_unarchived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.662Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  initiatedBy: [32m'unknown'[39m,
+  reason: [32m'manual-unarchive'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.662Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  fromStatus: [32m'archived'[39m,
+  toStatus: [32m'reopened'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-archive.test.ts > Archive Spec (Unit) > unarchiveSpec > clears archivedAt timestamp
+[ReviewFlow Telemetry] Spec unarchived: {
+  type: [32m'review.spec_unarchived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.663Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  initiatedBy: [32m'unknown'[39m,
+  reason: [32m'manual-unarchive'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.663Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  fromStatus: [32m'archived'[39m,
+  toStatus: [32m'reopened'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-archive.test.ts > Archive Spec (Unit) > unarchiveSpec > updates updatedAt timestamp
+[ReviewFlow Telemetry] Spec unarchived: {
+  type: [32m'review.spec_unarchived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.663Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  initiatedBy: [32m'unknown'[39m,
+  reason: [32m'manual-unarchive'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.663Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  fromStatus: [32m'archived'[39m,
+  toStatus: [32m'reopened'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-archive.test.ts > Archive Spec (Unit) > unarchiveSpec > accepts initiatedBy and reason options
+[ReviewFlow Telemetry] Spec unarchived: {
+  type: [32m'review.spec_unarchived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.663Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  initiatedBy: [32m'admin@example.com'[39m,
+  reason: [32m'change-request-filed'[39m
+}
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.663Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  fromStatus: [32m'archived'[39m,
+  toStatus: [32m'reopened'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-archive.test.ts > Archive Spec (Unit) > Multi-change-request blocker detection > allows archival when all change requests are addressed with completed tasks
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.664Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  fromStatus: [32m'review'[39m,
+  toStatus: [32m'archived'[39m
+}
+[ReviewFlow Telemetry] Outstanding blocker count: {
+  type: [32m'review.blocker_count'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.664Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  status: [32m'archived'[39m,
+  totalChangeRequests: [33m2[39m,
+  openChangeRequests: [33m0[39m,
+  blockingChangeRequests: [33m0[39m
+}
+[ReviewFlow Telemetry] Send to Archived: {
+  type: [32m'review.send_to_archived'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.664Z'[39m,
+  specId: [32m'spec-archive-001'[39m,
+  blockerChangeRequestIds: []
+}
+
+ ✓ tests/unit/features/spec/review-flow-archive.test.ts (27 tests) 19ms
+ ✓ tests/unit/features/hooks/actions/custom-action.test.ts (27 tests) 6ms
+stdout | tests/unit/features/spec/review-flow-send-to-review.test.ts > Send to Review - Gating and Transitions > sendToReview transition > transitions spec from current to review with timestamps
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.989Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'current'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Send to Review: {
+  type: [32m'review.send_to_review'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.989Z'[39m,
+  specId: [32m'spec-001'[39m,
+  pendingTasks: [33m0[39m,
+  pendingChecklistItems: [33m0[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-send-to-review.test.ts > Send to Review - Gating and Transitions > sendToReview transition > preserves spec metadata during transition
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.991Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'current'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Send to Review: {
+  type: [32m'review.send_to_review'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.991Z'[39m,
+  specId: [32m'spec-001'[39m,
+  pendingTasks: [33m0[39m,
+  pendingChecklistItems: [33m0[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-send-to-review.test.ts > Send to Review - Gating and Transitions > sendToReview transition > transitions reopened spec back to review
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.992Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'reopened'[39m,
+  toStatus: [32m'review'[39m
+}
+
+stdout | tests/unit/features/spec/review-flow-send-to-review.test.ts > Send to Review - Gating and Transitions > sendToReview transition > updates updatedAt timestamp on transition
+[ReviewFlow Telemetry] Spec status change: {
+  type: [32m'spec.status.changed'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.993Z'[39m,
+  specId: [32m'spec-001'[39m,
+  fromStatus: [32m'current'[39m,
+  toStatus: [32m'review'[39m
+}
+[ReviewFlow Telemetry] Send to Review: {
+  type: [32m'review.send_to_review'[39m,
+  timestamp: [32m'2025-12-18T02:02:45.993Z'[39m,
+  specId: [32m'spec-001'[39m,
+  pendingTasks: [33m0[39m,
+  pendingChecklistItems: [33m0[39m
+}
+
+ ✓ tests/unit/features/spec/review-flow-send-to-review.test.ts (17 tests) 21ms
+ ✓ src/providers/prompts-explorer-provider.test.ts (6 tests) 6ms
+ ✓ tests/integration/welcome/welcome-config.test.ts (21 tests) 21ms
+stdout | tests/integration/preview/preview-performance.test.ts > Preview Performance Harness > SC-001: Preview Load Time Target (95% within 3 seconds) > should meet the 95% target for fast preview loads
+
+=== SC-001 Performance Results ===
+Total Previews: 100
+Successful: 100
+Under 3 seconds: 95 (95.0%)
+Average Load Time: 1891ms
+Median Load Time: 1959ms
+P95 Load Time: 3191ms
+Target Met: ✓ PASS
+
+
+stdout | tests/integration/preview/preview-performance.test.ts > Preview Performance Harness > SC-001: Preview Load Time Target (95% within 3 seconds) > should track load times by document type
+spec: 20 previews, 2548ms avg
+task: 20 previews, 1914ms avg
+plan: 20 previews, 1948ms avg
+research: 20 previews, 2018ms avg
+dataModel: 20 previews, 1939ms avg
+
+stdout | tests/integration/preview/preview-performance.test.ts > Preview Performance Harness > SC-002: Diagram Render Success Target (90% success rate) > should meet the 90% diagram render success target
+
+=== SC-002 Performance Results ===
+Total Diagrams: 100
+Successful: 92
+Failed: 8
+Success Rate: 92.0%
+Target Met: ✓ PASS
+
+
+stdout | tests/integration/preview/preview-performance.test.ts > Preview Performance Harness > SC-002: Diagram Render Success Target (90% success rate) > should track diagram render success by diagram type
+
+=== Diagram Success by Type ===
+Overall Success Rate: 89.3%
+
+stdout | tests/integration/preview/preview-performance.test.ts > Preview Performance Harness > Combined Performance Validation > should validate both SC-001 and SC-002 targets simultaneously
+
+=== Combined Performance Validation ===
+Preview Performance:
+  48/50 under 3s (96.0%) - Target: 95%
+Diagram Performance:
+  90/100 successful (90.0%) - Target: 90%
+Overall: ✓ BOTH TARGETS MET
+
+
+stdout | tests/integration/preview/preview-performance.test.ts > Preview Performance Harness > Combined Performance Validation > should generate comprehensive performance report
+
+=== Performance Report Summary ===
+Total Documents Tested: 100
+Average Load Time: 1649ms
+Median Load Time: 1666ms
+P95 Load Time: 2763ms
+
+By Document Type:
+  spec: 25 docs, 1701ms avg, 100.0% success
+  task: 25 docs, 1351ms avg, 100.0% success
+  plan: 25 docs, 1506ms avg, 100.0% success
+  research: 25 docs, 2037ms avg, 100.0% success
+
+
+ ✓ tests/integration/preview/preview-performance.test.ts (11 tests) 17ms
+ ✓ tests/integration/spec-explorer/review-flow-latency.test.ts (2 tests) 9ms
+ ✓ src/providers/hook-view-provider.test.ts (5 tests) 10ms
+ ✓ src/features/spec/spec-manager.test.ts (16 tests) 20ms
+ ✓ tests/unit/features/hooks/services/mcp-client.test.ts (28 tests) 7ms
+ ✓ src/utils/task-parser.test.ts (17 tests) 5ms
+ ✓ tests/unit/services/system-diagnostics.test.ts (31 tests) 12ms
+ ✓ tests/unit/features/hooks/actions/agent-action.test.ts (24 tests) 11ms
+ ✓ tests/unit/features/spec/review-flow-tasks-dispatch.test.ts (22 tests) 6ms
+ ✓ tests/integration/preview/preview-webview.test.ts (3 tests) 7ms
+ ✓ tests/unit/features/hooks/services/command-completion-detector.test.ts (9 tests) 15ms
+ ✓ tests/unit/features/hooks/services/mcp-parameter-resolver.test.ts (25 tests) 13ms
+ ❯ tests/unit/providers/welcome-screen-provider.test.ts (67 tests | 1 failed) 11153ms
+   ✓ WelcomeScreenProvider > getWelcomeState() > should return complete welcome screen state  625ms
+   × WelcomeScreenProvider > getWelcomeState() > should set hasShownBefore to false for first-time workspace 734ms
+     → expected undefined to be false // Object.is equality
+   ✓ WelcomeScreenProvider > getWelcomeState() > should set hasShownBefore to true after welcome has been shown  415ms
+   ✓ WelcomeScreenProvider > getWelcomeState() > should include dependency status for all three dependencies  403ms
+   ✓ WelcomeScreenProvider > getWelcomeState() > should include configuration with 6 editable keys  509ms
+   ✓ WelcomeScreenProvider > getWelcomeState() > should set currentView to 'setup' by default  516ms
+   ✓ WelcomeScreenProvider > updateConfiguration() > should update editable configuration key 2ms
+   ✓ WelcomeScreenProvider > updateConfiguration() > should reject non-editable configuration key 1ms
+   ✓ WelcomeScreenProvider > updateConfiguration() > should validate path configurations are strings 0ms
+   ✓ WelcomeScreenProvider > updateConfiguration() > should log configuration updates to output channel 1ms
+   ✓ WelcomeScreenProvider > installDependency() > should open Extensions marketplace for Copilot Chat 0ms
+   ✓ WelcomeScreenProvider > installDependency() > should copy SpecKit install command to clipboard 0ms
+   ✓ WelcomeScreenProvider > installDependency() > should copy OpenSpec install command to clipboard 0ms
+   ✓ WelcomeScreenProvider > refreshDependencies() > should invalidate cache and re-check dependencies  1144ms
+   ✓ WelcomeScreenProvider > refreshDependencies() > should send updated dependency status to panel  463ms
+   ✓ WelcomeScreenProvider > executeCommand() > should execute VS Code command with arguments 1ms
+   ✓ WelcomeScreenProvider > executeCommand() > should handle command execution errors 0ms
+   ✓ WelcomeScreenProvider > executeCommand() > should log command execution to output channel 1ms
+   ✓ WelcomeScreenProvider > openExternal() > should open HTTPS URLs 1ms
+   ✓ WelcomeScreenProvider > openExternal() > should reject non-HTTPS URLs for security 1ms
+   ✓ WelcomeScreenProvider > openExternal() > should log opened URLs to output channel 1ms
+   ✓ WelcomeScreenProvider > searchResources() > should search learning resources by keyword 1ms
+   ✓ WelcomeScreenProvider > searchResources() > should return resources with relevance scores 0ms
+   ✓ WelcomeScreenProvider > recordError() > should record error diagnostics 0ms
+   ✓ WelcomeScreenProvider > recordError() > should record warning diagnostics 0ms
+   ✓ WelcomeScreenProvider > Configuration Management (US3 - T053) > should load configuration from workspace.getConfiguration('gatomia')  546ms
+   ✓ WelcomeScreenProvider > Configuration Management (US3 - T053) > should include all 6 editable configuration keys  542ms
+   ✓ WelcomeScreenProvider > Configuration Management (US3 - T053) > should return configuration items with correct structure  487ms
+   ✓ WelcomeScreenProvider > Configuration Management (US3 - T053) > should return configuration values with correct types  494ms
+   ✓ WelcomeScreenProvider > Configuration Management (US3 - T053) > should mark all configuration items as editable  443ms
+   ✓ WelcomeScreenProvider > Configuration Management (US3 - T053) > should include options array for specSystem dropdown  472ms
+   ✓ WelcomeScreenProvider > Configuration Management (US3 - T053) > should include correct key property for each configuration item  448ms
+   ✓ WelcomeScreenProvider > Configuration Management (US3 - T053) > should include descriptive labels for each configuration item  538ms
+   ✓ WelcomeScreenProvider > Configuration Management (US3 - T053) > should have valid specSystem value (auto/speckit/openspec)  564ms
+   ✓ WelcomeScreenProvider > Configuration Management (US3 - T053) > should have string values for all path configurations  420ms
+   ✓ WelcomeScreenProvider > Configuration Management (US3 - T053) > should call workspace.getConfiguration with 'gatomia' section  417ms
+   ✓ WelcomeScreenProvider > Configuration Management (US3 - T053) > should handle missing workspace configuration gracefully  478ms
+   ✓ WelcomeScreenProvider > Configuration Management (US3 - T053) > should load configuration with consistent structure across calls  455ms
+   ✓ WelcomeScreenProvider > Configuration Validation (US3 - T054) > should validate that key is in editable keys whitelist 1ms
+   ✓ WelcomeScreenProvider > Configuration Validation (US3 - T054) > should allow updating editable configuration keys 1ms
+   ✓ WelcomeScreenProvider > Configuration Validation (US3 - T054) > should reject keys outside the editable whitelist 1ms
+   ✓ WelcomeScreenProvider > Configuration Validation (US3 - T054) > should validate value type for path configurations (must be string) 1ms
+   ✓ WelcomeScreenProvider > Configuration Validation (US3 - T054) > should accept string values for path configurations 1ms
+   ✓ WelcomeScreenProvider > Configuration Validation (US3 - T054) > should validate path format (allow relative paths) 1ms
+   ✓ WelcomeScreenProvider > Configuration Validation (US3 - T054) > should validate path format (allow absolute paths) 1ms
+   ✓ WelcomeScreenProvider > Configuration Validation (US3 - T054) > should validate path length (max 500 characters) 1ms
+   ✓ WelcomeScreenProvider > Configuration Validation (US3 - T054) > should validate path contains only valid characters 1ms
+   ✓ WelcomeScreenProvider > Configuration Validation (US3 - T054) > should validate specSystem value is one of allowed options 1ms
+   ✓ WelcomeScreenProvider > Configuration Validation (US3 - T054) > should reject invalid specSystem values 1ms
+   ✓ WelcomeScreenProvider > Configuration Validation (US3 - T054) > should log validation errors to output channel 0ms
+   ✓ WelcomeScreenProvider > Configuration Validation (US3 - T054) > should include error context in validation error messages 1ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should execute command via vscode.commands.executeCommand 2ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should execute command with arguments 1ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should log command execution to output channel (before) 0ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should log successful command execution to output channel (after) 0ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should handle command execution errors with try-catch 2ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should log error message when command fails 1ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should send error message to webview when command fails 0ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should show error notification to user when command fails 0ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should handle non-Error exceptions 0ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should execute all feature action commands successfully 6ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should work with no arguments provided 1ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should spread args array when executing command 1ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should handle empty args array correctly 0ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should log both before and after messages on success 0ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should not send success message to webview (only logs) 0ms
+   ✓ WelcomeScreenProvider > onExecuteCommand callback (T036) > should only send message to webview on error 0ms
+ ✓ src/utils/spec-kit-migration.test.ts (12 tests) 12ms
+ ✓ src/services/refinement-gateway.test.ts (10 tests) 8ms
+ ✓ tests/unit/features/hooks/actions/github-action.test.ts (7 tests) 20ms
+ ✓ src/providers/hooks-explorer-provider.test.ts (4 tests) 7ms
+ ✓ tests/unit/services/learning-resources.test.ts (26 tests) 11ms
+ ✓ src/features/steering/constitution-manager.test.ts (11 tests) 15ms
+ ✓ src/services/prompt-loader.test.ts (3 tests) 10ms
+ ✓ src/utils/copilot-chat-utils.test.ts (3 tests) 5ms
+ ✓ src/utils/chat-prompt-runner.test.ts (7 tests) 6ms
+ ✓ src/utils/notification-utils.test.ts (3 tests) 10ms
+ ✓ tests/integration/preview/preview-task-group.test.ts (4 tests) 5ms
+ ✓ tests/unit/features/hooks/actions/git-action.test.ts (6 tests) 8ms
+ ✓ src/utils/get-webview-content.test.ts (3 tests) 3ms
+ ✓ tests/unit/features/documents/refine-request.test.ts (1 test) 2ms
+ ✓ tests/integration/preview/preview-readonly.test.ts (1 test) 2ms
+ ✓ src/utils/config-manager.test.ts (3 tests) 2ms
+
+ Test Files  3 failed | 77 passed (80)
+      Tests  13 failed | 1199 passed (1212)
+   Start at  23:02:35
+   Duration  13.48s (transform 2.17s, setup 12.02s, collect 4.74s, tests 52.00s, environment 46.01s, prepare 4.63s)
+

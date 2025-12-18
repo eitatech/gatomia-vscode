@@ -1,15 +1,13 @@
-# GatomIA (Agentic Lifecycle Management Automation)
+# GatomIA (Agentic Spec-Driven Development Toolkit)
 
 [![Visual Studio Marketplace](https://img.shields.io/vscode-marketplace/v/EITA.gatomia.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=EITA.gatomia)
 [![Downloads](https://img.shields.io/vscode-marketplace/d/EITA.gatomia.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=EITA.gatomia)
 [![GitHub stars](https://img.shields.io/github/stars/eitatech/gatomia-vscode.svg?style=flat-square)](https://github.com/eitatech/gatomia-vscode/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/eitatech/gatomia-vscode.svg?style=flat-square)](https://github.com/eitatech/gatomia-vscode/issues)
 
-GatomIA is a VS Code extension that brings Agentic Lifecycle Management Automation to your workflow, leveraging **SpecKit**, **OpenSpec**, and **GitHub Copilot**.
+GatomIA is a VS Code extension that brings Agentic Spec-Driven Development  to your workflow, leveraging **SpecKit**, **OpenSpec**, and **GitHub Copilot**.
 
 It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.md), and custom prompts, seamlessly integrating with GitHub Copilot Chat to generate high-quality documentation and code.
-
-Aqui está a versão em inglês, refinada e adequada para um README de projeto em desenvolvimento ativo:
 
 ---
 
@@ -63,6 +61,17 @@ You can follow our progress, open issues, or contribute directly through our off
 - **Configure Actions**: Set up hooks to execute MCP tools automatically (e.g., create GitHub issues, send Slack notifications) after operations like spec generation or task completion.
 - **Execution Tracking**: View execution logs and monitor hook performance in real-time.
 - **Error Handling**: Graceful degradation when MCP servers are unavailable, with automatic retry logic for transient failures.
+
+### Welcome Screen
+
+- **First-Time Setup**: Interactive welcome screen appears on first activation to guide you through extension setup.
+- **Dependency Detection**: Automatically checks for GitHub Copilot Chat, SpecKit CLI, and OpenSpec CLI installations.
+- **Quick Installation**: One-click install buttons copy installation commands to your clipboard.
+- **Configuration Management**: Edit key settings directly from the welcome screen with inline validation.
+- **Learning Resources**: Browse documentation, examples, and tutorials organized by category.
+- **Feature Discovery**: Explore all extension features with quick-access command buttons.
+- **System Health**: Monitor extension status with real-time diagnostics and health indicators.
+- **Persistent Access**: Re-open welcome screen anytime via `GatomIA: Show Welcome Screen` command.
 
 ## Installation
 
