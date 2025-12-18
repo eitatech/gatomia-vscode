@@ -55,6 +55,12 @@ import {
 	handleSendToArchived,
 	handleUnarchive,
 } from "./features/spec/review-flow/commands/send-to-archived-command";
+import { WelcomeScreenPanel } from "./panels/welcome-screen-panel";
+import { WelcomeScreenProvider } from "./providers/welcome-screen-provider";
+import {
+	shouldShowWelcomeAutomatically,
+	markWelcomeAsShown,
+} from "./utils/workspace-state";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -412,6 +418,46 @@ export async function activate(context: ExtensionContext) {
 	);
 	context.subscriptions.push(specTasksDisposable);
 	outputChannel.appendLine("CodeLens provider for spec tasks registered");
+
+	// T019-T020: First-time welcome screen activation
+	try {
+		const shouldShow = shouldShowWelcomeAutomatically(context);
+		outputChannel.appendLine(`[Welcome] First-time check: ${shouldShow}`);
+
+		if (shouldShow) {
+			outputChannel.appendLine(
+				"[Welcome] Showing welcome screen for first time"
+			);
+
+			// Initialize welcome screen provider
+			const welcomeProvider = new WelcomeScreenProvider(context, outputChannel);
+			outputChannel.appendLine("[Welcome] Provider created");
+
+			// Get callbacks with panel reference setter
+			const callbacks = welcomeProvider.getCallbacks();
+			outputChannel.appendLine("[Welcome] Callbacks retrieved");
+
+			// Show welcome screen panel with provider callbacks
+			const panel = WelcomeScreenPanel.show(context, outputChannel, callbacks);
+			outputChannel.appendLine("[Welcome] Panel created");
+
+			// Set panel reference in callbacks (T028-T032)
+			if (callbacks.setPanel) {
+				callbacks.setPanel(panel);
+				outputChannel.appendLine("[Welcome] Panel reference set in callbacks");
+			}
+
+			// Mark as shown for next time
+			await markWelcomeAsShown(context);
+			outputChannel.appendLine("[Welcome] Marked as shown");
+		}
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		outputChannel.appendLine(
+			`[Welcome] Failed to show first-time screen: ${message}`
+		);
+		// Don't show error to user - welcome screen is optional
+	}
 
 	// No UI mode toggle commands required
 }
@@ -1064,6 +1110,31 @@ function registerCommands({
 		commands.registerCommand("gatomia.dependencies.check", async () => {
 			outputChannel.appendLine("Opening dependencies checker...");
 			await dependenciesViewProvider.show();
+		}),
+
+		commands.registerCommand("gatomia.showWelcome", () => {
+			outputChannel.appendLine("Showing welcome screen (on-demand)...");
+			try {
+				const welcomeProvider = new WelcomeScreenProvider(
+					context,
+					outputChannel
+				);
+				const callbacks = welcomeProvider.getCallbacks();
+				const panel = WelcomeScreenPanel.show(
+					context,
+					outputChannel,
+					callbacks
+				);
+
+				// Set panel reference in callbacks (T028-T032)
+				if (callbacks.setPanel) {
+					callbacks.setPanel(panel);
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				outputChannel.appendLine(`[Welcome] Failed to show: ${message}`);
+				window.showErrorMessage(`Failed to show welcome screen: ${message}`);
+			}
 		}),
 
 		commands.registerCommand("gatomia.menu.open", async () => {
