@@ -70,7 +70,7 @@
 - Features without current use cases are rejected
 - Refactoring happens when patterns emerge (Rule of Three)
 
-## Code Quality Standards
+## Code Quality Standards (MANDATORY - NON NEGOTIABLE)
 
 ### Formatting & Style
 
@@ -81,6 +81,7 @@
 - Semicolons required
 - Formatter (`npm run format`) MUST pass before commit
 - Linter (`npm run lint`) MUST pass before merge
+- Validation (`npm run check`) MUST pass before mark the task as completed
 
 ### Documentation
 

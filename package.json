@@ -426,6 +426,12 @@
         "icon": "$(desktop-download)"
       },
       {
+        "command": "gatomia.showWelcome",
+        "title": "Show Welcome Screen",
+        "category": "GatomIA",
+        "icon": "$(home)"
+      },
+      {
         "command": "gatomia.speckit.constitution",
         "title": "Create Constitution",
         "category": "GatomIA"
