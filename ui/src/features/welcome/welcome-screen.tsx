@@ -300,7 +300,7 @@ export const WelcomeScreen = () => {
 					)}
 				</div>
 				<p>An Agentic Spec-Driven Development Toolkit</p>
-				<div className="header-actions">
+				{/* <div className="header-actions">
 					<input
 						aria-label="Show welcome screen on startup"
 						checked={dontShowOnStartup}
@@ -312,7 +312,7 @@ export const WelcomeScreen = () => {
 					<label className="checkbox-label" htmlFor="showOnStartup">
 						<span>Show on startup</span>
 					</label>
-				</div>
+				</div> */}
 			</header>
 
 			<nav aria-label="Welcome screen sections" className="welcome-nav">
