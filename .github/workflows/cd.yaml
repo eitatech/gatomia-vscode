@@ -1,0 +1,532 @@
+name: Continuous Delivery
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: read
+  id-token: write
+  actions: write
+
+# Prevent concurrent CD runs
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ============================================================================
+  # Job 1: Determine release type based on merged branch
+  # ============================================================================
+  determine-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_type: ${{ steps.detect.outputs.release_type }}
+      should_release: ${{ steps.detect.outputs.should_release }}
+      source_branch: ${{ steps.detect.outputs.source_branch }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect source branch and release type
+        id: detect
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the merge commit message to extract PR info
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $COMMIT_MSG"
+
+          # Try to find the PR number from merge commit
+          PR_NUMBER=$(echo "$COMMIT_MSG" | grep -oP '(?<=#)\d+' | head -1 || echo "")
+
+          SOURCE_BRANCH=""
+          RELEASE_TYPE=""
+          SHOULD_RELEASE="false"
+
+          if [ -n "$PR_NUMBER" ]; then
+            echo "Found PR #$PR_NUMBER"
+            # Get the source branch from the PR
+            SOURCE_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName -q '.headRefName' 2>/dev/null || echo "")
+            echo "Source branch from PR: $SOURCE_BRANCH"
+          fi
+
+          # If we couldn't get it from PR, try to detect from commit parents
+          if [ -z "$SOURCE_BRANCH" ]; then
+            # Check if this is a merge commit (has 2 parents)
+            PARENT_COUNT=$(git rev-list --parents -n 1 HEAD | wc -w)
+            if [ "$PARENT_COUNT" -gt 2 ]; then
+              # This is a merge commit, try to get the merged branch name from message
+              SOURCE_BRANCH=$(echo "$COMMIT_MSG" | grep -oP "(?<=Merge (branch |pull request #\d+ from )['\"]?)[^'\"]+(?=['\"]?)" | head -1 || echo "")
+              # Also try pattern: "Merge branch 'xxx' into main"
+              if [ -z "$SOURCE_BRANCH" ]; then
+                SOURCE_BRANCH=$(echo "$COMMIT_MSG" | sed -n "s/.*Merge branch '\([^']*\)'.*/\1/p" | head -1 || echo "")
+              fi
+              # Try pattern from GitHub PR merges: "Merge pull request #X from owner/branch"
+              if [ -z "$SOURCE_BRANCH" ]; then
+                SOURCE_BRANCH=$(echo "$COMMIT_MSG" | sed -n 's/.*from [^/]*\/\([^ ]*\).*/\1/p' | head -1 || echo "")
+              fi
+            fi
+          fi
+
+          echo "Detected source branch: $SOURCE_BRANCH"
+
+          # Determine release type based on branch naming convention (Git Flow)
+          if [ -n "$SOURCE_BRANCH" ]; then
+            case "$SOURCE_BRANCH" in
+              release/*)
+                # Release branch = major version bump
+                RELEASE_TYPE="major"
+                SHOULD_RELEASE="true"
+                echo "Release branch detected -> MAJOR version bump"
+                ;;
+              hotfix/*|fix/*)
+                # Hotfix or fix branch = patch version bump
+                RELEASE_TYPE="patch"
+                SHOULD_RELEASE="true"
+                echo "Hotfix/Fix branch detected -> PATCH version bump"
+                ;;
+              develop|feature/*|feat/*)
+                # Develop or feature branch = minor version bump
+                RELEASE_TYPE="minor"
+                SHOULD_RELEASE="true"
+                echo "Develop/Feature branch detected -> MINOR version bump"
+                ;;
+              *)
+                # Unknown branch pattern - default to patch for safety
+                echo "Unknown branch pattern: $SOURCE_BRANCH"
+                # Only release if it looks like a meaningful merge
+                if echo "$COMMIT_MSG" | grep -qiE "(feat|fix|feature|hotfix|release|breaking)"; then
+                  RELEASE_TYPE="patch"
+                  SHOULD_RELEASE="true"
+                  echo "Detected release keywords in commit -> PATCH version bump"
+                else
+                  echo "No release keywords found, skipping release"
+                  SHOULD_RELEASE="false"
+                fi
+                ;;
+            esac
+          else
+            echo "Could not determine source branch"
+            # Check commit message for conventional commit patterns
+            if echo "$COMMIT_MSG" | grep -qE "^feat(\(.+\))?!:|BREAKING CHANGE"; then
+              RELEASE_TYPE="major"
+              SHOULD_RELEASE="true"
+            elif echo "$COMMIT_MSG" | grep -qE "^feat(\(.+\))?:"; then
+              RELEASE_TYPE="minor"
+              SHOULD_RELEASE="true"
+            elif echo "$COMMIT_MSG" | grep -qE "^fix(\(.+\))?:"; then
+              RELEASE_TYPE="patch"
+              SHOULD_RELEASE="true"
+            else
+              echo "No conventional commit pattern found, skipping release"
+              SHOULD_RELEASE="false"
+            fi
+          fi
+
+          echo "release_type=$RELEASE_TYPE" >> "$GITHUB_OUTPUT"
+          echo "should_release=$SHOULD_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "source_branch=$SOURCE_BRANCH" >> "$GITHUB_OUTPUT"
+
+          echo "=== Summary ==="
+          echo "Source Branch: $SOURCE_BRANCH"
+          echo "Release Type: $RELEASE_TYPE"
+          echo "Should Release: $SHOULD_RELEASE"
+
+  # ============================================================================
+  # Job 2: Quality Gates (Tests, Lint, Security Audit)
+  # ============================================================================
+  quality-gates:
+    needs: determine-release
+    if: needs.determine-release.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            ui/package-lock.json
+
+      - name: Install dependencies (root)
+        run: npm ci
+
+      - name: Install dependencies (ui)
+        run: npm --prefix ui ci
+
+      - name: Run linting and format check
+        run: npm run check
+
+      - name: Run tests
+        run: npm run test
+
+      - name: Security audit (root)
+        run: npm audit --audit-level=high
+        continue-on-error: false
+
+      - name: Security audit (ui)
+        run: npm --prefix ui audit --audit-level=high
+        continue-on-error: false
+
+      - name: Build project
+        run: npm run build
+
+  # ============================================================================
+  # Job 3: Version Bump and Changelog Generation
+  # ============================================================================
+  version-and-changelog:
+    needs: [determine-release, quality-gates]
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+      previous_version: ${{ steps.get_current.outputs.current_version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.EITA_PAT_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Get current version
+        id: get_current
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Current version: $CURRENT_VERSION"
+
+      - name: Calculate new version
+        id: bump
+        env:
+          RELEASE_TYPE: ${{ needs.determine-release.outputs.release_type }}
+          CURRENT_VERSION: ${{ steps.get_current.outputs.current_version }}
+        run: |
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+
+          case "$RELEASE_TYPE" in
+            major)
+              NEW_MAJOR=$((MAJOR + 1))
+              NEW_VERSION="${NEW_MAJOR}.0.0"
+              ;;
+            minor)
+              NEW_MINOR=$((MINOR + 1))
+              NEW_VERSION="${MAJOR}.${NEW_MINOR}.0"
+              ;;
+            patch)
+              NEW_PATCH=$((PATCH + 1))
+              NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+              ;;
+            *)
+              echo "::error::Invalid release type: $RELEASE_TYPE"
+              exit 1
+              ;;
+          esac
+
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "New version: $NEW_VERSION (type: $RELEASE_TYPE)"
+
+      - name: Update package.json version
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+        run: |
+          # Update root package.json
+          npm version "$NEW_VERSION" --no-git-tag-version --allow-same-version
+
+          echo "Updated package.json to version $NEW_VERSION"
+
+      - name: Generate changelog entry
+        id: changelog
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+          PREVIOUS_VERSION: ${{ steps.get_current.outputs.current_version }}
+          SOURCE_BRANCH: ${{ needs.determine-release.outputs.source_branch }}
+          RELEASE_TYPE: ${{ needs.determine-release.outputs.release_type }}
+        run: |
+          DATE=$(date +%Y-%m-%d)
+
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          # Create changelog entry
+          CHANGELOG_ENTRY="## v${NEW_VERSION} ${DATE}\n\n"
+
+          # Categorize commits
+          FEATURES=""
+          FIXES=""
+          CHANGES=""
+          BREAKING=""
+
+          if [ -n "$LAST_TAG" ]; then
+            COMMITS=$(git log "${LAST_TAG}..HEAD" --pretty=format:"%s" --no-merges)
+          else
+            COMMITS=$(git log --pretty=format:"%s" --no-merges -20)
+          fi
+
+          while IFS= read -r commit; do
+            [ -z "$commit" ] && continue
+
+            # Skip merge commits and version bumps
+            if echo "$commit" | grep -qE "^(Merge|chore\(release\))"; then
+              continue
+            fi
+
+            # Categorize by conventional commits
+            if echo "$commit" | grep -qE "^feat(\(.+\))?!:|BREAKING CHANGE"; then
+              BREAKING="${BREAKING}- ${commit}\n"
+            elif echo "$commit" | grep -qE "^feat(\(.+\))?:"; then
+              FEATURES="${FEATURES}- ${commit#feat*: }\n"
+            elif echo "$commit" | grep -qE "^fix(\(.+\))?:"; then
+              FIXES="${FIXES}- ${commit#fix*: }\n"
+            elif echo "$commit" | grep -qE "^(docs|style|refactor|perf|test|chore)(\(.+\))?:"; then
+              CHANGES="${CHANGES}- ${commit}\n"
+            else
+              # Non-conventional commits
+              CHANGES="${CHANGES}- ${commit}\n"
+            fi
+          done <<< "$COMMITS"
+
+          # Build changelog sections
+          if [ -n "$BREAKING" ]; then
+            CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### ⚠️ BREAKING CHANGES\n\n${BREAKING}\n"
+          fi
+
+          if [ -n "$FEATURES" ]; then
+            CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Added\n\n${FEATURES}\n"
+          fi
+
+          if [ -n "$FIXES" ]; then
+            CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Fixed\n\n${FIXES}\n"
+          fi
+
+          if [ -n "$CHANGES" ]; then
+            CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Changed\n\n${CHANGES}\n"
+          fi
+
+          # Add source info
+          if [ -n "$SOURCE_BRANCH" ]; then
+            CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Release Info\n\n"
+            CHANGELOG_ENTRY="${CHANGELOG_ENTRY}- **Source Branch**: \`${SOURCE_BRANCH}\`\n"
+            CHANGELOG_ENTRY="${CHANGELOG_ENTRY}- **Release Type**: ${RELEASE_TYPE}\n\n"
+          fi
+
+          CHANGELOG_ENTRY="${CHANGELOG_ENTRY}---\n\n"
+
+          # Prepend to CHANGELOG.md
+          if [ -f CHANGELOG.md ]; then
+            # Read existing content, skip the header
+            EXISTING=$(tail -n +4 CHANGELOG.md)
+            # Write new changelog
+            echo -e "# 📦 Changelog\n\n---\n\n${CHANGELOG_ENTRY}${EXISTING}" > CHANGELOG.md
+          else
+            echo -e "# 📦 Changelog\n\n---\n\n${CHANGELOG_ENTRY}" > CHANGELOG.md
+          fi
+
+          echo "Changelog updated for version $NEW_VERSION"
+
+          # Save changelog entry for release notes (without escape chars)
+          {
+            echo "CHANGELOG_CONTENT<<EOF"
+            echo -e "$CHANGELOG_ENTRY"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Commit version bump and changelog
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+        run: |
+          git add package.json package-lock.json CHANGELOG.md
+          git commit -m "chore(release): v${NEW_VERSION}
+
+          - Bump version to ${NEW_VERSION}
+          - Update CHANGELOG.md
+
+          [skip ci]"
+          git push origin main
+
+  # ============================================================================
+  # Job 4: Create Git Tag
+  # ============================================================================
+  create-tag:
+    needs: [version-and-changelog]
+    runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.tag.outputs.tag_name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+          token: ${{ secrets.EITA_PAT_TOKEN }}
+
+      - name: Pull latest changes
+        run: git pull origin main
+
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create and push tag
+        id: tag
+        env:
+          NEW_VERSION: ${{ needs.version-and-changelog.outputs.new_version }}
+        run: |
+          TAG_NAME="v${NEW_VERSION}"
+
+          # Check if tag already exists
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "::warning::Tag $TAG_NAME already exists locally, deleting..."
+            git tag -d "$TAG_NAME"
+          fi
+
+          if git ls-remote --tags origin "refs/tags/$TAG_NAME" | grep -q .; then
+            echo "::error::Tag $TAG_NAME already exists on remote!"
+            exit 1
+          fi
+
+          git tag -a "$TAG_NAME" -m "chore(release): $TAG_NAME"
+          git push origin "$TAG_NAME"
+
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "Created and pushed tag: $TAG_NAME"
+
+  # ============================================================================
+  # Job 5: Build and Publish Release
+  # ============================================================================
+  release:
+    needs: [version-and-changelog, create-tag]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.create-tag.outputs.tag_name }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            ui/package-lock.json
+
+      - name: Install dependencies (root)
+        run: npm ci
+
+      - name: Install dependencies (ui)
+        run: npm --prefix ui ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Build VSIX package
+        run: vsce package
+
+      - name: Extract changelog for release notes
+        id: release_notes
+        env:
+          VERSION: ${{ needs.version-and-changelog.outputs.new_version }}
+        run: |
+          # Extract the changelog section for the current version
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[?v?" ver {capture=1; next}
+            capture && $0 ~ /^## / {capture=0}
+            capture {print}
+          ' CHANGELOG.md > version_changelog.txt
+
+          if [ -s version_changelog.txt ]; then
+            {
+              echo "NOTES<<EOF"
+              cat version_changelog.txt
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "NOTES=Release v${VERSION}" >> "$GITHUB_OUTPUT"
+          fi
+
+          rm -f version_changelog.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-tag.outputs.tag_name }}
+          name: Release ${{ needs.create-tag.outputs.tag_name }}
+          body: |
+            ## Release ${{ needs.create-tag.outputs.tag_name }}
+
+            ${{ steps.release_notes.outputs.NOTES }}
+
+            ---
+
+            ### Installation
+
+            **VS Code Marketplace**: Search for "GatomIA" in the Extensions view
+
+            **Open VSX**: Available at [open-vsx.org](https://open-vsx.org/extension/EITA/gatomia)
+
+            **Manual**: Download the `.vsix` file below and install via `code --install-extension <file>.vsix`
+          files: '*.vsix'
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
+      - name: Publish to VS Code Marketplace
+        uses: HaaLeo/publish-vscode-extension@v2
+        with:
+          pat: ${{ secrets.VSCE_PAT }}
+          registryUrl: https://marketplace.visualstudio.com
+          dependencies: false
+          skipDuplicate: true
+
+      - name: Publish to Open VSX
+        uses: HaaLeo/publish-vscode-extension@v2
+        with:
+          pat: ${{ secrets.OPENVSX_PAT }}
+          registryUrl: https://open-vsx.org
+          dependencies: false
+          skipDuplicate: true
+
+      - name: Summary
+        env:
+          VERSION: ${{ needs.version-and-changelog.outputs.new_version }}
+          PREVIOUS: ${{ needs.version-and-changelog.outputs.previous_version }}
+          TAG: ${{ needs.create-tag.outputs.tag_name }}
+        run: |
+          echo "## 🚀 Release Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Previous Version | $PREVIOUS |" >> $GITHUB_STEP_SUMMARY
+          echo "| New Version | $VERSION |" >> $GITHUB_STEP_SUMMARY
+          echo "| Git Tag | $TAG |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Published To:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ GitHub Releases" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ VS Code Marketplace" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Open VSX Registry" >> $GITHUB_STEP_SUMMARY
