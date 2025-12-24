@@ -78,7 +78,7 @@ describe("Send to Review - Gating and Transitions", () => {
 
 			const result = canSendToReview(mockSpec.id);
 			expect(result.canSend).toBe(false);
-			expect(result.blockers).toContain("Spec not in current status");
+			expect(result.blockers).toContain("Spec already in review");
 		});
 
 		it("allows reopened specs to be sent to review", () => {
