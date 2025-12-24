@@ -48,4 +48,12 @@ export class NotificationUtils {
 	static showInfo(message: string): void {
 		window.showInformationMessage(message);
 	}
+
+	/**
+	 * Show a review-alert notification (shared by manual + automatic review flows)
+	 * @param message - The review alert message to display
+	 */
+	static showReviewAlert(message: string): void {
+		window.showInformationMessage(message);
+	}
 }

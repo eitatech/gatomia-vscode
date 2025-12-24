@@ -49,6 +49,7 @@ import {
 	SEND_TO_REVIEW_COMMAND_ID,
 	handleSendToReview,
 } from "./features/spec/review-flow/commands/send-to-review-command";
+import { initializeAutoReviewTransitions } from "./features/spec/review-flow/state";
 import {
 	SEND_TO_ARCHIVED_COMMAND_ID,
 	UNARCHIVE_COMMAND_ID,
@@ -364,6 +365,8 @@ export async function activate(context: ExtensionContext) {
 	// Set managers
 	specExplorer.setSpecManager(specManager);
 	steeringExplorer.setSteeringManager(steeringManager);
+	initializeAutoReviewTransitions();
+	outputChannel.appendLine("[ReviewFlow] Auto review transitions initialized");
 
 	context.subscriptions.push(
 		window.registerTreeDataProvider(

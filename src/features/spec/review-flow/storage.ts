@@ -41,6 +41,7 @@ export interface PersistedSpecification {
 	pendingTasks?: number;
 	pendingChecklistItems?: number;
 	changeRequests?: PersistedChangeRequest[];
+	watchers?: string[];
 }
 
 /**
@@ -64,6 +65,7 @@ export function serializeSpecification(
 		pendingTasks: spec.pendingTasks,
 		pendingChecklistItems: spec.pendingChecklistItems,
 		changeRequests: spec.changeRequests?.map(serializeChangeRequest),
+		watchers: spec.watchers,
 	};
 }
 
@@ -88,6 +90,7 @@ export function deserializeSpecification(
 		pendingTasks: data.pendingTasks,
 		pendingChecklistItems: data.pendingChecklistItems,
 		changeRequests: data.changeRequests?.map(deserializeChangeRequest),
+		watchers: data.watchers,
 	};
 }
 
