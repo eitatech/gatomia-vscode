@@ -258,3 +258,10 @@ npm test -- -t "MCP"
 - Build webview: `npm run build:webview`
 - Check browser console in webview (Ctrl+Shift+I)
 - Verify bridge communication in extension logs
+
+## Active Technologies
+- TypeScript 5.3+ (strict) + VS Code Extension API, React 18, Spec Explorer stores, telemetry helpers in `src/features/spec/review-flow/telemetry.ts` (001-auto-review-transition)
+- JSON workspace state `.vscode/gatomia/spec-review-state.json` managed via `review-flow/state.ts` + `storage.ts` (001-auto-review-transition)
+
+## Recent Changes
+- 001-auto-review-transition: Added TypeScript 5.3+ (strict) + VS Code Extension API, React 18, Spec Explorer stores, telemetry helpers in `src/features/spec/review-flow/telemetry.ts`
