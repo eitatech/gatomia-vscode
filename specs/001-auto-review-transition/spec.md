@@ -3,13 +3,13 @@
 **Feature Branch**: `001-auto-review-transition`  
 **Created**: 2025-12-24  
 **Status**: Draft  
-**Input**: User description: "specificações que foram concluídas não estão indo para a aba de review isso deveria ocorrer automaticamente, após todas as tarefas de uma especificação terem sido marcadas como concluídas, ou caso o usuário clique com o botão da direita e selecione send to review precisamos corrigir esse fluxo."
+**Input**: User description: "Specifications that have been completed are not going to the review area. This should happen automatically, after all tasks in a specification have been marked as completed, or if the user right-clicks and selects "send to review." We need to correct this flow."
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Auto move when work is done (Priority: P1)
 
-Spec owners need their completed specifications to appear in the Review tab as soon as every task linked to that spec is marked as concluída so they can hand off for approval without extra clicks.
+Spec owners need their completed specifications to appear in the Review area as soon as every task linked to that spec is marked as concluída so they can hand off for approval without extra clicks.
 
 **Why this priority**: Prevents the review backlog from stalling because owners forget to manually move the card, which currently blocks reviewers entirely.
 
@@ -17,8 +17,10 @@ Spec owners need their completed specifications to appear in the Review tab as s
 
 **Acceptance Scenarios**:
 
-1. **Given** a specification in the “Em Progresso” column with at least one tarefa pendente, **When** the final tarefa for that specification is marked concluída, **Then** the specification status updates to “Review” and the card appears in the Review tab without user action.
-2. **Given** a specification already moved to Review by automation, **When** reviewers open the Review tab, **Then** the new card is visible with the completion timestamp and awaiting reviewer assignment.
+1. **Given** a specification is in the **“In Progress”**  and has at least one pending task, **When** the last remaining task is marked **Completed**, **Then** the specification status automatically updates to **“Review”** and the specification appears in the **Review** tree without any user action.
+
+2. **Given** a specification has already been moved to **Review** automatically, **When** reviewers open the **Review** tree, **Then** the specification is visible with the **completion timestamp** and is **awaiting reviewer assignment**.
+
 
 ---
 
@@ -28,25 +30,25 @@ Spec owners sometimes prefer to trigger the review handoff manually (e.g., after
 
 **Why this priority**: Provides agency when automation is delayed or when owners deliberately override the auto-trigger after double-checking the work.
 
-**Independent Test**: From a clean workspace, right-click an eligible specification, choose “Send to review,” and verify the Review tab reflects the change immediately and acknowledges the triggering user.
+**Independent Test**: From a clean workspace, right-click an eligible specification, choose “Send to review,” and verify the Review tree reflects the change immediately and acknowledges the triggering user.
 
 **Acceptance Scenarios**:
 
-1. **Given** a specification that is eligible for review, **When** the user right-clicks it (em qualquer lista relevante) and selects “Send to review,” **Then** the specification status, Review tab entry, and audit log all update with the initiating user and timestamp.
+1. **Given** a specification that is eligible for review, **When** the user right-clicks it (in any relevant item) and selects “Send to review,” **Then** the specification status, Review tree entry, and audit log all update with the initiating user and timestamp.
 
 ---
 
 ### User Story 3 - Consistent status handling (Priority: P3)
 
-Coordinators must trust that specs do not bounce between tabs or stay stuck when tarefas são reabertas, ensuring reviewers always see only ready items.
+Coordinators must trust that specs do not bounce between tabs or stay stuck when tasks are reopened, ensuring reviewers always see only ready items.
 
-**Why this priority**: Maintains predictability and prevents reviewers from wasting tempo on specs that are not realmente prontas.
+**Why this priority**: Maintains predictability and prevents reviewers from wasting tempo on specs that are not really ready.
 
-**Independent Test**: Simulate reopening uma tarefa after a review transition and verify the specification leaves the Review tab until it becomes eligible again.
+**Independent Test**: Simulate reopening one task after a review transition and verify the specification leaves the Review tab until it becomes eligible again.
 
 **Acceptance Scenarios**:
 
-1. **Given** a specification sitting in Review because all tasks were concluídas, **When** qualquer tarefa é reaberta ou marcada como pendente novamente, **Then** the specification is removed from Review and flagged back to the execution column until all tarefas return to concluídas.
+1. **Given** a specification sitting in Review because all tasks were completed, **When** any task is reopened or marked as pending again, **Then** the specification is removed from Review and flagged back to the execution column until all tasks return to completed.
 
 ---
 
@@ -60,29 +62,29 @@ Coordinators must trust that specs do not bounce between tabs or stay stuck when
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST continuously evaluate each specification’s tarefas and flag a specification as “eligible for review” only when 100% of its tarefas estão com status concluído.
-- **FR-002**: When a specification first becomes eligible, the system MUST automatically mudar o status para “Review”, mover o card para a respectiva aba e registrar o horário e usuário (ou processo) que disparou a mudança.
-- **FR-003**: The Review tab MUST refresh (ou receber push) para refletir o novo card em até 10 segundos após a transição automática sem exigir reload manual da UI.
-- **FR-004**: A contexto action “Send to review” MUST estar disponível para todas as especificações prontas e, ao ser acionada, executar o mesmo fluxo de transição, incluindo mensagens de sucesso e feedback imediato ao usuário.
-- **FR-005**: Caso a transição manual seja solicitada para um item já em Review, the system MUST bloquear operações duplicadas e informar ao usuário que o item já está lá.
-- **FR-006**: Se qualquer tarefa for reaberta depois da ida para Review, the system MUST remover o card da aba Review, restaurar o status anterior e notificar os stakeholders relevantes.
-- **FR-007**: Cada transição (automática ou manual) MUST emitir telemetria e logs com ID da especificação, usuário envolvido (quando aplicável), timestamps e resultado (sucesso/falha) para auditoria.
-- **FR-008**: Toda transição para Review MUST disparar notificações no canal padrão de alertas de revisão para todos os revisores ou watchers atribuídos, garantindo confirmação imediata do novo item.
+- **FR-001**: The system MUST continuously evaluate each specification’s tasks and flag a specification as “eligible for review” only when 100% of its tasks have a completed status.
+- **FR-002**: When a specification first becomes eligible, the system MUST automatically change the status to “Review”, move the card to the respective tab, and record the time and user (or process) that triggered the change.
+- **FR-003**: The Review tab MUST refresh (or receive a push) to reflect the new card within 10 seconds after the automatic transition without requiring a manual UI reload.
+- **FR-004**: The “Send to review” context action MUST be available for all ready specifications and, when triggered, execute the same transition flow, including success messages and immediate user feedback.
+- **FR-005**: If a manual transition is requested for an item already in Review, the system MUST block duplicate operations and inform the user that the item is already there.
+- **FR-006**: If any task is reopened after going to Review, the system MUST remove the card from the Review tab, restore the previous status, and notify the relevant stakeholders.
+- **FR-007**: Each transition (automatic or manual) MUST emit telemetry and logs with the specification ID, user involved (when applicable), timestamps, and result (success/failure) for auditing purposes.
+- **FR-008**: Every transition to Review MUST trigger notifications on the standard review alert channel to all assigned reviewers or watchers, ensuring immediate confirmation of the new item.
 
 ### Key Entities *(include if feature involves data)*
 
-- **Especificação**: Item principal contendo título, autor, status atual, coluna exibida e o conjunto de tarefas vinculadas; é o objeto movido entre “Em Progresso” e “Review”.
-- **Tarefa**: Trabalho granular associado a uma especificação, possuindo status (pendente, em andamento, concluído) e timestamps; determina a elegibilidade da especificação.
-- **Evento de Transição para Review**: Registro audível que captura fonte (automática X manual), usuário, horário e resultado; alimenta relatórios e telemetria.
+- **Specification**: Main item containing title, author, current status, displayed column, and the set of linked tasks; it is the object moved between “In Progress” and “Review”.
+- **Task**: Granular work associated with a specification, possessing status (pending, in progress, completed) and timestamps; determines the eligibility of the specification.
+- **Transition to Review Event**: Audible record that captures source (automatic X manual), user, time, and result; feeds reports and telemetry.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: 95% das especificações com todas as tarefas concluídas devem aparecer na aba Review em até 10 segundos após o fechamento da última tarefa, medido em ambiente de staging.
-- **SC-002**: 100% das execuções do comando “Send to review” em especificações elegíveis devem resultar na transição bem-sucedida na primeira tentativa durante testes end-to-end.
-- **SC-003**: 0 tickets de suporte relacionados a “spec concluída não aparece em Review” durante o ciclo de release imediatamente após o lançamento.
-- **SC-004**: 100% dos eventos de ida ou saída de Review devem constar nos logs/telemetria com os campos obrigatórios (ID da especificação, tipo de trigger, usuário quando houver, timestamp e status).
+- **SC-001**: 95% of specifications with all tasks completed must appear in the Review tab within 10 seconds of the last task being closed, measured in a staging environment.
+- **SC-002**: 100% of executions of the “Send to review” command on eligible specifications must result in a successful transition on the first attempt during end-to-end testing.
+- **SC-003**: 0 support tickets related to “completed spec does not appear in Review” during the release cycle immediately after launch.
+- **SC-004**: 100% of Review inbound or outbound events must be recorded in the logs/telemetry with the required fields (Specification ID, trigger type, user if applicable, timestamp, and status).
 
 ## Clarifications
 
@@ -92,6 +94,6 @@ Coordinators must trust that specs do not bounce between tabs or stay stuck when
 
 ## Assumptions
 
-- “Todas as tarefas concluídas” significa que nenhum item associado à especificação está marcado como pendente ou em andamento; tarefas recém-criadas contam imediatamente para a verificação.
-- A ação “Send to review” permanece disponível nos context menus das listas onde as especificações são exibidas atualmente (explorer e painel principal).
-- Notificações de erro podem usar os mesmos mecanismos já existentes para alertas no produto; não é necessário criar novos canais específicos.
+- “All tasks completed” means that no item associated with the specification is marked as pending or in progress; newly created tasks immediately count towards the review.
+- The “Send to review” action remains available in the context menus of the lists where the specifications are currently displayed (explorer and main panel).
+- Error notifications can use the same mechanisms already existing for alerts in the product; it is not necessary to create new specific channels.

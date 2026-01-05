@@ -276,6 +276,30 @@
         "icon": "$(play)"
       },
       {
+        "command": "gatomia.spec.sendToReview",
+        "title": "Send to Review",
+        "category": "GatomIA",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "gatomia.spec.reopen",
+        "title": "Reopen (Back to Current)",
+        "category": "GatomIA",
+        "icon": "$(arrow-left)"
+      },
+      {
+        "command": "gatomia.spec.sendToArchived",
+        "title": "Send to Archived",
+        "category": "GatomIA",
+        "icon": "$(archive)"
+      },
+      {
+        "command": "gatomia.spec.unarchive",
+        "title": "Unarchive",
+        "category": "GatomIA",
+        "icon": "$(arrow-up)"
+      },
+      {
         "command": "gatomia.hooks.export",
         "title": "Export Hooks",
         "category": "GatomIA",
@@ -606,7 +630,7 @@
       "view/item/context": [
         {
           "command": "gatomia.spec.delete",
-          "when": "view == gatomia.views.specExplorer && viewItem == spec",
+          "when": "view == gatomia.views.specExplorer && (viewItem == spec || viewItem == spec-current || viewItem == spec-review || viewItem == spec-archived)",
           "group": "7_modification"
         },
         {
@@ -623,6 +647,31 @@
           "command": "gatomia.spec.runTaskGroup",
           "when": "view == gatomia.views.specExplorer && viewItem == task-group",
           "group": "inline"
+        },
+        {
+          "command": "gatomia.spec.sendToReview",
+          "when": "view == gatomia.views.specExplorer && viewItem == spec-current",
+          "group": "inline@1"
+        },
+        {
+          "command": "gatomia.spec.reopen",
+          "when": "view == gatomia.views.specExplorer && viewItem == spec-review",
+          "group": "inline@1"
+        },
+        {
+          "command": "gatomia.spec.sendToArchived",
+          "when": "view == gatomia.views.specExplorer && viewItem == spec-review",
+          "group": "inline@2"
+        },
+        {
+          "command": "gatomia.spec.unarchive",
+          "when": "view == gatomia.views.specExplorer && viewItem == spec-archived",
+          "group": "inline@1"
+        },
+        {
+          "command": "gatomia.spec.delete",
+          "when": "view == gatomia.views.specExplorer && (viewItem == spec-current || viewItem == spec-review || viewItem == spec-archived)",
+          "group": "inline@9"
         },
         {
           "command": "gatomia.prompts.run",
