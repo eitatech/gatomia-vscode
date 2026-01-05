@@ -20,8 +20,7 @@ function escapeHtml(text: string): string {
  * Plugin for markdown-it that detects task group headers and adds an execute button.
  * Detects headers like "## Phase X: User Story Y" and wraps them with an interactive button.
  */
-const PHASE_USER_STORY_PATTERN =
-	/^(Phase\s+\d+:\s*[^(]*?)(\s*\(P\d+\))?\s*(?:🎯)?.*$/i;
+const PHASE_USER_STORY_PATTERN = /^(Phase\s+\d+:\s*[^(]*?)(\s*\(P\d+\))?.*$/i;
 
 function isTaskGroupHeading(token: Token): boolean {
 	if (token.type !== "inline") {

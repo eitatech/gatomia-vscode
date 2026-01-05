@@ -66,10 +66,10 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 		specId: string,
 		system?: SpecSystemMode
 	): SpecItem {
-		return new SpecItem(
+		const item = new SpecItem(
 			label,
 			TreeItemCollapsibleState.Collapsed,
-			"spec",
+			"spec-current",
 			this.context,
 			specId,
 			undefined,
@@ -78,6 +78,14 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 			undefined,
 			system
 		);
+		const state = getSpecState(specId);
+		if (state) {
+			const reviewExitTooltip = this.getReviewExitTooltip(state);
+			if (reviewExitTooltip) {
+				item.tooltip = reviewExitTooltip;
+			}
+		}
+		return item;
 	}
 
 	private createReviewSpecItem(
@@ -85,7 +93,18 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 		specId: string,
 		system?: SpecSystemMode
 	): SpecItem {
-		const item = this.createSpecItem(label, specId, system);
+		const item = new SpecItem(
+			label,
+			TreeItemCollapsibleState.Collapsed,
+			"spec-review",
+			this.context,
+			specId,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			system
+		);
 		const state = getSpecState(specId);
 		if (state) {
 			item.description = this.describeReviewSpec(state);
@@ -100,7 +119,18 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 		specId: string,
 		system?: SpecSystemMode
 	): SpecItem {
-		const item = this.createSpecItem(label, specId, system);
+		const item = new SpecItem(
+			label,
+			TreeItemCollapsibleState.Collapsed,
+			"spec-archived",
+			this.context,
+			specId,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			system
+		);
 		const state = getSpecState(specId);
 		if (state?.archivedAt) {
 			item.description = `Archived ${state.archivedAt.toLocaleDateString()}`;
@@ -131,6 +161,30 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 			);
 		}
 		return parts.length > 0 ? parts.join(" | ") : "Ready for reviewers";
+	}
+
+	private getReviewExitTooltip(state: Specification): string | null {
+		if (!(state.status === "current" || state.status === "reopened")) {
+			return null;
+		}
+		if (!state.reviewEnteredAt) {
+			return null;
+		}
+		const pendingTasks = state.pendingTasks ?? 0;
+		const pendingChecklistItems = state.pendingChecklistItems ?? 0;
+		if (pendingTasks === 0 && pendingChecklistItems === 0) {
+			return null;
+		}
+		const parts: string[] = [];
+		if (pendingTasks > 0) {
+			parts.push(`${pendingTasks} task${pendingTasks === 1 ? "" : "s"}`);
+		}
+		if (pendingChecklistItems > 0) {
+			parts.push(
+				`${pendingChecklistItems} checklist item${pendingChecklistItems === 1 ? "" : "s"}`
+			);
+		}
+		return `Returned from Review: ${parts.join(" | ")}`;
 	}
 
 	setSpecManager(specManager: SpecManager) {
@@ -277,7 +331,12 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 			);
 		}
 
-		if (element.contextValue === "spec") {
+		if (
+			element.contextValue === "spec" ||
+			element.contextValue === "spec-current" ||
+			element.contextValue === "spec-review" ||
+			element.contextValue === "spec-archived"
+		) {
 			// Handle SpecKit System
 			if (element.system === SPEC_SYSTEM_MODE.SPECKIT) {
 				const adapter = getSpecSystemAdapter();
@@ -717,6 +776,9 @@ class SpecItem extends TreeItem {
 	private getContextHandler(): (() => void) | undefined {
 		const handlers: Record<string, () => void> = {
 			spec: () => this.handleSpecIcon(),
+			"spec-current": () => this.handleSpecIcon(),
+			"spec-review": () => this.handleSpecIcon(),
+			"spec-archived": () => this.handleSpecIcon(),
 			change: () => this.handleSpecIcon(),
 			"change-spec": () => this.handleSpecIcon(),
 			"spec-document": () => this.updateDocumentIcon(),

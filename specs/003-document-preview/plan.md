@@ -55,7 +55,7 @@ src/
 ├── panels/             # Webview providers, serialization helpers
 └── utils/              # Shared helpers (telemetry, file IO)
 
-webview-ui/
+ui/
 ├── src/
 │   ├── components/     # React UI for preview + refinement form
 │   ├── features/       # Zustand stores, hooks
@@ -68,7 +68,7 @@ tests/
 └── __mocks__/          # Shared fixtures (VS Code APIs, document data)
 ```
 
-**Structure Decision**: Maintain existing extension + webview split; add preview-specific modules under `src/panels` and `webview-ui/src/features/preview` plus corresponding tests in `tests/unit/features/documents` and `webview-ui/tests/preview`.
+**Structure Decision**: Maintain existing extension + webview split; add preview-specific modules under `src/panels` and `ui/src/features/preview` plus corresponding tests in `tests/unit/features/documents` and `ui/tests/preview`.
 
 ## Complexity Tracking
 

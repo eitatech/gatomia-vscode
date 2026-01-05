@@ -1,0 +1,917 @@
+/**
+ * Welcome Screen Styles
+ * Uses VS Code theme variables for automatic light/dark theme support
+ */
+
+/* Codicons (VS Code icon font) - already loaded by VS Code, just define the class */
+.codicon {
+	font:
+		normal normal normal 16px / 1 codicon,
+		sans-serif;
+	display: inline-block;
+	text-decoration: none;
+	text-rendering: auto;
+	text-align: center;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+}
+
+.welcome-screen {
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+	overflow-y: auto;
+	background-color: var(--vscode-editor-background);
+	color: var(--vscode-editor-foreground);
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	padding: 0;
+	margin: 0;
+}
+
+/* ============================================================================
+ * Header
+ * ============================================================================ */
+
+.welcome-header {
+	display: flex;
+	flex-direction: column;
+	padding: 24px 32px 0;
+	border-bottom: none;
+	background-color: var(--vscode-sideBar-background);
+}
+
+.welcome-header h1 {
+	font-size: 24px;
+	font-weight: 600;
+	margin: 0 0 8px 0;
+	color: var(--vscode-foreground);
+}
+
+.welcome-header p {
+	font-size: 14px;
+	color: var(--vscode-descriptionForeground);
+	margin: 0 0 20px 0;
+}
+
+/* ============================================================================
+ * Navigation
+ * ============================================================================ */
+
+.welcome-nav {
+	display: flex;
+	gap: 4px;
+	padding: 0 32px;
+	background-color: var(--vscode-sideBar-background);
+	border-bottom: 1px solid var(--vscode-panel-border);
+	overflow-x: auto;
+}
+
+.welcome-nav button {
+	padding: 12px 20px;
+	background: transparent;
+	border: none;
+	border-bottom: 2px solid transparent;
+	color: var(--vscode-foreground);
+	font-family: var(--vscode-font-family);
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	white-space: nowrap;
+}
+
+/* Better focus indicators for keyboard navigation (T126) */
+button:focus-visible,
+input:focus-visible,
+a:focus-visible {
+	outline: 2px solid var(--vscode-focusBorder);
+	outline-offset: 2px;
+}
+
+.welcome-nav button:hover {
+	background-color: var(--vscode-list-hoverBackground);
+	color: var(--vscode-textLink-foreground);
+}
+
+.welcome-nav button.active {
+	border-bottom-color: var(--vscode-textLink-foreground);
+	color: var(--vscode-textLink-foreground);
+}
+
+.welcome-header-title {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	font-size: 20px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+}
+
+.welcome-header-version {
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	font-weight: 400;
+}
+
+.welcome-header-actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+/* ============================================================================
+ * Main Content
+ * ============================================================================ */
+
+.welcome-content {
+	flex: 1;
+	padding: 0;
+	overflow-y: auto;
+}
+
+.welcome-section {
+	padding: 32px 32px;
+}
+
+.welcome-section:last-child {
+	border-bottom: none;
+}
+
+.welcome-section-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 20px;
+}
+
+.welcome-section-title {
+	font-size: 18px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.welcome-section-description {
+	color: var(--vscode-descriptionForeground);
+	margin-bottom: 20px;
+	line-height: 1.6;
+}
+
+/* ============================================================================
+ * Cards
+ * ============================================================================ */
+
+.welcome-card-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: 16px;
+}
+
+.welcome-card {
+	padding: 20px;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 6px;
+	background-color: var(--vscode-editor-background);
+	transition: all 0.2s ease;
+	cursor: pointer;
+}
+
+.welcome-card:hover {
+	border-color: var(--vscode-focusBorder);
+	background-color: var(--vscode-list-hoverBackground);
+	transform: translateY(-2px);
+	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.welcome-card-header {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 12px;
+}
+
+.welcome-card-icon {
+	width: 24px;
+	height: 24px;
+	color: var(--vscode-symbolIcon-classForeground);
+}
+
+.welcome-card-title {
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	flex: 1;
+}
+
+.welcome-card-description {
+	color: var(--vscode-descriptionForeground);
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+/* ============================================================================
+ * Status Indicators
+ * ============================================================================ */
+
+.status-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 12px;
+	border-radius: 12px;
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.status-badge.success {
+	background-color: var(--vscode-testing-iconPassed);
+	color: var(--vscode-editor-background);
+}
+
+.status-badge.warning {
+	background-color: var(--vscode-editorWarning-foreground);
+	color: var(--vscode-editor-background);
+}
+
+.status-badge.error {
+	background-color: var(--vscode-editorError-foreground);
+	color: var(--vscode-editor-background);
+}
+
+.status-badge.inactive {
+	background-color: var(--vscode-badge-background);
+	color: var(--vscode-badge-foreground);
+}
+
+/* ============================================================================
+ * Buttons
+ * ============================================================================ */
+
+.welcome-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 16px;
+	border: none;
+	border-radius: 4px;
+	font-family: var(--vscode-font-family);
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.welcome-button-primary {
+	background-color: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+}
+
+.welcome-button-primary:hover {
+	background-color: var(--vscode-button-hoverBackground);
+}
+
+.welcome-button-secondary {
+	background-color: var(--vscode-button-secondaryBackground);
+	color: var(--vscode-button-secondaryForeground);
+}
+
+.welcome-button-secondary:hover {
+	background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.welcome-button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* ============================================================================
+ * Configuration Items
+ * ============================================================================ */
+
+.config-group {
+	margin-bottom: 24px;
+}
+
+.config-group-title {
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.config-group-description {
+	font-size: 13px;
+	color: var(--vscode-descriptionForeground);
+	margin-bottom: 16px;
+	line-height: 1.5;
+}
+
+.config-item {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 16px;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+	margin-bottom: 12px;
+	background-color: var(--vscode-editor-background);
+}
+
+.config-label {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	margin-bottom: 4px;
+}
+
+.config-readonly-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 8px;
+	border-radius: 8px;
+	background-color: var(--vscode-badge-background);
+	color: var(--vscode-badge-foreground);
+	font-size: 10px;
+	font-weight: 500;
+	margin-left: 8px;
+}
+
+.config-description {
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	line-height: 1.5;
+	margin: 0;
+}
+
+.config-input {
+	flex: 1;
+	padding: 8px 12px;
+	background-color: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 3px;
+	font-family: var(--vscode-font-family);
+	font-size: 13px;
+	transition: border-color 0.2s ease;
+}
+
+.config-input:focus {
+	outline: none;
+	border-color: var(--vscode-focusBorder);
+	box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+.config-input:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.config-input::placeholder {
+	color: var(--vscode-input-placeholderForeground);
+}
+
+.config-input[type="text"] {
+	font-family: var(--vscode-editor-font-family, var(--vscode-font-family));
+}
+
+/* Dropdown/Select styling */
+.config-input[id^="config-gatomia.specSystem"] {
+	cursor: pointer;
+	background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="currentColor" d="M6 9L1 4h10z"/></svg>');
+	background-repeat: no-repeat;
+	background-position: right 10px center;
+	padding-right: 32px;
+}
+
+/* Read-only configuration list */
+.config-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.config-readonly-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 16px;
+	background-color: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+}
+
+.config-readonly-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+	color: var(--vscode-foreground);
+	font-weight: 500;
+}
+
+.config-readonly-value {
+	font-size: 13px;
+	color: var(--vscode-descriptionForeground);
+	font-family: var(--vscode-editor-font-family, var(--vscode-font-family));
+}
+
+/* Configuration tips section */
+.config-tips {
+	margin-top: 32px;
+	padding: 16px;
+	background-color: color-mix(
+		in srgb,
+		var(--vscode-textBlockQuote-background) 50%,
+		transparent
+	);
+	border-radius: 4px;
+	border-left: 3px solid var(--vscode-textLink-foreground);
+}
+
+.config-tips h4 {
+	font-size: 13px;
+	font-weight: 600;
+	margin: 0 0 8px 0;
+	color: var(--vscode-foreground);
+}
+
+.config-tips ul {
+	margin: 0 0 0 20px;
+	padding: 0;
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	line-height: 1.8;
+}
+
+.config-tips ul li {
+	margin-bottom: 4px;
+}
+
+.config-tips ul li strong {
+	color: var(--vscode-foreground);
+	font-weight: 600;
+}
+
+.config-item-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.config-item-label {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+}
+
+.config-item-description {
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	line-height: 1.5;
+}
+
+.config-item-value {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.config-select {
+	padding: 6px 10px;
+	background-color: var(--vscode-dropdown-background);
+	color: var(--vscode-dropdown-foreground);
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: 3px;
+	font-family: var(--vscode-font-family);
+	font-size: 13px;
+	cursor: pointer;
+}
+
+/* ============================================================================
+ * Diagnostics
+ * ============================================================================ */
+
+.diagnostic-list {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.diagnostic-item {
+	display: flex;
+	gap: 12px;
+	padding: 16px;
+	border-left: 3px solid;
+	background-color: var(--vscode-editor-background);
+	border-radius: 4px;
+}
+
+.diagnostic-item.error {
+	border-left-color: var(--vscode-editorError-foreground);
+	background-color: color-mix(
+		in srgb,
+		var(--vscode-editorError-background) 20%,
+		transparent
+	);
+}
+
+.diagnostic-item.warning {
+	border-left-color: var(--vscode-editorWarning-foreground);
+	background-color: color-mix(
+		in srgb,
+		var(--vscode-editorWarning-background) 20%,
+		transparent
+	);
+}
+
+.diagnostic-icon {
+	flex-shrink: 0;
+	width: 20px;
+	height: 20px;
+}
+
+.diagnostic-content {
+	flex: 1;
+}
+
+.diagnostic-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 6px;
+}
+
+.diagnostic-message {
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--vscode-foreground);
+}
+
+.diagnostic-timestamp {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.diagnostic-source {
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	margin-bottom: 8px;
+}
+
+.diagnostic-action {
+	font-size: 12px;
+	color: var(--vscode-textLink-foreground);
+	margin-top: 8px;
+}
+
+/* ============================================================================
+ * Learning Resources
+ * ============================================================================ */
+
+.learning-filters {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 20px;
+	flex-wrap: wrap;
+}
+
+.learning-filter-button {
+	padding: 6px 14px;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 16px;
+	background-color: transparent;
+	color: var(--vscode-foreground);
+	font-size: 12px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.learning-filter-button.active {
+	background-color: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border-color: var(--vscode-button-background);
+}
+
+.learning-filter-button:hover:not(.active) {
+	border-color: var(--vscode-focusBorder);
+}
+
+.learning-search {
+	margin-bottom: 20px;
+}
+
+.learning-search-input {
+	width: 100%;
+	padding: 10px 16px;
+	background-color: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 4px;
+	font-family: var(--vscode-font-family);
+	font-size: 13px;
+}
+
+.learning-search-input:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.resource-card {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 16px;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 6px;
+	background-color: var(--vscode-editor-background);
+	transition: all 0.2s ease;
+	cursor: pointer;
+}
+
+.resource-card:hover {
+	border-color: var(--vscode-focusBorder);
+	transform: translateX(4px);
+}
+
+.resource-card-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.resource-card-title {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--vscode-textLink-foreground);
+}
+
+.resource-card-meta {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.resource-card-description {
+	font-size: 13px;
+	color: var(--vscode-descriptionForeground);
+	line-height: 1.5;
+}
+
+.resource-card-category {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 8px;
+	background-color: var(--vscode-badge-background);
+	color: var(--vscode-badge-foreground);
+	font-size: 11px;
+	font-weight: 500;
+}
+
+/* ============================================================================
+ * Loading & Empty States
+ * ============================================================================ */
+
+.welcome-loading {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	min-height: 400px;
+	gap: 16px;
+}
+
+.welcome-spinner {
+	width: 32px;
+	height: 32px;
+	border: 3px solid var(--vscode-panel-border);
+	border-top-color: var(--vscode-progressBar-background);
+	border-radius: 50%;
+	animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.welcome-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 48px 32px;
+	color: var(--vscode-descriptionForeground);
+	text-align: center;
+}
+
+.welcome-empty-title {
+	font-size: 16px;
+	font-weight: 600;
+	margin-bottom: 8px;
+	color: var(--vscode-foreground);
+}
+
+.welcome-empty-description {
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+/* ============================================================================
+ * Preferences
+ * ============================================================================ */
+
+.welcome-preference {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 12px 0;
+}
+
+.welcome-checkbox {
+	width: 16px;
+	height: 16px;
+	cursor: pointer;
+	accent-color: var(--vscode-checkbox-background);
+}
+
+.welcome-preference-label {
+	font-size: 13px;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	user-select: none;
+}
+
+/* ============================================================================
+ * Responsive Design
+ * ============================================================================ */
+
+@media (max-width: 768px) {
+	.welcome-section {
+		padding: 24px 16px;
+	}
+
+	.welcome-header {
+		padding: 16px 16px;
+	}
+
+	.welcome-card-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* ============================================================================
+ * Accessibility
+ * ============================================================================ */
+
+.welcome-button:focus-visible,
+.welcome-card:focus-visible,
+.config-input:focus-visible,
+.learning-filter-button:focus-visible {
+	outline: 2px solid var(--vscode-focusBorder);
+	outline-offset: 2px;
+}
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border-width: 0;
+}
+
+/* ============================================================================
+ * T119-T124: Polish Phase Enhancements
+ * ============================================================================ */
+
+/* T119: Version badge in header */
+.header-content {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 8px;
+}
+
+.version-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 8px;
+	background-color: var(--vscode-badge-background);
+	color: var(--vscode-badge-foreground);
+	border-radius: 10px;
+	font-size: 12px;
+	font-weight: 500;
+}
+
+/* T120: Show on startup checkbox - VS Code monaco-custom-toggle pattern */
+.header-actions {
+	margin-top: 12px;
+}
+
+.checkbox-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+	user-select: none;
+	font-size: 13px;
+	color: var(--vscode-foreground);
+}
+
+/* Monaco custom toggle - matches VS Code's getting started checkbox */
+.monaco-custom-toggle {
+	width: 20px;
+	height: 20px;
+	border-radius: 3px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	background-color: var(--vscode-checkbox-background) !important;
+	border: 1px solid var(--vscode-checkbox-border) !important;
+	color: transparent;
+	transition: color 0.1s ease;
+}
+
+.checkbox-label .monaco-custom-toggle {
+	margin: 0 2px;
+}
+
+.monaco-custom-toggle:hover {
+	background-color: var(--vscode-checkbox-background) !important;
+}
+
+.monaco-custom-toggle.checked {
+	color: var(--vscode-checkbox-foreground) !important;
+	background-color: var(--vscode-checkbox-background) !important;
+}
+
+.monaco-custom-toggle.checked {
+	color: var(--vscode-checkbox-foreground) !important;
+	background-color: var(--vscode-checkbox-background) !important;
+}
+
+.monaco-custom-toggle:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 2px;
+}
+
+.checkbox-label span {
+	color: var(--vscode-foreground);
+}
+
+/* T124: Loading spinner */
+.spinner {
+	width: 40px;
+	height: 40px;
+	border: 4px solid var(--vscode-editorWidget-border);
+	border-top-color: var(--vscode-progressBar-background);
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+	margin: 0 auto 16px;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.loading-slow {
+	color: var(--vscode-editorWarning-foreground);
+	font-size: 12px;
+	margin-top: 8px;
+	animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+/* T122: Ensure proper theme support */
+.welcome-screen {
+	scroll-behavior: smooth;
+}
