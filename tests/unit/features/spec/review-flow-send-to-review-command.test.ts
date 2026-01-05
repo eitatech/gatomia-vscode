@@ -82,4 +82,35 @@ describe("Send to Review Command", () => {
 		);
 		expect(refreshCallback).toHaveBeenCalled();
 	});
+
+	it("accepts a Spec Explorer item argument", async () => {
+		const spec: Specification = {
+			id: "spec-123",
+			title: "Command Success Spec",
+			owner: "owner@example.com",
+			status: "review",
+			completedAt: new Date(),
+			reviewEnteredAt: new Date(),
+			archivedAt: null,
+			updatedAt: new Date(),
+			links: { specPath: "specs/spec-123/spec.md" },
+			pendingTasks: 0,
+			pendingChecklistItems: 0,
+		};
+
+		vi.mocked(sendToReviewWithTrigger).mockReturnValue({
+			result: spec,
+			blockers: [],
+		});
+
+		await handleSendToReview({ specName: "spec-123" });
+
+		expect(sendToReviewWithTrigger).toHaveBeenCalledWith(
+			expect.objectContaining({
+				specId: "spec-123",
+				triggerType: "manual",
+				initiatedBy: "manual-command",
+			})
+		);
+	});
 });

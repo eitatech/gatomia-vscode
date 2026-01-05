@@ -6,6 +6,7 @@
 import { window } from "vscode";
 import { archiveSpec, unarchiveSpec, canArchive, getSpecState } from "../state";
 import type { Specification } from "../types";
+import { resolveSpecIdFromCommandArg } from "./spec-command-args";
 
 export const SEND_TO_ARCHIVED_COMMAND_ID = "gatomia.spec.sendToArchived";
 export const UNARCHIVE_COMMAND_ID = "gatomia.spec.unarchive";
@@ -13,35 +14,83 @@ export const UNARCHIVE_COMMAND_ID = "gatomia.spec.unarchive";
 /**
  * Helper to generate blocker messages for archival
  */
+function isInReviewStatus(spec: Specification): boolean {
+	return spec.status === "review" || spec.status === "readyToReview";
+}
+
+function addStatusBlocker(blockers: string[], spec: Specification): void {
+	if (isInReviewStatus(spec)) {
+		return;
+	}
+	blockers.push(`spec status is "${spec.status}" (must be in review)`);
+}
+
+function addPendingTasksBlocker(
+	blockers: string[],
+	pendingTasks: number
+): void {
+	if (pendingTasks <= 0) {
+		return;
+	}
+	blockers.push(`${pendingTasks} pending task${pendingTasks === 1 ? "" : "s"}`);
+}
+
+function addPendingChecklistItemsBlocker(
+	blockers: string[],
+	pendingChecklistItems: number
+): void {
+	if (pendingChecklistItems <= 0) {
+		return;
+	}
+	blockers.push(
+		`${pendingChecklistItems} pending checklist item${pendingChecklistItems === 1 ? "" : "s"}`
+	);
+}
+
+function addOpenChangeRequestsBlocker(
+	blockers: string[],
+	openChangeRequests: number
+): void {
+	if (openChangeRequests <= 0) {
+		return;
+	}
+	blockers.push(
+		`${openChangeRequests} open change request${openChangeRequests === 1 ? "" : "s"}`
+	);
+}
+
+function addIncompleteTasksInChangeRequestsBlocker(
+	blockers: string[],
+	incompleteTasksInChangeRequests: boolean
+): void {
+	if (!incompleteTasksInChangeRequests) {
+		return;
+	}
+	blockers.push("incomplete tasks in change requests");
+}
+
 function getBlockerMessages(spec: Specification): string[] {
 	const blockers: string[] = [];
+	addStatusBlocker(blockers, spec);
+
 	const pendingTasks = spec.pendingTasks ?? 0;
+	addPendingTasksBlocker(blockers, pendingTasks);
+
 	const pendingChecklistItems = spec.pendingChecklistItems ?? 0;
+	addPendingChecklistItemsBlocker(blockers, pendingChecklistItems);
+
 	const openChangeRequests =
 		spec.changeRequests?.filter((cr) => cr.status !== "addressed").length ?? 0;
-	const incompleteTasksInChangeRequests =
-		spec.changeRequests?.some((cr) =>
-			cr.tasks.some((t) => t.status !== "done")
-		) ?? false;
+	addOpenChangeRequestsBlocker(blockers, openChangeRequests);
 
-	if (pendingTasks > 0) {
-		blockers.push(
-			`${pendingTasks} pending task${pendingTasks === 1 ? "" : "s"}`
-		);
-	}
-	if (pendingChecklistItems > 0) {
-		blockers.push(
-			`${pendingChecklistItems} pending checklist item${pendingChecklistItems === 1 ? "" : "s"}`
-		);
-	}
-	if (openChangeRequests > 0) {
-		blockers.push(
-			`${openChangeRequests} open change request${openChangeRequests === 1 ? "" : "s"}`
-		);
-	}
-	if (incompleteTasksInChangeRequests) {
-		blockers.push("incomplete tasks in change requests");
-	}
+	const incompleteTasksInChangeRequests =
+		spec.changeRequests?.some(
+			(cr) => cr.tasks?.some((t) => t.status !== "done") ?? false
+		) ?? false;
+	addIncompleteTasksInChangeRequestsBlocker(
+		blockers,
+		incompleteTasksInChangeRequests
+	);
 
 	return blockers;
 }
@@ -52,13 +101,25 @@ function getBlockerMessages(spec: Specification): string[] {
  * @param refreshCallback Optional callback to refresh the Spec Explorer
  */
 export async function handleSendToArchived(
-	specId: string,
+	specArg: unknown,
 	refreshCallback?: () => void
 ): Promise<void> {
+	const specId = resolveSpecIdFromCommandArg(specArg);
+	if (!specId) {
+		await window.showErrorMessage("Cannot archive spec: Spec not found");
+		return;
+	}
+
+	const existingSpec = getSpecState(specId);
+	if (!existingSpec) {
+		await window.showErrorMessage("Cannot archive spec: Spec not found");
+		return;
+	}
+
 	// Check gating conditions
 	if (!canArchive(specId)) {
 		// Get spec to build detailed error message
-		const spec = getSpecState(specId);
+		const spec = existingSpec;
 		let blockers: string[] = [];
 
 		if (spec) {
@@ -66,7 +127,9 @@ export async function handleSendToArchived(
 		}
 
 		const blockerMessage =
-			blockers.length > 0 ? blockers.join(", ") : "unknown blockers";
+			blockers.length > 0
+				? blockers.join(", ")
+				: "blocked (please refresh and try again)";
 		await window.showErrorMessage(`Cannot archive spec: ${blockerMessage}`);
 		return;
 	}
@@ -97,10 +160,18 @@ export async function handleSendToArchived(
  * @param options Optional unarchive options (initiatedBy, reason)
  */
 export async function handleUnarchive(
-	specId: string,
+	specArg: unknown,
 	refreshCallback?: () => void,
 	options?: { initiatedBy?: string; reason?: string }
 ): Promise<void> {
+	const specId = resolveSpecIdFromCommandArg(specArg);
+	if (!specId) {
+		await window.showErrorMessage(
+			"Spec not found. Please refresh and try again."
+		);
+		return;
+	}
+
 	// Get spec to show title in messages
 	const spec = getSpecState(specId);
 

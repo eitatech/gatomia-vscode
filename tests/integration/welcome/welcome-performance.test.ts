@@ -6,6 +6,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+// These tests must be deterministic and not depend on whether CLIs are installed
+// (or how long they take to execute) on the machine running the tests.
+vi.mock("../../../src/utils/cli-detector", () => ({
+	checkCLI: vi.fn(async () => ({ installed: false, version: null })),
+}));
+
 import { WelcomeScreenProvider } from "../../../src/providers/welcome-screen-provider";
 import type { ExtensionContext, OutputChannel } from "vscode";
 
