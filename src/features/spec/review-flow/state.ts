@@ -15,6 +15,7 @@ import type {
 	SpecStatus,
 	ChangeRequestStatus,
 	TaskLink,
+	TaskLinkStatus,
 } from "./types";
 import { workspace } from "vscode";
 import { join, dirname } from "path";
@@ -32,12 +33,18 @@ import {
 	logSpecUnarchived,
 	logSpecReopenedFromChangeRequest,
 	logOutstandingBlockerCount,
+	logReviewTransitionEvent,
+	logReviewExitEvent,
 } from "./telemetry";
 import { EventEmitter } from "vscode";
+import { NotificationUtils } from "../../../utils/notification-utils";
+import type { ReviewTransitionTrigger } from "./types";
 
 // In-memory cache of spec states (synced with workspace persistence)
 const specStateCache: Map<string, Specification> = new Map();
 let cacheInitialized = false;
+const autoReviewRetryQueue = new Set<string>();
+let autoReviewInitialized = false;
 
 // Event emitter for state changes
 const _onReviewFlowStateChange = new EventEmitter<void>();
@@ -128,7 +135,7 @@ function validateStatusTransition(
 	const validTransitions: Record<SpecStatus, SpecStatus[]> = {
 		current: ["review"],
 		readyToReview: ["reopened", "review"],
-		review: ["reopened", "archived"],
+		review: ["reopened", "archived", "current"],
 		reopened: ["review"],
 		archived: ["reopened"],
 	};
@@ -148,6 +155,29 @@ function isReviewStatus(status: SpecStatus): boolean {
 	return normalized === "review";
 }
 
+function buildReviewAlertMessage(
+	spec: Specification,
+	triggerType: ReviewTransitionTrigger
+): string {
+	const base = `Spec "${spec.title}" is ready for review`;
+	const suffix = triggerType === "auto" ? " (auto)." : ".";
+	return `${base}${suffix}`;
+}
+
+function notifyReviewAlert(
+	spec: Specification,
+	triggerType: ReviewTransitionTrigger
+): void {
+	NotificationUtils.showReviewAlert(buildReviewAlertMessage(spec, triggerType));
+}
+
+function getReviewNotificationRecipients(spec: Specification): string[] {
+	if (spec.watchers && spec.watchers.length > 0) {
+		return Array.from(new Set(spec.watchers));
+	}
+	return spec.owner ? [spec.owner] : [];
+}
+
 /**
  * Initialize or retrieve spec state from persistence
  * @param specId Unique spec identifier
@@ -161,9 +191,75 @@ export function getSpecState(specId: string): Specification | null {
 	}
 
 	// If spec not in cache, attempt to create default spec for testing/initialization
-	// In production, fetch from SpecExplorer's spec metadata
-	// For now, return null to allow tests to set up their own specs
+	// In production, specs should be initialized from SpecExplorer metadata via upsertSpecState.
+	// We return null here to keep the state layer decoupled from the explorer layer.
 	return null;
+}
+
+export function upsertSpecState(options: {
+	specId: string;
+	title: string;
+	owner: string;
+	links: Specification["links"];
+	watchers?: string[];
+}): Specification {
+	loadStateCache();
+
+	const existing = specStateCache.get(options.specId);
+	if (existing) {
+		let changed = false;
+		if (existing.title !== options.title) {
+			existing.title = options.title;
+			changed = true;
+		}
+		if (existing.owner !== options.owner) {
+			existing.owner = options.owner;
+			changed = true;
+		}
+		if (
+			existing.links.specPath !== options.links.specPath ||
+			existing.links.docUrl !== options.links.docUrl
+		) {
+			existing.links = options.links;
+			changed = true;
+		}
+		if (
+			options.watchers &&
+			options.watchers.join("|") !== existing.watchers?.join("|")
+		) {
+			existing.watchers = options.watchers;
+			changed = true;
+		}
+
+		if (changed) {
+			existing.updatedAt = new Date();
+			specStateCache.set(options.specId, existing);
+			persistStateCache();
+			_onReviewFlowStateChange.fire();
+		}
+		return existing;
+	}
+
+	const created: Specification = {
+		id: options.specId,
+		title: options.title,
+		owner: options.owner,
+		status: "current",
+		completedAt: null,
+		reviewEnteredAt: null,
+		archivedAt: null,
+		updatedAt: new Date(),
+		links: options.links,
+		pendingTasks: 0,
+		pendingChecklistItems: 0,
+		changeRequests: [],
+		watchers: options.watchers,
+	};
+
+	specStateCache.set(options.specId, created);
+	persistStateCache();
+	_onReviewFlowStateChange.fire();
+	return created;
 }
 
 /**
@@ -422,9 +518,165 @@ export function updatePendingSummary(
 	spec.pendingChecklistItems = Math.max(0, pendingChecklistItems);
 	spec.updatedAt = new Date();
 	specStateCache.set(specId, spec);
+
+	if (
+		isReviewStatus(spec.status) &&
+		(spec.pendingTasks > 0 || spec.pendingChecklistItems > 0)
+	) {
+		const nextStatus = hasBlockingChangeRequests(spec) ? "reopened" : "current";
+		const updated = updateSpecStatus(specId, nextStatus);
+		if (updated) {
+			const reason =
+				spec.pendingTasks > 0 ? "pending-tasks" : "pending-checklist-items";
+			logReviewExitEvent({
+				specId,
+				fromStatus: "review",
+				toStatus: nextStatus,
+				reason,
+				pendingTasks: spec.pendingTasks,
+				pendingChecklistItems: spec.pendingChecklistItems,
+			});
+			NotificationUtils.showWarning(
+				`Spec "${spec.title}" returned to execution due to new blockers.`
+			);
+		}
+		return updated;
+	}
+
 	persistStateCache();
 	_onReviewFlowStateChange.fire();
+	evaluateAutoReviewTransitions();
 	return spec;
+}
+
+function evaluateAutoReviewTransitions(): void {
+	if (!autoReviewInitialized || specStateCache.size === 0) {
+		return;
+	}
+
+	const candidates = new Set<string>([
+		...specStateCache.keys(),
+		...autoReviewRetryQueue,
+	]);
+
+	for (const specId of candidates) {
+		const result = _autoSendToReview(specId);
+		if (result) {
+			autoReviewRetryQueue.delete(specId);
+		}
+	}
+}
+
+function _autoSendToReview(specId: string): Specification | null {
+	const gatingResult = canSendToReview(specId);
+	if (!gatingResult.canSend) {
+		autoReviewRetryQueue.delete(specId);
+		return null;
+	}
+
+	const result = performReviewTransition(specId, "auto");
+	if (!result) {
+		autoReviewRetryQueue.add(specId);
+		NotificationUtils.showError(
+			"Failed to send spec to review automatically. Will retry."
+		);
+		return null;
+	}
+
+	return result;
+}
+
+function performReviewTransition(
+	specId: string,
+	triggerType: ReviewTransitionTrigger,
+	initiatedBy?: string
+): Specification | null {
+	const result = sendToReview(specId);
+	if (!result) {
+		logReviewTransitionEvent({
+			eventId: `${triggerType}-${specId}-${Date.now()}`,
+			specId,
+			triggerType,
+			initiatedBy,
+			occurredAt: new Date(),
+			notificationRecipients: [],
+			status: "failed",
+			failureReason: "send-to-review-failed",
+		});
+		return null;
+	}
+
+	const recipients = getReviewNotificationRecipients(result);
+	logReviewTransitionEvent({
+		eventId: `${triggerType}-${specId}-${Date.now()}`,
+		specId,
+		triggerType,
+		initiatedBy,
+		occurredAt: new Date(),
+		notificationRecipients: recipients,
+		status: "succeeded",
+		failureReason: null,
+	});
+	notifyReviewAlert(result, triggerType);
+	return result;
+}
+
+export function initializeAutoReviewTransitions(): void {
+	if (autoReviewInitialized) {
+		return;
+	}
+
+	autoReviewInitialized = true;
+	onReviewFlowStateChange(() => {
+		evaluateAutoReviewTransitions();
+	});
+}
+
+export function __testAutoSendToReview(
+	specId: string,
+	options?: { forceFailure?: boolean }
+): Specification | null {
+	if (options?.forceFailure) {
+		logReviewTransitionEvent({
+			eventId: `auto-${specId}-${Date.now()}`,
+			specId,
+			triggerType: "auto",
+			occurredAt: new Date(),
+			notificationRecipients: [],
+			status: "failed",
+			failureReason: "test-forced-failure",
+		});
+		NotificationUtils.showError(
+			"Failed to send spec to review automatically. Will retry."
+		);
+		return null;
+	}
+	return _autoSendToReview(specId);
+}
+
+export function sendToReviewWithTrigger(options: {
+	specId: string;
+	triggerType: ReviewTransitionTrigger;
+	initiatedBy?: string;
+}): { result: Specification | null; blockers: string[] } {
+	const gatingResult = canSendToReview(options.specId);
+	if (!gatingResult.canSend) {
+		return { result: null, blockers: gatingResult.blockers };
+	}
+
+	const result = performReviewTransition(
+		options.specId,
+		options.triggerType,
+		options.initiatedBy
+	);
+	if (!result) {
+		return {
+			result: null,
+			blockers: ["Send to review failed"],
+		};
+	}
+
+	return { result, blockers: [] };
 }
 
 function hasBlockingChangeRequests(spec: Specification): boolean {
@@ -645,7 +897,12 @@ export function canSendToReview(specId: string): {
 
 	// Check if spec is in current or reopened status
 	const normalizedStatus = normalizeStatus(spec.status);
-	if (normalizedStatus !== "current" && normalizedStatus !== "reopened") {
+	if (normalizedStatus === "review") {
+		blockers.push("Spec already in review");
+	} else if (
+		normalizedStatus !== "current" &&
+		normalizedStatus !== "reopened"
+	) {
 		blockers.push("Spec not in current status");
 	}
 

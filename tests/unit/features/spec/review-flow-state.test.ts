@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
+	getSpecState,
 	updateSpecStatus,
 	shouldReturnToReview,
 	addChangeRequest,
@@ -169,6 +170,31 @@ describe("Spec Review Flow - State Management", () => {
 			});
 			expect(result?.status).toBe("reopened");
 			expect(result?.archivedAt).toBeNull();
+		});
+	});
+
+	describe("review → current/reopened when blockers return", () => {
+		beforeEach(() => {
+			mockSpec.status = "review";
+			mockSpec.pendingTasks = 0;
+			mockSpec.pendingChecklistItems = 0;
+			mockSpec.changeRequests = [];
+			__testInitSpec(mockSpec);
+		});
+
+		it("reverts review status when pending tasks return", () => {
+			updatePendingSummary(mockSpec.id, 1, 0);
+			const updated = getSpecState(mockSpec.id);
+			expect(updated?.status).toBe("current");
+		});
+
+		it("moves to reopened when blockers return and change requests exist", () => {
+			mockSpec.changeRequests = [mockChangeRequest];
+			__testInitSpec(mockSpec);
+
+			updatePendingSummary(mockSpec.id, 1, 0);
+			const updated = getSpecState(mockSpec.id);
+			expect(updated?.status).toBe("reopened");
 		});
 	});
 });
