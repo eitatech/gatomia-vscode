@@ -258,3 +258,11 @@ npm test -- -t "MCP"
 - Build webview: `npm run build:webview`
 - Check browser console in webview (Ctrl+Shift+I)
 - Verify bridge communication in extension logs
+
+## Recent Changes
+- 001-steering-instructions-rules: Added TypeScript 5.x (strict), target ES2022 + VS Code Extension API, Node.js (extension host), React 18 + Vite (webview), Biome
+
+
+## Active Technologies
+- TypeScript 5.x (strict), target ES2022 + VS Code Extension API, Node.js (extension host), React 18 + Vite (webview), Biome (001-steering-instructions-rules)
+- Filesystem (`workspace.fs`) and existing workspace JSON state where applicable (001-steering-instructions-rules)
