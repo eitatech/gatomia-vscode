@@ -920,12 +920,25 @@ function registerCommands({
 	context.subscriptions.push(
 		// Configuration commands
 		commands.registerCommand("gatomia.steering.createUserRule", async () => {
-			await steeringManager.createUserConfiguration();
+			const created = await steeringManager.createUserInstructionRule();
+			if (created) {
+				steeringExplorer.refresh();
+			}
 		}),
 
 		commands.registerCommand("gatomia.steering.createProjectRule", async () => {
-			await steeringManager.createProjectDocumentation();
+			const created = await steeringManager.createProjectInstructionRule();
+			if (created) {
+				steeringExplorer.refresh();
+			}
 		}),
+
+		commands.registerCommand(
+			"gatomia.steering.createConstitution",
+			async () => {
+				await steeringManager.createConstitutionRequest();
+			}
+		),
 
 		commands.registerCommand("gatomia.steering.refresh", () => {
 			outputChannel.appendLine(

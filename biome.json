@@ -18,7 +18,8 @@
       "!ui/node_modules/**/*",
       "!.tmp/**/*",
       "!.codex/**/*",
-      "!.vscode/**/*"
+      "!.vscode/**/*",
+      "!.agent_work/**/*"
     ],
     "ignoreUnknown": false
   },
