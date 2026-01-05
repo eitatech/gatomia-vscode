@@ -2,6 +2,13 @@
 
 ---
 
+## v0.29.0 2026-01-05
+
+### Changed
+
+- Merge pull request #18 from eitatech/001-steering-instructions-rules
+- Adds project/user instruction rule creation and constitution support
+
 ## v0.28.0 2026-01-05
 
 ### Added
