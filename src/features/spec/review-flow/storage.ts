@@ -41,6 +41,28 @@ export interface PersistedSpecification {
 	pendingTasks?: number;
 	pendingChecklistItems?: number;
 	changeRequests?: PersistedChangeRequest[];
+	watchers?: string[];
+}
+
+function coerceOptionalCount(value: unknown): number | undefined {
+	if (value === undefined) {
+		return;
+	}
+
+	let numeric: number;
+	if (typeof value === "number") {
+		numeric = value;
+	} else if (typeof value === "string") {
+		numeric = Number(value);
+	} else {
+		numeric = Number.NaN;
+	}
+
+	if (!Number.isFinite(numeric)) {
+		return;
+	}
+
+	return Math.max(0, Math.trunc(numeric));
 }
 
 /**
@@ -64,6 +86,7 @@ export function serializeSpecification(
 		pendingTasks: spec.pendingTasks,
 		pendingChecklistItems: spec.pendingChecklistItems,
 		changeRequests: spec.changeRequests?.map(serializeChangeRequest),
+		watchers: spec.watchers,
 	};
 }
 
@@ -85,9 +108,10 @@ export function deserializeSpecification(
 		archivedAt: data.archivedAt ? new Date(data.archivedAt) : null,
 		updatedAt: new Date(data.updatedAt),
 		links: data.links,
-		pendingTasks: data.pendingTasks,
-		pendingChecklistItems: data.pendingChecklistItems,
+		pendingTasks: coerceOptionalCount(data.pendingTasks),
+		pendingChecklistItems: coerceOptionalCount(data.pendingChecklistItems),
 		changeRequests: data.changeRequests?.map(deserializeChangeRequest),
+		watchers: data.watchers,
 	};
 }
 

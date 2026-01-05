@@ -4,7 +4,8 @@
  */
 
 import { window } from "vscode";
-import { sendToReview, canSendToReview } from "../state";
+import { sendToReviewWithTrigger } from "../state";
+import { resolveSpecIdFromCommandArg } from "./spec-command-args";
 
 export const SEND_TO_REVIEW_COMMAND_ID = "gatomia.spec.sendToReview";
 
@@ -14,25 +15,30 @@ export const SEND_TO_REVIEW_COMMAND_ID = "gatomia.spec.sendToReview";
  * @param refreshCallback Optional callback to refresh the Spec Explorer
  */
 export async function handleSendToReview(
-	specId: string,
+	specArg: unknown,
 	refreshCallback?: () => void
 ): Promise<void> {
-	// Check gating conditions
-	const gatingResult = canSendToReview(specId);
-
-	if (!gatingResult.canSend) {
-		// Show error message with blockers
-		const blockerMessage = gatingResult.blockers.join(", ");
-		await window.showErrorMessage(
-			`Cannot send spec to review: ${blockerMessage}`
-		);
+	const specId = resolveSpecIdFromCommandArg(specArg);
+	if (!specId) {
+		await window.showErrorMessage("Cannot send spec to review: Spec not found");
 		return;
 	}
 
-	// Attempt to send to review
-	const result = sendToReview(specId);
+	const { result, blockers } = sendToReviewWithTrigger({
+		specId,
+		triggerType: "manual",
+		initiatedBy: "manual-command",
+	});
 
 	if (!result) {
+		if (blockers.length > 0) {
+			const blockerMessage = blockers.join(", ");
+			await window.showErrorMessage(
+				`Cannot send spec to review: ${blockerMessage}`
+			);
+			return;
+		}
+
 		await window.showErrorMessage(
 			"Failed to send spec to review. Please try again."
 		);

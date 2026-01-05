@@ -14,6 +14,7 @@ import type {
 	SpecStatus,
 	ChangeRequestStatus,
 	ChangeRequestSeverity,
+	ReviewTransitionEvent,
 } from "./types";
 
 /**
@@ -24,6 +25,8 @@ export const REVIEW_FLOW_EVENTS = {
 	SPEC_STATUS_CHANGED: "spec.status.changed",
 	SEND_TO_REVIEW: "review.send_to_review",
 	SEND_TO_ARCHIVED: "review.send_to_archived",
+	REVIEW_TRANSITION: "review.transition",
+	REVIEW_EXITED: "review.left",
 	SPEC_UNARCHIVED: "review.spec_unarchived",
 	SPEC_REOPENED: "review.spec_reopened",
 	CHANGE_REQUEST_CREATED: "change_request.created",
@@ -38,6 +41,36 @@ export const REVIEW_FLOW_EVENTS = {
  */
 export type ReviewFlowEventType =
 	(typeof REVIEW_FLOW_EVENTS)[keyof typeof REVIEW_FLOW_EVENTS];
+
+/**
+ * Log a structured review transition event (auto/manual) with notification metadata.
+ */
+export function logReviewTransitionEvent(event: ReviewTransitionEvent): void {
+	const payload = {
+		type: REVIEW_FLOW_EVENTS.REVIEW_TRANSITION,
+		timestamp: event.occurredAt.toISOString(),
+		...event,
+	};
+
+	console.log("[ReviewFlow Telemetry] Review transition:", payload);
+}
+
+export function logReviewExitEvent(options: {
+	specId: string;
+	fromStatus: SpecStatus;
+	toStatus: SpecStatus;
+	reason: string;
+	pendingTasks: number;
+	pendingChecklistItems: number;
+}): void {
+	const event = {
+		type: REVIEW_FLOW_EVENTS.REVIEW_EXITED,
+		timestamp: new Date().toISOString(),
+		...options,
+	};
+
+	console.log("[ReviewFlow Telemetry] Review exit:", event);
+}
 
 /**
  * Log a spec status transition
