@@ -15,6 +15,7 @@ import type {
 	SpecStatus,
 	ChangeRequestStatus,
 	TaskLink,
+	TaskLinkStatus,
 } from "./types";
 import { workspace } from "vscode";
 import { join, dirname } from "path";
@@ -190,9 +191,75 @@ export function getSpecState(specId: string): Specification | null {
 	}
 
 	// If spec not in cache, attempt to create default spec for testing/initialization
-	// In production, fetch from SpecExplorer's spec metadata
-	// For now, return null to allow tests to set up their own specs
+	// In production, specs should be initialized from SpecExplorer metadata via upsertSpecState.
+	// We return null here to keep the state layer decoupled from the explorer layer.
 	return null;
+}
+
+export function upsertSpecState(options: {
+	specId: string;
+	title: string;
+	owner: string;
+	links: Specification["links"];
+	watchers?: string[];
+}): Specification {
+	loadStateCache();
+
+	const existing = specStateCache.get(options.specId);
+	if (existing) {
+		let changed = false;
+		if (existing.title !== options.title) {
+			existing.title = options.title;
+			changed = true;
+		}
+		if (existing.owner !== options.owner) {
+			existing.owner = options.owner;
+			changed = true;
+		}
+		if (
+			existing.links.specPath !== options.links.specPath ||
+			existing.links.docUrl !== options.links.docUrl
+		) {
+			existing.links = options.links;
+			changed = true;
+		}
+		if (
+			options.watchers &&
+			options.watchers.join("|") !== existing.watchers?.join("|")
+		) {
+			existing.watchers = options.watchers;
+			changed = true;
+		}
+
+		if (changed) {
+			existing.updatedAt = new Date();
+			specStateCache.set(options.specId, existing);
+			persistStateCache();
+			_onReviewFlowStateChange.fire();
+		}
+		return existing;
+	}
+
+	const created: Specification = {
+		id: options.specId,
+		title: options.title,
+		owner: options.owner,
+		status: "current",
+		completedAt: null,
+		reviewEnteredAt: null,
+		archivedAt: null,
+		updatedAt: new Date(),
+		links: options.links,
+		pendingTasks: 0,
+		pendingChecklistItems: 0,
+		changeRequests: [],
+		watchers: options.watchers,
+	};
+
+	specStateCache.set(options.specId, created);
+	persistStateCache();
+	_onReviewFlowStateChange.fire();
+	return created;
 }
 
 /**

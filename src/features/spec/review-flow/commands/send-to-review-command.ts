@@ -5,6 +5,7 @@
 
 import { window } from "vscode";
 import { sendToReviewWithTrigger } from "../state";
+import { resolveSpecIdFromCommandArg } from "./spec-command-args";
 
 export const SEND_TO_REVIEW_COMMAND_ID = "gatomia.spec.sendToReview";
 
@@ -14,9 +15,15 @@ export const SEND_TO_REVIEW_COMMAND_ID = "gatomia.spec.sendToReview";
  * @param refreshCallback Optional callback to refresh the Spec Explorer
  */
 export async function handleSendToReview(
-	specId: string,
+	specArg: unknown,
 	refreshCallback?: () => void
 ): Promise<void> {
+	const specId = resolveSpecIdFromCommandArg(specArg);
+	if (!specId) {
+		await window.showErrorMessage("Cannot send spec to review: Spec not found");
+		return;
+	}
+
 	const { result, blockers } = sendToReviewWithTrigger({
 		specId,
 		triggerType: "manual",

@@ -34,7 +34,7 @@
 
 **Goal**: Automatically move a spec to Review when every tarefa is concluída.
 
-**Independent Test**: Close every tarefa for a sample spec; confirm it appears in the Review tab within 10 seconds and telemetry records an auto trigger.
+**Independent Test**: Close every task for a sample spec; confirm it appears in the Review tab within 10 seconds and telemetry records an auto trigger.
 
 ### Tests (write first)
 
@@ -110,6 +110,7 @@
 - [X] T033 [P] Perform final accessibility + copy review for Review tab strings in `ui/src/components/spec-explorer/review-list/`
 - [X] T034 [P] Add SC-003 monitoring guidance and failure-reason telemetry notes in `specs/001-auto-review-transition/quickstart.md`
 - [X] T035 Run full `npm test`, `npm run check`, and record pass results before handoff
+	- 2026-01-05: `npm run check` PASS; `npm test` PASS (82 files passed, 4 skipped; 1152 tests passed, 82 skipped)
 
 ---
 
