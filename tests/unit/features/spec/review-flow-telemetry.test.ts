@@ -4,7 +4,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { logTasksDispatchSuccess } from "../../../../src/features/spec/review-flow/telemetry";
 import type * as TelemetryModule from "../../../../src/features/spec/review-flow/telemetry";
 import {
 	dispatchToTasksPrompt,
@@ -16,19 +15,23 @@ import type {
 } from "../../../../src/features/spec/review-flow/types";
 
 // Mock telemetry module
-vi.mock("../../../../src/features/spec/review-flow/telemetry", async () => {
-	const actual = await vi.importActual<typeof TelemetryModule>(
-		"../../../../src/features/spec/review-flow/telemetry"
-	);
-	return {
-		...actual,
-		logTasksDispatchSuccess: vi.fn(),
-		logTasksDispatchFailed: vi.fn(),
-		logSpecStatusChange: vi.fn(),
-		logChangeRequestCreated: vi.fn(),
-		logChangeRequestStatusChange: vi.fn(),
-	};
-});
+vi.mock("../../../../src/features/spec/review-flow/telemetry", () => ({
+	logTasksDispatchSuccess: vi.fn(),
+	logTasksDispatchFailed: vi.fn(),
+	logSpecStatusChange: vi.fn(),
+	logChangeRequestCreated: vi.fn(),
+	logChangeRequestStatusChange: vi.fn(),
+	logSendToReview: vi.fn(),
+	logApproval: vi.fn(),
+	logRejection: vi.fn(),
+	logComplete: vi.fn(),
+	logRevertToReview: vi.fn(),
+}));
+
+// Import the mocked module to access the spy functions
+const { logTasksDispatchSuccess, logTasksDispatchFailed } = await import(
+	"../../../../src/features/spec/review-flow/telemetry"
+);
 
 describe("Review Flow Telemetry", () => {
 	const MOCK_SPEC: Specification = {
@@ -58,6 +61,8 @@ describe("Review Flow Telemetry", () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		// Mock Math.random to ensure predictable behavior (not in the 10% failure range)
+		vi.spyOn(Math, "random").mockReturnValue(0.5); // This ensures shouldFail = false
 	});
 
 	describe("Tasks Dispatch Telemetry Integration", () => {

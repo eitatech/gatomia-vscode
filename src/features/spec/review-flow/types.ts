@@ -57,6 +57,7 @@ export interface Specification {
 	pendingTasks?: number;
 	pendingChecklistItems?: number;
 	changeRequests?: ChangeRequest[];
+	watchers?: string[];
 }
 
 /**
@@ -89,4 +90,18 @@ export interface ChangeRequest {
 	 * Flag indicating this change request currently blocks archiving/unarchiving actions.
 	 */
 	archivalBlocker?: boolean;
+}
+
+export type ReviewTransitionTrigger = "auto" | "manual";
+export type ReviewTransitionStatus = "succeeded" | "failed";
+
+export interface ReviewTransitionEvent {
+	eventId: string;
+	specId: string;
+	triggerType: ReviewTransitionTrigger;
+	initiatedBy?: string;
+	occurredAt: Date;
+	notificationRecipients: string[];
+	status: ReviewTransitionStatus;
+	failureReason?: string | null;
 }
