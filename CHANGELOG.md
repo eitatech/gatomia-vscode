@@ -2,6 +2,34 @@
 
 ---
 
+## v0.28.0 2026-01-05
+
+### Added
+
+- Implement auto-review transition and enhance spec management commands
+- rename specs
+- rename specs
+
+### Fixed
+
+- spec review flow
+- spec review flow
+- spec review flow
+- remove vscode
+
+### Changed
+
+- add some agentes to github copilot
+- Establishes comprehensive development and agent guidelines
+
+### Release Info
+
+- **Source Branch**: `develop`
+- **Release Type**: minor
+
+---
+
+
 ## v0.27.1 2025-12-18
 
 ### Added
@@ -116,5 +144,3 @@
 - Server availability checks with graceful degradation
 - Hook stability when MCP servers become unavailable
 - Parameter validation with detailed error messages
-
-
