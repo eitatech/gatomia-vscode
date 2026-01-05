@@ -17,7 +17,8 @@
       "!ui/src/app.css",
       "!ui/node_modules/**/*",
       "!.tmp/**/*",
-      "!.codex/**/*"
+      "!.codex/**/*",
+      "!.vscode/**/*"
     ],
     "ignoreUnknown": false
   },

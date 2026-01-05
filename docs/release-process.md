@@ -7,7 +7,7 @@ This document describes how to cut a release and publish the extension to both t
 - Trigger model: pushing a `v*` tag (or manually dispatching `.github/workflows/release.yml` with a version input) starts the unified pipeline that builds, creates a GitHub Release (attaching the VSIX and changelog), and publishes to both stores.
 - Two entry points to create that tag:
   1) Version bump with computed next version: `.github/workflows/version-bump.yml` (manual dispatch with `release_type`).
-  2) Release without bump (tag only): `.github/workflows/release-only.yml` (manual dispatch with `version`).
+  2) Release without bump (tag only): `.github/workflows/tag-trigger-release.yml` (manual dispatch with `version`).
 - Manual reruns or republish attempts should be performed by re-running `release.yml` (either via the Actions “Re-run” button or by dispatching it with the `version` input); there is no separate fallback workflow.
 
 ## Prerequisites
@@ -45,7 +45,7 @@ This document describes how to cut a release and publish the extension to both t
 Use this when the version is already set in `package.json`.
 
 1) Ensure `package.json` contains the intended version `X.Y.Z`.
-2) Manually run Actions → “Release Only (Tag and Trigger)” (`.github/workflows/release-only.yml`).
+2) Manually run Actions → “Release Only (Tag and Trigger)” (`.github/workflows/tag-trigger-release.yml`).
    - Input `version`: `X.Y.Z`.
    - The workflow validates that the input matches `package.json`.
 3) The workflow either:
