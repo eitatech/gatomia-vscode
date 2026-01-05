@@ -1,0 +1,163 @@
+openapi: 3.1.0
+info:
+  title: Spec Review Flow API
+  version: 1.0.0
+  description: >-
+    Local contract representing extension-side services that transition specifications
+    into the Review state and emit watcher notifications.
+servers:
+  - url: vscode://gatomia/spec-review
+paths:
+  /specs/{specId}/review:
+    post:
+      summary: Transition a specification to Review
+      description: >-
+        Executes the full Send to Review flow (gating, status update, telemetry,
+        notifications). Used by both manual commands and the automatic evaluator by
+        passing the appropriate triggerType.
+      parameters:
+        - name: specId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewTransitionRequest'
+      responses:
+        '200':
+          description: Spec moved to Review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewTransitionResponse'
+        '409':
+          description: Transition blocked (pending tarefas, checklist, or invalid status)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransitionBlockedResponse'
+  /specs/{specId}/review/notify:
+    post:
+      summary: Notify reviewers & watchers about a Review entry
+      description: Dispatches review-alert channel messages and records outcome telemetry.
+      parameters:
+        - name: specId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewNotificationRequest'
+      responses:
+        '202':
+          description: Notification accepted for delivery
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewNotificationResponse'
+        '400':
+          description: Invalid recipients or channel
+components:
+  schemas:
+    ReviewTransitionRequest:
+      type: object
+      required:
+        - triggerType
+      properties:
+        triggerType:
+          type: string
+          enum: [auto, manual]
+        initiatedBy:
+          type: string
+          description: VS Code user initiating manual command; omitted for auto.
+        autoReason:
+          type: string
+          description: Reason the evaluator fired (e.g., `allTasksDone`).
+    ReviewTransitionResponse:
+      type: object
+      required:
+        - specId
+        - status
+        - reviewEnteredAt
+        - transitionStatus
+      properties:
+        specId:
+          type: string
+        status:
+          type: string
+          enum: [review]
+        reviewEnteredAt:
+          type: string
+          format: date-time
+        notificationRecipients:
+          type: array
+          items:
+            type: string
+        telemetryEventId:
+          type: string
+        transitionStatus:
+          type: string
+          enum: [succeeded, failed]
+        failureReason:
+          type: string
+          nullable: true
+    TransitionBlockedResponse:
+      type: object
+      required:
+        - specId
+        - blockers
+      properties:
+        specId:
+          type: string
+        blockers:
+          type: array
+          items:
+            type: string
+    ReviewNotificationRequest:
+      type: object
+      required:
+        - recipients
+        - channel
+      properties:
+        recipients:
+          type: array
+          items:
+            type: string
+        channel:
+          type: string
+          enum: [review-alert]
+        specSummary:
+          type: object
+          properties:
+            title:
+              type: string
+            owner:
+              type: string
+            tasksClosedAt:
+              type: string
+              format: date-time
+            triggerType:
+              type: string
+              enum: [auto, manual]
+    ReviewNotificationResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [accepted]
+        deliveryId:
+          type: string
+        acknowledgements:
+          type: array
+          items:
+            type: string
