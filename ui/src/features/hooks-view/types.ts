@@ -47,21 +47,39 @@ export interface GitHubActionParams {
 }
 
 export interface CustomActionParams {
+	agentId?: string; // Optional: GitHub Copilot agent ID
 	agentName: string;
+	prompt?: string; // Instruction/action text for the agent
+	selectedTools?: SelectedMCPTool[]; // Optional: MCP tools available to agent
 	arguments?: string;
 }
 
 export interface MCPActionParams {
-	serverId: string;
-	serverName: string;
-	toolName: string;
-	toolDisplayName: string;
+	// Agent and instruction
+	agentId?: string; // Optional: GitHub Copilot agent ID (e.g., 'copilot', 'workspace')
+	prompt: string; // Instruction/action text for the agent to execute
+
+	// Selected tools (multiple selection supported)
+	selectedTools: SelectedMCPTool[]; // Array of selected MCP tools
+
+	// Legacy fields (kept for backward compatibility)
+	serverId?: string; // MCP server identifier (deprecated, use selectedTools)
+	serverName?: string; // Server display name (deprecated)
+	toolName?: string; // Tool to execute (deprecated, use selectedTools)
+	toolDisplayName?: string; // Tool display name (deprecated)
 	parameterMappings?: Array<{
 		toolParam: string;
 		source: "context" | "literal" | "template";
 		value: string;
 	}>;
 	timeout?: number;
+}
+
+export interface SelectedMCPTool {
+	serverId: string; // Server providing the tool
+	serverName: string; // Display name of server
+	toolName: string; // Tool identifier
+	toolDisplayName: string; // Human-readable tool name
 }
 
 export type ActionParameters =
