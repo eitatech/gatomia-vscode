@@ -162,18 +162,39 @@ export type GitHubOperation =
  * CustomActionParams - Parameters for custom agent invocations
  */
 export interface CustomActionParams {
+	agentId?: string; // Optional: GitHub Copilot agent ID
 	agentName: string; // Custom agent identifier
-	arguments?: string; // Arguments to pass to agent
+	prompt?: string; // Instruction/action text for the agent
+	selectedTools?: SelectedMCPTool[]; // Optional: MCP tools available to agent
+	arguments?: string; // Legacy: Arguments to pass to agent
 }
 
 /**
  * MCPActionParams - Parameters for MCP server tool execution
  */
 export interface MCPActionParams {
-	serverId: string; // MCP server identifier
-	toolName: string; // Tool to execute
-	parameterMappings: ParameterMapping[]; // How to map parameters
+	// Agent and instruction
+	agentId?: string; // Optional: GitHub Copilot agent ID (e.g., 'copilot', 'workspace')
+	prompt: string; // Instruction/action text for the agent to execute
+
+	// Selected tools (multiple selection supported)
+	selectedTools: SelectedMCPTool[]; // Array of selected MCP tools
+
+	// Legacy fields (kept for backward compatibility)
+	serverId?: string; // MCP server identifier (deprecated, use selectedTools)
+	toolName?: string; // Tool to execute (deprecated, use selectedTools)
+	parameterMappings?: ParameterMapping[]; // How to map parameters (optional)
 	timeout?: number; // Optional timeout override (1000-300000ms)
+}
+
+/**
+ * SelectedMCPTool - Represents a selected MCP tool for execution
+ */
+export interface SelectedMCPTool {
+	serverId: string; // Server providing the tool
+	serverName: string; // Display name of server
+	toolName: string; // Tool identifier
+	toolDisplayName: string; // Human-readable tool name
 }
 
 /**
@@ -630,17 +651,56 @@ export function isValidMCPParams(obj: unknown): obj is MCPActionParams {
 	}
 	const params = obj as MCPActionParams;
 
-	return (
+	// New structure: requires prompt and selectedTools
+	const hasNewStructure =
+		typeof params.prompt === "string" &&
+		params.prompt.length > 0 &&
+		Array.isArray(params.selectedTools) &&
+		params.selectedTools.length > 0 &&
+		params.selectedTools.every(isValidSelectedMCPTool);
+
+	// Legacy structure: requires serverId and toolName
+	const hasLegacyStructure =
 		typeof params.serverId === "string" &&
 		params.serverId.length > 0 &&
 		typeof params.toolName === "string" &&
-		params.toolName.length > 0 &&
-		Array.isArray(params.parameterMappings) &&
-		params.parameterMappings.every(isValidParameterMapping) &&
+		params.toolName.length > 0;
+
+	// Accept either new or legacy structure
+	const hasValidStructure = hasNewStructure || hasLegacyStructure;
+
+	// Validate optional fields
+	const hasValidOptionalFields =
+		(params.agentId === undefined || typeof params.agentId === "string") &&
+		(params.parameterMappings === undefined ||
+			(Array.isArray(params.parameterMappings) &&
+				params.parameterMappings.every(isValidParameterMapping))) &&
 		(params.timeout === undefined ||
 			(typeof params.timeout === "number" &&
 				params.timeout >= MCP_MIN_TIMEOUT &&
-				params.timeout <= MCP_MAX_TIMEOUT))
+				params.timeout <= MCP_MAX_TIMEOUT));
+
+	return hasValidStructure && hasValidOptionalFields;
+}
+
+/**
+ * Validate selected MCP tool
+ */
+export function isValidSelectedMCPTool(obj: unknown): obj is SelectedMCPTool {
+	if (typeof obj !== "object" || obj === null) {
+		return false;
+	}
+	const tool = obj as SelectedMCPTool;
+
+	return (
+		typeof tool.serverId === "string" &&
+		tool.serverId.length > 0 &&
+		typeof tool.serverName === "string" &&
+		tool.serverName.length > 0 &&
+		typeof tool.toolName === "string" &&
+		tool.toolName.length > 0 &&
+		typeof tool.toolDisplayName === "string" &&
+		tool.toolDisplayName.length > 0
 	);
 }
 

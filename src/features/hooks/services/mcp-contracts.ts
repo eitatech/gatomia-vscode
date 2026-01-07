@@ -60,22 +60,22 @@ export interface IMCPDiscoveryService {
 	 * @param forceRefresh - Skip cache and force fresh discovery
 	 * @returns Promise resolving to array of MCP servers with their tools
 	 */
-	discoverServers(forceRefresh?: boolean): Promise<MCPServer[]>;
+	discoverServers(forceRefresh?: boolean): MCPServer[];
 
 	/**
 	 * Get a specific MCP server by ID
 	 * @param serverId - Server identifier
-	 * @returns Promise resolving to server or undefined if not found
+	 * @returns Server or undefined if not found
 	 */
-	getServer(serverId: string): Promise<MCPServer | undefined>;
+	getServer(serverId: string): MCPServer | undefined;
 
 	/**
 	 * Get a specific tool from a server
 	 * @param serverId - Server identifier
 	 * @param toolName - Tool name
-	 * @returns Promise resolving to tool or undefined if not found
+	 * @returns Tool or undefined if not found
 	 */
-	getTool(serverId: string, toolName: string): Promise<MCPTool | undefined>;
+	getTool(serverId: string, toolName: string): MCPTool | undefined;
 
 	/**
 	 * Clear the discovery cache
@@ -118,7 +118,7 @@ export interface IMCPClientService {
 		serverId: string,
 		toolName: string,
 		parameters: Record<string, unknown>
-	): Promise<ParameterValidationResult>;
+	): ParameterValidationResult;
 }
 
 /**

@@ -784,6 +784,8 @@ describe("HookForm", () => {
 						parameters: {
 							agentName: "my-custom-agent",
 							arguments: "--mode=auto --feature={feature}",
+							prompt: "",
+							selectedTools: [],
 						},
 					},
 				});
