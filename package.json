@@ -2,7 +2,7 @@
   "name": "gatomia",
   "displayName": "GatomIA",
   "description": "Agentic Spec-Driven Development Toolkit",
-  "version": "0.28.0",
+  "version": "0.29.0",
   "license": "MIT",
   "author": "Italo A. G.",
   "publisher": "EITA",
@@ -226,7 +226,7 @@
       },
       {
         "view": "gatomia.views.steeringExplorer",
-        "contents": "Manage steering rules for Copilot\n\n[$(root-folder) Create Project Rule](command:gatomia.steering.createProjectRule)\n[$(globe) Create User Rule](command:gatomia.steering.createUserRule)"
+        "contents": "Manage steering rules for Copilot\n\n[$(root-folder) Create Project Rule](command:gatomia.steering.createProjectRule)\n[$(globe) Create User Rule](command:gatomia.steering.createUserRule)\n[$(book) Create Constitution](command:gatomia.steering.createConstitution)"
       },
       {
         "view": "gatomia.views.hooksExplorer",
@@ -370,6 +370,12 @@
         "title": "Create Project Rule",
         "category": "GatomIA",
         "icon": "$(root-folder)"
+      },
+      {
+        "command": "gatomia.steering.createConstitution",
+        "title": "Create Constitution",
+        "category": "GatomIA",
+        "icon": "$(book)"
       },
       {
         "command": "gatomia.prompts.create",
@@ -564,7 +570,7 @@
         {
           "command": "gatomia.steering.refresh",
           "when": "view == gatomia.views.steeringExplorer",
-          "group": "navigation@3"
+          "group": "navigation@4"
         },
         {
           "command": "gatomia.steering.createProjectRule",
@@ -575,6 +581,11 @@
           "command": "gatomia.steering.createUserRule",
           "when": "view == gatomia.views.steeringExplorer",
           "group": "navigation@2"
+        },
+        {
+          "command": "gatomia.steering.createConstitution",
+          "when": "view == gatomia.views.steeringExplorer",
+          "group": "navigation@3"
         },
         {
           "command": "gatomia.prompts.createAgentFile",

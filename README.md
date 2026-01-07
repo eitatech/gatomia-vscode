@@ -46,6 +46,10 @@ You can follow our progress, open issues, or contribute directly through our off
 
 ### Steering
 
+* **Instruction Rules**: Create and manage instruction rules for GitHub Copilot at both project (`.github/instructions/*.instructions.md`) and user (`$HOME/.github/instructions/*.instructions.md`) levels.
+  - **Project Rules**: Standardize team guidelines within the repository
+  - **User Rules**: Define personal reusable guidance without committing to the repo
+  - **Constitution**: Request Constitution document generation via `Create Constitution` button with AI-assisted drafting
 * **Constitution / Agents**: Manage your project's "Constitution" (SpecKit) or "AGENTS.md" (OpenSpec) to steer Copilot's behavior.
 * **Global Instructions**: Configure global instructions for Copilot across all your projects.
 
@@ -135,13 +139,22 @@ Search for "GatomIA" in the VS Code Marketplace and install the extension.
 2. Click **Start All Tasks** above a checklist item.
 3. GitHub Copilot Chat will open with the task context. Interact with it to implement the code.
 
-### 3. Create Constitution (SpecKit)
+### 3. Manage Instruction Rules
 
-1. Open the **Steering** view.
-2. Click **Create Project Rule**.
-3. Select **SpecKit**.
-4. Enter your directives (e.g., "Focus on clean code").
-5. Copilot will generate your `constitution.md`.
+1. Open the **Steering** view in the Activity Bar.
+2. **Create Project Rule**:
+   - Click **Create Project Rule** button
+   - Enter a name (e.g., "TypeScript Rules")
+   - Edit the generated `.github/instructions/<name>.instructions.md` file
+3. **Create User Rule**:
+   - Click **Create User Rule** button
+   - Enter a name for personal guidance
+   - Edit the generated `$HOME/.github/instructions/<name>.instructions.md` file
+4. **Create Constitution**:
+   - Click **Create Constitution** button
+   - Enter a brief description (e.g., "Python project with FastAPI")
+   - Copilot Chat opens with `/speckit.constitution` prompt
+   - The agent generates your `constitution.md`
 
 ### 4. Automate with Hooks
 
