@@ -159,16 +159,16 @@ export const MCPActionPicker = ({
 	});
 
 	/**
-	 * Get status badge color
+	 * Get status badge color using VS Code theme variables
 	 */
 	const getStatusColor = (status: MCPServer["status"]): string => {
 		switch (status) {
 			case "available":
-				return "bg-green-500";
+				return "bg-[color:var(--vscode-testing-iconPassed,#73c991)]";
 			case "unavailable":
-				return "bg-red-500";
+				return "bg-[color:var(--vscode-testing-iconFailed,#f48771)]";
 			default:
-				return "bg-gray-500";
+				return "bg-[color:var(--vscode-descriptionForeground,#888)]";
 		}
 	};
 
@@ -176,7 +176,9 @@ export const MCPActionPicker = ({
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center p-8">
-				<div className="text-gray-500 text-sm">Discovering MCP servers...</div>
+				<div className="text-[color:var(--vscode-descriptionForeground)] text-sm">
+					Discovering MCP servers...
+				</div>
 			</div>
 		);
 	}
@@ -184,8 +186,8 @@ export const MCPActionPicker = ({
 	// Error state
 	if (error) {
 		return (
-			<div className="rounded border border-red-500 bg-red-50 p-4">
-				<div className="text-red-700 text-sm">
+			<div className="rounded border border-[color:var(--vscode-inputValidation-errorBorder,#be1100)] bg-[color:var(--vscode-inputValidation-errorBackground,rgba(190,17,0,0.1))] p-4">
+				<div className="text-[color:var(--vscode-inputValidation-errorForeground,#f48771)] text-sm">
 					<strong>Error:</strong> {error}
 				</div>
 			</div>
@@ -195,8 +197,8 @@ export const MCPActionPicker = ({
 	// Empty state
 	if (servers.length === 0) {
 		return (
-			<div className="rounded border border-gray-300 bg-gray-50 p-8 text-center">
-				<div className="text-gray-600 text-sm">
+			<div className="rounded border border-[color:var(--vscode-input-border,#3c3c3c)] bg-[color:var(--vscode-tree-tableOddRowsBackground,transparent)] p-8 text-center">
+				<div className="text-[color:var(--vscode-descriptionForeground)] text-sm">
 					No MCP servers found. Make sure you have MCP servers configured in
 					GitHub Copilot.
 				</div>
@@ -209,7 +211,7 @@ export const MCPActionPicker = ({
 			{/* Search Input */}
 			<div className="relative">
 				<input
-					className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+					className="w-full rounded border border-[color:var(--vscode-input-border,#3c3c3c)] bg-[color:var(--vscode-input-background)] px-3 py-2 text-[color:var(--vscode-input-foreground)] text-sm placeholder:text-[color:var(--vscode-input-placeholderForeground,#888)] focus:border-[color:var(--vscode-focusBorder,#0078d4)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 					disabled={disabled}
 					onChange={handleSearchChange}
 					placeholder="Search servers and tools..."
@@ -221,21 +223,24 @@ export const MCPActionPicker = ({
 			{/* Server Tree View */}
 			<div className="space-y-2">
 				{filteredServers.length === 0 ? (
-					<div className="py-4 text-center text-gray-500 text-sm">
+					<div className="py-4 text-center text-[color:var(--vscode-descriptionForeground)] text-sm">
 						No servers or tools match your search.
 					</div>
 				) : (
 					filteredServers.map((server) => (
-						<div className="rounded border border-gray-300" key={server.id}>
+						<div
+							className="rounded border border-[color:var(--vscode-input-border,#3c3c3c)]"
+							key={server.id}
+						>
 							{/* Server Header */}
 							<button
-								className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+								className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-[color:var(--vscode-list-hoverBackground)] disabled:cursor-not-allowed disabled:opacity-50"
 								disabled={disabled}
 								onClick={() => toggleServerExpansion(server.id)}
 								type="button"
 							>
 								{/* Expansion Icon */}
-								<span className="text-gray-500">
+								<span className="text-[color:var(--vscode-descriptionForeground)]">
 									{expandedServers.has(server.id) ? "▼" : "▶"}
 								</span>
 
@@ -246,26 +251,28 @@ export const MCPActionPicker = ({
 								/>
 
 								{/* Server Name */}
-								<span className="flex-1 font-medium text-sm">
+								<span className="flex-1 font-medium text-[color:var(--vscode-foreground)] text-sm">
 									{server.name}
 								</span>
 
 								{/* Tool Count */}
-								<span className="text-gray-500 text-xs">
+								<span className="text-[color:var(--vscode-descriptionForeground)] text-xs">
 									{server.tools.length} tools
 								</span>
 							</button>
 
 							{/* Tools List (when expanded) */}
 							{expandedServers.has(server.id) && (
-								<div className="border-gray-300 border-t bg-gray-50">
+								<div className="border-[color:var(--vscode-input-border,#3c3c3c)] border-t bg-[color:var(--vscode-tree-tableOddRowsBackground,transparent)]">
 									{" "}
 									{/* Warning for unavailable servers */}
 									{server.status === "unavailable" && (
-										<div className="mx-3 my-2 rounded border border-yellow-400 bg-yellow-50 px-3 py-2">
+										<div className="mx-3 my-2 rounded border border-[color:var(--vscode-inputValidation-warningBorder,#cca700)] bg-[color:var(--vscode-inputValidation-warningBackground,rgba(204,167,0,0.1))] px-3 py-2">
 											<div className="flex items-start gap-2">
-												<span className="text-yellow-600">⚠️</span>
-												<div className="flex-1 text-xs text-yellow-800">
+												<span className="text-[color:var(--vscode-inputValidation-warningForeground,#f6c177)]">
+													⚠️
+												</span>
+												<div className="flex-1 text-[color:var(--vscode-inputValidation-warningForeground,#f6c177)] text-xs">
 													<strong>Server Unavailable</strong>
 													<p className="mt-1">
 														This MCP server is currently unavailable. Tools may
@@ -278,10 +285,12 @@ export const MCPActionPicker = ({
 									)}
 									{/* Warning for unknown status servers */}
 									{server.status === "unknown" && (
-										<div className="mx-3 my-2 rounded border border-gray-400 bg-gray-50 px-3 py-2">
+										<div className="mx-3 my-2 rounded border border-[color:var(--vscode-input-border,#3c3c3c)] bg-[color:var(--vscode-tree-tableOddRowsBackground,transparent)] px-3 py-2">
 											<div className="flex items-start gap-2">
-												<span className="text-gray-600">ℹ️</span>
-												<div className="flex-1 text-gray-700 text-xs">
+												<span className="text-[color:var(--vscode-descriptionForeground)]">
+													ℹ️
+												</span>
+												<div className="flex-1 text-[color:var(--vscode-descriptionForeground)] text-xs">
 													<strong>Server Status Unknown</strong>
 													<p className="mt-1">
 														Unable to verify server availability. Proceed with
@@ -292,11 +301,11 @@ export const MCPActionPicker = ({
 										</div>
 									)}
 									{server.tools.length === 0 ? (
-										<div className="px-8 py-2 text-gray-500 text-sm">
+										<div className="px-8 py-2 text-[color:var(--vscode-descriptionForeground)] text-sm">
 											No tools available
 										</div>
 									) : (
-										<div className="divide-y divide-gray-200">
+										<div className="divide-y divide-[color:var(--vscode-input-border,#3c3c3c)]">
 											{server.tools.map((tool) => {
 												const isSelected =
 													selectedAction?.serverId === server.id &&
@@ -304,10 +313,10 @@ export const MCPActionPicker = ({
 
 												return (
 													<button
-														className={`w-full px-8 py-2 text-left text-sm hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 ${
+														className={`w-full px-8 py-2 text-left text-sm hover:bg-[color:var(--vscode-list-hoverBackground)] disabled:cursor-not-allowed disabled:opacity-50 ${
 															isSelected
-																? "bg-blue-100 font-medium text-blue-700"
-																: "text-gray-700"
+																? "bg-[color:var(--vscode-list-activeSelectionBackground)] font-medium text-[color:var(--vscode-list-activeSelectionForeground)]"
+																: "text-[color:var(--vscode-foreground)]"
 														}`}
 														disabled={
 															disabled || server.status === "unavailable"
@@ -320,7 +329,7 @@ export const MCPActionPicker = ({
 															{tool.displayName}
 														</div>
 														{tool.description && (
-															<div className="mt-1 text-gray-500 text-xs">
+															<div className="mt-1 text-[color:var(--vscode-descriptionForeground)] text-xs">
 																{tool.description}
 															</div>
 														)}
@@ -338,7 +347,7 @@ export const MCPActionPicker = ({
 
 			{/* Selection Summary */}
 			{selectedAction && (
-				<div className="rounded border border-blue-300 bg-blue-50 px-3 py-2 text-sm">
+				<div className="rounded border border-[color:var(--vscode-focusBorder,#0078d4)] bg-[color:var(--vscode-list-activeSelectionBackground)] px-3 py-2 text-[color:var(--vscode-list-activeSelectionForeground)] text-sm">
 					<strong>Selected:</strong> {selectedAction.toolDisplayName} from{" "}
 					{selectedAction.serverName}
 				</div>
