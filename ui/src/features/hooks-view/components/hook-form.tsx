@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { VSCodeCheckbox } from "@/components/ui/vscode-checkbox";
 import type { ChangeEvent, FormEvent } from "react";
 import { useCallback, useState } from "react";
 import type {
@@ -143,6 +144,23 @@ export const HookForm = ({
 				}
 				break;
 			}
+			case "mcp": {
+				const params = formData.action.parameters as MCPActionParams;
+				// Validate new required fields
+				if (!params.prompt?.trim()) {
+					errors.action = "Instruction/prompt is required";
+				} else if (params.prompt.length > 1000) {
+					errors.action = "Instruction/prompt must be 1000 characters or less";
+				}
+				// Check for tool selection (new format OR legacy format)
+				const hasNewFormat =
+					params.selectedTools && params.selectedTools.length > 0;
+				const hasLegacyFormat = params.serverId && params.toolName;
+				if (!(hasNewFormat || hasLegacyFormat)) {
+					errors.action = "At least one MCP tool must be selected";
+				}
+				break;
+			}
 			default:
 				break;
 		}
@@ -245,22 +263,13 @@ export const HookForm = ({
 					)}
 				</div>
 
-				<div className="flex items-center gap-2">
-					<input
-						checked={formData.enabled}
-						className="size-4"
-						disabled={isSubmitting}
-						id="hook-enabled"
-						onChange={handleEnabledChange}
-						type="checkbox"
-					/>
-					<label
-						className="text-[color:var(--vscode-foreground)] text-sm"
-						htmlFor="hook-enabled"
-					>
-						Enabled
-					</label>
-				</div>
+				<VSCodeCheckbox
+					checked={formData.enabled}
+					disabled={isSubmitting}
+					id="hook-enabled"
+					label="Enabled"
+					onChange={handleEnabledChange}
+				/>
 
 				<TriggerActionSelector
 					action={formData.action}

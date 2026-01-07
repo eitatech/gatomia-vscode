@@ -1,4 +1,6 @@
 import { TextareaPanel } from "@/components/textarea-panel";
+import { VSCodeCheckbox } from "@/components/ui/vscode-checkbox";
+import { VSCodeSelect } from "@/components/ui/vscode-select";
 import type {
 	ActionConfig,
 	ActionType,
@@ -9,6 +11,7 @@ import type {
 	GitHubActionParams,
 	MCPActionParams,
 	OperationType,
+	SelectedMCPTool,
 	TriggerCondition,
 } from "../types";
 import type {
@@ -17,8 +20,8 @@ import type {
 	HTMLSelectElement,
 	HTMLTextAreaElement,
 } from "react";
-import { MCPActionPicker, type MCPActionSelection } from "./mcp-action-picker";
 import { useMCPServers } from "../hooks/use-mcp-servers";
+import { MCPToolsSelector } from "./mcp-tools-selector";
 
 interface TriggerActionSelectorProps {
 	trigger: TriggerCondition;
@@ -45,9 +48,14 @@ const getDefaultParameters = (type: ActionType): ActionConfig["parameters"] => {
 		case "custom":
 			return {
 				agentName: "",
+				prompt: "",
+				selectedTools: [],
 			} as CustomActionParams;
 		case "mcp":
 			return {
+				prompt: "",
+				selectedTools: [],
+				// Legacy fields for backward compatibility
 				serverId: "",
 				serverName: "",
 				toolName: "",
@@ -179,23 +187,30 @@ export const TriggerActionSelector = ({
 		onClearActionError?.();
 	};
 
-	const handleMCPActionSelection = (
-		selection: MCPActionSelection | null
-	): void => {
-		if (!selection) {
-			return;
-		}
-
+	const handleMCPToolsSelection = (selectedTools: SelectedMCPTool[]): void => {
+		const params = action.parameters as MCPActionParams;
 		onActionChange({
 			...action,
 			type: "mcp",
 			parameters: {
-				serverId: selection.serverId,
-				serverName: selection.serverName,
-				toolName: selection.toolName,
-				toolDisplayName: selection.toolDisplayName,
-				parameterMappings: [],
+				...params,
+				selectedTools,
 			} as MCPActionParams,
+		});
+		onClearActionError?.();
+	};
+
+	const handleCustomToolsSelection = (
+		selectedTools: SelectedMCPTool[]
+	): void => {
+		const params = action.parameters as CustomActionParams;
+		onActionChange({
+			...action,
+			type: "custom",
+			parameters: {
+				...params,
+				selectedTools,
+			} as CustomActionParams,
 		});
 		onClearActionError?.();
 	};
@@ -245,24 +260,16 @@ export const TriggerActionSelector = ({
 				const isCommitOperation = params.operation === "commit";
 				return (
 					<>
-						<div className="flex flex-col gap-2">
-							<label
-								className="font-medium text-[color:var(--vscode-foreground)] text-sm"
-								htmlFor="git-operation"
-							>
-								Operation
-							</label>
-							<select
-								className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-dropdown-background)] px-3 py-2 text-[color:var(--vscode-dropdown-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
-								disabled={disabled}
-								id="git-operation"
-								onChange={handleGitOperationChange}
-								value={params.operation}
-							>
-								<option value="commit">Commit</option>
-								<option value="push">Push</option>
-							</select>
-						</div>
+						<VSCodeSelect
+							disabled={disabled}
+							id="git-operation"
+							label="Operation"
+							onChange={handleGitOperationChange}
+							value={params.operation}
+						>
+							<option value="commit">Commit</option>
+							<option value="push">Push</option>
+						</VSCodeSelect>
 						{isCommitOperation ? (
 							<>
 								<div className="flex flex-col gap-2">
@@ -294,22 +301,13 @@ export const TriggerActionSelector = ({
 										{"{timestamp}"}, {"{user}"}
 									</p>
 								</div>
-								<div className="flex items-center gap-2">
-									<input
-										checked={params.pushToRemote ?? false}
-										className="size-4"
-										disabled={disabled}
-										id="git-push-to-remote"
-										onChange={handleActionParamChange("pushToRemote")}
-										type="checkbox"
-									/>
-									<label
-										className="text-[color:var(--vscode-foreground)] text-sm"
-										htmlFor="git-push-to-remote"
-									>
-										Push to remote after commit
-									</label>
-								</div>
+								<VSCodeCheckbox
+									checked={params.pushToRemote ?? false}
+									disabled={disabled}
+									id="git-push-to-remote"
+									label="Push to remote after commit"
+									onChange={handleActionParamChange("pushToRemote")}
+								/>
 							</>
 						) : (
 							<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.6))] text-xs">
@@ -324,26 +322,18 @@ export const TriggerActionSelector = ({
 				const params = action.parameters as GitHubActionParams;
 				return (
 					<>
-						<div className="flex flex-col gap-2">
-							<label
-								className="font-medium text-[color:var(--vscode-foreground)] text-sm"
-								htmlFor="github-operation"
-							>
-								Operation
-							</label>
-							<select
-								className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-dropdown-background)] px-3 py-2 text-[color:var(--vscode-dropdown-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
-								disabled={disabled}
-								id="github-operation"
-								onChange={handleActionParamChange("operation")}
-								value={params.operation}
-							>
-								<option value="open-issue">Open Issue</option>
-								<option value="close-issue">Close Issue</option>
-								<option value="create-pr">Create Pull Request</option>
-								<option value="add-comment">Add Comment</option>
-							</select>
-						</div>
+						<VSCodeSelect
+							disabled={disabled}
+							id="github-operation"
+							label="Operation"
+							onChange={handleActionParamChange("operation")}
+							value={params.operation}
+						>
+							<option value="open-issue">Open Issue</option>
+							<option value="close-issue">Close Issue</option>
+							<option value="create-pr">Create Pull Request</option>
+							<option value="add-comment">Add Comment</option>
+						</VSCodeSelect>
 						<div className="flex flex-col gap-2">
 							<label
 								className="font-medium text-[color:var(--vscode-foreground)] text-sm"
@@ -495,22 +485,99 @@ export const TriggerActionSelector = ({
 			case "mcp": {
 				const params = action.parameters as MCPActionParams;
 				return (
-					<div className="flex flex-col gap-3">
-						<MCPActionPicker
-							disabled={disabled}
-							error={mcpError}
-							loading={mcpLoading}
-							onSelectionChange={handleMCPActionSelection}
-							servers={servers}
-						/>
-						{params.serverId && params.toolName && (
-							<div className="rounded border border-[color:var(--vscode-panel-border)] bg-[color:var(--vscode-editor-background)] px-3 py-2">
-								<div className="text-[color:var(--vscode-descriptionForeground)] text-xs">
-									<strong>Selected:</strong> {params.toolDisplayName} from{" "}
-									{params.serverName}
-								</div>
+					<div className="flex flex-col gap-4">
+						{/* Prompt/Instruction Field */}
+						<div className="flex flex-col gap-2">
+							<label
+								className="font-medium text-[color:var(--vscode-foreground)] text-xs"
+								htmlFor="mcp-prompt"
+							>
+								Instruction/Prompt{" "}
+								<span className="text-[color:var(--vscode-errorForeground)]">
+									*
+								</span>
+							</label>
+							<textarea
+								className="min-h-[80px] resize-y rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-input-background)] px-3 py-2 text-[color:var(--vscode-input-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
+								disabled={disabled}
+								id="mcp-prompt"
+								maxLength={1000}
+								onChange={(e) => {
+									onActionChange({
+										...action,
+										parameters: {
+											...params,
+											prompt: e.target.value,
+										} as MCPActionParams,
+									});
+									onClearActionError?.();
+								}}
+								placeholder="Enter the instruction or prompt for the agent to execute..."
+								value={params.prompt || ""}
+							/>
+							<div className="flex justify-between text-[color:var(--vscode-descriptionForeground)] text-xs">
+								<span>
+									Describe what the agent should do with the selected tools
+								</span>
+								<span>{params.prompt?.length || 0}/1000</span>
 							</div>
-						)}
+						</div>
+
+						{/* Agent Selector */}
+						<VSCodeSelect
+							description="Select which agent should execute the action (optional, defaults to GitHub Copilot)"
+							disabled={disabled}
+							id="mcp-agent"
+							label="Agent (Optional)"
+							onChange={(e) => {
+								onActionChange({
+									...action,
+									parameters: {
+										...params,
+										agentId: e.target.value || undefined,
+									} as MCPActionParams,
+								});
+								onClearActionError?.();
+							}}
+							size="sm"
+							value={params.agentId || ""}
+						>
+							<option value="">Default Agent</option>
+							<option value="gpt-4o">GPT-4o</option>
+							<option value="gpt-4o-mini">GPT-4o Mini</option>
+							<option value="o1-preview">O1 Preview</option>
+							<option value="o1-mini">O1 Mini</option>
+							<option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+						</VSCodeSelect>
+
+						{/* MCP Tools Selector - Multi-select with checkboxes */}
+						<div className="flex flex-col gap-2">
+							<div className="font-medium text-[color:var(--vscode-foreground)] text-xs">
+								MCP Tools{" "}
+								<span className="text-[color:var(--vscode-errorForeground)]">
+									*
+								</span>
+							</div>
+							{mcpLoading && (
+								<div className="flex items-center justify-center py-8 text-[color:var(--vscode-descriptionForeground)] text-sm">
+									<span className="codicon codicon-loading codicon-modifier-spin mr-2" />
+									Loading MCP tools...
+								</div>
+							)}
+							{!mcpLoading && mcpError && (
+								<div className="rounded border border-[color:var(--vscode-errorBorder)] bg-[color:var(--vscode-inputValidation-errorBackground)] px-3 py-2 text-[color:var(--vscode-errorForeground)] text-sm">
+									{mcpError}
+								</div>
+							)}
+							{!(mcpLoading || mcpError) && (
+								<MCPToolsSelector
+									disabled={disabled}
+									onSelectionChange={handleMCPToolsSelection}
+									selectedTools={params.selectedTools || []}
+									servers={servers}
+								/>
+							)}
+						</div>
 					</div>
 				);
 			}
@@ -526,36 +593,26 @@ export const TriggerActionSelector = ({
 					Trigger
 				</legend>
 				<div className="flex gap-3">
-					<div className="flex flex-1 flex-col gap-2">
-						<label
-							className="font-medium text-[color:var(--vscode-foreground)] text-xs"
-							htmlFor="trigger-agent"
-						>
-							Agent
-						</label>
-						<select
-							className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-dropdown-background)] px-3 py-2 text-[color:var(--vscode-dropdown-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
+					<div className="flex-1">
+						<VSCodeSelect
 							disabled={disabled}
 							id="trigger-agent"
+							label="Agent"
 							onChange={handleTriggerAgentChange}
+							size="sm"
 							value={trigger.agent}
 						>
 							<option value="speckit">SpecKit</option>
 							<option value="openspec">OpenSpec</option>
-						</select>
+						</VSCodeSelect>
 					</div>
-					<div className="flex flex-1 flex-col gap-2">
-						<label
-							className="font-medium text-[color:var(--vscode-foreground)] text-xs"
-							htmlFor="trigger-operation"
-						>
-							Operation
-						</label>
-						<select
-							className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-dropdown-background)] px-3 py-2 text-[color:var(--vscode-dropdown-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
+					<div className="flex-1">
+						<VSCodeSelect
 							disabled={disabled}
 							id="trigger-operation"
+							label="Operation"
 							onChange={handleTriggerOperationChange}
+							size="sm"
 							value={trigger.operation}
 						>
 							{SPECKIT_OPERATIONS.map((operation) => (
@@ -563,7 +620,7 @@ export const TriggerActionSelector = ({
 									{operation.label}
 								</option>
 							))}
-						</select>
+						</VSCodeSelect>
 					</div>
 				</div>
 			</fieldset>
@@ -572,27 +629,20 @@ export const TriggerActionSelector = ({
 				<legend className="px-2 font-medium text-[color:var(--vscode-foreground)] text-sm">
 					Action
 				</legend>
-				<div className="flex flex-col gap-2">
-					<label
-						className="font-medium text-[color:var(--vscode-foreground)] text-xs"
-						htmlFor="action-type"
-					>
-						Type
-					</label>
-					<select
-						className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-dropdown-background)] px-3 py-2 text-[color:var(--vscode-dropdown-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
-						disabled={disabled}
-						id="action-type"
-						onChange={handleActionTypeChange}
-						value={action.type}
-					>
-						<option value="agent">Agent Command</option>
-						<option value="git">Git Operation</option>
-						<option value="github">GitHub Operation</option>
-						<option value="custom">Custom Agent</option>
-						<option value="mcp">MCP Action</option>
-					</select>
-				</div>
+				<VSCodeSelect
+					disabled={disabled}
+					id="action-type"
+					label="Type"
+					onChange={handleActionTypeChange}
+					size="sm"
+					value={action.type}
+				>
+					<option value="agent">Agent Command</option>
+					<option value="git">Git Operation</option>
+					<option value="github">GitHub Operation</option>
+					<option value="custom">Custom Agent</option>
+					<option value="mcp">MCP Action</option>
+				</VSCodeSelect>
 				{renderActionParameters()}
 				{actionError && (
 					<span className="text-[color:var(--vscode-errorForeground)] text-xs">
