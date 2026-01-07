@@ -228,4 +228,175 @@ describe("SteeringManager", () => {
 			await steeringManager.createProjectDocumentation();
 		});
 	});
+
+	describe("createProjectInstructionRule", () => {
+		it("creates .github/instructions/<name>.instructions.md with the standard template", async () => {
+			vi.mocked(window.showInputBox).mockResolvedValue("TypeScript Rules");
+			vi.mocked(workspace.fs.createDirectory).mockResolvedValue(undefined);
+			vi.mocked(workspace.fs.stat).mockRejectedValue(new Error("Not found"));
+			vi.mocked(workspace.fs.writeFile).mockResolvedValue(undefined);
+			vi.mocked(workspace.openTextDocument).mockResolvedValue({} as any);
+			vi.mocked(window.showTextDocument).mockResolvedValue({} as any);
+
+			const created = await (
+				steeringManager as any
+			).createProjectInstructionRule();
+
+			expect(created).toBe(true);
+			expect(workspace.fs.createDirectory).toHaveBeenCalledWith(
+				expect.objectContaining({
+					fsPath: `${mockWorkspaceRoot}/.github/instructions`,
+				})
+			);
+			expect(workspace.fs.writeFile).toHaveBeenCalledTimes(1);
+
+			const [uri, content] = vi.mocked(workspace.fs.writeFile).mock.calls[0];
+			expect((uri as Uri).fsPath).toBe(
+				`${mockWorkspaceRoot}/.github/instructions/typescript-rules.instructions.md`
+			);
+			expect(ArrayBuffer.isView(content)).toBe(true);
+			expect((content as Uint8Array).byteLength).toBeGreaterThan(0);
+		});
+
+		it("creates the instructions directory when missing", async () => {
+			vi.mocked(window.showInputBox).mockResolvedValue("TypeScript Rules");
+			vi.mocked(workspace.fs.createDirectory).mockResolvedValue(undefined);
+			vi.mocked(workspace.fs.stat).mockRejectedValue(new Error("Not found"));
+			vi.mocked(workspace.fs.writeFile).mockResolvedValue(undefined);
+			vi.mocked(workspace.openTextDocument).mockResolvedValue({} as any);
+			vi.mocked(window.showTextDocument).mockResolvedValue({} as any);
+
+			await (steeringManager as any).createProjectInstructionRule();
+
+			expect(workspace.fs.createDirectory).toHaveBeenCalledWith(
+				expect.objectContaining({
+					fsPath: `${mockWorkspaceRoot}/.github/instructions`,
+				})
+			);
+		});
+
+		it("does not overwrite when the target file already exists", async () => {
+			vi.mocked(window.showInputBox).mockResolvedValue("TypeScript Rules");
+			vi.mocked(workspace.fs.createDirectory).mockResolvedValue(undefined);
+			vi.mocked(workspace.fs.stat).mockResolvedValue({} as any);
+			vi.mocked(window.showErrorMessage).mockResolvedValue(undefined);
+
+			const created = await (
+				steeringManager as any
+			).createProjectInstructionRule();
+
+			expect(created).toBe(false);
+			expect(workspace.fs.writeFile).not.toHaveBeenCalled();
+			expect(window.showErrorMessage).toHaveBeenCalledWith(
+				expect.stringContaining("already exists")
+			);
+		});
+
+		it("normalizes input to kebab-case filename", async () => {
+			vi.mocked(window.showInputBox).mockResolvedValue("TypeScript Rules");
+			vi.mocked(workspace.fs.createDirectory).mockResolvedValue(undefined);
+			vi.mocked(workspace.fs.stat).mockRejectedValue(new Error("Not found"));
+			vi.mocked(workspace.fs.writeFile).mockResolvedValue(undefined);
+			vi.mocked(workspace.openTextDocument).mockResolvedValue({} as any);
+			vi.mocked(window.showTextDocument).mockResolvedValue({} as any);
+
+			await (steeringManager as any).createProjectInstructionRule();
+
+			const [uri] = vi.mocked(workspace.fs.writeFile).mock.calls[0];
+			expect((uri as Uri).fsPath).toContain("typescript-rules.instructions.md");
+		});
+	});
+
+	describe("createUserInstructionRule", () => {
+		it("creates $HOME/.github/instructions/<name>.instructions.md with the standard template", async () => {
+			vi.mocked(window.showInputBox).mockResolvedValue("TypeScript Rules");
+			vi.mocked(workspace.fs.createDirectory).mockResolvedValue(undefined);
+			vi.mocked(workspace.fs.stat).mockRejectedValue(new Error("Not found"));
+			vi.mocked(workspace.fs.writeFile).mockResolvedValue(undefined);
+			vi.mocked(workspace.openTextDocument).mockResolvedValue({} as any);
+			vi.mocked(window.showTextDocument).mockResolvedValue({} as any);
+
+			const created = await (
+				steeringManager as any
+			).createUserInstructionRule();
+
+			expect(created).toBe(true);
+			expect(workspace.fs.createDirectory).toHaveBeenCalledWith(
+				expect.objectContaining({
+					fsPath: expect.stringContaining(".github/instructions"),
+				})
+			);
+			expect(workspace.fs.writeFile).toHaveBeenCalledTimes(1);
+
+			const [uri, content] = vi.mocked(workspace.fs.writeFile).mock.calls[0];
+			expect((uri as Uri).fsPath).toContain(".github/instructions");
+			expect((uri as Uri).fsPath).toContain("typescript-rules.instructions.md");
+			expect(ArrayBuffer.isView(content)).toBe(true);
+			expect((content as Uint8Array).byteLength).toBeGreaterThan(0);
+		});
+
+		it("creates the home instructions directory when missing", async () => {
+			vi.mocked(window.showInputBox).mockResolvedValue("TypeScript Rules");
+			vi.mocked(workspace.fs.createDirectory).mockResolvedValue(undefined);
+			vi.mocked(workspace.fs.stat).mockRejectedValue(new Error("Not found"));
+			vi.mocked(workspace.fs.writeFile).mockResolvedValue(undefined);
+			vi.mocked(workspace.openTextDocument).mockResolvedValue({} as any);
+			vi.mocked(window.showTextDocument).mockResolvedValue({} as any);
+
+			await (steeringManager as any).createUserInstructionRule();
+
+			expect(workspace.fs.createDirectory).toHaveBeenCalledWith(
+				expect.objectContaining({
+					fsPath: expect.stringContaining(".github/instructions"),
+				})
+			);
+		});
+
+		it("does not overwrite when the target file already exists", async () => {
+			vi.mocked(window.showInputBox).mockResolvedValue("TypeScript Rules");
+			vi.mocked(workspace.fs.createDirectory).mockResolvedValue(undefined);
+			vi.mocked(workspace.fs.stat).mockResolvedValue({} as any);
+			vi.mocked(window.showErrorMessage).mockResolvedValue(undefined);
+
+			const created = await (
+				steeringManager as any
+			).createUserInstructionRule();
+
+			expect(created).toBe(false);
+			expect(workspace.fs.writeFile).not.toHaveBeenCalled();
+			expect(window.showErrorMessage).toHaveBeenCalledWith(
+				expect.stringContaining("already exists")
+			);
+		});
+	});
+
+	describe("createConstitutionRequest", () => {
+		it("sends /speckit.constitution with the provided description", async () => {
+			vi.mocked(window.showInputBox).mockResolvedValue(
+				"Python project with FastAPI"
+			);
+
+			await steeringManager.createConstitutionRequest();
+
+			expect(sendPromptToChat).toHaveBeenCalledWith(
+				"/speckit.constitution Python project with FastAPI"
+			);
+		});
+
+		it("does not send chat request when user cancels", async () => {
+			vi.mocked(window.showInputBox).mockResolvedValue(undefined);
+
+			await steeringManager.createConstitutionRequest();
+
+			expect(sendPromptToChat).not.toHaveBeenCalled();
+		});
+
+		it("does not send chat request for empty description", async () => {
+			vi.mocked(window.showInputBox).mockResolvedValue("   ");
+
+			await steeringManager.createConstitutionRequest();
+
+			expect(sendPromptToChat).not.toHaveBeenCalled();
+		});
+	});
 });
