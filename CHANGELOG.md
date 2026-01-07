@@ -2,6 +2,23 @@
 
 ---
 
+## v0.30.0 2026-01-07
+
+### Changed
+
+- Simplifies unit tests by removing unnecessary async logic
+- Implement real MCP server discovery and UI tool selection
+- add new brand logo
+- Adds robust instruction rule system and streamlines Steering UI
+
+### Release Info
+
+- **Source Branch**: `develop`
+- **Release Type**: minor
+
+---
+
+
 ## v0.29.0 2026-01-05
 
 ### Added
