@@ -46,14 +46,14 @@ export class MCPDiscoveryService implements IMCPDiscoveryService {
 		}
 
 		try {
-			// Query MCP servers from Copilot
+			// Query MCP servers from Copilot (async to load mcp.json)
 			const servers = await queryMCPServers();
 
 			// Enrich each server with its tools
 			const serversWithTools = await Promise.all(
 				servers.map(async (server) => {
 					try {
-						// Query tools for this server
+						// Query tools for this server (async)
 						const tools = await queryMCPTools(server.id);
 
 						// Return server with populated tools array

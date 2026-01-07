@@ -4,30 +4,85 @@
 
 ## v0.29.0 2026-01-05
 
+### Added
+
+- **Steering Instructions & Rules**: Comprehensive instruction rule management system with project and user scopes
+  - **Project Instruction Rules**: Create and manage instruction rules for teams in `.github/instructions/*.instructions.md`
+    - Automatic kebab-case filename normalization (e.g., "TypeScript Rules" → `typescript-rules.instructions.md`)
+    - Directory auto-creation when missing
+    - Standard template generation with frontmatter (`description`, `applyTo`) and heading
+    - No-overwrite protection with actionable error messages
+    - Integrated with Steering tree view under "Project Instructions" group
+  - **User Instruction Rules**: Personal instruction rules in `$HOME/.github/instructions/*.instructions.md`
+    - Same normalization, template, and protection features as project rules
+    - Stored outside repository for personal workflows
+    - Integrated with Steering tree view under "User Instructions" group
+  - **Constitution Request**: AI-assisted Constitution document generation
+    - "Create Constitution" button in Steering toolbar (book icon 📖)
+    - Prompts for brief description and sends `/speckit.constitution <description>` to Copilot Chat
+    - Agent handles document creation with no post-processing
+  - **Consolidated Tree View**: Simplified Steering explorer organization
+    - "User Instructions" group combines Global Instructions and user instruction rules
+    - "Project Instructions" group for project-level instruction rules
+    - Removed redundant "User Instruction Rules" section
+  - **Toolbar Actions**: Quick-access buttons in Steering view
+    - Create Project Rule
+    - Create User Rule
+    - Create Constitution
+    - Refresh
+  - **Test Coverage**: 22 tests covering all user stories and edge cases
+    - 18 tests for SteeringManager (creation, normalization, validation)
+    - 4 tests for tree view provider (listing, filtering, opening)
+    - 100% pass rate with TDD approach
+
 ### Changed
 
-- Merge pull request #18 from eitatech/001-steering-instructions-rules
-- Adds project/user instruction rule creation and constitution support
+- **Steering View Organization**: Streamlined grouping for better user experience
+  - Renamed "Project Instruction Rules" to "Project Instructions"
+  - Merged "User Instructions" and "User Instruction Rules" into single expandable group
+  - Always show user/project groups (welcome content no longer needed)
+- **README Documentation**: Updated with comprehensive Steering section
+  - Added instruction rules usage examples
+  - Constitution creation workflow documented
+  - Clear distinction between project and user scope
+
+### Technical Details
+
+- **Implementation Checklists**: All 56 validation items completed
+  - Requirements checklist: 16/16 items verified
+  - Implementation checklist: 40/40 items validated
+- **Quality Gate**: 255 files checked with 0 violations (Biome/Ultracite)
+- **Code Organization**: New utility module for instruction rules
+  - `src/features/steering/instruction-rules.ts`: Shared utilities for normalization, templates, path resolution
+  - `src/features/steering/steering-manager.ts`: Business logic for all creation flows
+  - `src/providers/steering-explorer-provider.ts`: Tree view with consolidated groups
+
+### Release Info
+
+- **Source Branch**: `develop`
+- **Release Type**: minor
+- **Pull Request**: #18
+
+---
 
 ## v0.28.0 2026-01-05
 
 ### Added
 
-- Implement auto-review transition and enhance spec management commands
-- rename specs
-- rename specs
-
-### Fixed
-
-- spec review flow
-- spec review flow
-- spec review flow
-- remove vscode
+- **Auto Review Transition**: Automatically moves a spec to Review when all tasks and checklists are completed.
+- **Spec Review Flow Commands**: New command to reopen specs from Review back to Current.
+- **Command Argument Resolver**: Shared utilities to resolve spec IDs from Spec Explorer items and command arguments.
 
 ### Changed
 
-- add some agentes to github copilot
-- Establishes comprehensive development and agent guidelines
+- **Spec State Management**: Improved persistence and updates (upsert) for spec review-flow state, including pending summaries.
+- **Review/Archive Workflows**: Enhanced send-to-review and send-to-archived commands with clearer blocker messages based on status and pending work.
+- **Developer Tooling**: Updated lint/check configuration to ignore VS Code task configuration files.
+
+### Fixed
+
+- **Command Robustness**: Improved handling of Spec Explorer item arguments for archiving and send-to-review flows.
+- **Test Clarity**: Updated test descriptions and added coverage for the new review-flow behaviors.
 
 ### Release Info
 
@@ -35,7 +90,6 @@
 - **Release Type**: minor
 
 ---
-
 
 ## v0.27.1 2025-12-18
 

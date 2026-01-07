@@ -1,4 +1,5 @@
 import type { ChangeEvent } from "react";
+import { VSCodeSelect } from "@/components/ui/vscode-select";
 import type { Hook, HookExecutionLog, ExecutionStatus } from "../types";
 
 interface ExecutionLogsListProps {
@@ -116,21 +117,20 @@ export const ExecutionLogsList = ({
 				</div>
 			</div>
 
-			<label className="flex flex-col gap-1 text-[color:var(--vscode-descriptionForeground)] text-xs">
-				Filter by hook
-				<select
-					className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-input-background)] px-2 py-1 text-[color:var(--vscode-input-foreground)]"
-					onChange={handleFilterChange}
-					value={selectedHookId ?? "all"}
-				>
-					<option value="all">All hooks</option>
-					{hooks.map((hook) => (
-						<option key={hook.id} value={hook.id}>
-							{hook.name}
-						</option>
-					))}
-				</select>
-			</label>
+			<VSCodeSelect
+				id="filter-hook"
+				label="Filter by hook"
+				onChange={handleFilterChange}
+				size="sm"
+				value={selectedHookId ?? "all"}
+			>
+				<option value="all">All hooks</option>
+				{hooks.map((hook) => (
+					<option key={hook.id} value={hook.id}>
+						{hook.name}
+					</option>
+				))}
+			</VSCodeSelect>
 
 			<div className="max-h-64 overflow-auto rounded border border-[color:var(--vscode-panel-border)]">
 				{(() => {
