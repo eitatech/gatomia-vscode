@@ -1,57 +1,89 @@
-# GatomIA (Agentic Spec-Driven Development Tool)
+# GatomIA (Agentic Spec-Driven Development Toolkit)
 
 [![Visual Studio Marketplace](https://img.shields.io/vscode-marketplace/v/EITA.gatomia.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=EITA.gatomia)
 [![Downloads](https://img.shields.io/vscode-marketplace/d/EITA.gatomia.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=EITA.gatomia)
 [![GitHub stars](https://img.shields.io/github/stars/eitatech/gatomia-vscode.svg?style=flat-square)](https://github.com/eitatech/gatomia-vscode/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/eitatech/gatomia-vscode.svg?style=flat-square)](https://github.com/eitatech/gatomia-vscode/issues)
 
-GatomIA is a VS Code extension that brings Agentic Lifecycle Management Automation to your workflow, leveraging **SpecKit**, **OpenSpec**, and **GitHub Copilot**.
+GatomIA is a VS Code extension that brings Agentic Spec-Driven Development  to your workflow, leveraging **SpecKit**, **OpenSpec**, and **GitHub Copilot**.
 
 It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.md), and custom prompts, seamlessly integrating with GitHub Copilot Chat to generate high-quality documentation and code.
+
+---
+
+## Current Project Status
+
+This project is under **continuous development**. Some features may still exhibit unexpected behavior, contain bugs, or be only partially implemented.
+
+**Bug reports, suggestions, and general feedback are highly appreciated!** They play a crucial role in helping us stabilize and improve the extension.
+
+We are actively working on:
+
+* **Stabilizing all existing features**
+* **Implementing the upcoming functionalities from our roadmap**
+* **Improving overall reliability and user experience**
+
+You can follow our progress, open issues, or contribute directly through our official repository:
+
+**[https://github.com/eitatech/gatomia-vscode/issues](https://github.com/eitatech/gatomia-vscode/issues)**
 
 ## Features
 
 ### Spec Management
 
-- **Create Specs**: Run `GatomIA: Create New Spec` (`gatomia.spec.create`) to open the creation dialog. Define your summary, product context, and constraints.
-- **Support for Multiple Systems**: Choose between **SpecKit** (Recommended) or **OpenSpec** for your Spec-Driven Development workflow.
-- **Generate with Copilot**: The extension compiles your input into an optimized prompt and sends it to **GitHub Copilot Chat** to generate the full specification.
-- **Manage Specs**: Browse generated specs in the **Specs** view.
-- **Execute Tasks**: Open `tasks.md` and use the "Start Task" CodeLens to send task context to GitHub Copilot Chat for implementation.
+* **Create Specs**: Run `GatomIA: Create New Spec` (`gatomia.spec.create`) to open the creation dialog. Define your summary, product context, and constraints.
+* **Support for Multiple Systems**: Choose between **SpecKit** (Recommended) or **OpenSpec** for your Spec-Driven Development workflow.
+* **Generate with Copilot**: The extension compiles your input into an optimized prompt and sends it to **GitHub Copilot Chat** to generate the full specification.
+* **Manage Specs**: Browse generated specs in the **Specs** view.
+* **Execute Tasks**: Open `tasks.md` and use the "Start Task" CodeLens to send task context to GitHub Copilot Chat for implementation.
 
 ### Prompt Management
 
-- **Custom Prompts**: Manage Markdown prompts under `.github/prompts` (configurable) alongside instructions and agents to keep all project guidance in one place.
-- **Project Instructions & Agents**: The Prompts explorer shows `Project Instructions` and `Project Agents` groups, surfacing `.github/instructions` and `.github/agents` files.
-- **Run Prompts**: Execute prompts directly from the tree view, passing the context to GitHub Copilot Chat.
-- **Rename or Delete**: Use the item context menu to rename or delete prompts.
+* **Custom Prompts**: Manage Markdown prompts under `.github/prompts` (configurable) alongside instructions and agents to keep all project guidance in one place.
+* **Project Instructions & Agents**: The Prompts explorer shows `Project Instructions` and `Project Agents` groups, surfacing `.github/instructions` and `.github/agents` files.
+* **Run Prompts**: Execute prompts directly from the tree view, passing the context to GitHub Copilot Chat.
+* **Rename or Delete**: Use the item context menu to rename or delete prompts.
 
 ### Steering
 
-- **Constitution / Agents**: Manage your project's "Constitution" (SpecKit) or "AGENTS.md" (OpenSpec) to steer Copilot's behavior.
-- **Global Instructions**: Configure global instructions for Copilot across all your projects.
+* **Instruction Rules**: Create and manage instruction rules for GitHub Copilot at both project (`.github/instructions/*.instructions.md`) and user (`$HOME/.github/instructions/*.instructions.md`) levels.
+  - **Project Rules**: Standardize team guidelines within the repository
+  - **User Rules**: Define personal reusable guidance without committing to the repo
+  - **Constitution**: Request Constitution document generation via `Create Constitution` button with AI-assisted drafting
+* **Constitution / Agents**: Manage your project's "Constitution" (SpecKit) or "AGENTS.md" (OpenSpec) to steer Copilot's behavior.
+* **Global Instructions**: Configure global instructions for Copilot across all your projects.
 
 ### Migration
 
-- **Migrate to SpecKit**: Easily migrate existing OpenSpec projects to the modern SpecKit structure using the `GatomIA: Migrate to SpecKit` command.
+* **Migrate to SpecKit**: Easily migrate existing OpenSpec projects to the modern SpecKit structure using the `GatomIA: Migrate to SpecKit` command.
 
 ### Hooks & Automation
 
-- **MCP Hooks Integration**: Automate workflows by creating hooks that trigger MCP (Model Context Protocol) actions when agent operations complete.
-- **Browse MCP Servers**: Discover available MCP servers and tools configured in your GitHub Copilot setup.
-- **Configure Actions**: Set up hooks to execute MCP tools automatically (e.g., create GitHub issues, send Slack notifications) after operations like spec generation or task completion.
-- **Execution Tracking**: View execution logs and monitor hook performance in real-time.
-- **Error Handling**: Graceful degradation when MCP servers are unavailable, with automatic retry logic for transient failures.
+* **MCP Hooks Integration**: Automate workflows by creating hooks that trigger MCP (Model Context Protocol) actions when agent operations complete.
+* **Browse MCP Servers**: Discover available MCP servers and tools configured in your GitHub Copilot setup.
+* **Configure Actions**: Set up hooks to execute MCP tools automatically (e.g., create GitHub issues, send Slack notifications) after operations like spec generation or task completion.
+* **Execution Tracking**: View execution logs and monitor hook performance in real-time.
+* **Error Handling**: Graceful degradation when MCP servers are unavailable, with automatic retry logic for transient failures.
+
+### Welcome Screen
+
+- **First-Time Setup**: Interactive welcome screen appears on first activation to guide you through extension setup.
+- **Dependency Detection**: Automatically checks for GitHub Copilot Chat, SpecKit CLI, and OpenSpec CLI installations.
+- **Quick Installation**: One-click install buttons copy installation commands to your clipboard.
+- **Configuration Management**: Edit key settings directly from the welcome screen with inline validation.
+- **Learning Resources**: Browse documentation, examples, and tutorials organized by category.
+- **Feature Discovery**: Explore all extension features with quick-access command buttons.
+- **System Health**: Monitor extension status with real-time diagnostics and health indicators.
+- **Persistent Access**: Re-open welcome screen anytime via `GatomIA: Show Welcome Screen` command.
 
 ## Installation
 
 ### Prerequisites
 
-- Visual Studio Code 1.84.0 or newer.
-- **[GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat)** extension must be installed.
+* Visual Studio Code 1.84.0 or newer.
+* **[GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat)** extension must be installed.
 
 ### [SpecKit](https://github.com/github/spec-kit)
-
 
 1. Install the Specify CLI globally:
 
@@ -59,10 +91,11 @@ It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.
    uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
    ```
 
-2. Initialize in your project:
+2. Initialize SpecKit in your project:
 
    ```shell
    specify init --here --ai copilot
+
    ```
 
 ### [OpenSpec](https://github.com/fission-ai/openspec)
@@ -106,13 +139,22 @@ Search for "GatomIA" in the VS Code Marketplace and install the extension.
 2. Click **Start All Tasks** above a checklist item.
 3. GitHub Copilot Chat will open with the task context. Interact with it to implement the code.
 
-### 3. Create Constitution (SpecKit)
+### 3. Manage Instruction Rules
 
-1. Open the **Steering** view.
-2. Click **Create Project Rule**.
-3. Select **SpecKit**.
-4. Enter your directives (e.g., "Focus on clean code").
-5. Copilot will generate your `constitution.md`.
+1. Open the **Steering** view in the Activity Bar.
+2. **Create Project Rule**:
+   - Click **Create Project Rule** button
+   - Enter a name (e.g., "TypeScript Rules")
+   - Edit the generated `.github/instructions/<name>.instructions.md` file
+3. **Create User Rule**:
+   - Click **Create User Rule** button
+   - Enter a name for personal guidance
+   - Edit the generated `$HOME/.github/instructions/<name>.instructions.md` file
+4. **Create Constitution**:
+   - Click **Create Constitution** button
+   - Enter a brief description (e.g., "Python project with FastAPI")
+   - Copilot Chat opens with `/speckit.constitution` prompt
+   - The agent generates your `constitution.md`
 
 ### 4. Automate with Hooks
 
@@ -121,9 +163,9 @@ Search for "GatomIA" in the VS Code Marketplace and install the extension.
 3. Configure the trigger (e.g., after "plan" operation in "speckit" agent).
 4. Select an action type (MCP, Agent, Git, GitHub, or Custom).
 5. For MCP actions:
-   - Browse available MCP servers and tools
-   - Map parameters using context variables or literal values
-   - Save and enable the hook
+   * Browse available MCP servers and tools
+   * Map parameters using context variables or literal values
+   * Save and enable the hook
 6. Execute operations that match your trigger.
 7. View execution logs in the Hooks view to monitor automation.
 
@@ -176,11 +218,11 @@ openspec/
 ## Development
 
 1. Install dependencies:
-   - `npm run install:all`
+   * `npm run install:all`
 2. Build:
-   - `npm run build`
+   * `npm run build`
 3. Launch:
-   - Press `F5` inside VS Code.
+   * Press `F5` inside VS Code.
 
 ## License
 
@@ -188,5 +230,5 @@ MIT License. See [`LICENSE`](LICENSE).
 
 ## Credits
 
-- [SpecKit](https://github.com/github/spec-kit)
-- [OpenSpec](https://github.com/Fission-AI/OpenSpec)
+* [SpecKit](https://github.com/github/spec-kit)
+* [OpenSpec](https://github.com/Fission-AI/OpenSpec)

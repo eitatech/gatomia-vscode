@@ -6,7 +6,11 @@
 import { randomUUID } from "crypto";
 import type { ChangeRequest, Specification } from "./types";
 import { validateUniqueChangeRequest } from "./duplicate-guard";
-import { addChangeRequest, getSpecState } from "./state";
+import {
+	addChangeRequest,
+	getSpecState,
+	__testInitSpec as initSpec,
+} from "./state";
 import { logChangeRequestCreated } from "./telemetry";
 
 export class DuplicateChangeRequestError extends Error {
@@ -63,6 +67,7 @@ export function createChangeRequest(
 		createdAt: now,
 		updatedAt: now,
 		sentToTasksAt: null,
+		archivalBlocker: true,
 		notes: input.notes?.trim() || undefined,
 	};
 
@@ -80,4 +85,44 @@ export function createChangeRequest(
 	});
 
 	return { spec: updatedSpec, changeRequest };
+}
+
+/**
+ * Check if a change request with the same title already exists for a spec
+ * @param specId Spec identifier
+ * @param title Change request title
+ * @returns True if duplicate exists, false otherwise
+ */
+export function hasDuplicateChangeRequest(
+	specId: string,
+	title: string
+): boolean {
+	const spec = getSpecState(specId);
+	if (!spec?.changeRequests) {
+		return false;
+	}
+
+	const { isValid } = validateUniqueChangeRequest(
+		specId,
+		title,
+		spec.changeRequests
+	);
+	return !isValid;
+}
+
+/**
+ * Get all change requests for a spec
+ * @param specId Spec identifier
+ * @returns Array of change requests
+ */
+export function getChangeRequestsForSpec(specId: string): ChangeRequest[] {
+	const spec = getSpecState(specId);
+	return spec?.changeRequests ?? [];
+}
+
+/**
+ * TEST HELPER: Initialize spec state for testing
+ */
+export function __testInitSpec(spec: Specification): void {
+	initSpec(spec);
 }

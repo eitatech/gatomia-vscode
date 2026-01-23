@@ -2,7 +2,21 @@
 
 ## Core Principles
 
-### I. Kebab-Case File Naming (MANDATORY)
+### I. Purpose
+
+This constitution establishes the foundational coding standards and practices for the GatomIA project. It aims to ensure code quality, maintainability, and consistency across the codebase while fostering a collaborative and efficient development environment.
+
+### II. Scope
+
+This constitution applies to all source code, tests, documentation, and configuration files within the GatomIA project. It governs naming conventions, coding practices, testing strategies, and overall code quality standards.
+
+### III. Definitions
+
+- **Documentation**: Written descriptions and explanations of code functionality, usage, and architecture.
+- **Language**: All documentation and code comments MUST be written in English.
+- **Source Files**: All files containing code, including but not limited to `.ts`, `.tsx`, `.js`, `.json`, and configuration files.
+
+### IV. Kebab-Case File Naming (NON-NEGOTIABLE, MANDATORY)
 
 **Rule**: All source files MUST follow kebab-case naming convention.
 
@@ -21,7 +35,7 @@
 
 **Exceptions**: Configuration files that require specific naming (e.g., `package.json`, `tsconfig.json`, `README.md`)
 
-### II. TypeScript-First Development
+### V. TypeScript-First Development
 
 **Rule**: All source code MUST be written in TypeScript with strict type checking enabled.
 
@@ -33,7 +47,7 @@
 - No `any` types without explicit justification in code review
 - All public APIs MUST have complete type definitions
 
-### III. Test-First Development (NON-NEGOTIABLE)
+### VI. Test-First Development (NON-NEGOTIABLE)
 
 **Rule**: Tests MUST be written and approved BEFORE implementation begins.
 
@@ -46,7 +60,7 @@
 - Test coverage MUST not decrease with new changes
 - Integration tests required for new features and contract changes
 
-### IV. Observability & Instrumentation
+### VII. Observability & Instrumentation
 
 **Rule**: All significant operations MUST include appropriate telemetry, logging, and error reporting.
 
@@ -58,7 +72,7 @@
 - Errors MUST be logged with sufficient context for debugging
 - Success criteria from specifications MUST be measurable via telemetry
 
-### V. Simplicity & YAGNI
+### VIII. Simplicity & YAGNI
 
 **Rule**: Implement only what is needed now. Do not add features or abstractions for potential future use.
 
@@ -70,7 +84,7 @@
 - Features without current use cases are rejected
 - Refactoring happens when patterns emerge (Rule of Three)
 
-## Code Quality Standards
+## Code Quality Standards (MANDATORY - NON NEGOTIABLE)
 
 ### Formatting & Style
 
@@ -81,6 +95,8 @@
 - Semicolons required
 - Formatter (`npm run format`) MUST pass before commit
 - Linter (`npm run lint`) MUST pass before merge
+- Validation (`npm run check`) MUST pass before mark the task as completed
+- Never use emoji in source code files (from global user instructions).
 
 ### Documentation
 
@@ -90,6 +106,8 @@
 - Complex algorithms MUST include explanatory comments
 - README files MUST be kept up-to-date with feature changes
 - Breaking changes MUST be documented in CHANGELOG
+- Architecture decisions MUST be recorded in ADRs
+- All documentation MUST be in English
 
 ### Error Handling
 
@@ -99,6 +117,13 @@
 - User-facing errors MUST be actionable and clear
 - Internal errors MUST include sufficient debug context
 - No silent failures
+- Use custom error classes for domain-specific errors
+- Logging of errors MUST follow the observability guidelines
+- Graceful degradation strategies MUST be implemented where applicable
+- Retry logic MUST be applied for transient failures
+- Validation of inputs MUST be performed to prevent unexpected errors
+- Fallback mechanisms MUST be in place for critical operations
+- Error handling strategies MUST be reviewed during code reviews
 
 ## Governance
 
@@ -123,12 +148,14 @@
 
 ### Version History
 
-**Current Version**: 1.0.0
+**Current Version**: 1.1.0
 
-**Ratified**: 2025-12-06
+**Ratified**: 2025-12-24
 
-**Last Amended**: 2025-12-06
+**Last Amended**: 2025-12-24
 
 **Change Log**:
 
 - v1.0.0 (2025-12-06): Initial constitution with kebab-case mandate, TypeScript-first, TDD, observability, and simplicity principles
+
+- v1.1.0 (2025-12-24): Added detailed error handling requirements and expanded observability guidelines.

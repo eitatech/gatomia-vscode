@@ -4,9 +4,15 @@
  */
 
 /**
- * Spec status in the review flow: Current Specs → Ready to Review → (optional) Reopened
+ * Spec status in the review flow: Current Specs → Review → Reopened → Archived (with optional unarchive)
+ * NOTE: keep legacy "readyToReview" temporarily for backward compatibility until providers are migrated.
  */
-export type SpecStatus = "current" | "readyToReview" | "reopened";
+export type SpecStatus =
+	| "current"
+	| "readyToReview"
+	| "review"
+	| "reopened"
+	| "archived";
 
 /**
  * Change request status: open → (blocked | inProgress) → addressed
@@ -44,9 +50,14 @@ export interface Specification {
 	owner: string;
 	status: SpecStatus;
 	completedAt: Date | null;
+	reviewEnteredAt?: Date | null;
+	archivedAt?: Date | null;
 	updatedAt: Date;
 	links: SpecLinks;
+	pendingTasks?: number;
+	pendingChecklistItems?: number;
 	changeRequests?: ChangeRequest[];
+	watchers?: string[];
 }
 
 /**
@@ -75,4 +86,22 @@ export interface ChangeRequest {
 	updatedAt: Date;
 	sentToTasksAt: Date | null;
 	notes?: string;
+	/**
+	 * Flag indicating this change request currently blocks archiving/unarchiving actions.
+	 */
+	archivalBlocker?: boolean;
+}
+
+export type ReviewTransitionTrigger = "auto" | "manual";
+export type ReviewTransitionStatus = "succeeded" | "failed";
+
+export interface ReviewTransitionEvent {
+	eventId: string;
+	specId: string;
+	triggerType: ReviewTransitionTrigger;
+	initiatedBy?: string;
+	occurredAt: Date;
+	notificationRecipients: string[];
+	status: ReviewTransitionStatus;
+	failureReason?: string | null;
 }

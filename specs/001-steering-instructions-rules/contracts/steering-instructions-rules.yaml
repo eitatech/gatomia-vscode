@@ -1,0 +1,121 @@
+openapi: 3.1.0
+info:
+  title: Steering Instructions & Rules
+  version: 0.1.0
+  description: |
+    Contracts for listing instruction rule files (project + user scopes), creating new rule files,
+    and sending a constitution request to Copilot Chat.
+
+paths:
+  /steering/instructions:
+    get:
+      summary: List all instruction documents
+      description: |
+        Returns instruction documents from:
+        - Project: .github/instructions/*.instructions.md
+        - User: $HOME/.github/instructions/*.instructions.md
+      responses:
+        "200":
+          description: Instruction documents discovered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstructionList"
+
+  /steering/instructions/project:
+    post:
+      summary: Create a project instruction rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInstructionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstructionDocument"
+        "409":
+          description: Target file already exists
+
+  /steering/instructions/user:
+    post:
+      summary: Create a user instruction rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInstructionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstructionDocument"
+        "409":
+          description: Target file already exists
+
+  /steering/constitution:
+    post:
+      summary: Send a constitution request to Copilot Chat
+      description: |
+        Sends `/speckit.constitution <description>` via chat integration.
+        No post-processing is performed after the agent responds.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConstitutionRequest"
+      responses:
+        "202":
+          description: Request accepted
+
+components:
+  schemas:
+    InstructionList:
+      type: object
+      required: [instructions]
+      properties:
+        instructions:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstructionDocument"
+
+    InstructionDocument:
+      type: object
+      required: [id, name, scope, fileName, uri]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        scope:
+          type: string
+          enum: [project, user]
+        fileName:
+          type: string
+        uri:
+          type: string
+          description: File URI string
+
+    CreateInstructionInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: User-provided name; will be normalized to lowercase kebab-case
+
+    ConstitutionRequest:
+      type: object
+      required: [description]
+      properties:
+        description:
+          type: string
+          description: Short prompt describing desired constitution content

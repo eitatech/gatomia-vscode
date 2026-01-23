@@ -50,7 +50,7 @@ export class MCPClientService implements IMCPClientService {
 
 		try {
 			// Verify server exists
-			const server = await this.discoveryService.getServer(serverId);
+			const server = this.discoveryService.getServer(serverId);
 			if (!server) {
 				const error: MCPServerNotFoundError = {
 					name: "MCPServerNotFoundError",
@@ -60,7 +60,7 @@ export class MCPClientService implements IMCPClientService {
 			}
 
 			// Verify tool exists
-			const tool = await this.discoveryService.getTool(serverId, toolName);
+			const tool = this.discoveryService.getTool(serverId, toolName);
 			if (!tool) {
 				const error: MCPToolNotFoundError = {
 					name: "MCPToolNotFoundError",
@@ -70,7 +70,7 @@ export class MCPClientService implements IMCPClientService {
 			}
 
 			// Validate parameters
-			const validation = await this.validateParameters(
+			const validation = this.validateParameters(
 				serverId,
 				toolName,
 				parameters
@@ -151,16 +151,16 @@ export class MCPClientService implements IMCPClientService {
 	 * @param parameters - Parameters to validate
 	 * @returns Validation result with errors if invalid
 	 */
-	async validateParameters(
+	validateParameters(
 		serverId: string,
 		toolName: string,
 		parameters: Record<string, unknown>
-	): Promise<ParameterValidationResult> {
+	): ParameterValidationResult {
 		const errors: ParameterValidationError[] = [];
 
 		try {
 			// Get tool schema
-			const tool = await this.discoveryService.getTool(serverId, toolName);
+			const tool = this.discoveryService.getTool(serverId, toolName);
 			if (!tool) {
 				errors.push({
 					parameter: "_tool",

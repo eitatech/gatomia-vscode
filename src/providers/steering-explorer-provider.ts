@@ -1,5 +1,5 @@
 import { existsSync } from "fs";
-import { join } from "path";
+import { basename, join } from "path";
 import {
 	type Command,
 	type Event,
@@ -20,6 +20,10 @@ import { SPEC_SYSTEM_MODE } from "../constants";
 
 import { homedir } from "os";
 import { getVSCodeUserDataPath, isWindowsOrWsl } from "../utils/platform-utils";
+
+const INSTRUCTION_RULE_SUFFIX = ".instructions.md";
+const RULES_GROUP_EMPTY_LABEL = "No instruction rules found";
+const RULES_GROUP_ERROR_LABEL = "Unable to read instruction rules";
 
 const { joinPath } = Uri;
 
@@ -113,7 +117,7 @@ export class SteeringExplorerProvider
 	}
 
 	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ignore
-	getChildren(element?: SteeringItem): SteeringItem[] {
+	async getChildren(element?: SteeringItem): Promise<SteeringItem[]> {
 		if (!element) {
 			const items: SteeringItem[] = [];
 
@@ -125,21 +129,29 @@ export class SteeringExplorerProvider
 				"copilot-instructions.md"
 			);
 
-			if (existsSync(globalConfigPath)) {
-				items.push(
-					new SteeringItem(
-						"User Instructions",
-						TreeItemCollapsibleState.Expanded,
-						"user-instructions-group",
-						"",
-						this.context
-					)
-				);
-			}
+			items.push(
+				new SteeringItem(
+					"User Instructions",
+					TreeItemCollapsibleState.Expanded,
+					"user-instructions-group",
+					"",
+					this.context
+				)
+			);
 
 			if (workspace.workspaceFolders) {
 				const workspaceRoot = workspace.workspaceFolders[0].uri.fsPath;
 				const specSystem = this.configManager.getSettings().specSystem;
+
+				items.push(
+					new SteeringItem(
+						"Project Instructions",
+						TreeItemCollapsibleState.Expanded,
+						"project-instruction-rules-group",
+						"",
+						this.context
+					)
+				);
 
 				// Check if any project instruction files exist
 				const projectCopilotMd = join(
@@ -213,14 +225,17 @@ export class SteeringExplorerProvider
 		}
 
 		if (element.contextValue === "user-instructions-group") {
+			const items: SteeringItem[] = [];
 			const homeDir = homedir() || process.env.USERPROFILE || "";
+
+			// Add Global Instructions if exists
 			const globalConfigPath = join(
 				homeDir,
 				".github",
 				"copilot-instructions.md"
 			);
 			if (existsSync(globalConfigPath)) {
-				return [
+				items.push(
 					new SteeringItem(
 						"Global Instructions",
 						TreeItemCollapsibleState.None,
@@ -232,10 +247,53 @@ export class SteeringExplorerProvider
 							title: "Open Global Instructions",
 							arguments: [Uri.file(globalConfigPath)],
 						}
-					),
-				];
+					)
+				);
 			}
-			return [];
+
+			// Add User Instruction Rules
+			if (!homeDir) {
+				items.push(
+					new SteeringItem(
+						RULES_GROUP_ERROR_LABEL,
+						TreeItemCollapsibleState.None,
+						"instruction-rules-error",
+						"",
+						this.context
+					)
+				);
+				return items;
+			}
+			const rulesRoot = joinPath(Uri.file(homeDir), ".github", "instructions");
+			const ruleUris = await this.readFilesInDirectoryWithSuffix(
+				rulesRoot,
+				INSTRUCTION_RULE_SUFFIX
+			);
+
+			if (ruleUris.kind === "error") {
+				// If no rules and no global config, show empty message
+				if (items.length === 0) {
+					items.push(
+						new SteeringItem(
+							RULES_GROUP_EMPTY_LABEL,
+							TreeItemCollapsibleState.None,
+							"instruction-rules-empty",
+							"",
+							this.context
+						)
+					);
+				}
+				return items;
+			}
+
+			if (ruleUris.items.length === 0) {
+				// If no rules but have global config, just return what we have
+				return items;
+			}
+
+			// Add instruction rules to items
+			items.push(...this.buildInstructionRuleItems(ruleUris.items));
+			return items;
 		}
 
 		if (element.contextValue === "project-instructions-group") {
@@ -329,6 +387,45 @@ export class SteeringExplorerProvider
 			return items;
 		}
 
+		if (element.contextValue === "project-instruction-rules-group") {
+			if (!workspace.workspaceFolders) {
+				return [];
+			}
+
+			const workspaceRoot = workspace.workspaceFolders[0].uri;
+			const rulesRoot = joinPath(workspaceRoot, ".github", "instructions");
+			const ruleUris = await this.readFilesInDirectoryWithSuffix(
+				rulesRoot,
+				INSTRUCTION_RULE_SUFFIX
+			);
+
+			if (ruleUris.kind === "error") {
+				return [
+					new SteeringItem(
+						RULES_GROUP_ERROR_LABEL,
+						TreeItemCollapsibleState.None,
+						"instruction-rules-error",
+						"",
+						this.context
+					),
+				];
+			}
+
+			if (ruleUris.items.length === 0) {
+				return [
+					new SteeringItem(
+						RULES_GROUP_EMPTY_LABEL,
+						TreeItemCollapsibleState.None,
+						"instruction-rules-empty",
+						"",
+						this.context
+					),
+				];
+			}
+
+			return this.buildInstructionRuleItems(ruleUris.items);
+		}
+
 		if (element.contextValue === "project-spec-group") {
 			const items: SteeringItem[] = [];
 			if (workspace.workspaceFolders) {
@@ -356,6 +453,55 @@ export class SteeringExplorerProvider
 
 		return [];
 	}
+
+	private readonly readFilesInDirectoryWithSuffix = async (
+		dir: Uri,
+		suffix: string
+	): Promise<{ kind: "ok"; items: Uri[] } | { kind: "error" }> => {
+		try {
+			const entries = await workspace.fs.readDirectory(dir);
+			const results: Uri[] = [];
+			for (const [name, type] of entries) {
+				if (type !== FileType.File) {
+					continue;
+				}
+
+				if (!name.endsWith(suffix)) {
+					continue;
+				}
+
+				results.push(joinPath(dir, name));
+			}
+			results.sort((a, b) => a.fsPath.localeCompare(b.fsPath));
+			return { kind: "ok", items: results };
+		} catch {
+			return { kind: "error" };
+		}
+	};
+
+	private readonly buildInstructionRuleItems = (
+		ruleUris: Uri[]
+	): SteeringItem[] =>
+		ruleUris.map((uri) => {
+			const fileName = basename(uri.fsPath);
+			const label = fileName.endsWith(INSTRUCTION_RULE_SUFFIX)
+				? fileName.slice(0, -INSTRUCTION_RULE_SUFFIX.length)
+				: fileName;
+
+			return new SteeringItem(
+				label,
+				TreeItemCollapsibleState.None,
+				"instruction-rule",
+				uri.fsPath,
+				this.context,
+				{
+					command: "vscode.open",
+					title: "Open Instruction Rule",
+					arguments: [uri],
+				},
+				fileName
+			);
+		});
 }
 
 class SteeringItem extends TreeItem {
@@ -445,6 +591,22 @@ class SteeringItem extends TreeItem {
 			}
 			this.tooltip = `Steering document: ${resourcePath}`;
 			this.description = filename; // Show the relative path
+		} else if (
+			contextValue === "user-instruction-rules-group" ||
+			contextValue === "project-instruction-rules-group"
+		) {
+			this.iconPath = new ThemeIcon("folder");
+			this.tooltip = "Instruction Rules";
+		} else if (contextValue === "instruction-rule") {
+			this.iconPath = new ThemeIcon("file-text");
+			this.tooltip = `Instruction Rule: ${resourcePath}`;
+			this.description = filename;
+		} else if (contextValue === "instruction-rules-empty") {
+			this.iconPath = new ThemeIcon("info");
+			this.tooltip = "No instruction rules found";
+		} else if (contextValue === "instruction-rules-error") {
+			this.iconPath = new ThemeIcon("warning");
+			this.tooltip = "Unable to read instruction rules";
 		}
 	}
 }

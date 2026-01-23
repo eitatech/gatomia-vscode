@@ -1,12 +1,12 @@
 # Build artifacts
 dist/
 out/
-webview-ui/dist/
+ui/dist/
 build/
 
 # Dependencies
 node_modules/
-webview-ui/node_modules/
+ui/node_modules/
 
 # Tooling & workspace state
 .vscode/

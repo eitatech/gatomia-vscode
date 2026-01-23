@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { HooksList } from "../../../../webview-ui/src/features/hooks-view/components/hooks-list";
-import type { Hook } from "../../../../webview-ui/src/features/hooks-view/types";
+import { HooksList } from "../../../../ui/src/features/hooks-view/components/hooks-list";
+import type { Hook } from "../../../../ui/src/features/hooks-view/types";
 
 let counter = 0;
 const baseHook = (overrides: Partial<Hook>): Hook => {
