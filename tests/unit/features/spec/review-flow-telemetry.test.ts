@@ -4,35 +4,41 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { logTasksDispatchSuccess } from "../../../../src/features/spec/review-flow/telemetry";
 import type * as TelemetryModule from "../../../../src/features/spec/review-flow/telemetry";
-import { dispatchToTasksPrompt } from "../../../../src/features/spec/review-flow/tasks-dispatch";
+import {
+	dispatchToTasksPrompt,
+	buildTasksPromptPayload,
+} from "../../../../src/features/spec/review-flow/tasks-dispatch";
 import type {
 	Specification,
 	ChangeRequest,
 } from "../../../../src/features/spec/review-flow/types";
 
 // Mock telemetry module
-vi.mock("../../../../src/features/spec/review-flow/telemetry", async () => {
-	const actual = await vi.importActual<typeof TelemetryModule>(
-		"../../../../src/features/spec/review-flow/telemetry"
-	);
-	return {
-		...actual,
-		logTasksDispatchSuccess: vi.fn(),
-		logTasksDispatchFailed: vi.fn(),
-		logSpecStatusChange: vi.fn(),
-		logChangeRequestCreated: vi.fn(),
-		logChangeRequestStatusChange: vi.fn(),
-	};
-});
+vi.mock("../../../../src/features/spec/review-flow/telemetry", () => ({
+	logTasksDispatchSuccess: vi.fn(),
+	logTasksDispatchFailed: vi.fn(),
+	logSpecStatusChange: vi.fn(),
+	logChangeRequestCreated: vi.fn(),
+	logChangeRequestStatusChange: vi.fn(),
+	logSendToReview: vi.fn(),
+	logApproval: vi.fn(),
+	logRejection: vi.fn(),
+	logComplete: vi.fn(),
+	logRevertToReview: vi.fn(),
+}));
+
+// Import the mocked module to access the spy functions
+const { logTasksDispatchSuccess, logTasksDispatchFailed } = await import(
+	"../../../../src/features/spec/review-flow/telemetry"
+);
 
 describe("Review Flow Telemetry", () => {
 	const MOCK_SPEC: Specification = {
 		id: "spec-001",
 		title: "Test Spec",
 		owner: "user",
-		status: "readyToReview",
+		status: "review",
 		completedAt: new Date(),
 		updatedAt: new Date(),
 		links: { specPath: "/path/to/spec.md" },
@@ -55,16 +61,19 @@ describe("Review Flow Telemetry", () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		// Mock Math.random to ensure predictable behavior (not in the 10% failure range)
+		vi.spyOn(Math, "random").mockReturnValue(0.5); // This ensures shouldFail = false
 	});
 
 	describe("Tasks Dispatch Telemetry Integration", () => {
 		it("should log success event on successful dispatch", async () => {
-			await dispatchToTasksPrompt(MOCK_SPEC, MOCK_CHANGE_REQUEST);
+			const payload = buildTasksPromptPayload(MOCK_SPEC, MOCK_CHANGE_REQUEST);
+			await dispatchToTasksPrompt(payload);
 
 			expect(logTasksDispatchSuccess).toHaveBeenCalledWith(
 				MOCK_SPEC.id,
 				MOCK_CHANGE_REQUEST.id,
-				1, // Mock response returns 1 task
+				2, // Mock response returns 2 tasks
 				expect.any(Number) // roundtripMs
 			);
 		});

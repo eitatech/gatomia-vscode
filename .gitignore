@@ -25,5 +25,7 @@ repomix-output*
 
 .serena
 .codex
+.agent_work/
 .vscode/
 .envrc
+.claude/
