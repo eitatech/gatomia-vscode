@@ -32,6 +32,7 @@ import { ConfigManager } from "./utils/config-manager";
 import { getVSCodeUserDataPath } from "./utils/platform-utils";
 import { getSpecSystemAdapter } from "./utils/spec-kit-adapter";
 import { parseTasksFromFile, getTasksFilePath } from "./utils/task-parser";
+import { getChecklistStatusFromFile } from "./utils/checklist-parser";
 import { SpecKitMigration } from "./utils/spec-kit-migration";
 import { TriggerRegistry } from "./features/hooks/trigger-registry";
 import { HookManager } from "./features/hooks/hook-manager";
@@ -45,6 +46,31 @@ import { DocumentPreviewPanel } from "./panels/document-preview-panel";
 import { DocumentPreviewService } from "./services/document-preview-service";
 import { RefinementGateway } from "./services/refinement-gateway";
 import type { DocumentArtifact } from "./types/preview";
+import {
+	SEND_TO_REVIEW_COMMAND_ID,
+	handleSendToReview,
+} from "./features/spec/review-flow/commands/send-to-review-command";
+import {
+	REOPEN_SPEC_COMMAND_ID,
+	handleReopenSpec,
+} from "./features/spec/review-flow/commands/reopen-spec-command";
+import {
+	initializeAutoReviewTransitions,
+	updatePendingSummary,
+	upsertSpecState,
+} from "./features/spec/review-flow/state";
+import {
+	SEND_TO_ARCHIVED_COMMAND_ID,
+	UNARCHIVE_COMMAND_ID,
+	handleSendToArchived,
+	handleUnarchive,
+} from "./features/spec/review-flow/commands/send-to-archived-command";
+import { WelcomeScreenPanel } from "./panels/welcome-screen-panel";
+import { WelcomeScreenProvider } from "./providers/welcome-screen-provider";
+import {
+	shouldShowWelcomeAutomatically,
+	markWelcomeAsShown,
+} from "./utils/workspace-state";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -168,7 +194,7 @@ export async function activate(context: ExtensionContext) {
 		outputChannel
 	);
 
-	documentPreviewService = new DocumentPreviewService(outputChannel);
+	documentPreviewService = new DocumentPreviewService(outputChannel, context);
 	refinementGateway = new RefinementGateway(outputChannel);
 	documentPreviewPanel = new DocumentPreviewPanel(context, outputChannel, {
 		onReloadRequested: async () => {
@@ -348,6 +374,9 @@ export async function activate(context: ExtensionContext) {
 	// Set managers
 	specExplorer.setSpecManager(specManager);
 	steeringExplorer.setSteeringManager(steeringManager);
+	initializeAutoReviewTransitions();
+	outputChannel.appendLine("[ReviewFlow] Auto review transitions initialized");
+	await syncAllSpecReviewFlowSummaries(specManager);
 
 	context.subscriptions.push(
 		window.registerTreeDataProvider(
@@ -403,7 +432,164 @@ export async function activate(context: ExtensionContext) {
 	context.subscriptions.push(specTasksDisposable);
 	outputChannel.appendLine("CodeLens provider for spec tasks registered");
 
+	// T019-T020: First-time welcome screen activation
+	try {
+		const shouldShow = shouldShowWelcomeAutomatically(context);
+		outputChannel.appendLine(`[Welcome] First-time check: ${shouldShow}`);
+
+		if (shouldShow) {
+			outputChannel.appendLine(
+				"[Welcome] Showing welcome screen for first time"
+			);
+
+			// Initialize welcome screen provider
+			const welcomeProvider = new WelcomeScreenProvider(context, outputChannel);
+			outputChannel.appendLine("[Welcome] Provider created");
+
+			// Get callbacks with panel reference setter
+			const callbacks = welcomeProvider.getCallbacks();
+			outputChannel.appendLine("[Welcome] Callbacks retrieved");
+
+			// Show welcome screen panel with provider callbacks
+			const welcomePanel = WelcomeScreenPanel.show(
+				context,
+				outputChannel,
+				callbacks
+			);
+			outputChannel.appendLine("[Welcome] Panel created");
+
+			// Set panel reference in callbacks (T028-T032)
+			if (callbacks.setPanel) {
+				callbacks.setPanel(welcomePanel);
+				outputChannel.appendLine("[Welcome] Panel reference set in callbacks");
+			}
+
+			// Mark as shown for next time
+			await markWelcomeAsShown(context);
+			outputChannel.appendLine("[Welcome] Marked as shown");
+		}
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		outputChannel.appendLine(
+			`[Welcome] Failed to show first-time screen: ${message}`
+		);
+		// Don't show error to user - welcome screen is optional
+	}
+
 	// No UI mode toggle commands required
+}
+
+async function syncAllSpecReviewFlowSummaries(
+	specManagerInstance: SpecManager
+): Promise<void> {
+	try {
+		const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
+		if (!workspaceRoot) {
+			return;
+		}
+
+		const unifiedSpecs = await specManagerInstance.getAllSpecsUnified();
+		for (const spec of unifiedSpecs) {
+			await syncSpecReviewFlowSummary({
+				workspaceRoot,
+				specId: spec.id,
+				specTitle: spec.name,
+			});
+		}
+	} catch (error) {
+		outputChannel.appendLine(
+			`[ReviewFlow] Failed to sync initial pending summaries: ${error}`
+		);
+	}
+}
+
+function extractSpecIdFromPath(filePath: string): string | null {
+	const parts = filePath.split("/");
+	return parts.find((part) => part.match(SPEC_NAME_PATTERN)) ?? null;
+}
+
+function resolveSpecLinks(options: { workspaceRoot: string; specId: string }): {
+	specPath: string;
+	docUrl?: string;
+} {
+	// We keep this lightweight: the specPath does not need to exist for state to function.
+	return {
+		specPath: join(options.workspaceRoot, "specs", options.specId, "spec.md"),
+	};
+}
+
+async function computePendingSummary(options: {
+	workspaceRoot: string;
+	specId: string;
+}): Promise<{ pendingTasks: number; pendingChecklistItems: number }> {
+	const tasksFilePath = getTasksFilePath(options.specId);
+	const pendingTasks = (() => {
+		if (!tasksFilePath) {
+			// Treat missing tasks file as a blocker to avoid false-positive auto transitions.
+			return 1;
+		}
+		const groups = parseTasksFromFile(tasksFilePath);
+		const allTasks = groups.flatMap((group) => group.tasks);
+		return allTasks.filter((task) => task.status !== "completed").length;
+	})();
+
+	const checklistsFolderCandidates = [
+		join(options.workspaceRoot, "specs", options.specId, "checklists"),
+		join(
+			options.workspaceRoot,
+			"openspec",
+			"specs",
+			options.specId,
+			"checklists"
+		),
+		join(options.workspaceRoot, "openspec", options.specId, "checklists"),
+	];
+
+	const { existsSync, readdirSync, statSync } = await import("node:fs");
+	let pendingChecklistItems = 0;
+	const folderPath = checklistsFolderCandidates.find((candidate) =>
+		existsSync(candidate)
+	);
+	if (folderPath) {
+		for (const entry of readdirSync(folderPath)) {
+			if (!entry.endsWith(".md")) {
+				continue;
+			}
+			const filePath = join(folderPath, entry);
+			if (!statSync(filePath).isFile()) {
+				continue;
+			}
+			const { total, completed } = getChecklistStatusFromFile(filePath);
+			pendingChecklistItems += Math.max(0, total - completed);
+		}
+	}
+
+	return { pendingTasks, pendingChecklistItems };
+}
+
+async function syncSpecReviewFlowSummary(options: {
+	workspaceRoot: string;
+	specId: string;
+	specTitle: string;
+}): Promise<void> {
+	const links = resolveSpecLinks({
+		workspaceRoot: options.workspaceRoot,
+		specId: options.specId,
+	});
+
+	upsertSpecState({
+		specId: options.specId,
+		title: options.specTitle,
+		owner: "unknown",
+		links,
+	});
+
+	const { pendingTasks, pendingChecklistItems } = await computePendingSummary({
+		workspaceRoot: options.workspaceRoot,
+		specId: options.specId,
+	});
+
+	updatePendingSummary(options.specId, pendingTasks, pendingChecklistItems);
 }
 
 interface RegisterCommandsOptions {
@@ -565,6 +751,27 @@ function registerCommands({
 			outputChannel.appendLine("[Manual Refresh] Refreshing spec explorer...");
 			specExplorer.refresh();
 		}),
+		commands.registerCommand(
+			SEND_TO_REVIEW_COMMAND_ID,
+			async (specArg: unknown) => {
+				await handleSendToReview(specArg, () => specExplorer.refresh());
+			}
+		),
+		commands.registerCommand(
+			SEND_TO_ARCHIVED_COMMAND_ID,
+			async (specArg: unknown) => {
+				await handleSendToArchived(specArg, () => specExplorer.refresh());
+			}
+		),
+		commands.registerCommand(UNARCHIVE_COMMAND_ID, async (specArg: unknown) => {
+			await handleUnarchive(specArg, () => specExplorer.refresh());
+		}),
+		commands.registerCommand(
+			REOPEN_SPEC_COMMAND_ID,
+			async (specArg: unknown) => {
+				await handleReopenSpec(specArg, () => specExplorer.refresh());
+			}
+		),
 		commands.registerCommand("gatomia.hooks.export", async () => {
 			if (!hookManager) {
 				window.showErrorMessage("Hook manager is not ready yet.");
@@ -713,12 +920,25 @@ function registerCommands({
 	context.subscriptions.push(
 		// Configuration commands
 		commands.registerCommand("gatomia.steering.createUserRule", async () => {
-			await steeringManager.createUserConfiguration();
+			const created = await steeringManager.createUserInstructionRule();
+			if (created) {
+				steeringExplorer.refresh();
+			}
 		}),
 
 		commands.registerCommand("gatomia.steering.createProjectRule", async () => {
-			await steeringManager.createProjectDocumentation();
+			const created = await steeringManager.createProjectInstructionRule();
+			if (created) {
+				steeringExplorer.refresh();
+			}
 		}),
+
+		commands.registerCommand(
+			"gatomia.steering.createConstitution",
+			async () => {
+				await steeringManager.createConstitutionRequest();
+			}
+		),
 
 		commands.registerCommand("gatomia.steering.refresh", () => {
 			outputChannel.appendLine(
@@ -755,8 +975,40 @@ function registerCommands({
 
 	// Spec delete command
 	context.subscriptions.push(
-		commands.registerCommand("gatomia.spec.delete", async (item: any) => {
-			await specManager.delete(item.specName || item.label, item.system);
+		commands.registerCommand("gatomia.spec.delete", async (item: unknown) => {
+			const resolvedSpecId = (() => {
+				if (typeof item === "string") {
+					return item;
+				}
+				if (!item || typeof item !== "object") {
+					return null;
+				}
+				const record = item as { specName?: unknown; label?: unknown };
+				if (typeof record.specName === "string" && record.specName.length > 0) {
+					return record.specName;
+				}
+				if (typeof record.label === "string" && record.label.length > 0) {
+					return record.label;
+				}
+				return null;
+			})();
+
+			if (!resolvedSpecId) {
+				await window.showErrorMessage(
+					"Could not determine which spec to delete. Please refresh and try again."
+				);
+				return;
+			}
+
+			const system =
+				item && typeof item === "object"
+					? (item as { system?: unknown }).system
+					: undefined;
+
+			await specManager.delete(
+				resolvedSpecId,
+				system as Parameters<typeof specManager.delete>[1]
+			);
 			specExplorer.refresh();
 		}),
 		commands.registerCommand(
@@ -1041,6 +1293,31 @@ function registerCommands({
 			await dependenciesViewProvider.show();
 		}),
 
+		commands.registerCommand("gatomia.showWelcome", () => {
+			outputChannel.appendLine("Showing welcome screen (on-demand)...");
+			try {
+				const welcomeProvider = new WelcomeScreenProvider(
+					context,
+					outputChannel
+				);
+				const callbacks = welcomeProvider.getCallbacks();
+				const panel = WelcomeScreenPanel.show(
+					context,
+					outputChannel,
+					callbacks
+				);
+
+				// Set panel reference in callbacks (T028-T032)
+				if (callbacks.setPanel) {
+					callbacks.setPanel(panel);
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				outputChannel.appendLine(`[Welcome] Failed to show: ${message}`);
+				window.showErrorMessage(`Failed to show welcome screen: ${message}`);
+			}
+		}),
+
 		commands.registerCommand("gatomia.menu.open", async () => {
 			outputChannel.appendLine("Opening GatomIA menu...");
 			await toggleViews();
@@ -1163,8 +1440,18 @@ function setupFileWatchers(
 	const copilotWatcher = workspace.createFileSystemWatcher("**/.copilot/**/*");
 
 	let refreshTimeout: NodeJS.Timeout | undefined;
+	const pendingReviewFlowSpecIds = new Set<string>();
 	const debouncedRefresh = (event: string, uri: Uri) => {
 		outputChannel.appendLine(`[FileWatcher] ${event}: ${uri.fsPath}`);
+		const specId = extractSpecIdFromPath(uri.fsPath);
+		if (specId) {
+			const isTasksFile = uri.fsPath.endsWith("/tasks.md");
+			const isChecklistFile =
+				uri.fsPath.includes("/checklists/") && uri.fsPath.endsWith(".md");
+			if (isTasksFile || isChecklistFile) {
+				pendingReviewFlowSpecIds.add(specId);
+			}
+		}
 
 		if (refreshTimeout) {
 			clearTimeout(refreshTimeout);
@@ -1173,7 +1460,37 @@ function setupFileWatchers(
 			specExplorer.refresh();
 			steeringExplorer.refresh();
 			promptsExplorer.refresh();
+
+			const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
+			if (workspaceRoot && pendingReviewFlowSpecIds.size > 0) {
+				const specIds = Array.from(pendingReviewFlowSpecIds);
+				pendingReviewFlowSpecIds.clear();
+				processReviewFlowSync(workspaceRoot, specIds).catch((error) => {
+					outputChannel.appendLine(
+						`[ReviewFlow] Failed to process pending summary sync: ${error}`
+					);
+				});
+			}
 		}, 1000); // Increase debounce time to 1 second
+	};
+
+	const processReviewFlowSync = async (
+		workspaceRoot: string,
+		specIds: string[]
+	): Promise<void> => {
+		for (const id of specIds) {
+			try {
+				await syncSpecReviewFlowSummary({
+					workspaceRoot,
+					specId: id,
+					specTitle: id,
+				});
+			} catch (error) {
+				outputChannel.appendLine(
+					`[ReviewFlow] Failed to sync pending summary for ${id}: ${error}`
+				);
+			}
+		}
 	};
 
 	const attachWatcherHandlers = (watcher: FileSystemWatcher) => {

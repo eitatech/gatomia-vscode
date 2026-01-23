@@ -13,6 +13,7 @@ export const workspace = {
 	],
 	getConfiguration: vi.fn(() => ({
 		get: vi.fn(),
+		update: vi.fn().mockResolvedValue(undefined),
 	})),
 	fs: {
 		createDirectory: vi.fn(),
@@ -31,17 +32,32 @@ export const window = {
 	visibleTextEditors: [],
 	showTextDocument: vi.fn(),
 	withProgress: vi.fn((options, task) => task()),
-	showErrorMessage: vi.fn(),
-	showWarningMessage: vi.fn(),
-	showInformationMessage: vi.fn(),
+	showErrorMessage: vi.fn().mockResolvedValue(undefined),
+	showWarningMessage: vi.fn().mockResolvedValue(undefined),
+	showInformationMessage: vi.fn().mockResolvedValue(undefined),
 	showInputBox: vi.fn(),
 	showQuickPick: vi.fn(),
 	createTerminal: vi.fn(),
 	onDidEndTerminalShellExecution: vi.fn(),
+	createWebviewPanel: vi.fn(() => ({
+		webview: {
+			html: "",
+			onDidReceiveMessage: vi.fn(),
+			postMessage: vi.fn(),
+			asWebviewUri: vi.fn((uri) => uri),
+		},
+		onDidDispose: vi.fn(),
+		onDidChangeViewState: vi.fn(),
+		reveal: vi.fn(),
+		dispose: vi.fn(),
+	})),
 };
 
 export const commands = {
 	executeCommand: vi.fn(),
+	registerCommand: vi.fn(() => ({
+		dispose: vi.fn(),
+	})),
 };
 
 export const Uri = {
@@ -156,4 +172,23 @@ export class EventEmitter<T> {
 
 export const env = {
 	machineId: "test-machine",
+	clipboard: {
+		writeText: vi.fn().mockResolvedValue(undefined),
+		readText: vi.fn().mockResolvedValue(""),
+	},
+	openExternal: vi.fn().mockResolvedValue(true),
+};
+
+export const extensions = {
+	getExtension: vi.fn((extensionId: string) => {
+		// Mock extensions can be configured in tests
+		return;
+	}),
+	all: [] as unknown[],
+};
+
+export const ConfigurationTarget = {
+	Global: 1,
+	Workspace: 2,
+	WorkspaceFolder: 3,
 };

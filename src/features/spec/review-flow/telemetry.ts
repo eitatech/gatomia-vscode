@@ -14,18 +14,63 @@ import type {
 	SpecStatus,
 	ChangeRequestStatus,
 	ChangeRequestSeverity,
+	ReviewTransitionEvent,
 } from "./types";
+
+/**
+ * Canonical telemetry event names for the review flow domain.
+ * Using constants keeps instrumentation consistent across commands and UI.
+ */
+export const REVIEW_FLOW_EVENTS = {
+	SPEC_STATUS_CHANGED: "spec.status.changed",
+	SEND_TO_REVIEW: "review.send_to_review",
+	SEND_TO_ARCHIVED: "review.send_to_archived",
+	REVIEW_TRANSITION: "review.transition",
+	REVIEW_EXITED: "review.left",
+	SPEC_UNARCHIVED: "review.spec_unarchived",
+	SPEC_REOPENED: "review.spec_reopened",
+	CHANGE_REQUEST_CREATED: "change_request.created",
+	CHANGE_REQUEST_STATUS_CHANGED: "change_request.status.changed",
+	TASKS_DISPATCHED: "tasks.dispatched",
+	TASKS_DISPATCH_FAILED: "tasks.dispatch.failed",
+	TASKS_DISPATCH_BLOCKED: "tasks.dispatch.blocked",
+} as const;
 
 /**
  * Telemetry event types for review flow
  */
 export type ReviewFlowEventType =
-	| "spec.status.changed"
-	| "change_request.created"
-	| "change_request.status.changed"
-	| "tasks.dispatched"
-	| "tasks.dispatch.failed"
-	| "tasks.dispatch.blocked";
+	(typeof REVIEW_FLOW_EVENTS)[keyof typeof REVIEW_FLOW_EVENTS];
+
+/**
+ * Log a structured review transition event (auto/manual) with notification metadata.
+ */
+export function logReviewTransitionEvent(event: ReviewTransitionEvent): void {
+	const payload = {
+		type: REVIEW_FLOW_EVENTS.REVIEW_TRANSITION,
+		timestamp: event.occurredAt.toISOString(),
+		...event,
+	};
+
+	console.log("[ReviewFlow Telemetry] Review transition:", payload);
+}
+
+export function logReviewExitEvent(options: {
+	specId: string;
+	fromStatus: SpecStatus;
+	toStatus: SpecStatus;
+	reason: string;
+	pendingTasks: number;
+	pendingChecklistItems: number;
+}): void {
+	const event = {
+		type: REVIEW_FLOW_EVENTS.REVIEW_EXITED,
+		timestamp: new Date().toISOString(),
+		...options,
+	};
+
+	console.log("[ReviewFlow Telemetry] Review exit:", event);
+}
 
 /**
  * Log a spec status transition
@@ -39,7 +84,7 @@ export function logSpecStatusChange(
 	toStatus: SpecStatus
 ): void {
 	const event = {
-		type: "spec.status.changed",
+		type: REVIEW_FLOW_EVENTS.SPEC_STATUS_CHANGED,
 		timestamp: new Date().toISOString(),
 		specId,
 		fromStatus,
@@ -69,7 +114,7 @@ export function logChangeRequestCreated(options: {
 }): void {
 	const { specId, changeRequestId, severity, title, submitter } = options;
 	const event = {
-		type: "change_request.created",
+		type: REVIEW_FLOW_EVENTS.CHANGE_REQUEST_CREATED,
 		timestamp: new Date().toISOString(),
 		specId,
 		changeRequestId,
@@ -100,7 +145,7 @@ export function logChangeRequestStatusChange(
 	toStatus: ChangeRequestStatus
 ): void {
 	const event = {
-		type: "change_request.status.changed",
+		type: REVIEW_FLOW_EVENTS.CHANGE_REQUEST_STATUS_CHANGED,
 		timestamp: new Date().toISOString(),
 		changeRequestId,
 		fromStatus,
@@ -131,7 +176,7 @@ export function logTasksDispatchSuccess(
 	roundtripMs: number
 ): void {
 	const event = {
-		type: "tasks.dispatched",
+		type: REVIEW_FLOW_EVENTS.TASKS_DISPATCHED,
 		timestamp: new Date().toISOString(),
 		specId,
 		changeRequestId,
@@ -165,7 +210,9 @@ export function logTasksDispatchFailed(
 	retryable: boolean
 ): void {
 	const event = {
-		type: retryable ? "tasks.dispatch.failed" : "tasks.dispatch.blocked",
+		type: retryable
+			? REVIEW_FLOW_EVENTS.TASKS_DISPATCH_FAILED
+			: REVIEW_FLOW_EVENTS.TASKS_DISPATCH_BLOCKED,
 		timestamp: new Date().toISOString(),
 		specId,
 		changeRequestId,
@@ -181,4 +228,88 @@ export function logTasksDispatchFailed(
 	//   changeRequestId,
 	//   retryable: retryable.toString(),
 	// });
+}
+
+/**
+ * Log a Send to Review action after the button becomes available.
+ */
+export function logSendToReviewAction(options: {
+	specId: string;
+	pendingTasks: number;
+	pendingChecklistItems: number;
+	latencyMs?: number;
+}): void {
+	const event = {
+		type: REVIEW_FLOW_EVENTS.SEND_TO_REVIEW,
+		timestamp: new Date().toISOString(),
+		...options,
+	};
+	console.log("[ReviewFlow Telemetry] Send to Review:", event);
+}
+
+/**
+ * Log a Send to Archived action once blockers are cleared.
+ */
+export function logSendToArchivedAction(options: {
+	specId: string;
+	blockerChangeRequestIds: string[];
+	latencyMs?: number;
+}): void {
+	const event = {
+		type: REVIEW_FLOW_EVENTS.SEND_TO_ARCHIVED,
+		timestamp: new Date().toISOString(),
+		...options,
+	};
+	console.log("[ReviewFlow Telemetry] Send to Archived:", event);
+}
+
+/**
+ * Log unarchive actions when archived specs must re-enter Current Specs.
+ */
+export function logSpecUnarchived(options: {
+	specId: string;
+	initiatedBy: string;
+	reason: string;
+}): void {
+	const event = {
+		type: REVIEW_FLOW_EVENTS.SPEC_UNARCHIVED,
+		timestamp: new Date().toISOString(),
+		...options,
+	};
+	console.log("[ReviewFlow Telemetry] Spec unarchived:", event);
+}
+
+/**
+ * Log explicit reopen actions triggered by change requests.
+ */
+export function logSpecReopenedFromChangeRequest(options: {
+	specId: string;
+	changeRequestId: string;
+	reason?: string;
+}): void {
+	const event = {
+		type: REVIEW_FLOW_EVENTS.SPEC_REOPENED,
+		timestamp: new Date().toISOString(),
+		...options,
+	};
+	console.log("[ReviewFlow Telemetry] Spec reopened:", event);
+}
+
+/**
+ * Log outstanding blocker counts when a spec status changes.
+ * Tracks how many change requests are blocking archival.
+ */
+export function logOutstandingBlockerCount(options: {
+	specId: string;
+	status: SpecStatus;
+	totalChangeRequests: number;
+	openChangeRequests: number;
+	blockingChangeRequests: number;
+}): void {
+	const event = {
+		type: "review.blocker_count",
+		timestamp: new Date().toISOString(),
+		...options,
+	};
+	console.log("[ReviewFlow Telemetry] Outstanding blocker count:", event);
 }

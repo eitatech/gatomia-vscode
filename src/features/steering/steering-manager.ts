@@ -16,6 +16,15 @@ import { ConfigManager } from "../../utils/config-manager";
 import { getSpecSystemAdapter } from "../../utils/spec-kit-adapter";
 import { SPEC_SYSTEM_MODE } from "../../constants";
 import { ConstitutionManager } from "./constitution-manager";
+import {
+	InstructionRuleError,
+	assertFileDoesNotExist,
+	buildInstructionRuleTemplate,
+	instructionRuleFileName,
+	normalizeInstructionRuleName,
+	projectInstructionsDirUri,
+	userInstructionsDirUri,
+} from "./instruction-rules";
 
 export class SteeringManager {
 	private readonly configManager: ConfigManager;
@@ -221,5 +230,138 @@ This file contains instructions for AI agents working on this project.
 			preview: false,
 			viewColumn: ViewColumn.Active,
 		});
+	}
+
+	async createProjectInstructionRule(): Promise<boolean> {
+		if (!workspace.workspaceFolders) {
+			window.showErrorMessage("No workspace folder open.");
+			return false;
+		}
+
+		const name = await window.showInputBox({
+			title: "Create Project Rule",
+			prompt: "Enter a name for the project instruction rule.",
+			placeHolder: "TypeScript Rules",
+			ignoreFocusOut: true,
+		});
+
+		if (!name) {
+			return false;
+		}
+
+		const normalized = normalizeInstructionRuleName(name);
+		if (!normalized.ok) {
+			window.showErrorMessage(normalized.error.userMessage);
+			return false;
+		}
+
+		const workspaceFolderUri = workspace.workspaceFolders[0].uri;
+		const instructionsDir = projectInstructionsDirUri(workspaceFolderUri);
+		const fileUri = Uri.joinPath(
+			instructionsDir,
+			instructionRuleFileName(normalized.normalizedName)
+		);
+
+		try {
+			await workspace.fs.createDirectory(instructionsDir);
+			await assertFileDoesNotExist(fileUri);
+
+			const templateBytes = new TextEncoder().encode(
+				buildInstructionRuleTemplate(normalized.normalizedName)
+			);
+
+			await workspace.fs.writeFile(fileUri, templateBytes);
+
+			const document = await workspace.openTextDocument(fileUri);
+			await window.showTextDocument(document, {
+				preview: false,
+				viewColumn: ViewColumn.Active,
+			});
+
+			return true;
+		} catch (error) {
+			if (error instanceof InstructionRuleError) {
+				window.showErrorMessage(error.userMessage);
+				return false;
+			}
+
+			const message = error instanceof Error ? error.message : String(error);
+			this.outputChannel.appendLine(
+				`[Create Project Rule] Failed to create instruction rule: ${message}`
+			);
+			window.showErrorMessage(`Failed to create project rule: ${message}`);
+			return false;
+		}
+	}
+
+	async createUserInstructionRule(): Promise<boolean> {
+		const name = await window.showInputBox({
+			title: "Create User Rule",
+			prompt: "Enter a name for the user instruction rule.",
+			placeHolder: "TypeScript Rules",
+			ignoreFocusOut: true,
+		});
+
+		if (!name) {
+			return false;
+		}
+
+		const normalized = normalizeInstructionRuleName(name);
+		if (!normalized.ok) {
+			window.showErrorMessage(normalized.error.userMessage);
+			return false;
+		}
+
+		try {
+			const instructionsDir = userInstructionsDirUri();
+			const fileUri = Uri.joinPath(
+				instructionsDir,
+				instructionRuleFileName(normalized.normalizedName)
+			);
+
+			await workspace.fs.createDirectory(instructionsDir);
+			await assertFileDoesNotExist(fileUri);
+
+			const templateBytes = new TextEncoder().encode(
+				buildInstructionRuleTemplate(normalized.normalizedName)
+			);
+
+			await workspace.fs.writeFile(fileUri, templateBytes);
+
+			const document = await workspace.openTextDocument(fileUri);
+			await window.showTextDocument(document, {
+				preview: false,
+				viewColumn: ViewColumn.Active,
+			});
+
+			return true;
+		} catch (error) {
+			if (error instanceof InstructionRuleError) {
+				window.showErrorMessage(error.userMessage);
+				return false;
+			}
+
+			const message = error instanceof Error ? error.message : String(error);
+			this.outputChannel.appendLine(
+				`[Create User Rule] Failed to create instruction rule: ${message}`
+			);
+			window.showErrorMessage(`Failed to create user rule: ${message}`);
+			return false;
+		}
+	}
+
+	async createConstitutionRequest(): Promise<void> {
+		const description = await window.showInputBox({
+			title: "Create Constitution",
+			prompt: "Enter a brief description for the constitution.",
+			placeHolder: "Python project with FastAPI",
+			ignoreFocusOut: true,
+		});
+
+		if (!description || description.trim().length === 0) {
+			return;
+		}
+
+		await sendPromptToChat(`/speckit.constitution ${description}`);
 	}
 }

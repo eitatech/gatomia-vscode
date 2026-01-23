@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { HookForm } from "../../../../webview-ui/src/features/hooks-view/components/hook-form";
-import type { Hook } from "../../../../webview-ui/src/features/hooks-view/types";
+import { HookForm } from "../../../../ui/src/features/hooks-view/components/hook-form";
+import type { Hook } from "../../../../ui/src/features/hooks-view/types";
 
 const CREATE_HOOK_BUTTON = /Create Hook/i;
 const SAVE_CHANGES_BUTTON = /Save Changes/i;
@@ -784,6 +784,8 @@ describe("HookForm", () => {
 						parameters: {
 							agentName: "my-custom-agent",
 							arguments: "--mode=auto --feature={feature}",
+							prompt: "",
+							selectedTools: [],
 						},
 					},
 				});

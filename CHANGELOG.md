@@ -2,6 +2,197 @@
 
 ---
 
+## v0.30.0 2026-01-07
+
+### Changed
+
+- Simplifies unit tests by removing unnecessary async logic
+- Implement real MCP server discovery and UI tool selection
+- add new brand logo
+- Adds robust instruction rule system and streamlines Steering UI
+
+### Release Info
+
+- **Source Branch**: `develop`
+- **Release Type**: minor
+
+---
+
+
+## v0.29.0 2026-01-05
+
+### Added
+
+- **Steering Instructions & Rules**: Comprehensive instruction rule management system with project and user scopes
+  - **Project Instruction Rules**: Create and manage instruction rules for teams in `.github/instructions/*.instructions.md`
+    - Automatic kebab-case filename normalization (e.g., "TypeScript Rules" → `typescript-rules.instructions.md`)
+    - Directory auto-creation when missing
+    - Standard template generation with frontmatter (`description`, `applyTo`) and heading
+    - No-overwrite protection with actionable error messages
+    - Integrated with Steering tree view under "Project Instructions" group
+  - **User Instruction Rules**: Personal instruction rules in `$HOME/.github/instructions/*.instructions.md`
+    - Same normalization, template, and protection features as project rules
+    - Stored outside repository for personal workflows
+    - Integrated with Steering tree view under "User Instructions" group
+  - **Constitution Request**: AI-assisted Constitution document generation
+    - "Create Constitution" button in Steering toolbar (book icon 📖)
+    - Prompts for brief description and sends `/speckit.constitution <description>` to Copilot Chat
+    - Agent handles document creation with no post-processing
+  - **Consolidated Tree View**: Simplified Steering explorer organization
+    - "User Instructions" group combines Global Instructions and user instruction rules
+    - "Project Instructions" group for project-level instruction rules
+    - Removed redundant "User Instruction Rules" section
+  - **Toolbar Actions**: Quick-access buttons in Steering view
+    - Create Project Rule
+    - Create User Rule
+    - Create Constitution
+    - Refresh
+  - **Test Coverage**: 22 tests covering all user stories and edge cases
+    - 18 tests for SteeringManager (creation, normalization, validation)
+    - 4 tests for tree view provider (listing, filtering, opening)
+    - 100% pass rate with TDD approach
+
+### Changed
+
+- **Steering View Organization**: Streamlined grouping for better user experience
+  - Renamed "Project Instruction Rules" to "Project Instructions"
+  - Merged "User Instructions" and "User Instruction Rules" into single expandable group
+  - Always show user/project groups (welcome content no longer needed)
+- **README Documentation**: Updated with comprehensive Steering section
+  - Added instruction rules usage examples
+  - Constitution creation workflow documented
+  - Clear distinction between project and user scope
+
+### Technical Details
+
+- **Implementation Checklists**: All 56 validation items completed
+  - Requirements checklist: 16/16 items verified
+  - Implementation checklist: 40/40 items validated
+- **Quality Gate**: 255 files checked with 0 violations (Biome/Ultracite)
+- **Code Organization**: New utility module for instruction rules
+  - `src/features/steering/instruction-rules.ts`: Shared utilities for normalization, templates, path resolution
+  - `src/features/steering/steering-manager.ts`: Business logic for all creation flows
+  - `src/providers/steering-explorer-provider.ts`: Tree view with consolidated groups
+
+### Release Info
+
+- **Source Branch**: `develop`
+- **Release Type**: minor
+- **Pull Request**: #18
+
+---
+
+## v0.28.0 2026-01-05
+
+### Added
+
+- **Auto Review Transition**: Automatically moves a spec to Review when all tasks and checklists are completed.
+- **Spec Review Flow Commands**: New command to reopen specs from Review back to Current.
+- **Command Argument Resolver**: Shared utilities to resolve spec IDs from Spec Explorer items and command arguments.
+
+### Changed
+
+- **Spec State Management**: Improved persistence and updates (upsert) for spec review-flow state, including pending summaries.
+- **Review/Archive Workflows**: Enhanced send-to-review and send-to-archived commands with clearer blocker messages based on status and pending work.
+- **Developer Tooling**: Updated lint/check configuration to ignore VS Code task configuration files.
+
+### Fixed
+
+- **Command Robustness**: Improved handling of Spec Explorer item arguments for archiving and send-to-review flows.
+- **Test Clarity**: Updated test descriptions and added coverage for the new review-flow behaviors.
+
+### Release Info
+
+- **Source Branch**: `develop`
+- **Release Type**: minor
+
+---
+
+## v0.27.1 2025-12-18
+
+### Added
+
+- Implement Welcome Screen with Zustand state management and VS Code integration
+
+### Changed
+
+- Merge pull request #13 from eitatech/welcome-screen
+- Update zustand package source URL
+- Merge branch 'main' into 006-welcome-screen
+- eitatech/gatomia-vscode
+- Removes redundant English version marker
+
+### Fixed
+
+- Comment out header actions in Welcome Screen for future implementation
+- change docs and structure
+
+## v0.27.0 2025-12-17
+
+### Added
+
+- **Welcome Screen**: Comprehensive onboarding and management interface for GatomIA extension
+  - **First-Time Setup**: Interactive welcome screen appears automatically on first activation to guide users through extension setup
+  - **Dependency Detection**: Real-time detection of GitHub Copilot Chat, SpecKit CLI, and OpenSpec CLI with installation guidance
+  - **Configuration Management**: Inline editing of 6 key settings (spec system, paths) with validation and instant feedback
+  - **Learning Resources**: Curated documentation, examples, and tutorials organized by category (Getting Started, Concepts, Advanced)
+  - **Feature Discovery**: Quick-access buttons for all extension features (Spec Management, Hooks, Steering, etc.)
+  - **System Health**: Real-time diagnostics with 24-hour rolling window and 5-entry limit, showing errors/warnings with suggested actions
+  - **Performance**: Loads in <2 seconds, UI updates in <500ms (verified with automated tests)
+  - **Accessibility**: Full ARIA labels, keyboard navigation, screen reader support
+  - **Theme Support**: Automatic light/dark theme adaptation using VS Code CSS variables
+  - **Error Recovery**: Comprehensive error boundary and graceful degradation for all failure modes
+  - **Persistence**: "Don't show on startup" preference with workspace state tracking
+  - **Test Coverage**: 1,204 automated tests (234 for welcome screen alone)
+
+---
+
+## v0.26.2 2025-12-15
+
+### Added
+
+- **Document Dependency Tracking**: Intelligent system to detect when documents need updates based on changes in their dependencies
+  - Automatic dependency detection based on document type hierarchy (spec → plan → tasks → checklist)
+  - Version tracking with content hashing to detect real changes vs. progress updates
+  - Structural hash for tasks/checklists that ignores checkbox state changes (detects only content modifications)
+  - "Update Document" button appears automatically when dependencies change
+  - Formatted prompts sent to appropriate agents with context about changed dependencies
+  - Visual indicators showing which dependencies changed and when
+  - Optional additional context field for user-specific update instructions
+  - Persistent tracking across workspace sessions
+  - 14 comprehensive unit tests ensuring reliability
+
+**Dependency Hierarchy**:
+- `spec.md` (base) → no dependencies
+- `plan.md` → depends on `spec.md`
+- `tasks.md` → depends on `spec.md` + `plan.md`
+- `checklist.md` → depends on `tasks.md`
+- `data-model.md` → depends on `spec.md`
+- `api.md` → depends on `spec.md` + `data-model.md`
+- `quickstart.md` → depends on `spec.md` + `plan.md`
+- `research.md` → independent (supports spec but no hard dependency)
+
+---
+
+## v0.26.1 2025-12-15
+
+### Fixed
+
+- **Document Refinement**: Refinement requests now properly send feedback to the appropriate agent instead of just creating annotations
+  - Refinement requests are sent to the correct SpecKit/OpenSpec agent based on document type (spec → `/speckit.specify`, plan → `/speckit.plan`, etc.)
+  - Formatted prompts include document ID, section reference, issue type, and detailed description
+  - Status messages now accurately reflect what happens ("Refinement sent to agent" instead of fictitious "queued" messages)
+  - Added comprehensive logging for all refinement operations
+  - Error handling with detailed feedback when agent communication fails
+  - 10 new unit tests to ensure reliability
+
+- **Task Group Navigation**: Fixed bug where clicking on phase headers (e.g., "Phase 1: Foundation & Core Types") would incorrectly trigger task execution
+  - Phase headers now only expand/collapse when clicked (expected behavior)
+  - Task execution only happens via the dedicated inline button (intended behavior)
+  - Maintains proper separation between navigation and execution actions
+
+---
+
 ## v0.26.0 2025-12-05
 
 ### Added
@@ -31,88 +222,3 @@
 - Server availability checks with graceful degradation
 - Hook stability when MCP servers become unavailable
 - Parameter validation with detailed error messages
-
----
-
-## v0.3.3 2025-11-23
-
-### Added
-
-- implement "New Agent File" command and menu integration
-
-### Changed
-
-- feature/new-agent-file
-- add "New Agent File" button to Prompts view with command integration and ordering
-- add "New Agent File" button to Prompts view with command integration
-- Merge pull request #10 from atman-33/version-bump/v0.3.2
-
-## v0.3.2 2025-11-22
-
-### Changed
-
-- Merge remote-tracking branch 'origin/main'
-- update screenshot images
-- Merge pull request #9 from atman-33/version-bump/v0.3.1
-
-## v0.3.1 2025-11-22
-
-### Changed
-
-- update icon image
-- Merge remote-tracking branch 'origin/main'
-- add Project Agents group and rename functionality in Prompts explorer
-- Merge pull request #8 from atman-33/version-bump/v0.3.0
-
-## v0.3.0 2025-11-22
-
-### Added
-
-- update SVG icon design for improved visual clarity
-- add rename functionality for prompts in the explorer view
-
-### Changed
-
-- feature/improve-prompts-view
-- add Project Agents group and rename functionality in Prompts explorer
-- add project instructions display in Prompts view with separate grouping
-- Merge pull request #6 from atman-33/version-bump/v0.2.1
-
-## v0.2.1 2025-11-22
-
-### Added
-
-- add support for project instructions label in prompts explorer
-- enhance PromptsExplorerProvider to include project instructions group and update related tests
-- reorder sidebar views in Spec and Prompts Explorers
-
-### Changed
-
-- feature/show-github-instructions
-- add design, proposal, spec, and tasks for displaying project instructions in Prompts view
-- add display order requirements for Spec and Prompts Explorers
-- add proposal and requirements for reordering sidebar views in Spec and Prompts Explorers
-- Merge pull request #4 from atman-33/version-bump/v0.2.0
-
-### Fixed
-
-- update prompt and steering explorer descriptions for clarity
-
-## v0.2.0 2025-11-22
-
-### Added
-
-- add support for custom instructions in prompts for GitHub Copilot integration
-
-### Changed
-
-- feature/prompt-custom-footer
-- add custom instructions structure to ConfigManager tests
-- implement custom prompt instructions injection for GitHub Copilot integration
-- add support for custom prompt instructions in GitHub Copilot integration
-- Merge pull request #2 from atman-33/version-bump/v0.1.7
-
-## v0.1.7 2025-11-21
-
-- Initial implementation of Spec UI for Copilot features.
-

@@ -1,0 +1,173 @@
+[
+  {
+    "id": "speckit-quickstart",
+    "title": "SpecKit Quickstart Guide",
+    "description": "Create your first specification in 5 minutes with step-by-step guidance",
+    "url": "https://github.com/github/spec-kit/blob/main/docs/quickstart.md",
+    "category": "Getting Started",
+    "keywords": [
+      "speckit",
+      "quickstart",
+      "tutorial",
+      "first spec",
+      "getting started"
+    ],
+    "estimatedMinutes": 5
+  },
+  {
+    "id": "openspec-quickstart",
+    "title": "OpenSpec Quickstart Guide",
+    "description": "Introduction to OpenSpec workflow and creating your first specification",
+    "url": "https://docs.openspec.ai/quickstart",
+    "category": "Getting Started",
+    "keywords": [
+      "openspec",
+      "quickstart",
+      "tutorial",
+      "introduction",
+      "getting started"
+    ],
+    "estimatedMinutes": 7
+  },
+  {
+    "id": "choosing-spec-system",
+    "title": "Choosing Between SpecKit and OpenSpec",
+    "description": "Compare features and decide which specification system fits your workflow",
+    "url": "https://github.com/github/gatomia-vscode/blob/main/docs/spec-systems-comparison.md",
+    "category": "Getting Started",
+    "keywords": ["speckit", "openspec", "comparison", "choose", "decision"],
+    "estimatedMinutes": 10
+  },
+  {
+    "id": "writing-effective-specs",
+    "title": "Writing Effective Specifications",
+    "description": "Best practices for clear, actionable, and maintainable specifications",
+    "url": "https://github.com/github/spec-kit/blob/main/docs/best-practices.md",
+    "category": "Getting Started",
+    "keywords": [
+      "best practices",
+      "writing",
+      "specifications",
+      "quality",
+      "effective"
+    ],
+    "estimatedMinutes": 15
+  },
+  {
+    "id": "prompt-management",
+    "title": "Managing Custom Prompts",
+    "description": "Create and organize custom prompts for AI-assisted development",
+    "url": "https://github.com/github/gatomia-vscode/blob/main/docs/prompts.md",
+    "category": "Getting Started",
+    "keywords": ["prompts", "custom", "ai", "copilot", "templates"],
+    "estimatedMinutes": 8
+  },
+  {
+    "id": "mcp-hooks-integration",
+    "title": "MCP Hooks Integration Guide",
+    "description": "Connect your specifications to Model Context Protocol hooks for automated workflows",
+    "url": "https://github.com/github/gatomia-vscode/blob/main/docs/mcp-hooks.md",
+    "category": "Advanced Features",
+    "keywords": ["mcp", "hooks", "integration", "automation", "workflow"],
+    "estimatedMinutes": 20
+  },
+  {
+    "id": "hook-execution-lifecycle",
+    "title": "Understanding Hook Execution Lifecycle",
+    "description": "Deep dive into hook triggers, execution order, and error handling",
+    "url": "https://github.com/github/gatomia-vscode/blob/main/docs/hook-lifecycle.md",
+    "category": "Advanced Features",
+    "keywords": ["hooks", "lifecycle", "execution", "triggers", "advanced"],
+    "estimatedMinutes": 25
+  },
+  {
+    "id": "migration-speckit-openspec",
+    "title": "Migrating Between SpecKit and OpenSpec",
+    "description": "Step-by-step guide for converting specifications between spec systems",
+    "url": "https://github.com/github/gatomia-vscode/blob/main/docs/migration.md",
+    "category": "Advanced Features",
+    "keywords": ["migration", "convert", "speckit", "openspec", "switch"],
+    "estimatedMinutes": 15
+  },
+  {
+    "id": "steering-constitutions",
+    "title": "Creating Project Constitutions",
+    "description": "Define project principles and constraints with steering constitutions",
+    "url": "https://github.com/github/gatomia-vscode/blob/main/docs/constitutions.md",
+    "category": "Advanced Features",
+    "keywords": [
+      "steering",
+      "constitution",
+      "principles",
+      "constraints",
+      "governance"
+    ],
+    "estimatedMinutes": 18
+  },
+  {
+    "id": "multi-workspace-setup",
+    "title": "Multi-Workspace Configuration",
+    "description": "Manage specifications across multiple workspace folders effectively",
+    "url": "https://github.com/github/gatomia-vscode/blob/main/docs/multi-workspace.md",
+    "category": "Advanced Features",
+    "keywords": [
+      "workspace",
+      "multi-root",
+      "configuration",
+      "multiple",
+      "folders"
+    ],
+    "estimatedMinutes": 12
+  },
+  {
+    "id": "troubleshooting-cli",
+    "title": "Troubleshooting CLI Installation Issues",
+    "description": "Common problems and solutions for SpecKit and OpenSpec CLI setup",
+    "url": "https://github.com/github/gatomia-vscode/blob/main/docs/troubleshooting-cli.md",
+    "category": "Troubleshooting",
+    "keywords": ["troubleshooting", "cli", "installation", "path", "errors"],
+    "estimatedMinutes": null
+  },
+  {
+    "id": "troubleshooting-copilot",
+    "title": "GitHub Copilot Chat Integration Issues",
+    "description": "Resolve common issues with GitHub Copilot Chat dependency and integration",
+    "url": "https://github.com/github/gatomia-vscode/blob/main/docs/troubleshooting-copilot.md",
+    "category": "Troubleshooting",
+    "keywords": ["troubleshooting", "copilot", "chat", "github", "integration"],
+    "estimatedMinutes": null
+  },
+  {
+    "id": "troubleshooting-hooks",
+    "title": "Debugging Hook Execution Failures",
+    "description": "Diagnose and fix problems with MCP hook triggers and execution",
+    "url": "https://github.com/github/gatomia-vscode/blob/main/docs/troubleshooting-hooks.md",
+    "category": "Troubleshooting",
+    "keywords": ["troubleshooting", "hooks", "debug", "execution", "errors"],
+    "estimatedMinutes": null
+  },
+  {
+    "id": "troubleshooting-performance",
+    "title": "Performance Optimization Tips",
+    "description": "Improve extension performance for large workspaces and specifications",
+    "url": "https://github.com/github/gatomia-vscode/blob/main/docs/performance.md",
+    "category": "Troubleshooting",
+    "keywords": ["performance", "optimization", "slow", "large", "workspace"],
+    "estimatedMinutes": null
+  },
+  {
+    "id": "extension-api",
+    "title": "GatomIA Extension API Reference",
+    "description": "Programmatic access to GatomIA features for custom integrations",
+    "url": "https://github.com/github/gatomia-vscode/blob/main/docs/api.md",
+    "category": "Advanced Features",
+    "keywords": [
+      "api",
+      "extension",
+      "programmatic",
+      "integration",
+      "reference"
+    ],
+    "estimatedMinutes": null
+  }
+]

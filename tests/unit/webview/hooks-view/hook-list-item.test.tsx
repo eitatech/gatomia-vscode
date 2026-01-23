@@ -1,10 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { HookListItem } from "../../../../webview-ui/src/features/hooks-view/components/hook-list-item";
+import { HookListItem } from "../../../../ui/src/features/hooks-view/components/hook-list-item";
 import type {
 	Hook,
 	HookExecutionStatusEntry,
-} from "../../../../webview-ui/src/features/hooks-view/types";
+} from "../../../../ui/src/features/hooks-view/types";
 
 const baseHook: Hook = {
 	id: "status-hook",

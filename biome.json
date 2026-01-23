@@ -9,15 +9,17 @@
     "includes": [
       "src/**/*.ts",
       "tests/**/*.ts",
-      "webview-ui/src/**/*.ts",
-      "webview-ui/src/**/*.tsx",
+      "ui/src/**/*.ts",
+      "ui/src/**/*.tsx",
       "!node_modules/**/*",
       "!src/prompts/target/**/*",
-      "!webview-ui/src/components/ui/**/*.tsx",
-      "!webview-ui/src/app.css",
-      "!webview-ui/node_modules/**/*",
+      "!ui/src/components/ui/**/*.tsx",
+      "!ui/src/app.css",
+      "!ui/node_modules/**/*",
       "!.tmp/**/*",
-      "!.codex/**/*"
+      "!.codex/**/*",
+      "!.vscode/**/*",
+      "!.agent_work/**/*"
     ],
     "ignoreUnknown": false
   },

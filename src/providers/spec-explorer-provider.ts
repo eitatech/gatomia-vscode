@@ -10,9 +10,13 @@ import {
 	TreeItemCollapsibleState,
 	workspace,
 } from "vscode";
+import type { Specification } from "../features/spec/review-flow/types";
 import type { SpecManager } from "../features/spec/spec-manager";
 import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../constants";
-import { getSpecState } from "../features/spec/review-flow/state";
+import {
+	getSpecState,
+	onReviewFlowStateChange,
+} from "../features/spec/review-flow/state";
 import { getSpecSystemAdapter } from "../utils/spec-kit-adapter";
 import { basename, join } from "node:path";
 import {
@@ -48,6 +52,139 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 
 	constructor(context: ExtensionContext) {
 		this.context = context;
+		// Listen for review flow state changes (e.g. status updates, change requests)
+		// and refresh the tree view to reflect the new state.
+		context.subscriptions.push(
+			onReviewFlowStateChange(() => {
+				this.refresh();
+			})
+		);
+	}
+
+	private createSpecItem(
+		label: string,
+		specId: string,
+		system?: SpecSystemMode
+	): SpecItem {
+		const item = new SpecItem(
+			label,
+			TreeItemCollapsibleState.Collapsed,
+			"spec-current",
+			this.context,
+			specId,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			system
+		);
+		const state = getSpecState(specId);
+		if (state) {
+			const reviewExitTooltip = this.getReviewExitTooltip(state);
+			if (reviewExitTooltip) {
+				item.tooltip = reviewExitTooltip;
+			}
+		}
+		return item;
+	}
+
+	private createReviewSpecItem(
+		label: string,
+		specId: string,
+		system?: SpecSystemMode
+	): SpecItem {
+		const item = new SpecItem(
+			label,
+			TreeItemCollapsibleState.Collapsed,
+			"spec-review",
+			this.context,
+			specId,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			system
+		);
+		const state = getSpecState(specId);
+		if (state) {
+			item.description = this.describeReviewSpec(state);
+		} else {
+			item.description = "Awaiting review metadata";
+		}
+		return item;
+	}
+
+	private createArchivedSpecItem(
+		label: string,
+		specId: string,
+		system?: SpecSystemMode
+	): SpecItem {
+		const item = new SpecItem(
+			label,
+			TreeItemCollapsibleState.Collapsed,
+			"spec-archived",
+			this.context,
+			specId,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			system
+		);
+		const state = getSpecState(specId);
+		if (state?.archivedAt) {
+			item.description = `Archived ${state.archivedAt.toLocaleDateString()}`;
+		} else {
+			item.description = "Archived";
+		}
+		return item;
+	}
+
+	private describeReviewSpec(state: Specification): string {
+		const pendingTasks = state.pendingTasks ?? 0;
+		const pendingChecklistItems = state.pendingChecklistItems ?? 0;
+		const openChangeRequests =
+			state.changeRequests?.filter((cr) => cr.status !== "addressed").length ??
+			0;
+		const parts: string[] = [];
+		if (pendingTasks > 0) {
+			parts.push(`${pendingTasks} task${pendingTasks === 1 ? "" : "s"}`);
+		}
+		if (pendingChecklistItems > 0) {
+			parts.push(
+				`${pendingChecklistItems} checklist item${pendingChecklistItems === 1 ? "" : "s"}`
+			);
+		}
+		if (openChangeRequests > 0) {
+			parts.push(
+				`${openChangeRequests} change request${openChangeRequests === 1 ? "" : "s"}`
+			);
+		}
+		return parts.length > 0 ? parts.join(" | ") : "Ready for reviewers";
+	}
+
+	private getReviewExitTooltip(state: Specification): string | null {
+		if (!(state.status === "current" || state.status === "reopened")) {
+			return null;
+		}
+		if (!state.reviewEnteredAt) {
+			return null;
+		}
+		const pendingTasks = state.pendingTasks ?? 0;
+		const pendingChecklistItems = state.pendingChecklistItems ?? 0;
+		if (pendingTasks === 0 && pendingChecklistItems === 0) {
+			return null;
+		}
+		const parts: string[] = [];
+		if (pendingTasks > 0) {
+			parts.push(`${pendingTasks} task${pendingTasks === 1 ? "" : "s"}`);
+		}
+		if (pendingChecklistItems > 0) {
+			parts.push(
+				`${pendingChecklistItems} checklist item${pendingChecklistItems === 1 ? "" : "s"}`
+			);
+		}
+		return `Returned from Review: ${parts.join(" | ")}`;
 	}
 
 	setSpecManager(specManager: SpecManager) {
@@ -117,13 +254,19 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 				new SpecItem(
 					"Current Specs",
 					TreeItemCollapsibleState.Expanded,
-					"group-specs",
+					"group-current-specs",
 					this.context
 				),
 				new SpecItem(
-					"Ready to Review",
+					"Review",
 					TreeItemCollapsibleState.Expanded,
-					"group-ready-to-review",
+					"group-review-specs",
+					this.context
+				),
+				new SpecItem(
+					"Archived",
+					TreeItemCollapsibleState.Expanded,
+					"group-archived-specs",
 					this.context
 				),
 				new SpecItem(
@@ -135,55 +278,41 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 			];
 		}
 
-		if (element.contextValue === "group-specs") {
-			const unifiedSpecs = await this.specManager.getAllSpecsUnified();
-			return unifiedSpecs.map(
-				(spec) =>
-					new SpecItem(
-						spec.name,
-						TreeItemCollapsibleState.Collapsed,
-						"spec",
-						this.context,
-						spec.id,
-						undefined,
-						undefined,
-						undefined,
-						undefined,
-						spec.system
-					)
-			);
+		const unifiedSpecs = await this.specManager.getAllSpecsUnified();
+
+		if (element.contextValue === "group-current-specs") {
+			return unifiedSpecs
+				.filter((spec) => {
+					const state = getSpecState(spec.id);
+					return (
+						!state || state.status === "current" || state.status === "reopened"
+					);
+				})
+				.map((spec) => this.createSpecItem(spec.name, spec.id, spec.system));
 		}
 
-		if (element.contextValue === "group-ready-to-review") {
-			const unifiedSpecs = await this.specManager.getAllSpecsUnified();
-			const readyToReviewSpecs = unifiedSpecs.filter((spec) => {
-				const state = getSpecState(spec.id);
-				return state?.status === "readyToReview";
-			});
+		if (element.contextValue === "group-review-specs") {
+			return unifiedSpecs
+				.filter((spec) => getSpecState(spec.id)?.status === "review")
+				.map((spec) =>
+					this.createReviewSpecItem(spec.name, spec.id, spec.system)
+				);
+		}
 
-			return readyToReviewSpecs.map(
-				(spec) =>
-					new SpecItem(
-						spec.name,
-						TreeItemCollapsibleState.Collapsed,
-						"spec",
-						this.context,
-						spec.id,
-						undefined,
-						undefined,
-						undefined,
-						undefined,
-						spec.system
-					)
-			);
+		if (element.contextValue === "group-archived-specs") {
+			return unifiedSpecs
+				.filter((spec) => getSpecState(spec.id)?.status === "archived")
+				.map((spec) =>
+					this.createArchivedSpecItem(spec.name, spec.id, spec.system)
+				);
 		}
 
 		if (element.contextValue === "group-changes") {
 			const activeChangeRequests =
 				await this.specManager.getActiveChangeRequests();
 			return activeChangeRequests.map(
-				({ specId, specTitle, changeRequest }) =>
-					new SpecItem(
+				({ specId, specTitle, changeRequest }) => {
+					const item = new SpecItem(
 						changeRequest.title,
 						TreeItemCollapsibleState.None,
 						"change-request",
@@ -193,11 +322,21 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 						undefined,
 						undefined,
 						changeRequest.id
-					)
+					);
+					// Pass the change request and spec title for enhanced display
+					item.changeRequest = changeRequest;
+					item.specTitle = specTitle;
+					return item;
+				}
 			);
 		}
 
-		if (element.contextValue === "spec") {
+		if (
+			element.contextValue === "spec" ||
+			element.contextValue === "spec-current" ||
+			element.contextValue === "spec-review" ||
+			element.contextValue === "spec-archived"
+		) {
 			// Handle SpecKit System
 			if (element.system === SPEC_SYSTEM_MODE.SPECKIT) {
 				const adapter = getSpecSystemAdapter();
@@ -349,11 +488,7 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 					this.context,
 					element.specName,
 					"task-group",
-					{
-						command: "gatomia.spec.runTaskGroup",
-						title: "Run Task Group",
-						arguments: [{ parentName: group.name, filePath: tasksFilePath }],
-					},
+					undefined, // No command - clicking only expands/collapses
 					tasksFilePath,
 					group.name,
 					element.system,
@@ -588,6 +723,8 @@ class SpecItem extends TreeItem {
 	readonly system?: SpecSystemMode;
 	readonly task?: ParsedTask;
 	readonly groupStatus?: TaskStatus;
+	changeRequest?: import("../features/spec/review-flow/types").ChangeRequest;
+	specTitle?: string;
 
 	// biome-ignore lint/nursery/useMaxParams: ignore
 	constructor(
@@ -639,6 +776,9 @@ class SpecItem extends TreeItem {
 	private getContextHandler(): (() => void) | undefined {
 		const handlers: Record<string, () => void> = {
 			spec: () => this.handleSpecIcon(),
+			"spec-current": () => this.handleSpecIcon(),
+			"spec-review": () => this.handleSpecIcon(),
+			"spec-archived": () => this.handleSpecIcon(),
 			change: () => this.handleSpecIcon(),
 			"change-spec": () => this.handleSpecIcon(),
 			"spec-document": () => this.updateDocumentIcon(),
@@ -647,6 +787,7 @@ class SpecItem extends TreeItem {
 			"task-item": () => this.handleTaskItemIcon(),
 			"checklists-folder": () => this.handleChecklistsFolderIcon(),
 			"checklist-item": () => this.handleChecklistItemIcon(),
+			"change-request": () => this.handleChangeRequestIcon(),
 		};
 
 		return handlers[this.contextValue];
@@ -711,6 +852,49 @@ class SpecItem extends TreeItem {
 		const statusText = getTaskStatusTooltip(status);
 		this.tooltip = `Checklist: ${this.label} - ${statusText}`;
 		this.description = statusText;
+	}
+
+	private handleChangeRequestIcon(): void {
+		if (!this.changeRequest) {
+			return;
+		}
+
+		// Icon based on severity
+		const severityIcons = {
+			critical: "error",
+			high: "warning",
+			medium: "info",
+			low: "circle-outline",
+		};
+		const icon = severityIcons[this.changeRequest.severity];
+
+		// Color based on severity
+		const severityColors = {
+			critical: new ThemeColor("errorForeground"),
+			high: new ThemeColor("editorWarning.foreground"),
+			medium: new ThemeColor("editorInfo.foreground"),
+			low: new ThemeColor("descriptionForeground"),
+		};
+		const color = severityColors[this.changeRequest.severity];
+
+		this.iconPath = new ThemeIcon(icon, color);
+
+		// Build tooltip with details
+		const statusEmoji = {
+			open: "🔴",
+			inProgress: "🟡",
+			addressed: "✅",
+		};
+		const emoji = statusEmoji[this.changeRequest.status];
+
+		const blockerText = this.changeRequest.archivalBlocker
+			? " [BLOCKS ARCHIVAL]"
+			: "";
+
+		this.tooltip = `${emoji} ${this.changeRequest.title}\n\nSpec: ${this.specTitle}\nSeverity: ${this.changeRequest.severity}\nStatus: ${this.changeRequest.status}${blockerText}\nSubmitted: ${this.changeRequest.createdAt.toLocaleString()}\nSubmitter: ${this.changeRequest.submitter}`;
+
+		// Set description to show spec name and severity
+		this.description = `${this.specTitle} | ${this.changeRequest.severity}`;
 	}
 
 	private getTaskStatusColor(status?: TaskStatus): ThemeColor | undefined {

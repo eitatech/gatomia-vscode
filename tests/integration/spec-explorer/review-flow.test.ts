@@ -1,5 +1,5 @@
 /**
- * Integration test for review flow: from change request dispatch to spec returning to Ready to Review
+ * Integration test for review flow: from change request dispatch to spec returning to Review
  * Tests the complete cycle: dispatch → tasks created → tasks completed → spec moves back
  */
 
@@ -13,7 +13,7 @@ import {
 	getSpecState,
 	addChangeRequest,
 	updateChangeRequestStatus,
-	shouldReturnToReadyToReview,
+	shouldReturnToReview,
 	__testInitSpec,
 } from "../../../src/features/spec/review-flow/state";
 
@@ -22,7 +22,7 @@ describe("review flow integration", () => {
 		id: "spec-integration-001",
 		title: "User Authentication",
 		owner: "alice@example.com",
-		status: "readyToReview",
+		status: "review",
 		completedAt: new Date("2025-12-01T10:00:00Z"),
 		updatedAt: new Date("2025-12-07T10:00:00Z"),
 		links: {
@@ -37,11 +37,11 @@ describe("review flow integration", () => {
 		__testInitSpec({ ...MOCK_SPEC });
 	});
 
-	describe("change request dispatch to return to Ready to Review", () => {
+	describe("change request dispatch to return to Review", () => {
 		it("should complete full cycle: dispatch → tasks → addressed → return", () => {
-			// Step 1: Spec starts in readyToReview
+			// Step 1: Spec starts in review
 			let spec = getSpecState("spec-integration-001");
-			expect(spec?.status).toBe("readyToReview");
+			expect(spec?.status).toBe("review");
 
 			// Step 2: Create change request → spec moves to reopened
 			const changeRequest: ChangeRequest = {
@@ -112,9 +112,9 @@ describe("review flow integration", () => {
 			);
 			expect(addressedCR?.status).toBe("addressed");
 
-			// Step 6: Spec should automatically return to readyToReview
+			// Step 6: Spec should automatically return to review
 			spec = getSpecState("spec-integration-001");
-			expect(spec?.status).toBe("readyToReview");
+			expect(spec?.status).toBe("review");
 		});
 
 		it("should handle multiple change requests before returning", () => {
@@ -206,9 +206,9 @@ describe("review flow integration", () => {
 				"addressed"
 			);
 
-			// Now spec should return to readyToReview
+			// Now spec should return to review
 			spec = getSpecState("spec-integration-001");
-			expect(spec?.status).toBe("readyToReview");
+			expect(spec?.status).toBe("review");
 		});
 
 		it("should remain reopened if any task is incomplete", () => {
@@ -254,8 +254,8 @@ describe("review flow integration", () => {
 				"inProgress"
 			);
 
-			// Step 3: Try to mark as addressed (should not return to readyToReview)
-			const shouldReturn = shouldReturnToReadyToReview("spec-integration-001");
+			// Step 3: Try to mark as addressed (should not return to review)
+			const shouldReturn = shouldReturnToReview("spec-integration-001");
 			expect(shouldReturn).toBe(false);
 
 			spec = getSpecState("spec-integration-001");
@@ -325,13 +325,13 @@ describe("review flow integration", () => {
 				"addressed"
 			);
 
-			// Spec should return to readyToReview
+			// Spec should return to review
 			spec = getSpecState("spec-integration-001");
-			expect(spec?.status).toBe("readyToReview");
+			expect(spec?.status).toBe("review");
 		});
 	});
 
-	describe("shouldReturnToReadyToReview helper", () => {
+	describe("shouldReturnToReview helper", () => {
 		it("should return true when all change requests addressed and tasks done", () => {
 			// Arrange
 			const changeRequest: ChangeRequest = {
@@ -363,7 +363,7 @@ describe("review flow integration", () => {
 			);
 
 			// Act
-			const shouldReturn = shouldReturnToReadyToReview("spec-integration-001");
+			const shouldReturn = shouldReturnToReview("spec-integration-001");
 
 			// Assert
 			expect(shouldReturn).toBe(true);
@@ -400,7 +400,7 @@ describe("review flow integration", () => {
 			);
 
 			// Act
-			const shouldReturn = shouldReturnToReadyToReview("spec-integration-001");
+			const shouldReturn = shouldReturnToReview("spec-integration-001");
 
 			// Assert
 			expect(shouldReturn).toBe(false);
