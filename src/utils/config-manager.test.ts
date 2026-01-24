@@ -51,6 +51,8 @@ describe("ConfigManager", () => {
 					memory: SPECKIT_CONFIG.paths.memory,
 					templates: SPECKIT_CONFIG.paths.templates,
 					scripts: SPECKIT_CONFIG.paths.scripts,
+					agents: SPECKIT_CONFIG.paths.agents,
+					skills: SPECKIT_CONFIG.paths.skills,
 				},
 			},
 			views: {

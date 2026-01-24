@@ -51,6 +51,21 @@ New `gatomia.agents` settings:
 
 ---
 
+## v0.30.1 2026-01-24
+
+### Added
+
+- Add agents and skills paths to config tests and refactor steering explorer instruction group context values and labels.
+- Implement Actions Explorer to manage various action types, replacing the Prompts Explorer, and introduce GatomIA project guidelines.
+
+### Changed
+
+- extract SteeringExplorerProvider child item generation into dedicated methods and remove prompts explorer test file.
+
+### Fixed
+
+- constitution updated
+
 ## v0.30.0 2026-01-07
 
 ### Changed
