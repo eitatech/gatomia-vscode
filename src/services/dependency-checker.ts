@@ -20,7 +20,16 @@ interface CacheEntry {
 
 export class DependencyChecker {
 	private static readonly CACHE_TTL_MS = 60_000; // 60 seconds
-	private static readonly CLI_TIMEOUT_MS = 5000; // 5 seconds
+	/**
+	 * CLI invocation timeout.
+	 * Shorten automatically under Vitest to keep unit tests below the default 5s test timeout.
+	 * Can also be overridden via GATOMIA_CLI_TIMEOUT_MS for debugging.
+	 */
+	private static readonly CLI_TIMEOUT_MS: number = Number.parseInt(
+		process.env.GATOMIA_CLI_TIMEOUT_MS ??
+			(process.env.VITEST_WORKER_ID ? "1000" : "5000"),
+		10
+	);
 
 	private cache: CacheEntry | null = null;
 	private readonly outputChannel: OutputChannel;

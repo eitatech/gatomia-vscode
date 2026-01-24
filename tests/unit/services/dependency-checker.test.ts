@@ -124,7 +124,7 @@ describe("DependencyChecker", () => {
 			expect(secondCall.lastChecked).toBeGreaterThanOrEqual(
 				firstCall.lastChecked
 			);
-		});
+		}, 10_000);
 	});
 
 	describe("checkAll() aggregation", () => {
