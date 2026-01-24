@@ -192,3 +192,20 @@ export const ConfigurationTarget = {
 	Workspace: 2,
 	WorkspaceFolder: 3,
 };
+
+// Mock for Chat API
+export const chat = {
+	createChatParticipant: vi.fn((id: string, handler: any) => ({
+		iconPath: undefined,
+		dispose: vi.fn(),
+	})),
+};
+
+// Mock ChatResponseStream
+export class ChatResponseStream {
+	markdown = vi.fn();
+	button = vi.fn();
+	progress = vi.fn();
+	reference = vi.fn();
+	push = vi.fn();
+}
