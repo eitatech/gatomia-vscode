@@ -4,6 +4,26 @@
 
 ## v0.31.0 2026-01-24
 
+### Fixed
+
+- audit issues in ui
+- audit issues
+- polished about, experience and contact section
+- skills and update
+- skills and update
+- constitution updated
+- constitution updated
+
+### Release Info
+
+- **Source Branch**: `develop`
+- **Release Type**: minor
+
+---
+
+
+## v0.31.0 2026-01-24
+
 ### Added
 
 - **Copilot Agents Integration**: Seamless integration with GitHub Copilot Chat for agent capabilities
