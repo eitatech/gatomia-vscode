@@ -8,6 +8,7 @@ This constitution establishes the foundational coding standards and practices fo
 
 ### II. Scope
 
+notes
 This constitution applies to all source code, tests, documentation, and configuration files within the GatomIA project. It governs naming conventions, coding practices, testing strategies, and overall code quality standards.
 
 ### III. Definitions
