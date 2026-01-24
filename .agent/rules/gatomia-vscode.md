@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # GatomIA Constitution
 
 ## Core Principles
