@@ -30,7 +30,7 @@
   "scripts": {
     "install:all": "npm install && cd ui && npm install",
     "build-prompts": "node scripts/build-prompts.js",
-    "build:ext": "esbuild src/extension.ts --bundle --platform=node --target=node16 --external:vscode --outfile=dist/extension.js",
+    "build:ext": "esbuild src/extension.ts --bundle --platform=node --target=node16 --external:vscode --outfile=dist/extension.js --sourcemap",
     "build": "npm run build-prompts && npm run build:ext && npm run build:webview",
     "vscode:prepublish": "npm run build",
     "compile": "npm run build && npm run package",
@@ -169,6 +169,30 @@
           "default": ".specify/scripts",
           "description": "Path where SpecKit script files are stored.",
           "order": 11
+        },
+        "gatomia.agents.resourcesPath": {
+          "type": "string",
+          "default": "resources",
+          "description": "Path where agent resources (prompts, skills, instructions) are stored.",
+          "order": 12
+        },
+        "gatomia.agents.enableHotReload": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automatic reloading of agent resources when files change.",
+          "order": 13
+        },
+        "gatomia.agents.logLevel": {
+          "type": "string",
+          "default": "info",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
+          "description": "Log level for agent operations (debug, info, warn, error).",
+          "order": 14
         }
       }
     },
