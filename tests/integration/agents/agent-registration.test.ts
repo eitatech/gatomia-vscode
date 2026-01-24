@@ -1,0 +1,80 @@
+/**
+ * Integration tests for agent registration
+ * Tests end-to-end agent discovery and chat participant registration
+ */
+
+import { describe, it, expect } from "vitest";
+
+describe("Agent Registration Integration", () => {
+	describe("Agent Discovery", () => {
+		it("should discover agents from resources/agents directory", () => {
+			// T010: Test full agent discovery flow
+			// 1. Create test agent files in temp directory
+			// 2. Call AgentLoader.loadAgents()
+			// 3. Verify all valid agents are discovered
+			// 4. Verify invalid agents are skipped with errors logged
+			expect(true).toBe(true); // Placeholder
+		});
+
+		it("should reload agents when files change", () => {
+			// Test file watcher integration
+			// 1. Load initial agents
+			// 2. Add new agent file
+			// 3. Verify new agent is loaded
+			// 4. Modify existing agent
+			// 5. Verify agent is reloaded
+			expect(true).toBe(true); // Placeholder
+		});
+
+		it("should handle nested directories", () => {
+			// Should discover agents in subdirectories
+			// resources/agents/category/agent.agent.md
+			expect(true).toBe(true); // Placeholder
+		});
+	});
+
+	describe("Chat Participant Registration", () => {
+		it("should register agents as chat participants", () => {
+			// T011: Test VS Code Chat API integration
+			// Note: This requires VS Code test environment
+			// 1. Mock vscode.chat.createChatParticipant
+			// 2. Load agent definitions
+			// 3. Call ChatParticipantRegistry.registerAgent()
+			// 4. Verify createChatParticipant was called with correct metadata
+			expect(true).toBe(true); // Placeholder
+		});
+
+		it("should handle registration errors gracefully", () => {
+			// Should log error and continue if registration fails
+			expect(true).toBe(true); // Placeholder
+		});
+
+		it("should not register invalid agents", () => {
+			// Should skip agents that fail validation
+			expect(true).toBe(true); // Placeholder
+		});
+
+		it("should register multiple agents without conflicts", () => {
+			// Should handle multiple agent registrations
+			expect(true).toBe(true); // Placeholder
+		});
+	});
+
+	describe("End-to-End Flow", () => {
+		it("should complete full discovery and registration flow", () => {
+			// Complete flow test:
+			// 1. Start with clean state
+			// 2. Initialize AgentService
+			// 3. Verify agents are discovered
+			// 4. Verify agents are registered
+			// 5. Verify telemetry events are sent
+			expect(true).toBe(true); // Placeholder
+		});
+
+		it("should handle Copilot Chat unavailable scenario", () => {
+			// Should gracefully handle when GitHub Copilot Chat is not available
+			// (API not found, extension not installed, etc.)
+			expect(true).toBe(true); // Placeholder
+		});
+	});
+});

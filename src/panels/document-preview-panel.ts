@@ -59,7 +59,7 @@ export class DocumentPreviewPanel {
 	async renderDocument(artifact: DocumentArtifact): Promise<void> {
 		this.lastArtifact = artifact;
 		const panel = this.ensurePanel();
-		panel.reveal(ViewColumn.Beside, true);
+		panel.reveal(ViewColumn.Active, true);
 		await this.postMessage({
 			type: "preview/load-document",
 			payload: artifact,
@@ -90,7 +90,7 @@ export class DocumentPreviewPanel {
 			DocumentPreviewPanel.panelType,
 			"Document Preview",
 			{
-				viewColumn: ViewColumn.Beside,
+				viewColumn: ViewColumn.Active,
 				preserveFocus: true,
 			},
 			{

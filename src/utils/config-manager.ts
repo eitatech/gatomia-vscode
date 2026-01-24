@@ -18,6 +18,8 @@ export interface OpenSpecSettings {
 			memory: string;
 			templates: string;
 			scripts: string;
+			agents: string;
+			skills: string;
 		};
 	};
 	views: {
@@ -119,6 +121,10 @@ export class ConfigManager {
 			scripts:
 				config.get<string>("speckit.scriptsPath") ??
 				SPECKIT_CONFIG.paths.scripts,
+			agents:
+				config.get<string>("speckit.agentsPath") ?? SPECKIT_CONFIG.paths.agents,
+			skills:
+				config.get<string>("speckit.skillsPath") ?? SPECKIT_CONFIG.paths.skills,
 		};
 	}
 
