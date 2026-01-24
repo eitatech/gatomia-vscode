@@ -17,6 +17,15 @@ import { ConfigManager } from "../utils/config-manager";
 
 const { joinPath } = Uri;
 
+// Regex: ^name:\s*['"]?(.*?)['"]?$ (multiline)
+const FRONTMATTER_REGEXP = /^name:\s*['"]?(.+?)['"]?$/m;
+const H1_REGEXP = /^#\s+(.+)$/m;
+
+const EXTENSIONS_REGEXP =
+	/\.(prompt|agent|instructions|sh|py|ts|js|ps1|md|yaml|json|handlebars|hbs)$/;
+const SPECKIT_PREFIX_REGEXP = /^speckit\./;
+const SEPARATOR_REGEXP = /[-_.]/;
+
 type ActionCategory =
 	| "prompts"
 	| "agents"
@@ -59,45 +68,68 @@ class ActionItem extends TreeItem {
 		this.command = options?.command;
 		this.tooltip = options?.tooltip;
 		this.description = options?.description;
+		this.iconPath = this.getIconPath(contextValue, options);
+	}
 
+	private getIconPath(
+		contextValue: string,
+		options?: ActionItemOptions
+	): ThemeIcon {
 		if (contextValue.startsWith("group-speckit")) {
-			if (contextValue === "group-speckit-prompts") {
-				this.iconPath = new ThemeIcon("comment-discussion");
-			} else if (contextValue === "group-speckit-agents") {
-				this.iconPath = new ThemeIcon("robot");
-			} else if (contextValue === "group-speckit-instructions") {
-				this.iconPath = new ThemeIcon("book");
-			} else if (contextValue === "group-speckit-scripts") {
-				this.iconPath = new ThemeIcon("terminal");
-			} else if (contextValue === "group-speckit-templates") {
-				this.iconPath = new ThemeIcon("file-code");
-			} else {
-				this.iconPath = new ThemeIcon("package"); // Main SpecKit group
-			}
-		} else if (contextValue.startsWith("group-")) {
-			if (contextValue === "group-prompts") {
-				this.iconPath = new ThemeIcon("comment-discussion");
-			} else if (contextValue === "group-agents") {
-				this.iconPath = new ThemeIcon("robot");
-			} else if (contextValue === "group-skills") {
-				this.iconPath = new ThemeIcon("tools");
-			} else if (contextValue === "group-scripts") {
-				this.iconPath = new ThemeIcon("terminal");
-			} else if (contextValue === "group-templates") {
-				this.iconPath = new ThemeIcon("file-code");
-			} else {
-				this.iconPath = new ThemeIcon("folder");
-			}
-		} else if (contextValue === "action-runnable") {
-			this.iconPath = new ThemeIcon(options?.isAgent ? "robot" : "zap");
-		} else if (contextValue === "action-skill") {
-			this.iconPath = new ThemeIcon("tools");
-		} else if (contextValue === "action-script") {
-			this.iconPath = new ThemeIcon("terminal");
-		} else if (contextValue === "action-template") {
-			this.iconPath = new ThemeIcon("file-code");
-		} else if (contextValue === "action-file") {
-			this.iconPath = new ThemeIcon("file");
+			return this.getSpeckitGroupIcon(contextValue);
+		}
+		if (contextValue.startsWith("group-")) {
+			return this.getGroupIcon(contextValue);
+		}
+		if (contextValue === "action-runnable") {
+			return new ThemeIcon(options?.isAgent ? "robot" : "zap");
+		}
+		if (contextValue === "action-skill") {
+			return new ThemeIcon("tools");
+		}
+		if (contextValue === "action-script") {
+			return new ThemeIcon("terminal");
+		}
+		if (contextValue === "action-template") {
+			return new ThemeIcon("file-code");
+		}
+		if (contextValue === "action-file") {
+			return new ThemeIcon("file");
+		}
+		return new ThemeIcon("folder");
+	}
+
+	private getSpeckitGroupIcon(contextValue: string): ThemeIcon {
+		switch (contextValue) {
+			case "group-speckit-prompts":
+				return new ThemeIcon("comment-discussion");
+			case "group-speckit-agents":
+				return new ThemeIcon("robot");
+			case "group-speckit-instructions":
+				return new ThemeIcon("book");
+			case "group-speckit-scripts":
+				return new ThemeIcon("terminal");
+			case "group-speckit-templates":
+				return new ThemeIcon("file-code");
+			default:
+				return new ThemeIcon("package");
+		}
+	}
+
+	private getGroupIcon(contextValue: string): ThemeIcon {
+		switch (contextValue) {
+			case "group-prompts":
+				return new ThemeIcon("comment-discussion");
+			case "group-agents":
+				return new ThemeIcon("robot");
+			case "group-skills":
+				return new ThemeIcon("tools");
+			case "group-scripts":
+				return new ThemeIcon("terminal");
+			case "group-templates":
+				return new ThemeIcon("file-code");
+			default:
+				return new ThemeIcon("folder");
 		}
 	}
 }
@@ -129,44 +161,7 @@ export class ActionsExplorerProvider implements TreeDataProvider<ActionItem> {
 
 	async getChildren(element?: ActionItem): Promise<ActionItem[]> {
 		if (!element) {
-			return [
-				new ActionItem(
-					"SpecKit",
-					TreeItemCollapsibleState.Collapsed,
-					"group-speckit",
-					{ category: "speckit" }
-				),
-				new ActionItem(
-					"Prompts",
-					TreeItemCollapsibleState.Collapsed,
-					"group-prompts",
-					{ category: "prompts" }
-				),
-				new ActionItem(
-					"Agents",
-					TreeItemCollapsibleState.Collapsed,
-					"group-agents",
-					{ category: "agents" }
-				),
-				new ActionItem(
-					"Skills",
-					TreeItemCollapsibleState.Collapsed,
-					"group-skills",
-					{ category: "skills" }
-				),
-				new ActionItem(
-					"Scripts",
-					TreeItemCollapsibleState.Collapsed,
-					"group-scripts",
-					{ category: "scripts" }
-				),
-				new ActionItem(
-					"Templates",
-					TreeItemCollapsibleState.Collapsed,
-					"group-templates",
-					{ category: "templates" }
-				),
-			];
+			return this.getRootItems();
 		}
 
 		const ws = workspace.workspaceFolders?.[0];
@@ -175,45 +170,106 @@ export class ActionsExplorerProvider implements TreeDataProvider<ActionItem> {
 		}
 
 		if (element.category === "speckit") {
-			return [
-				new ActionItem(
-					"Prompts",
-					TreeItemCollapsibleState.Collapsed,
-					"group-speckit-prompts",
-					{ category: "speckit-prompts" }
-				),
-				new ActionItem(
-					"Agents",
-					TreeItemCollapsibleState.Collapsed,
-					"group-speckit-agents",
-					{ category: "speckit-agents" }
-				),
-				new ActionItem(
-					"Instructions",
-					TreeItemCollapsibleState.Collapsed,
-					"group-speckit-instructions",
-					{ category: "speckit-instructions" }
-				),
-				new ActionItem(
-					"Scripts",
-					TreeItemCollapsibleState.Collapsed,
-					"group-speckit-scripts",
-					{ category: "speckit-scripts" }
-				),
-				new ActionItem(
-					"Templates",
-					TreeItemCollapsibleState.Collapsed,
-					"group-speckit-templates",
-					{ category: "speckit-templates" }
-				),
-			];
+			return this.getSpeckitRootItems();
 		}
 
 		// SpecKit Children
+		if (element.category?.startsWith("speckit-")) {
+			return await this.getSpeckitChildren(element, ws.uri);
+		}
+
+		// Regular Children
+		if (element.category) {
+			return await this.getRegularChildren(element, ws.uri);
+		}
+
+		return [];
+	}
+
+	private getRootItems(): ActionItem[] {
+		return [
+			new ActionItem(
+				"SpecKit",
+				TreeItemCollapsibleState.Collapsed,
+				"group-speckit",
+				{ category: "speckit" }
+			),
+			new ActionItem(
+				"Prompts",
+				TreeItemCollapsibleState.Collapsed,
+				"group-prompts",
+				{ category: "prompts" }
+			),
+			new ActionItem(
+				"Agents",
+				TreeItemCollapsibleState.Collapsed,
+				"group-agents",
+				{ category: "agents" }
+			),
+			new ActionItem(
+				"Skills",
+				TreeItemCollapsibleState.Collapsed,
+				"group-skills",
+				{ category: "skills" }
+			),
+			new ActionItem(
+				"Scripts",
+				TreeItemCollapsibleState.Collapsed,
+				"group-scripts",
+				{ category: "scripts" }
+			),
+			new ActionItem(
+				"Templates",
+				TreeItemCollapsibleState.Collapsed,
+				"group-templates",
+				{ category: "templates" }
+			),
+		];
+	}
+
+	private getSpeckitRootItems(): ActionItem[] {
+		return [
+			new ActionItem(
+				"Prompts",
+				TreeItemCollapsibleState.Collapsed,
+				"group-speckit-prompts",
+				{ category: "speckit-prompts" }
+			),
+			new ActionItem(
+				"Agents",
+				TreeItemCollapsibleState.Collapsed,
+				"group-speckit-agents",
+				{ category: "speckit-agents" }
+			),
+			new ActionItem(
+				"Instructions",
+				TreeItemCollapsibleState.Collapsed,
+				"group-speckit-instructions",
+				{ category: "speckit-instructions" }
+			),
+			new ActionItem(
+				"Scripts",
+				TreeItemCollapsibleState.Collapsed,
+				"group-speckit-scripts",
+				{ category: "speckit-scripts" }
+			),
+			new ActionItem(
+				"Templates",
+				TreeItemCollapsibleState.Collapsed,
+				"group-speckit-templates",
+				{ category: "speckit-templates" }
+			),
+		];
+	}
+
+	private async getSpeckitChildren(
+		element: ActionItem,
+		wsUri: Uri
+	): Promise<ActionItem[]> {
 		switch (element.category) {
 			case "speckit-prompts":
 				return await this.getFiles({
-					root: joinPath(ws.uri, ".github", "prompts"),
+					root: joinPath(wsUri, ".github", "prompts"),
 					patterns: ["*.prompt.md"],
 					contextValue: "action-runnable",
 					category: "prompts",
@@ -222,7 +278,7 @@ export class ActionsExplorerProvider implements TreeDataProvider<ActionItem> {
 				});
 			case "speckit-agents":
 				return await this.getFiles({
-					root: joinPath(ws.uri, ".github", "agents"),
+					root: joinPath(wsUri, ".github", "agents"),
 					patterns: ["*.agent.md"],
 					contextValue: "action-runnable",
 					category: "agents",
@@ -231,7 +287,7 @@ export class ActionsExplorerProvider implements TreeDataProvider<ActionItem> {
 				});
 			case "speckit-instructions":
 				return await this.getFiles({
-					root: joinPath(ws.uri, ".github", "instructions"),
+					root: joinPath(wsUri, ".github", "instructions"),
 					patterns: ["*.instructions.md"],
 					contextValue: "action-runnable",
 					category: "instructions",
@@ -239,18 +295,22 @@ export class ActionsExplorerProvider implements TreeDataProvider<ActionItem> {
 					isSpecKit: true,
 				});
 			case "speckit-scripts":
-				return await this.getScripts(ws.uri, true);
+				return await this.getScripts(wsUri, true);
 			case "speckit-templates":
-				return await this.getTemplates(ws.uri, true);
+				return await this.getTemplates(wsUri, true);
 			default:
-				break;
+				return [];
 		}
+	}
 
-		// Regular Children
+	private async getRegularChildren(
+		element: ActionItem,
+		wsUri: Uri
+	): Promise<ActionItem[]> {
 		switch (element.category) {
 			case "prompts":
 				return await this.getFiles({
-					root: joinPath(ws.uri, ".github", "prompts"),
+					root: joinPath(wsUri, ".github", "prompts"),
 					patterns: ["*.prompt.md"],
 					contextValue: "action-runnable",
 					category: "prompts",
@@ -259,7 +319,7 @@ export class ActionsExplorerProvider implements TreeDataProvider<ActionItem> {
 				});
 			case "agents":
 				return await this.getFiles({
-					root: joinPath(ws.uri, ".github", "agents"),
+					root: joinPath(wsUri, ".github", "agents"),
 					patterns: ["*.agent.md"],
 					contextValue: "action-runnable",
 					category: "agents",
@@ -267,11 +327,11 @@ export class ActionsExplorerProvider implements TreeDataProvider<ActionItem> {
 					isSpecKit: false,
 				});
 			case "skills":
-				return await this.getSkills(joinPath(ws.uri, ".github", "skills"));
+				return await this.getSkills(joinPath(wsUri, ".github", "skills"));
 			case "scripts":
-				return await this.getScripts(ws.uri, false);
+				return await this.getScripts(wsUri, false);
 			case "templates":
-				return await this.getTemplates(ws.uri, false);
+				return await this.getTemplates(wsUri, false);
 			default:
 				return [];
 		}
@@ -284,16 +344,13 @@ export class ActionsExplorerProvider implements TreeDataProvider<ActionItem> {
 			const content = new TextDecoder().decode(fileData.slice(0, 1024));
 
 			// 1. Try Frontmatter name: ...
-			// Regex: ^name:\s*['"]?(.*?)['"]?$ (multiline)
-			const frontmatterRegExp = /^name:\s*['"]?(.+?)['"]?$/m;
-			const frontmatterMatch = frontmatterRegExp.exec(content);
+			const frontmatterMatch = FRONTMATTER_REGEXP.exec(content);
 			if (frontmatterMatch?.[1]) {
 				return frontmatterMatch[1].trim();
 			}
 
 			// 2. Try H1: # Title
-			const h1RegExp = /^#\s+(.+)$/m;
-			const h1Match = h1RegExp.exec(content);
+			const h1Match = H1_REGEXP.exec(content);
 			if (h1Match?.[1]) {
 				return h1Match[1].trim();
 			}
@@ -307,14 +364,11 @@ export class ActionsExplorerProvider implements TreeDataProvider<ActionItem> {
 
 	private normalizeName(name: string): string {
 		// Remove extensions
-		let normalized = name.replace(
-			/\.(prompt|agent|instructions|sh|py|ts|js|ps1|md|yaml|json|handlebars|hbs)$/,
-			""
-		);
+		let normalized = name.replace(EXTENSIONS_REGEXP, "");
 		// Remove speckit prefix if present
-		normalized = normalized.replace(/^speckit\./, "");
+		normalized = normalized.replace(SPECKIT_PREFIX_REGEXP, "");
 		return normalized
-			.split(/[-_.]/)
+			.split(SEPARATOR_REGEXP)
 			.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
 			.join(" ");
 	}
