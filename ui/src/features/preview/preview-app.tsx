@@ -287,7 +287,7 @@ export const PreviewApp = () => {
 							onClick={openInEditor}
 							type="button"
 						>
-							Open in Editor
+							Edit
 						</button>
 					</div>
 				</div>
