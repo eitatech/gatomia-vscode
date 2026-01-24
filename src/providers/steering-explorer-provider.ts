@@ -23,6 +23,11 @@ const homeDir = homedir() || process.env.USERPROFILE || "";
 
 const { joinPath } = Uri;
 
+// Regex: ^name:\s*['"]?(.*?)['"]?$ (multiline)
+const FRONTMATTER_REGEXP = /^name:\s*['"]?(.+?)['"]?$/m;
+const H1_REGEXP = /^#\s+(.+)$/m;
+const SEPARATOR_REGEXP = /[-_.]/;
+
 export class SteeringExplorerProvider
 	implements TreeDataProvider<SteeringItem>
 {
@@ -59,29 +64,7 @@ export class SteeringExplorerProvider
 
 	async getChildren(element?: SteeringItem): Promise<SteeringItem[]> {
 		if (!element) {
-			return [
-				new SteeringItem({
-					label: "Rules",
-					collapsibleState: TreeItemCollapsibleState.Expanded,
-					contextValue: "group-rules",
-					resourcePath: "",
-					context: this.context,
-				}),
-				new SteeringItem({
-					label: "User Instructions",
-					collapsibleState: TreeItemCollapsibleState.Expanded,
-					contextValue: "group-user",
-					resourcePath: "",
-					context: this.context,
-				}),
-				new SteeringItem({
-					label: "Custom Instructions",
-					collapsibleState: TreeItemCollapsibleState.Expanded,
-					contextValue: "group-project",
-					resourcePath: "",
-					context: this.context,
-				}),
-			];
+			return this.getRootItems();
 		}
 
 		const ws = workspace.workspaceFolders?.[0];
@@ -90,145 +73,174 @@ export class SteeringExplorerProvider
 		}
 
 		if (element.contextValue === "group-user") {
-			const items: SteeringItem[] = [];
-			const globalCopilotMd = join(
-				homeDir,
-				".github",
-				"copilot-instructions.md"
-			);
-			if (await this.exists(globalCopilotMd)) {
-				items.push(
-					new SteeringItem({
-						label: "Global Instructions",
-						collapsibleState: TreeItemCollapsibleState.None,
-						contextValue: "instruction-file",
-						resourcePath: globalCopilotMd,
-						context: this.context,
-						command: {
-							command: "vscode.open",
-							title: "Open",
-							arguments: [Uri.file(globalCopilotMd)],
-						},
-						filename: "copilot-instructions.md",
-					})
-				);
-			}
-
-			const rulesRoot = joinPath(Uri.file(homeDir), ".github", "instructions");
-			items.push(...(await this.getInstructionRules(rulesRoot)));
-			return items;
+			return await this.getGroupUserItems();
 		}
 
 		if (element.contextValue === "group-project") {
-			const items: SteeringItem[] = [];
-			const workspaceRoot = ws.uri.fsPath;
-			const specSystem = this.configManager.getSettings().specSystem;
-
-			// Project Copilot Instructions
-			const projectCopilotMd = join(
-				workspaceRoot,
-				".github",
-				"copilot-instructions.md"
-			);
-			if (await this.exists(projectCopilotMd)) {
-				items.push(
-					new SteeringItem({
-						label: "Project Instructions",
-						collapsibleState: TreeItemCollapsibleState.None,
-						contextValue: "instruction-file",
-						resourcePath: projectCopilotMd,
-						context: this.context,
-						command: {
-							command: "vscode.open",
-							title: "Open",
-							arguments: [Uri.file(projectCopilotMd)],
-						},
-						filename: ".github/copilot-instructions.md",
-					})
-				);
-			}
-
-			// Constitution
-			const constitutionMd = join(workspaceRoot, ".github", "constitution.md");
-			if (await this.exists(constitutionMd)) {
-				items.push(
-					new SteeringItem({
-						label: "Constitution",
-						collapsibleState: TreeItemCollapsibleState.None,
-						contextValue: "constitution-file",
-						resourcePath: constitutionMd,
-						context: this.context,
-						command: {
-							command: "vscode.open",
-							title: "Open",
-							arguments: [Uri.file(constitutionMd)],
-						},
-						filename: "constitution.md",
-					})
-				);
-			}
-
-			// AGENTS.md
-			const agentsMd = join(workspaceRoot, "AGENTS.md");
-			if (await this.exists(agentsMd)) {
-				items.push(
-					new SteeringItem({
-						label: "Rules (General)",
-						collapsibleState: TreeItemCollapsibleState.None,
-						contextValue: "agent-file",
-						resourcePath: agentsMd,
-						context: this.context,
-						command: {
-							command: "vscode.open",
-							title: "Open",
-							arguments: [Uri.file(agentsMd)],
-						},
-						filename: "AGENTS.md",
-					})
-				);
-			}
-
-			// OpenSpec AGENTS.md
-			const osAgentsMd = join(workspaceRoot, "openspec", "AGENTS.md");
-			if (
-				specSystem === SPEC_SYSTEM_MODE.OPENSPEC &&
-				(await this.exists(osAgentsMd))
-			) {
-				items.push(
-					new SteeringItem({
-						label: "Rules (OpenSpec)",
-						collapsibleState: TreeItemCollapsibleState.None,
-						contextValue: "agent-file",
-						resourcePath: osAgentsMd,
-						context: this.context,
-						command: {
-							command: "vscode.open",
-							title: "Open",
-							arguments: [Uri.file(osAgentsMd)],
-						},
-						filename: "openspec/AGENTS.md",
-					})
-				);
-			}
-
-			return items;
+			return await this.getGroupProjectItems(ws.uri.fsPath);
 		}
 
 		if (element.contextValue === "group-rules") {
-			const items: SteeringItem[] = [];
-
-			// User Instruction Rules (*.instructions.md)
-			// const globalRulesRoot = joinPath(Uri.file(homeDir), ".github", "instructions");
-			// items.push(...await this.getInstructionRules(globalRulesRoot));
-
-			// Project Instruction Rules (*.instructions.md)
-			const rulesRoot = joinPath(ws.uri, ".github", "instructions");
-			items.push(...(await this.getInstructionRules(rulesRoot)));
-
-			return items;
+			return await this.getGroupRulesItems(ws.uri);
 		}
 
 		return [];
+	}
+
+	private getRootItems(): SteeringItem[] {
+		return [
+			new SteeringItem({
+				label: "Rules",
+				collapsibleState: TreeItemCollapsibleState.Expanded,
+				contextValue: "group-rules",
+				resourcePath: "",
+				context: this.context,
+			}),
+			new SteeringItem({
+				label: "User Instructions",
+				collapsibleState: TreeItemCollapsibleState.Expanded,
+				contextValue: "group-user",
+				resourcePath: "",
+				context: this.context,
+			}),
+			new SteeringItem({
+				label: "Custom Instructions",
+				collapsibleState: TreeItemCollapsibleState.Expanded,
+				contextValue: "group-project",
+				resourcePath: "",
+				context: this.context,
+			}),
+		];
+	}
+
+	private async getGroupUserItems(): Promise<SteeringItem[]> {
+		const items: SteeringItem[] = [];
+		const globalCopilotMd = join(homeDir, ".github", "copilot-instructions.md");
+		if (await this.exists(globalCopilotMd)) {
+			items.push(
+				new SteeringItem({
+					label: "Global Instructions",
+					collapsibleState: TreeItemCollapsibleState.None,
+					contextValue: "instruction-file",
+					resourcePath: globalCopilotMd,
+					context: this.context,
+					command: {
+						command: "vscode.open",
+						title: "Open",
+						arguments: [Uri.file(globalCopilotMd)],
+					},
+					filename: "copilot-instructions.md",
+				})
+			);
+		}
+
+		const rulesRoot = joinPath(Uri.file(homeDir), ".github", "instructions");
+		items.push(...(await this.getInstructionRules(rulesRoot)));
+		return items;
+	}
+
+	private async getGroupProjectItems(
+		workspaceRoot: string
+	): Promise<SteeringItem[]> {
+		const items: SteeringItem[] = [];
+		const specSystem = this.configManager.getSettings().specSystem;
+
+		// Project Copilot Instructions
+		const projectCopilotMd = join(
+			workspaceRoot,
+			".github",
+			"copilot-instructions.md"
+		);
+		if (await this.exists(projectCopilotMd)) {
+			items.push(
+				new SteeringItem({
+					label: "Project Instructions",
+					collapsibleState: TreeItemCollapsibleState.None,
+					contextValue: "instruction-file",
+					resourcePath: projectCopilotMd,
+					context: this.context,
+					command: {
+						command: "vscode.open",
+						title: "Open",
+						arguments: [Uri.file(projectCopilotMd)],
+					},
+					filename: ".github/copilot-instructions.md",
+				})
+			);
+		}
+
+		// Constitution
+		const constitutionMd = join(workspaceRoot, ".github", "constitution.md");
+		if (await this.exists(constitutionMd)) {
+			items.push(
+				new SteeringItem({
+					label: "Constitution",
+					collapsibleState: TreeItemCollapsibleState.None,
+					contextValue: "constitution-file",
+					resourcePath: constitutionMd,
+					context: this.context,
+					command: {
+						command: "vscode.open",
+						title: "Open",
+						arguments: [Uri.file(constitutionMd)],
+					},
+					filename: "constitution.md",
+				})
+			);
+		}
+
+		// AGENTS.md
+		const agentsMd = join(workspaceRoot, "AGENTS.md");
+		if (await this.exists(agentsMd)) {
+			items.push(
+				new SteeringItem({
+					label: "Rules (General)",
+					collapsibleState: TreeItemCollapsibleState.None,
+					contextValue: "agent-file",
+					resourcePath: agentsMd,
+					context: this.context,
+					command: {
+						command: "vscode.open",
+						title: "Open",
+						arguments: [Uri.file(agentsMd)],
+					},
+					filename: "AGENTS.md",
+				})
+			);
+		}
+
+		// OpenSpec AGENTS.md
+		const osAgentsMd = join(workspaceRoot, "openspec", "AGENTS.md");
+		if (
+			specSystem === SPEC_SYSTEM_MODE.OPENSPEC &&
+			(await this.exists(osAgentsMd))
+		) {
+			items.push(
+				new SteeringItem({
+					label: "Rules (OpenSpec)",
+					collapsibleState: TreeItemCollapsibleState.None,
+					contextValue: "agent-file",
+					resourcePath: osAgentsMd,
+					context: this.context,
+					command: {
+						command: "vscode.open",
+						title: "Open",
+						arguments: [Uri.file(osAgentsMd)],
+					},
+					filename: "openspec/AGENTS.md",
+				})
+			);
+		}
+
+		return items;
+	}
+
+	private async getGroupRulesItems(workspaceUri: Uri): Promise<SteeringItem[]> {
+		const items: SteeringItem[] = [];
+		// Project Instruction Rules (*.instructions.md)
+		const rulesRoot = joinPath(workspaceUri, ".github", "instructions");
+		items.push(...(await this.getInstructionRules(rulesRoot)));
+		return items;
 	}
 
 	private async exists(path: string): Promise<boolean> {
@@ -280,16 +292,13 @@ export class SteeringExplorerProvider
 			const content = new TextDecoder().decode(fileData.slice(0, 1024));
 
 			// 1. Try Frontmatter name: ...
-			// Regex: ^name:\s*['"]?(.*?)['"]?$ (multiline)
-			const frontmatterRegExp = /^name:\s*['"]?(.+?)['"]?$/m;
-			const frontmatterMatch = frontmatterRegExp.exec(content);
+			const frontmatterMatch = FRONTMATTER_REGEXP.exec(content);
 			if (frontmatterMatch?.[1]) {
 				return frontmatterMatch[1].trim();
 			}
 
 			// 2. Try H1: # Title
-			const h1RegExp = /^#\s+(.+)$/m;
-			const h1Match = h1RegExp.exec(content);
+			const h1Match = H1_REGEXP.exec(content);
 			if (h1Match?.[1]) {
 				return h1Match[1].trim();
 			}
@@ -306,7 +315,7 @@ export class SteeringExplorerProvider
 		const normalized = name.replace(INSTRUCTION_RULE_SUFFIX, "");
 		// Kebab/Snake to Title Case
 		return normalized
-			.split(/[-_.]/)
+			.split(SEPARATOR_REGEXP)
 			.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
 			.join(" ");
 	}
