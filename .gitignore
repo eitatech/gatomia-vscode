@@ -29,3 +29,7 @@ repomix-output*
 .vscode/
 .envrc
 .claude/
+test-results2.txt
+test-results3.txt
+.gitignore
+test-results4.txt

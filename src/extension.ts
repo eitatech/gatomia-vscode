@@ -20,6 +20,7 @@ import {
 import { VSC_CONFIG_NAMESPACE } from "./constants";
 import { SpecManager } from "./features/spec/spec-manager";
 import { SteeringManager } from "./features/steering/steering-manager";
+import { AgentService } from "./services/agent-service";
 import { CopilotProvider } from "./providers/copilot-provider";
 import { QuickAccessExplorerProvider } from "./providers/quick-access-explorer-provider";
 import { PromptsExplorerProvider } from "./providers/prompts-explorer-provider";
@@ -75,6 +76,7 @@ import {
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
 let steeringManager: SteeringManager;
+let agentService: AgentService;
 let triggerRegistry: TriggerRegistry;
 let hookManager: HookManager;
 let hookExecutor: HookExecutor;
@@ -146,6 +148,26 @@ export async function activate(context: ExtensionContext) {
 		copilotProvider,
 		outputChannel
 	);
+
+	// Initialize AgentService
+	try {
+		outputChannel.appendLine("[Extension] Initializing AgentService...");
+		agentService = new AgentService(outputChannel);
+		await agentService.initialize(context.extensionPath);
+		context.subscriptions.push(agentService);
+		outputChannel.appendLine(
+			"[Extension] AgentService initialized successfully"
+		);
+	} catch (error) {
+		outputChannel.appendLine(
+			`[Extension] Failed to initialize AgentService: ${error}`
+		);
+		// Don't fail extension activation if agent service fails
+	}
+
+	// TODO: Initialize AgentService when implemented in Phase 2 (User Story 1)
+	// agentService = new AgentService(context, outputChannel);
+	// await agentService.initialize();
 
 	// Initialize TriggerRegistry for hooks
 	triggerRegistry = new TriggerRegistry(outputChannel);
