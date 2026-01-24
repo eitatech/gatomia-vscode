@@ -56,10 +56,10 @@
           "default": true,
           "description": "Controls visibility of the Specs view in the activity bar."
         },
-        "gatomia.views.prompts.visible": {
+        "gatomia.views.actions.visible": {
           "type": "boolean",
           "default": true,
-          "description": "Controls visibility of the Prompts view in the activity bar."
+          "description": "Controls visibility of the Actions view in the activity bar."
         },
         "gatomia.views.steering.visible": {
           "type": "boolean",
@@ -190,10 +190,10 @@
           "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.specs.visible"
         },
         {
-          "id": "gatomia.views.promptsExplorer",
-          "name": "Prompts",
+          "id": "gatomia.views.actionsExplorer",
+          "name": "Actions",
           "icon": "terminal",
-          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.prompts.visible"
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.actions.visible"
         },
         {
           "id": "gatomia.views.steeringExplorer",
@@ -221,8 +221,8 @@
         "contents": "Plan features with Specs\n\n[$(plus) Create New Spec](command:gatomia.spec.create)"
       },
       {
-        "view": "gatomia.views.promptsExplorer",
-        "contents": "Create and run prompts (.md) under .github/prompts\n\n[$(refresh) Refresh](command:gatomia.prompts.refresh)"
+        "view": "gatomia.views.actionsExplorer",
+        "contents": "Manage prompts, agents, skills, scripts and templates.\n\n[$(refresh) Refresh](command:gatomia.actions.refresh)"
       },
       {
         "view": "gatomia.views.steeringExplorer",
@@ -378,49 +378,49 @@
         "icon": "$(book)"
       },
       {
-        "command": "gatomia.prompts.create",
-        "title": "Create Prompt",
+        "command": "gatomia.actions.create",
+        "title": "Create Action",
         "category": "GatomIA",
         "icon": "$(plus)"
       },
       {
-        "command": "gatomia.prompts.createAgentFile",
+        "command": "gatomia.actions.createAgentFile",
         "title": "New Agent File",
         "category": "GatomIA",
         "icon": "$(robot)"
       },
       {
-        "command": "gatomia.prompts.createInstructions",
+        "command": "gatomia.actions.createInstructions",
         "title": "New Instructions File",
         "category": "GatomIA",
         "icon": "$(book)"
       },
       {
-        "command": "gatomia.prompts.createCopilotPrompt",
+        "command": "gatomia.actions.createCopilotPrompt",
         "title": "New Prompt File",
         "category": "GatomIA",
         "icon": "$(sparkle)"
       },
       {
-        "command": "gatomia.prompts.refresh",
-        "title": "Refresh Prompts",
+        "command": "gatomia.actions.refresh",
+        "title": "Refresh Actions",
         "category": "GatomIA",
         "icon": "$(refresh)"
       },
       {
-        "command": "gatomia.prompts.run",
-        "title": "Run Prompt",
+        "command": "gatomia.actions.run",
+        "title": "Run Action",
         "category": "GatomIA",
         "icon": "$(play)"
       },
       {
-        "command": "gatomia.prompts.rename",
+        "command": "gatomia.actions.rename",
         "title": "Rename",
         "category": "GatomIA",
         "icon": "$(edit)"
       },
       {
-        "command": "gatomia.prompts.delete",
+        "command": "gatomia.actions.delete",
         "title": "Delete",
         "category": "GatomIA",
         "icon": "$(trash)"
@@ -588,23 +588,23 @@
           "group": "navigation@3"
         },
         {
-          "command": "gatomia.prompts.createAgentFile",
-          "when": "view == gatomia.views.promptsExplorer",
+          "command": "gatomia.actions.createAgentFile",
+          "when": "view == gatomia.views.actionsExplorer",
           "group": "navigation@1"
         },
         {
-          "command": "gatomia.prompts.createInstructions",
-          "when": "view == gatomia.views.promptsExplorer",
+          "command": "gatomia.actions.createInstructions",
+          "when": "view == gatomia.views.actionsExplorer",
           "group": "navigation@2"
         },
         {
-          "command": "gatomia.prompts.createCopilotPrompt",
-          "when": "view == gatomia.views.promptsExplorer",
+          "command": "gatomia.actions.createCopilotPrompt",
+          "when": "view == gatomia.views.actionsExplorer",
           "group": "navigation@3"
         },
         {
-          "command": "gatomia.prompts.refresh",
-          "when": "view == gatomia.views.promptsExplorer",
+          "command": "gatomia.actions.refresh",
+          "when": "view == gatomia.views.actionsExplorer",
           "group": "navigation@4"
         },
         {
@@ -685,18 +685,18 @@
           "group": "inline@9"
         },
         {
-          "command": "gatomia.prompts.run",
-          "when": "view == gatomia.views.promptsExplorer && viewItem == prompt-runnable",
+          "command": "gatomia.actions.run",
+          "when": "view == gatomia.views.actionsExplorer && viewItem == prompt-runnable",
           "group": "inline"
         },
         {
-          "command": "gatomia.prompts.rename",
-          "when": "view == gatomia.views.promptsExplorer && (viewItem == prompt || viewItem == prompt-runnable)",
+          "command": "gatomia.actions.rename",
+          "when": "view == gatomia.views.actionsExplorer && (viewItem == prompt || viewItem == prompt-runnable)",
           "group": "7_modification@1"
         },
         {
-          "command": "gatomia.prompts.delete",
-          "when": "view == gatomia.views.promptsExplorer && (viewItem == prompt || viewItem == prompt-runnable)",
+          "command": "gatomia.actions.delete",
+          "when": "view == gatomia.views.actionsExplorer && (viewItem == prompt || viewItem == prompt-runnable)",
           "group": "7_modification@2"
         },
         {
@@ -749,7 +749,7 @@
           "when": "workspaceFolderCount > 0"
         },
         {
-          "command": "gatomia.prompts.create",
+          "command": "gatomia.actions.create",
           "when": "workspaceFolderCount > 0"
         },
         {
