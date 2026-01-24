@@ -29,6 +29,23 @@ You can follow our progress, open issues, or contribute directly through our off
 
 ## Features
 
+### Copilot Agents Integration
+
+* **Agent Discovery**: Automatically discover and register agents from `resources/agents/` directory as Copilot Chat participants
+* **Ask Agents**: Interact with agents directly in GitHub Copilot Chat with intelligent command suggestions and autocomplete
+* **Tool Execution**: Execute agent-defined tools with comprehensive error handling and real-time progress feedback
+* **Resource Management**: Automatic loading and caching of agent resources (prompts, skills, instructions)
+  - **Prompts**: Template prompts available to agents for consistent responses
+  - **Skills**: Domain knowledge packages that agents can reference
+  - **Instructions**: Behavior guidelines that shape agent responses
+* **Hot-Reload**: Real-time resource updates without extension reload (configurable, enabled by default)
+* **Configuration**: Customize agent behavior through extension settings
+  - **resourcesPath**: Directory containing agents and resources (default: `resources`)
+  - **enableHotReload**: Auto-reload resources on file changes (default: true)
+  - **logLevel**: Logging verbosity for debugging (default: info)
+* **Example Implementation**: Built-in example agent and tool handlers demonstrating best practices
+* **Comprehensive Help**: Built-in `/help` command for all agents with full documentation
+
 ### Spec Management
 
 * **Create Specs**: Run `GatomIA: Create New Spec` (`gatomia.spec.create`) to open the creation dialog. Define your summary, product context, and constraints.
@@ -156,7 +173,65 @@ Search for "GatomIA" in the VS Code Marketplace and install the extension.
    - Copilot Chat opens with `/speckit.constitution` prompt
    - The agent generates your `constitution.md`
 
-### 4. Automate with Hooks
+### 4. Use Copilot Agents
+
+GatomIA auto-discovers agents defined in `resources/agents/` and registers them with GitHub Copilot Chat. You can interact with them directly in the chat interface.
+
+**Using Agents**:
+
+1. Open GitHub Copilot Chat (Ctrl+Shift+I / Cmd+Shift+I)
+2. Type `@` to see available agents (e.g., `@example-agent`, `@speckit`, `@task-planner`)
+3. Type a command after the agent name (e.g., `@example-agent /hello`)
+4. Press Enter to execute the agent command
+5. The agent executes its tool handler and returns results as markdown
+
+**Available Commands**:
+
+* `@agent /help` - Show all available commands for the agent
+* `@agent /help <command>` - Show detailed documentation for a specific command
+* Agent-specific commands as defined in `resources/agents/<agent>.agent.md`
+
+**Creating Custom Agents**:
+
+1. Create a file at `resources/agents/my-agent.agent.md`:
+
+   ```markdown
+   ---
+   id: my-agent
+   name: My Agent
+   fullName: My Custom Agent Implementation
+   description: Describes what this agent does
+   commands:
+     - name: analyze
+       description: Analyze project structure
+       tool: my.analyze
+   resources:
+     prompts: [analysis.prompt.md]
+     skills: [expertise.skill.md]
+   ---
+   
+   # My Agent
+   
+   Documentation about the agent...
+   ```
+
+2. Create tool handlers in `src/features/agents/tools/` (reference [example-tool-handler.ts](src/features/agents/tools/example-tool-handler.ts))
+3. Register tools in the tool registry during extension initialization
+4. Agents are auto-discovered and registered when the extension activates
+
+**Configuration**:
+
+Access agent settings in VS Code: Settings → GatomIA → Agents
+
+| Setting | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `gatomia.agents.resourcesPath` | string | `resources` | Directory containing agents and resources. |
+| `gatomia.agents.enableHotReload` | boolean | `true` | Auto-reload resources when files change. |
+| `gatomia.agents.logLevel` | string | `info` | Logging verbosity (debug, info, warn, error). |
+
+For more details, see [src/features/agents/README.md](src/features/agents/README.md).
+
+### 5. Automate with Hooks
 
 1. Open the **Hooks** view in the Activity Bar.
 2. Click **Create New Hook**.

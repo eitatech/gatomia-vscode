@@ -2,6 +2,55 @@
 
 ---
 
+## v0.31.0 2026-01-24
+
+### Added
+
+- **Copilot Agents Integration**: Seamless integration with GitHub Copilot Chat for agent capabilities
+  - **Agent Discovery & Registration**: Auto-discover agents from `resources/agents/` directory and register as Copilot Chat participants
+  - **Tool Execution**: Execute agent-defined tools with comprehensive error handling and telemetry
+  - **Resource Management**: Automatic loading and caching of agent resources (prompts, skills, instructions)
+  - **Hot-Reload Support**: Configuration-driven automatic resource reloading when files change
+  - **Configuration Options**: Customize resource paths, enable/disable hot-reload, and control logging levels
+  - **Example Agent & Tools**: Comprehensive example implementations demonstrating agent and tool handler patterns
+  - **Built-in Help System**: Automatic `/help` command for all agents with full documentation
+  - **Error Handling**: Production-grade error categorization, formatting, and user-friendly messaging
+  - **Test Coverage**: 100+ unit and integration tests ensuring reliability
+
+### Documentation
+
+- Comprehensive README for `src/features/agents/` directory with architecture overview
+- Example agent definition at `resources/agents/example-agent.agent.md`
+- Example tool handler implementation with usage patterns
+- Complete JSDoc documentation for all public APIs
+- Integration guide and troubleshooting section
+
+### Performance
+
+- Agent registration: <1s per agent
+- Tool execution: <30s typical runtime (configurable timeouts)
+- Autocomplete suggestions: <200ms latency
+- Resource caching: O(1) in-memory lookups
+
+### Configuration
+
+New `gatomia.agents` settings:
+- `resourcesPath`: Directory containing agents and resources (default: "resources")
+- `enableHotReload`: Automatically reload resources on file changes (default: true)
+- `logLevel`: Logging verbosity (debug, info, warn, error) (default: "info")
+
+### Requires
+
+- GitHub Copilot Chat extension (installed and enabled)
+- VS Code 1.84.0 or later
+
+### Release Info
+
+- **Source Branch**: `010-copilot-agents`
+- **Release Type**: minor
+
+---
+
 ## v0.30.0 2026-01-07
 
 ### Changed

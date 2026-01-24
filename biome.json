@@ -19,7 +19,8 @@
       "!.tmp/**/*",
       "!.codex/**/*",
       "!.vscode/**/*",
-      "!.agent_work/**/*"
+      "!.agent_work/**/*",
+      "!specs/**/*"
     ],
     "ignoreUnknown": false
   },
