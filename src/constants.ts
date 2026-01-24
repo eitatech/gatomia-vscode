@@ -24,6 +24,8 @@ export const SPECKIT_CONFIG = {
 		templates: ".specify/templates",
 		scripts: ".specify/scripts",
 		commands: ".specify/commands",
+		agents: ".github/agents",
+		skills: ".github/skills",
 	},
 	views: {
 		specs: true,

@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Tool Response Schema",
+  "description": "Schema for structured responses returned by tool handlers",
+  "type": "object",
+  "required": ["content"],
+  "properties": {
+    "content": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Markdown-formatted content to display in chat",
+      "examples": [
+        "✅ Created specification: `spec.md`",
+        "## Analysis Results\n\nFound 3 issues:\n- Issue 1\n- Issue 2\n- Issue 3"
+      ]
+    },
+    "files": {
+      "type": "array",
+      "description": "Optional file references for navigation",
+      "items": {
+        "type": "object",
+        "required": ["uri"],
+        "properties": {
+          "uri": {
+            "type": "string",
+            "format": "uri",
+            "description": "File URI (file:// scheme)",
+            "examples": [
+              "file:///Users/user/project/spec.md",
+              "file:///workspace/src/feature.ts"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "description": "Display label (defaults to filename if omitted)",
+            "examples": ["Feature Specification", "Implementation File"]
+          },
+          "action": {
+            "type": "string",
+            "enum": ["created", "modified", "deleted"],
+            "description": "Action performed on file",
+            "examples": ["created", "modified"]
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional metadata for telemetry and debugging",
+      "properties": {
+        "duration": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Execution duration in milliseconds",
+          "examples": [150, 2340]
+        },
+        "tokensUsed": {
+          "type": "number",
+          "minimum": 0,
+          "description": "LLM tokens used (if applicable)",
+          "examples": [450, 1200]
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "examples": [
+    {
+      "content": "✅ Created feature specification",
+      "files": [
+        {
+          "uri": "file:///workspace/specs/010-feature/spec.md",
+          "label": "Feature Specification",
+          "action": "created"
+        }
+      ],
+      "metadata": {
+        "duration": 2340,
+        "tokensUsed": 1200
+      }
+    },
+    {
+      "content": "## Analysis Complete\n\nFound 3 potential issues:\n1. Missing tests\n2. Unused imports\n3. Complex function",
+      "metadata": {
+        "duration": 450
+      }
+    }
+  ]
+}
