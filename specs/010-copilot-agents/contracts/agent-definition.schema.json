@@ -1,0 +1,132 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Agent Definition YAML Frontmatter Schema",
+  "description": "Schema for YAML frontmatter in agent definition markdown files",
+  "type": "object",
+  "required": ["id", "name", "fullName", "description", "commands"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Unique agent identifier (lowercase alphanumeric with hyphens)",
+      "examples": ["speckit", "task-planner", "code-reviewer"]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Short display name",
+      "examples": ["SpecKit", "Task Planner"]
+    },
+    "fullName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Full descriptive name",
+      "examples": ["SpecKit Workflow Agent", "Task Planning Assistant"]
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Brief description of agent's purpose",
+      "examples": ["Manages feature specifications and workflow automation"]
+    },
+    "icon": {
+      "type": "string",
+      "description": "Optional path to icon file (relative to extension root)",
+      "examples": ["resources/icons/speckit.png"]
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Commands supported by this agent",
+      "items": {
+        "type": "object",
+        "required": ["name", "description", "tool"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "description": "Command name (without leading slash)",
+            "examples": ["specify", "plan", "tasks"]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Brief command description (shown in autocomplete)",
+            "examples": ["Create or update feature specification"]
+          },
+          "tool": {
+            "type": "string",
+            "pattern": "^[a-z0-9.-]+$",
+            "description": "Name of tool handler to invoke",
+            "examples": ["speckit.specify", "task-planner.generate"]
+          },
+          "parameters": {
+            "type": "string",
+            "description": "Optional parameter hints or schema"
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Resources used by this agent",
+      "properties": {
+        "prompts": {
+          "type": "array",
+          "description": "Prompt file names",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9.-]+\\.prompt\\.md$"
+          },
+          "examples": [["speckit.specify.prompt.md", "speckit.plan.prompt.md"]]
+        },
+        "skills": {
+          "type": "array",
+          "description": "Skill file names",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9.-]+\\.skill\\.md$"
+          },
+          "examples": [["spec-writing.skill.md", "tdd-practices.skill.md"]]
+        },
+        "instructions": {
+          "type": "array",
+          "description": "Instruction file names",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9.-]+\\.instructions\\.md$"
+          },
+          "examples": [["speckit-behavior.instructions.md"]]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "speckit",
+      "name": "SpecKit",
+      "fullName": "SpecKit Workflow Agent",
+      "description": "Manages feature specifications and workflow automation",
+      "icon": "resources/icons/speckit.png",
+      "commands": [
+        {
+          "name": "specify",
+          "description": "Create or update feature specification",
+          "tool": "speckit.specify"
+        },
+        {
+          "name": "plan",
+          "description": "Generate implementation plan",
+          "tool": "speckit.plan"
+        }
+      ],
+      "resources": {
+        "prompts": ["speckit.specify.prompt.md", "speckit.plan.prompt.md"],
+        "skills": ["spec-writing.skill.md"],
+        "instructions": ["speckit-behavior.instructions.md"]
+      }
+    }
+  ]
+}

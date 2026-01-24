@@ -34,7 +34,7 @@ export function RefineDialog({
 	sections,
 	onSubmit,
 	onSubmitted,
-	triggerLabel = "Refine Document",
+	triggerLabel = "Refine",
 }: RefineDialogProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [issueType, setIssueType] = useState<PreviewRefinementIssueType | "">(
