@@ -92,6 +92,13 @@ export class SteeringExplorerProvider
 			new SteeringItem({
 				label: "Rules",
 				collapsibleState: TreeItemCollapsibleState.Expanded,
+				contextValue: "group-project",
+				resourcePath: "",
+				context: this.context,
+			}),
+			new SteeringItem({
+				label: "Custom Instructions",
+				collapsibleState: TreeItemCollapsibleState.Expanded,
 				contextValue: "group-rules",
 				resourcePath: "",
 				context: this.context,
@@ -100,13 +107,6 @@ export class SteeringExplorerProvider
 				label: "User Instructions",
 				collapsibleState: TreeItemCollapsibleState.Expanded,
 				contextValue: "group-user",
-				resourcePath: "",
-				context: this.context,
-			}),
-			new SteeringItem({
-				label: "Custom Instructions",
-				collapsibleState: TreeItemCollapsibleState.Expanded,
-				contextValue: "group-project",
 				resourcePath: "",
 				context: this.context,
 			}),

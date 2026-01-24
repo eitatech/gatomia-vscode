@@ -50,7 +50,7 @@ describe("SteeringExplorerProvider - instruction rules", () => {
 			(item) => item.contextValue === "group-user"
 		);
 
-		expect(projectGroup?.label).toBe("Custom Instructions");
+		expect(projectGroup?.label).toBe("Rules");
 		expect(userGroup?.label).toBe("User Instructions");
 	});
 
