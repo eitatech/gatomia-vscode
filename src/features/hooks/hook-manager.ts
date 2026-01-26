@@ -6,9 +6,11 @@ import {
 } from "vscode";
 import { randomUUID } from "node:crypto";
 import type { IMCPDiscoveryService } from "./services/mcp-contracts";
+import type { AgentRegistry } from "./agent-registry";
 import {
 	type Hook,
 	type MCPActionParams,
+	type CustomActionParams,
 	isValidHook,
 	HOOKS_STORAGE_KEY,
 	MAX_HOOK_NAME_LENGTH,
@@ -74,6 +76,7 @@ export class HookManager {
 	private readonly context: ExtensionContext;
 	private readonly outputChannel: OutputChannel;
 	private readonly mcpDiscoveryService?: IMCPDiscoveryService;
+	private readonly agentRegistry?: AgentRegistry;
 	private hooks: Hook[] = [];
 
 	// Event emitters
@@ -91,11 +94,13 @@ export class HookManager {
 	constructor(
 		context: ExtensionContext,
 		outputChannel: OutputChannel,
-		mcpDiscoveryService?: IMCPDiscoveryService
+		mcpDiscoveryService?: IMCPDiscoveryService,
+		agentRegistry?: AgentRegistry
 	) {
 		this.context = context;
 		this.outputChannel = outputChannel;
 		this.mcpDiscoveryService = mcpDiscoveryService;
+		this.agentRegistry = agentRegistry;
 	}
 
 	/**
@@ -464,6 +469,20 @@ export class HookManager {
 			});
 		}
 
+		// T051: Validate agent type override BEFORE isValidHook() (User Story 2)
+		if (hook.action?.type === "custom") {
+			const customParams = hook.action.parameters as any;
+			if (customParams?.agentType) {
+				const validTypes: string[] = ["local", "background"];
+				if (!validTypes.includes(customParams.agentType)) {
+					errors.push({
+						field: "action.parameters.agentType",
+						message: `Invalid agent type "${customParams.agentType}". Must be "local" or "background".`,
+					});
+				}
+			}
+		}
+
 		// Validate using type guard for deeper validation
 		if (!isValidHook(hook)) {
 			errors.push({
@@ -485,10 +504,75 @@ export class HookManager {
 			}
 		}
 
+		// T025: Validate custom agent references if action type is "custom"
+		if (hook.action.type === "custom" && this.agentRegistry) {
+			const customParams = hook.action.parameters as CustomActionParams;
+			const agentId = customParams.agentId || customParams.agentName;
+			const agentValid = await this.validateCustomAgent(agentId);
+
+			if (!agentValid.valid) {
+				errors.push(...agentValid.errors);
+			}
+		}
+
 		return {
 			valid: errors.length === 0,
 			errors,
 		};
+	}
+
+	/**
+	 * T025: Validate custom agent references
+	 * Checks if the referenced agent exists and is available
+	 */
+	async validateCustomAgent(agentId?: string): Promise<ValidationResult> {
+		const errors: ValidationError[] = [];
+
+		if (!this.agentRegistry) {
+			// If no registry, skip validation (graceful degradation)
+			return { valid: true, errors };
+		}
+
+		if (!agentId) {
+			errors.push({
+				field: "action.parameters.agentId",
+				message: "Agent ID is required for custom actions",
+			});
+			return { valid: false, errors };
+		}
+
+		try {
+			// Check if agent exists
+			const agent = this.agentRegistry.getAgentById(agentId);
+
+			if (!agent) {
+				errors.push({
+					field: "action.parameters.agentId",
+					message: `Agent "${agentId}" not found. Please select a valid agent.`,
+				});
+				return { valid: false, errors };
+			}
+
+			// T025.5: Check if agent is available (warn but don't fail)
+			// TypeScript: agentId is guaranteed non-undefined here due to check above
+			const availCheck = await this.agentRegistry.checkAgentAvailability(
+				agentId as string
+			);
+			if (!availCheck.available) {
+				// Warning - allow saving but notify
+				this.outputChannel.appendLine(
+					`[HookManager] Warning: Agent "${agentId}" is not currently available: ${availCheck.reason}`
+				);
+			}
+
+			return { valid: true, errors };
+		} catch (error) {
+			errors.push({
+				field: "action.parameters.agentId",
+				message: `Failed to validate agent: ${(error as Error).message}`,
+			});
+			return { valid: false, errors };
+		}
 	}
 
 	/**

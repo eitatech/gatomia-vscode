@@ -262,6 +262,8 @@ npm test -- -t "MCP"
 ## Active Technologies
 - TypeScript 5.3+ (strict) + VS Code Extension API, React 18, Spec Explorer stores, telemetry helpers in `src/features/spec/review-flow/telemetry.ts` (001-auto-review-transition)
 - JSON workspace state `.vscode/gatomia/spec-review-state.json` managed via `review-flow/state.ts` + `storage.ts` (001-auto-review-transition)
+- TypeScript 5.3+ (strict mode, target: ES2022) + VS Code Extension API 1.84.0+, React 18.3+ (webview), Vitest 3.2+ (testing), Biome (linting/formatting), gray-matter (YAML frontmatter parsing), chokidar or VS Code FileSystemWatcher (file watching) (011-custom-agent-hooks)
+- VS Code Workspace State API (hooks configuration), File System (`.github/agents/*.agent.md` files) (011-custom-agent-hooks)
 
 ## Recent Changes
 - 001-auto-review-transition: Added TypeScript 5.3+ (strict) + VS Code Extension API, React 18, Spec Explorer stores, telemetry helpers in `src/features/spec/review-flow/telemetry.ts`
