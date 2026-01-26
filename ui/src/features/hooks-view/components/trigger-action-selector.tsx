@@ -1,6 +1,8 @@
 import { TextareaPanel } from "@/components/textarea-panel";
 import { VSCodeCheckbox } from "@/components/ui/vscode-checkbox";
 import { VSCodeSelect } from "@/components/ui/vscode-select";
+import { AgentDropdown } from "@/components/hooks/agent-dropdown";
+import { AgentTypeSelector } from "./agent-type-selector";
 import type {
 	ActionConfig,
 	ActionType,
@@ -22,6 +24,7 @@ import type {
 } from "react";
 import { useMCPServers } from "../hooks/use-mcp-servers";
 import { MCPToolsSelector } from "./mcp-tools-selector";
+import { ArgumentTemplateEditor } from "./argument-template-editor";
 
 interface TriggerActionSelectorProps {
 	trigger: TriggerCondition;
@@ -220,7 +223,6 @@ export const TriggerActionSelector = ({
 		switch (action.type) {
 			case "agent": {
 				const params = action.parameters as AgentActionParams;
-				const commandListId = "hooks-agent-commands";
 				return (
 					<div className="flex flex-col gap-2">
 						<div className="flex items-center gap-1">
@@ -237,21 +239,23 @@ export const TriggerActionSelector = ({
 								*
 							</span>
 						</div>
-						<input
-							className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-input-background)] px-3 py-2 text-[color:var(--vscode-input-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
+						<ArgumentTemplateEditor
 							disabled={disabled}
-							id="action-command"
-							list={commandListId}
-							onChange={handleActionParamChange("command")}
-							placeholder="/speckit.clarify or /openspec.analyze"
-							type="text"
+							error={actionError}
+							onChange={(value) => {
+								onActionChange({
+									...action,
+									parameters: {
+										...params,
+										command: value,
+									},
+								});
+								onClearActionError?.();
+							}}
+							placeholder="/speckit.clarify --spec {specId}"
+							triggerType={trigger.operation}
 							value={params.command || ""}
 						/>
-						<datalist id={commandListId}>
-							{AGENT_COMMAND_SUGGESTIONS.map((cmd) => (
-								<option key={cmd} value={cmd} />
-							))}
-						</datalist>
 					</div>
 				);
 			}
@@ -443,7 +447,7 @@ export const TriggerActionSelector = ({
 									className="font-medium text-[color:var(--vscode-foreground)] text-sm"
 									htmlFor="custom-agent-name"
 								>
-									Agent Name
+									Agent
 								</label>
 								<span
 									aria-hidden="true"
@@ -452,16 +456,39 @@ export const TriggerActionSelector = ({
 									*
 								</span>
 							</div>
-							<input
-								className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-input-background)] px-3 py-2 text-[color:var(--vscode-input-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
+							<AgentDropdown
 								disabled={disabled}
-								id="custom-agent-name"
-								onChange={handleActionParamChange("agentName")}
-								placeholder="my-custom-agent"
-								type="text"
-								value={params.agentName || ""}
+								onAgentChange={(agentId) => {
+									onActionChange({
+										...action,
+										parameters: {
+											...params,
+											agentId,
+											agentName: agentId, // Keep backward compatibility
+										} as CustomActionParams,
+									});
+									onClearActionError?.();
+								}}
+								selectedAgentId={params.agentId || params.agentName}
 							/>
 						</div>
+
+						{/* Agent Type Selector - Manual override for agent execution type */}
+						<AgentTypeSelector
+							disabled={disabled}
+							onChange={(agentType) => {
+								onActionChange({
+									...action,
+									parameters: {
+										...params,
+										agentType,
+									} as CustomActionParams,
+								});
+								onClearActionError?.();
+							}}
+							value={params.agentType}
+						/>
+
 						<div className="flex flex-col gap-2">
 							<label
 								className="font-medium text-[color:var(--vscode-foreground)] text-sm"

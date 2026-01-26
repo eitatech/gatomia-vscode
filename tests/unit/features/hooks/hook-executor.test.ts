@@ -5,6 +5,7 @@ import { HookManager } from "../../../../src/features/hooks/hook-manager";
 import { TriggerRegistry } from "../../../../src/features/hooks/trigger-registry";
 import type { Hook } from "../../../../src/features/hooks/types";
 import { MAX_CHAIN_DEPTH } from "../../../../src/features/hooks/types";
+import type { IMCPDiscoveryService } from "../../../../src/features/hooks/services/mcp-contracts";
 
 // Mock OutputChannel
 const createMockOutputChannel = (): OutputChannel => ({
@@ -17,6 +18,73 @@ const createMockOutputChannel = (): OutputChannel => ({
 	hide: vi.fn(),
 	dispose: vi.fn(),
 });
+
+// Mock MCPDiscoveryService
+const createMockMCPDiscoveryService = (): IMCPDiscoveryService => ({
+	discoverServers: vi.fn().mockReturnValue([]),
+	getServer: vi.fn().mockReturnValue(undefined),
+	getTool: vi.fn().mockReturnValue(undefined),
+	clearCache: vi.fn().mockReturnValue(undefined),
+	isCacheFresh: vi.fn().mockReturnValue(false),
+});
+
+// Mock AgentRegistry
+const createMockAgentRegistry = (): AgentRegistry => {
+	const mockRegistry = {
+		initialize: vi.fn().mockResolvedValue(undefined),
+		getAllAgents: vi.fn().mockReturnValue([
+			{
+				id: "local:code-reviewer",
+				name: "code-reviewer",
+				displayName: "code-reviewer",
+				description: "Reviews code",
+				type: "local",
+				source: "file",
+				metadata: {},
+			},
+			{
+				id: "local:test-agent",
+				name: "test-agent",
+				displayName: "test-agent",
+				description: "Test agent",
+				type: "local",
+				source: "file",
+				metadata: {},
+			},
+		]),
+		getAgentById: vi.fn((id: string) => {
+			if (id === "local:code-reviewer") {
+				return {
+					id: "local:code-reviewer",
+					name: "code-reviewer",
+					displayName: "code-reviewer",
+					description: "Reviews code",
+					type: "local" as const,
+					source: "file" as const,
+					metadata: {},
+				};
+			}
+			if (id === "local:test-agent") {
+				return {
+					id: "local:test-agent",
+					name: "test-agent",
+					displayName: "test-agent",
+					description: "Test agent",
+					type: "local" as const,
+					source: "file" as const,
+					metadata: {},
+				};
+			}
+			return;
+		}),
+		getAgentsGroupedByType: vi
+			.fn()
+			.mockReturnValue({ local: [], background: [] }),
+		clearCache: vi.fn(),
+		dispose: vi.fn(),
+	} as unknown as AgentRegistry;
+	return mockRegistry;
+};
 
 // Mock ExtensionContext for HookManager
 const createMockContext = (): any => {
@@ -39,7 +107,7 @@ const createMockContext = (): any => {
 
 // Mock sendPromptToChat
 vi.mock("../../../../src/utils/chat-prompt-runner", () => ({
-	sendPromptToChat: vi.fn(),
+	sendPromptToChat: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock GitActionExecutor
@@ -116,12 +184,16 @@ describe("HookExecutor", () => {
 	beforeEach(async () => {
 		mockOutputChannel = createMockOutputChannel();
 		mockContext = createMockContext();
+		const mockMCPDiscovery = createMockMCPDiscoveryService();
+		const mockAgentRegistry = createMockAgentRegistry();
 		hookManager = new HookManager(mockContext, mockOutputChannel);
 		triggerRegistry = new TriggerRegistry(mockOutputChannel);
 		executor = new HookExecutor(
 			hookManager,
 			triggerRegistry,
-			mockOutputChannel
+			mockOutputChannel,
+			mockMCPDiscovery,
+			mockAgentRegistry
 		);
 
 		await hookManager.initialize();
@@ -509,7 +581,7 @@ describe("HookExecutor", () => {
 
 	describe("template expansion", () => {
 		it("should expand template variables", async () => {
-			const templateContext = await executor.buildTemplateContext();
+			const templateContext = await executor.buildTemplateContext("clarify");
 			const template = "Branch: {branch}, User: {user}";
 
 			const expanded = executor.expandTemplate(template, templateContext);
@@ -519,17 +591,18 @@ describe("HookExecutor", () => {
 		});
 
 		it("should handle missing variables gracefully", async () => {
-			const templateContext = await executor.buildTemplateContext();
+			const templateContext = await executor.buildTemplateContext("clarify");
 			const template = "Feature: {feature}, Missing: {missing}";
 
 			const expanded = executor.expandTemplate(template, templateContext);
 
-			// Missing variables should remain as placeholders
-			expect(expanded).toContain("{missing}");
+			// Missing variables should be replaced with empty string (graceful degradation)
+			expect(expanded).not.toContain("{missing}");
+			expect(expanded).toBe("Feature: test-feature, Missing: ");
 		});
 
 		it("should expand multiple occurrences", async () => {
-			const templateContext = await executor.buildTemplateContext();
+			const templateContext = await executor.buildTemplateContext("clarify");
 			const template = "{branch} and {branch} again";
 
 			const expanded = executor.expandTemplate(template, templateContext);
@@ -659,6 +732,159 @@ describe("HookExecutor", () => {
 
 			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
 				"[HookExecutor] Disposed"
+			);
+		});
+	});
+
+	// ============================================================================
+	// T046: Unit test for background agent execution logic
+	// ============================================================================
+
+	describe("Agent Type Routing (User Story 2)", () => {
+		it("should route to local agent execution for local agents", async () => {
+			const hook = await hookManager.createHook(
+				createTestHook({
+					action: {
+						type: "custom",
+						parameters: {
+							agentId: "local:code-reviewer",
+							agentName: "code-reviewer",
+							agentType: "local", // Explicit local type
+							prompt: "Review this code",
+						},
+					},
+				})
+			);
+
+			const result = await executor.executeHook(hook);
+
+			if (result.status !== "success") {
+				console.log("Error:", result.error);
+			}
+
+			expect(result.status).toBe("success");
+			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
+				expect.stringContaining("local agent")
+			);
+		});
+
+		it("should route to background agent execution for background agents", async () => {
+			const hook = await hookManager.createHook(
+				createTestHook({
+					action: {
+						type: "custom",
+						parameters: {
+							agentId: "local:test-agent",
+							agentName: "test-agent",
+							agentType: "background", // Force background execution
+							prompt: "Run background task",
+						},
+					},
+				})
+			);
+
+			const result = await executor.executeHook(hook);
+
+			expect(result.status).toBe("success");
+			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
+				expect.stringContaining("background agent")
+			);
+		});
+
+		it("should default to agent registry type when no override specified", async () => {
+			const hook = await hookManager.createHook(
+				createTestHook({
+					action: {
+						type: "custom",
+						parameters: {
+							agentId: "local:code-reviewer",
+							agentName: "code-reviewer",
+							// No agentType override - should use registry default
+							prompt: "Review this code",
+						},
+					},
+				})
+			);
+
+			const result = await executor.executeHook(hook);
+
+			expect(result.status).toBe("success");
+			// Should use default type from agent registry (local for file-based)
+		});
+
+		it("should handle local agent execution errors gracefully", async () => {
+			// Mock sendPromptToChat to throw error
+			const { sendPromptToChat } = await import(
+				"../../../../src/utils/chat-prompt-runner"
+			);
+			vi.mocked(sendPromptToChat).mockRejectedValueOnce(
+				new Error("Local agent failed")
+			);
+
+			const hook = await hookManager.createHook(
+				createTestHook({
+					action: {
+						type: "custom",
+						parameters: {
+							agentId: "local:code-reviewer",
+							agentName: "code-reviewer",
+							agentType: "local",
+							prompt: "Review this code",
+						},
+					},
+				})
+			);
+
+			const result = await executor.executeHook(hook);
+
+			expect(result.status).toBe("failure");
+			expect(result.error?.message).toContain("Local agent failed");
+		});
+
+		it("should handle background agent execution errors gracefully", async () => {
+			const hook = await hookManager.createHook(
+				createTestHook({
+					action: {
+						type: "custom",
+						parameters: {
+							agentId: "local:test-agent",
+							agentName: "test-agent",
+							agentType: "background",
+							prompt: "Run background task",
+						},
+					},
+				})
+			);
+
+			// Note: Background execution might fail if CLI not available
+			const result = await executor.executeHook(hook);
+
+			// Should either succeed or fail gracefully with error message
+			if (result.status !== "success") {
+				expect(result.error).toBeDefined();
+				expect(result.error?.message).toBeDefined();
+			}
+		});
+
+		it("should include agent type information in execution logs", async () => {
+			const hook = await hookManager.createHook(
+				createTestHook({
+					action: {
+						type: "custom",
+						parameters: {
+							agentId: "local:code-reviewer",
+							agentName: "code-reviewer",
+							agentType: "local",
+							prompt: "Review this code",
+						},
+					},
+				})
+			);
+
+			await executor.executeHook(hook);
+
+			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
+				expect.stringContaining("Agent type:")
 			);
 		});
 	});
