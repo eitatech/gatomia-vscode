@@ -162,11 +162,15 @@ export type GitHubOperation =
  * CustomActionParams - Parameters for custom agent invocations
  */
 export interface CustomActionParams {
-	agentId?: string; // Optional: GitHub Copilot agent ID
-	agentName: string; // Custom agent identifier
+	// NEW: Agent Registry Integration (for custom-agent-hooks refactoring)
+	agentId?: string; // Agent ID from agent registry (format: "source:name")
+	agentType?: "local" | "background"; // Explicit type override
+
+	// EXISTING: Legacy GitHub Copilot agent support
+	agentName: string; // Custom agent identifier (will be deprecated in favor of agentId)
 	prompt?: string; // Instruction/action text for the agent
 	selectedTools?: SelectedMCPTool[]; // Optional: MCP tools available to agent
-	arguments?: string; // Legacy: Arguments to pass to agent
+	arguments?: string; // Template string with {variable} syntax for passing trigger context
 }
 
 /**

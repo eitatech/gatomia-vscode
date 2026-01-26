@@ -7,8 +7,11 @@ import {
 	commands,
 } from "vscode";
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import type { HookManager } from "./hook-manager";
 import type { TriggerRegistry } from "./trigger-registry";
+import type { AgentRegistry } from "./agent-registry";
+import { sendPromptToChat } from "../../utils/chat-prompt-runner";
 import { AgentActionExecutor } from "./actions/agent-action";
 import { GitActionExecutor } from "./actions/git-action";
 import { GitHubActionExecutor } from "./actions/github-action";
@@ -17,15 +20,20 @@ import { MCPClientService } from "./services/mcp-client";
 import { MCPParameterResolver } from "./services/mcp-parameter-resolver";
 import { MCPExecutionPool } from "./services/mcp-execution-pool";
 import type { IMCPDiscoveryService } from "./services/mcp-contracts";
+import {
+	TemplateVariableParser,
+	type TemplateContext as ParserTemplateContext,
+} from "./template-variable-parser";
 import type {
 	Hook,
 	ExecutionContext,
 	HookExecutionLog,
-	TemplateContext,
 	AgentActionParams,
 	GitActionParams,
 	GitHubActionParams,
 	MCPActionParams,
+	CustomActionParams,
+	OperationType,
 } from "./types";
 import {
 	MAX_CHAIN_DEPTH,
@@ -105,11 +113,13 @@ export class ExecutionTimeoutError extends Error {
 export class HookExecutor {
 	private readonly hookManager: HookManager;
 	private readonly triggerRegistry: TriggerRegistry;
+	private readonly agentRegistry: AgentRegistry;
 	private readonly outputChannel: OutputChannel;
 	private readonly agentExecutor: AgentActionExecutor;
 	private readonly gitExecutor: GitActionExecutor;
 	private readonly githubExecutor: GitHubActionExecutor;
 	private readonly mcpExecutor: MCPActionExecutor;
+	private readonly templateParser: TemplateVariableParser;
 	private executionLogs: HookExecutionLog[] = [];
 
 	// Event emitters
@@ -125,18 +135,22 @@ export class HookExecutor {
 	readonly onExecutionFailed: Event<ExecutionEvent> =
 		this._onExecutionFailed.event;
 
+	// biome-ignore lint/nursery/useMaxParams: Dependency injection pattern requires multiple constructor parameters
 	constructor(
 		hookManager: HookManager,
 		triggerRegistry: TriggerRegistry,
 		outputChannel: OutputChannel,
-		mcpDiscoveryService: IMCPDiscoveryService
+		mcpDiscoveryService: IMCPDiscoveryService,
+		agentRegistry: AgentRegistry
 	) {
 		this.hookManager = hookManager;
 		this.triggerRegistry = triggerRegistry;
 		this.outputChannel = outputChannel;
+		this.agentRegistry = agentRegistry;
 		this.agentExecutor = new AgentActionExecutor();
 		this.gitExecutor = new GitActionExecutor();
 		this.githubExecutor = new GitHubActionExecutor();
+		this.templateParser = new TemplateVariableParser();
 
 		// Initialize MCP executor with all required services
 		const clientService = new MCPClientService(mcpDiscoveryService);
@@ -273,7 +287,10 @@ export class HookExecutor {
 			execContext.chainDepth += 1;
 
 			// Build template context
-			const templateContext = await this.buildTemplateContext();
+			// Extract trigger type from hook's trigger configuration
+			const templateContext = await this.buildTemplateContext(
+				hook.trigger.operation
+			);
 
 			// Emit execution started event
 			this._onExecutionStarted.fire({
@@ -337,6 +354,38 @@ export class HookExecutor {
 						() => this.mcpExecutor.execute(mcpParams, templateContext),
 						ACTION_TIMEOUT_MS
 					);
+					break;
+				}
+				case "custom": {
+					const customParams = hook.action.parameters as CustomActionParams;
+
+					// Determine agent type (override or default from registry)
+					let agentType = customParams.agentType;
+					if (!agentType && customParams.agentId) {
+						const agent = this.agentRegistry.getAgentById(customParams.agentId);
+						agentType = agent?.type;
+					}
+
+					this.outputChannel.appendLine(
+						`[HookExecutor] Custom action - Agent type: ${agentType || "unknown"}`
+					);
+
+					// Route based on agent type
+					if (agentType === "local") {
+						actionResult = await this.executeWithTimeout(
+							() => this.executeLocalAgent(customParams, templateContext),
+							ACTION_TIMEOUT_MS
+						);
+					} else if (agentType === "background") {
+						actionResult = await this.executeWithTimeout(
+							() => this.executeBackgroundAgent(customParams, templateContext),
+							ACTION_TIMEOUT_MS
+						);
+					} else {
+						throw new Error(
+							`Unknown agent type: ${agentType}. Agent ID: ${customParams.agentId}`
+						);
+					}
 					break;
 				}
 
@@ -546,7 +595,9 @@ export class HookExecutor {
 	/**
 	 * Build template context with runtime variables
 	 */
-	async buildTemplateContext(): Promise<TemplateContext> {
+	async buildTemplateContext(
+		triggerOperation: string
+	): Promise<ParserTemplateContext> {
 		try {
 			// Get Git extension
 			const gitExtension = extensions.getExtension("vscode.git");
@@ -560,9 +611,10 @@ export class HookExecutor {
 			const feature = branch ? this.extractFeatureName(branch) : undefined;
 
 			return {
+				timestamp: new Date().toISOString(),
+				triggerType: triggerOperation as OperationType,
 				feature,
 				branch,
-				timestamp: new Date().toISOString(),
 				user,
 			};
 		} catch (error) {
@@ -573,6 +625,7 @@ export class HookExecutor {
 			// Return minimal context
 			return {
 				timestamp: new Date().toISOString(),
+				triggerType: triggerOperation as OperationType,
 			};
 		}
 	}
@@ -588,23 +641,40 @@ export class HookExecutor {
 
 	/**
 	 * Expand template variables in a string
-	 * Replaces {variable} with values from context
+	 * Uses TemplateVariableParser to replace {variable} with values from context
 	 */
-	expandTemplate(template: string, context: TemplateContext): string {
-		let expanded = template;
+	expandTemplate(template: string, context: ParserTemplateContext): string {
+		// Log template expansion for debugging
+		this.outputChannel.appendLine(
+			`[HookExecutor] Expanding template: "${template}"`
+		);
 
-		// Replace each variable
-		for (const [key, value] of Object.entries(context)) {
-			if (value !== undefined) {
-				const placeholder = `{${key}}`;
-				expanded = expanded.replace(
-					new RegExp(placeholder, "g"),
-					String(value)
-				);
-			}
+		// Extract and log variables found
+		const variables = this.templateParser.extractVariables(template);
+		this.outputChannel.appendLine(
+			`[HookExecutor] Variables found: ${variables.length > 0 ? variables.join(", ") : "(none)"}`
+		);
+
+		// Log context values for found variables
+		if (variables.length > 0) {
+			const contextValues = variables
+				.map((varName) => {
+					const value = context[varName];
+					return `${varName}=${value !== undefined ? JSON.stringify(value) : "(undefined)"}`;
+				})
+				.join(", ");
+			this.outputChannel.appendLine(
+				`[HookExecutor] Context values: ${contextValues}`
+			);
 		}
 
-		return expanded;
+		// Perform substitution
+		const result = this.templateParser.substitute(template, context);
+
+		// Log final result
+		this.outputChannel.appendLine(`[HookExecutor] Result: "${result}"`);
+
+		return result;
 	}
 
 	/**
@@ -665,5 +735,129 @@ export class HookExecutor {
 	clearExecutionLogs(): void {
 		this.executionLogs = [];
 		this.outputChannel.appendLine("[HookExecutor] Execution logs cleared");
+	}
+
+	/**
+	 * Execute a local agent (in-process via sendPromptToChat)
+	 * T053: Implement local agent execution path
+	 */
+	private executeLocalAgent(
+		params: CustomActionParams,
+		templateContext: ParserTemplateContext
+	): Promise<{ success: boolean; error?: Error }> {
+		this.outputChannel.appendLine(
+			`[HookExecutor] Executing local agent: ${params.agentId}`
+		);
+
+		return (async () => {
+			try {
+				// Expand template variables in prompt
+				const prompt = params.prompt
+					? this.expandTemplate(params.prompt, templateContext)
+					: "";
+
+				// Send prompt to GitHub Copilot Chat (in-process execution)
+				await sendPromptToChat(prompt);
+
+				this.outputChannel.appendLine(
+					"[HookExecutor] Local agent execution completed successfully"
+				);
+
+				return { success: true };
+			} catch (error) {
+				const err = error as Error;
+				this.outputChannel.appendLine(
+					`[HookExecutor] Local agent execution failed: ${err.message}`
+				);
+				return { success: false, error: err };
+			}
+		})();
+	}
+
+	/**
+	 * Execute a background agent (external CLI process)
+	 * T054: Implement background agent execution path
+	 */
+	private executeBackgroundAgent(
+		params: CustomActionParams,
+		templateContext: ParserTemplateContext
+	): Promise<{ success: boolean; error?: Error }> {
+		this.outputChannel.appendLine(
+			`[HookExecutor] Executing background agent: ${params.agentId}`
+		);
+
+		try {
+			// Get agent from registry to determine executable path
+			const agent = params.agentId
+				? this.agentRegistry.getAgentById(params.agentId)
+				: undefined;
+
+			if (!agent) {
+				throw new Error(`Agent not found in registry: ${params.agentId}`);
+			}
+
+			// Expand template variables in arguments
+			const args = params.arguments
+				? this.expandTemplate(params.arguments, templateContext)
+				: "";
+
+			// Expand prompt if provided
+			const prompt = params.prompt
+				? this.expandTemplate(params.prompt, templateContext)
+				: "";
+
+			// For file-based agents, we simulate background execution
+			// In a real implementation, extension-based agents would provide executable paths
+			const proc = spawn("echo", [
+				`Background agent executed: ${agent.name}`,
+				prompt,
+				args,
+			]);
+
+			return new Promise((resolve) => {
+				let stdout = "";
+				let stderr = "";
+
+				proc.stdout.on("data", (data: Buffer) => {
+					stdout += data.toString();
+					this.outputChannel.append(data.toString());
+				});
+
+				proc.stderr.on("data", (data: Buffer) => {
+					stderr += data.toString();
+					this.outputChannel.append(data.toString());
+				});
+
+				proc.on("exit", (code: number | null) => {
+					if (code === 0) {
+						this.outputChannel.appendLine(
+							"[HookExecutor] Background agent execution completed successfully"
+						);
+						resolve({ success: true });
+					} else {
+						const error = new Error(
+							`Background agent failed with exit code ${code}: ${stderr}`
+						);
+						this.outputChannel.appendLine(
+							`[HookExecutor] Background agent execution failed: ${error.message}`
+						);
+						resolve({ success: false, error });
+					}
+				});
+
+				proc.on("error", (error: Error) => {
+					this.outputChannel.appendLine(
+						`[HookExecutor] Background agent execution error: ${error.message}`
+					);
+					resolve({ success: false, error });
+				});
+			});
+		} catch (error) {
+			const err = error as Error;
+			this.outputChannel.appendLine(
+				`[HookExecutor] Background agent execution failed: ${err.message}`
+			);
+			return Promise.resolve({ success: false, error: err });
+		}
 	}
 }

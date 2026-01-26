@@ -653,4 +653,116 @@ describe("HookManager", () => {
 			expect(unique).toBe(true);
 		});
 	});
+
+	// ============================================================================
+	// T045: Unit test for agent type override in hook configuration
+	// ============================================================================
+
+	describe("Agent Type Override (User Story 2)", () => {
+		it("should accept hook with custom agent type override", async () => {
+			const hook = createTestHook({
+				action: {
+					type: "custom",
+					parameters: {
+						agentId: "local:code-reviewer",
+						agentName: "code-reviewer",
+						agentType: "background", // Override: force background execution
+						prompt: "Review this code",
+					},
+				},
+			});
+
+			const created = await manager.createHook(hook);
+
+			expect(created).toBeDefined();
+			expect(created.action.type).toBe("custom");
+			const params = created.action.parameters as {
+				agentType?: string;
+				agentId?: string;
+			};
+			expect(params.agentType).toBe("background");
+			expect(params.agentId).toBe("local:code-reviewer");
+		});
+
+		it("should validate agent type override value", async () => {
+			const hook = createTestHook({
+				action: {
+					type: "custom",
+					parameters: {
+						agentId: "local:code-reviewer",
+						agentName: "code-reviewer",
+						agentType: "invalid-type" as any, // Invalid type (bypassing TypeScript for runtime test)
+						prompt: "Review this code",
+					},
+				},
+			});
+
+			const result = await manager.validateHook(hook);
+
+			expect(result.valid).toBe(false);
+			expect(result.errors.some((e) => e.message.includes("agent type"))).toBe(
+				true
+			);
+		});
+
+		it("should allow local agent type override", async () => {
+			const hook = createTestHook({
+				action: {
+					type: "custom",
+					parameters: {
+						agentId: "local:code-reviewer",
+						agentName: "code-reviewer",
+						agentType: "local", // Explicit local type
+						prompt: "Review this code",
+					},
+				},
+			});
+
+			const created = await manager.createHook(hook);
+
+			expect(created).toBeDefined();
+			const params = created.action.parameters as { agentType?: string };
+			expect(params.agentType).toBe("local");
+		});
+
+		it("should allow background agent type override", async () => {
+			const hook = createTestHook({
+				action: {
+					type: "custom",
+					parameters: {
+						agentId: "local:test-agent",
+						agentName: "test-agent",
+						agentType: "background", // Force background execution
+						prompt: "Run background task",
+					},
+				},
+			});
+
+			const created = await manager.createHook(hook);
+
+			expect(created).toBeDefined();
+			const params = created.action.parameters as { agentType?: string };
+			expect(params.agentType).toBe("background");
+		});
+
+		it("should work without agent type override (use default)", async () => {
+			const hook = createTestHook({
+				action: {
+					type: "custom",
+					parameters: {
+						agentId: "local:code-reviewer",
+						agentName: "code-reviewer",
+						// No agentType specified - should use agent's default type
+						prompt: "Review this code",
+					},
+				},
+			});
+
+			const created = await manager.createHook(hook);
+
+			expect(created).toBeDefined();
+			const params = created.action.parameters as { agentType?: string };
+			expect(params.agentType).toBeUndefined();
+		});
+	});
 });

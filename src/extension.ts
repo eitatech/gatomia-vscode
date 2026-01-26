@@ -38,6 +38,7 @@ import { SpecKitMigration } from "./utils/spec-kit-migration";
 import { TriggerRegistry } from "./features/hooks/trigger-registry";
 import { HookManager } from "./features/hooks/hook-manager";
 import { HookExecutor } from "./features/hooks/hook-executor";
+import { AgentRegistry } from "./features/hooks/agent-registry";
 import { CommandCompletionDetector } from "./features/hooks/services/command-completion-detector";
 import { MCPDiscoveryService } from "./features/hooks/services/mcp-discovery";
 import { HookViewProvider } from "./providers/hook-view-provider";
@@ -82,6 +83,7 @@ let hookManager: HookManager;
 let hookExecutor: HookExecutor;
 let commandCompletionDetector: CommandCompletionDetector;
 let mcpDiscoveryService: MCPDiscoveryService;
+let agentRegistry: AgentRegistry;
 let hookViewProvider: HookViewProvider;
 let dependenciesViewProvider: DependenciesViewProvider;
 let documentPreviewPanel: DocumentPreviewPanel;
@@ -181,15 +183,28 @@ export async function activate(context: ExtensionContext) {
 	mcpDiscoveryService = new MCPDiscoveryService();
 	outputChannel.appendLine("MCPDiscoveryService initialized");
 
-	// Initialize Hook infrastructure with MCP support
-	hookManager = new HookManager(context, outputChannel, mcpDiscoveryService);
+	// Initialize AgentRegistry for custom agent hooks (Phase 2 - T010, T018)
+	// Must be initialized before HookManager to enable agent validation
+	const agentWorkspaceRoot = workspaceFolders?.[0]?.uri.fsPath || "";
+	agentRegistry = new AgentRegistry(agentWorkspaceRoot);
+	await agentRegistry.initialize();
+	outputChannel.appendLine("AgentRegistry initialized");
+
+	// Initialize Hook infrastructure with MCP support and AgentRegistry (T025)
+	hookManager = new HookManager(
+		context,
+		outputChannel,
+		mcpDiscoveryService,
+		agentRegistry
+	);
 	await hookManager.initialize();
 
 	hookExecutor = new HookExecutor(
 		hookManager,
 		triggerRegistry,
 		outputChannel,
-		mcpDiscoveryService
+		mcpDiscoveryService,
+		agentRegistry
 	);
 	hookExecutor.initialize();
 
@@ -206,6 +221,7 @@ export async function activate(context: ExtensionContext) {
 		hookManager,
 		hookExecutor,
 		mcpDiscoveryService,
+		agentRegistry,
 		outputChannel,
 	});
 	hookViewProvider.initialize();

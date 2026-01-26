@@ -9,7 +9,7 @@ This file provides guidance to AI agents when working with code in this reposito
 
 ## Project Constitution (NON-NEGOTIABLE)
 
-This project follows strict principles defined in [.specify/memory/constitution.md](../../.specify/memory/constitution.md):
+This project follows strict principles defined in [.specify/memory/constitution.md](../.specify/memory/constitution.md):
 
 ### I. Kebab-Case File Naming (MANDATORY)
 
