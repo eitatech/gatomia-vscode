@@ -447,7 +447,7 @@ export class HookManager {
 	async validateHook(hook: Hook): Promise<ValidationResult> {
 		const errors: ValidationError[] = [];
 
-		// Basic structure validation
+		// Basic structure validation - early return for invalid structure
 		if (!hook || typeof hook !== "object") {
 			errors.push({
 				field: "hook",
@@ -457,31 +457,10 @@ export class HookManager {
 		}
 
 		// Name validation
-		if (typeof hook.name !== "string" || hook.name.length === 0) {
-			errors.push({
-				field: "name",
-				message: "Hook name cannot be empty",
-			});
-		} else if (hook.name.length > MAX_HOOK_NAME_LENGTH) {
-			errors.push({
-				field: "name",
-				message: `Hook name must be ${MAX_HOOK_NAME_LENGTH} characters or less`,
-			});
-		}
+		errors.push(...this.validateHookName(hook.name));
 
-		// T051: Validate agent type override BEFORE isValidHook() (User Story 2)
-		if (hook.action?.type === "custom") {
-			const customParams = hook.action.parameters as any;
-			if (customParams?.agentType) {
-				const validTypes: string[] = ["local", "background"];
-				if (!validTypes.includes(customParams.agentType)) {
-					errors.push({
-						field: "action.parameters.agentType",
-						message: `Invalid agent type "${customParams.agentType}". Must be "local" or "background".`,
-					});
-				}
-			}
-		}
+		// T051: Validate agent type override
+		errors.push(...this.validateAgentTypeParam(hook));
 
 		// Validate using type guard for deeper validation
 		if (!isValidHook(hook)) {
@@ -493,32 +472,97 @@ export class HookManager {
 
 		// T085: Validate MCP server references if action type is "mcp"
 		if (hook.action.type === "mcp" && this.mcpDiscoveryService) {
-			const mcpParams = hook.action.parameters as MCPActionParams;
-			const serverValid = await this.validateMCPServer(
-				mcpParams.serverId,
-				mcpParams.toolName
-			);
-
-			if (!serverValid.valid) {
-				errors.push(...serverValid.errors);
-			}
+			const mcpErrors = await this.validateMCPServerRef(hook);
+			errors.push(...mcpErrors);
 		}
 
 		// T025: Validate custom agent references if action type is "custom"
 		if (hook.action.type === "custom" && this.agentRegistry) {
-			const customParams = hook.action.parameters as CustomActionParams;
-			const agentId = customParams.agentId || customParams.agentName;
-			const agentValid = await this.validateCustomAgent(agentId);
-
-			if (!agentValid.valid) {
-				errors.push(...agentValid.errors);
-			}
+			const customErrors = await this.validateCustomAgentRef(hook);
+			errors.push(...customErrors);
 		}
 
 		return {
 			valid: errors.length === 0,
 			errors,
 		};
+	}
+
+	/**
+	 * Validate hook name field
+	 */
+	private validateHookName(name: string | undefined): ValidationError[] {
+		const errors: ValidationError[] = [];
+
+		if (!name || name.length === 0) {
+			errors.push({
+				field: "name",
+				message: "Hook name cannot be empty",
+			});
+			return errors;
+		}
+
+		if (name.length > MAX_HOOK_NAME_LENGTH) {
+			errors.push({
+				field: "name",
+				message: `Hook name must be ${MAX_HOOK_NAME_LENGTH} characters or less`,
+			});
+		}
+
+		return errors;
+	}
+
+	/**
+	 * Validate agent type parameter (T051)
+	 */
+	private validateAgentTypeParam(hook: Hook): ValidationError[] {
+		if (hook.action?.type !== "custom") {
+			return [];
+		}
+
+		const customParams = hook.action.parameters as any;
+		if (!customParams?.agentType) {
+			return [];
+		}
+
+		const validTypes: string[] = ["local", "background"];
+		if (!validTypes.includes(customParams.agentType)) {
+			return [
+				{
+					field: "action.parameters.agentType",
+					message: `Invalid agent type "${customParams.agentType}". Must be "local" or "background".`,
+				},
+			];
+		}
+
+		return [];
+	}
+
+	/**
+	 * Validate MCP server reference (T085)
+	 */
+	private async validateMCPServerRef(hook: Hook): Promise<ValidationError[]> {
+		const mcpParams = hook.action.parameters as MCPActionParams;
+		const serverId = mcpParams.serverId;
+		const toolName = mcpParams.toolName;
+
+		// Skip validation if legacy fields not present
+		if (!(serverId && toolName)) {
+			return [];
+		}
+
+		const serverValid = await this.validateMCPServer(serverId, toolName);
+		return serverValid.valid ? [] : serverValid.errors;
+	}
+
+	/**
+	 * Validate custom agent reference (T025)
+	 */
+	private async validateCustomAgentRef(hook: Hook): Promise<ValidationError[]> {
+		const customParams = hook.action.parameters as CustomActionParams;
+		const agentId = customParams.agentId || customParams.agentName;
+		const agentValid = await this.validateCustomAgent(agentId);
+		return agentValid.valid ? [] : agentValid.errors;
 	}
 
 	/**

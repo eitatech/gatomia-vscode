@@ -25,6 +25,12 @@ export const workspace = {
 	},
 	openTextDocument: vi.fn(),
 	onDidChangeConfiguration: vi.fn(),
+	createFileSystemWatcher: vi.fn(() => ({
+		onDidCreate: vi.fn(() => ({ dispose: vi.fn() })),
+		onDidChange: vi.fn(() => ({ dispose: vi.fn() })),
+		onDidDelete: vi.fn(() => ({ dispose: vi.fn() })),
+		dispose: vi.fn(),
+	})),
 };
 
 export const window = {
@@ -170,6 +176,16 @@ export class EventEmitter<T> {
 	});
 }
 
+export class RelativePattern {
+	base: string;
+	pattern: string;
+
+	constructor(base: string | { uri: { fsPath: string } }, pattern: string) {
+		this.base = typeof base === "string" ? base : base.uri.fsPath;
+		this.pattern = pattern;
+	}
+}
+
 export const env = {
 	machineId: "test-machine",
 	clipboard: {
@@ -185,6 +201,15 @@ export const extensions = {
 		return;
 	}),
 	all: [] as unknown[],
+	onDidChange: vi.fn((listener: () => void) => {
+		// Store the handler for test simulation
+		(extensions as any)._onDidChangeHandler = listener;
+		return {
+			dispose: vi.fn(() => {
+				(extensions as any)._onDidChangeHandler = undefined;
+			}),
+		};
+	}),
 };
 
 export const ConfigurationTarget = {
