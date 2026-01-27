@@ -4,8 +4,8 @@
  * Defines all standard template variables available for hook arguments,
  * organized by category (standard, spec-specific, file-specific, etc.).
  *
- * Template Syntax: {variableName}
- * Example: "Review spec {specId} changed to {newStatus} by {changeAuthor}"
+ * Template Syntax: $variableName
+ * Example: "Review spec $specId changed to $newStatus by $changeAuthor"
  *
  * @see specs/011-custom-agent-hooks/contracts/template-variable-schema.ts
  * @see specs/011-custom-agent-hooks/data-model.md
@@ -200,6 +200,112 @@ export const SPEC_VARIABLES: TemplateVariable[] = [
 ];
 
 // ============================================================================
+// Spec Artifact Variables
+// ============================================================================
+
+/**
+ * Spec artifact variables (for use case, task, requirement references)
+ */
+export const SPEC_ARTIFACT_VARIABLES: TemplateVariable[] = [
+	{
+		name: "useCaseId",
+		description: "Current use case identifier (if in use case context)",
+		valueType: "string",
+		availableFor: ["specify", "clarify", "plan"],
+		required: false,
+		example: "uc-001-user-authentication",
+		category: "spec",
+	},
+	{
+		name: "taskId",
+		description: "Current task identifier (if in task context)",
+		valueType: "string",
+		availableFor: ["tasks", "plan"],
+		required: false,
+		example: "t-042-implement-login",
+		category: "spec",
+	},
+	{
+		name: "requirementId",
+		description: "Current requirement identifier (if in requirement context)",
+		valueType: "string",
+		availableFor: ["specify", "clarify"],
+		required: false,
+		example: "req-003-secure-auth",
+		category: "spec",
+	},
+];
+
+// ============================================================================
+// Repository Context Variables
+// ============================================================================
+
+/**
+ * Repository and workspace variables
+ */
+export const REPOSITORY_VARIABLES: TemplateVariable[] = [
+	{
+		name: "repoOwner",
+		description: "GitHub repository owner/organization",
+		valueType: "string",
+		availableFor: [], // All triggers
+		required: false,
+		defaultValue: "",
+		example: "anomalyco",
+		category: "git",
+	},
+	{
+		name: "repoName",
+		description: "GitHub repository name",
+		valueType: "string",
+		availableFor: [], // All triggers
+		required: false,
+		defaultValue: "",
+		example: "gatomia-vscode",
+		category: "git",
+	},
+	{
+		name: "workspacePath",
+		description: "Absolute path to workspace root",
+		valueType: "path",
+		availableFor: [], // All triggers
+		required: true,
+		example: "/Users/john/projects/my-app",
+		category: "standard",
+	},
+];
+
+// ============================================================================
+// Agent Metadata Variables
+// ============================================================================
+
+/**
+ * Agent execution metadata variables
+ */
+export const AGENT_METADATA_VARIABLES: TemplateVariable[] = [
+	{
+		name: "agentId",
+		description: "ID of the agent being invoked",
+		valueType: "string",
+		availableFor: [], // All triggers with custom actions
+		required: false,
+		defaultValue: "",
+		example: "custom-review-agent",
+		category: "standard",
+	},
+	{
+		name: "agentType",
+		description: "Execution type of agent (local or background)",
+		valueType: "string",
+		availableFor: [], // All triggers with custom actions
+		required: false,
+		defaultValue: "local",
+		example: "local",
+		category: "standard",
+	},
+];
+
+// ============================================================================
 // File-Specific Variables
 // ============================================================================
 
@@ -256,7 +362,10 @@ export const FILE_VARIABLES: TemplateVariable[] = [
 export const ALL_TEMPLATE_VARIABLES: TemplateVariable[] = [
 	...STANDARD_VARIABLES,
 	...SPEC_VARIABLES,
+	...SPEC_ARTIFACT_VARIABLES,
 	...FILE_VARIABLES,
+	...REPOSITORY_VARIABLES,
+	...AGENT_METADATA_VARIABLES,
 ];
 
 /**
@@ -279,17 +388,18 @@ export const VARIABLES_BY_CATEGORY: Record<
 
 /**
  * Template variable regex pattern
- * Matches: {variableName}
+ * Matches: $variableName
  * Captures: variableName (group 1)
+ * Pattern allows: letters, numbers, underscores (must start with letter or underscore)
  * @see specs/011-custom-agent-hooks/research.md:L164-L180 (custom regex chosen)
  */
-export const TEMPLATE_VARIABLE_PATTERN = /\{([a-zA-Z0-9_]+)\}/g;
+export const TEMPLATE_VARIABLE_PATTERN = /\$([a-zA-Z_][a-zA-Z0-9_]*)/g;
 
 /**
  * Valid variable name pattern
- * Alphanumeric and underscores only
+ * Alphanumeric and underscores only, must start with letter or underscore
  */
-export const VALID_VARIABLE_NAME_PATTERN = /^[a-zA-Z0-9_]+$/;
+export const VALID_VARIABLE_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
 // ============================================================================
 // Helper Functions
