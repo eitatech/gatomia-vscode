@@ -181,6 +181,8 @@ description: Hidden agent file
 			await writeFile(
 				filePath,
 				`---
+id: long-name-agent
+name: Long Name Agent
 description: Agent with very long file name
 ---
 # Content`,
@@ -199,6 +201,8 @@ description: Agent with very long file name
 			await writeFile(
 				filePath,
 				`---
+id: special-chars-agent
+name: Special Chars Agent
 description: Agent with special characters in file name
 ---
 # Content`,
@@ -217,6 +221,8 @@ description: Agent with special characters in file name
 			await writeFile(
 				filePath,
 				`---
+id: unicode-name-agent
+name: Unicode Name Agent
 description: Agent with unicode file name
 ---
 # Content`,
@@ -244,6 +250,8 @@ description: Agent with unicode file name
 		it("should handle very large file (>1MB)", async () => {
 			const filePath = join(agentsDir, "large-file.agent.md");
 			const largeContent = `---
+id: large-file-agent
+name: Large File Agent
 description: Agent with very large content
 ---
 
@@ -264,6 +272,8 @@ ${"x".repeat(1024 * 1024 * 2)}`; // 2MB content
 			await writeFile(
 				filePath,
 				`---
+id: only-frontmatter-agent
+name: Only Frontmatter Agent
 description: Agent with only frontmatter
 ---`,
 				"utf-8"
@@ -280,7 +290,9 @@ description: Agent with only frontmatter
 			await writeFile(
 				filePath,
 				`---
-description: Agent with unicode content: 你好世界 🌍
+id: unicode-content-agent
+name: Unicode Content Agent
+description: "Agent with unicode content: 你好世界 🌍"
 ---
 
 # Агент на русском языке
@@ -452,6 +464,8 @@ description: Agent with unicode content: 你好世界 🌍
 				await writeFile(
 					filePath,
 					`---
+id: concurrent-agent-${i}
+name: Concurrent Agent ${i}
 description: Concurrent test agent ${i}
 ---
 # Agent ${i}`,
@@ -479,6 +493,8 @@ description: Concurrent test agent ${i}
 			await writeFile(
 				join(agentsDir, "valid-agent-1.agent.md"),
 				`---
+id: valid-agent-1
+name: Valid Agent 1
 description: Valid agent 1
 ---
 # Content`,
@@ -497,6 +513,8 @@ description: Invalid { yaml
 			await writeFile(
 				join(agentsDir, "valid-agent-2.agent.md"),
 				`---
+id: valid-agent-2
+name: Valid Agent 2
 description: Valid agent 2
 ---
 # Content`,
