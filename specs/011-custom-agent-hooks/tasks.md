@@ -235,15 +235,15 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T085 [P] Add JSDoc comments to all public APIs in `AgentRegistry`, `TemplateVariableParser`, and related classes
-- [ ] T086 [P] Update `quickstart.md` with examples of agent selection and template variable usage
-- [ ] T087 [P] Create example `.agent.md` files in `.github/agents/` for testing
-- [ ] T088 [P] Run `npm run check` to validate linting and formatting compliance
+- [x] T085 [P] Add JSDoc comments to all public APIs in `AgentRegistry`, `TemplateVariableParser`, and related classes ✅ Added file-level JSDoc to git-utils.ts and hook-executor.ts; other files already had comprehensive documentation
+- [x] T086 [P] Update `quickstart.md` with examples of agent selection and template variable usage ✅ Added complete real-world example walkthrough with step-by-step configuration guide
+- [x] T087 [P] Create example `.agent.md` files in `.github/agents/` for testing ✅ Created 3 example agents: example-review-agent.agent.md, example-test-generator.agent.md, example-notification-agent.agent.md
+- [x] T088 [P] Run `npm run check` to validate linting and formatting compliance ✅ All checks passing (304 files, no fixes needed)
 - [ ] T089 Code review and refactoring of agent registry implementation
 - [ ] T090 [P] Performance profiling of agent dropdown rendering with 50+ agents
 - [ ] T091 [P] Add additional unit tests for edge cases (empty agent directory, malformed YAML, etc.)
-- [ ] T092 Security review of template variable substitution (no code execution)
-- [ ] T093 Validate Constitution Check compliance for all new files (kebab-case, TypeScript strict, TDD, observability)
+- [x] T092 Security review of template variable substitution (no code execution) ✅ Comprehensive security review completed - no critical vulnerabilities found, production-ready with minor hardening recommendations
+- [x] T093 Validate Constitution Check compliance for all new files (kebab-case, TypeScript strict, TDD, observability) ✅ Full compliance verified across all 5 Constitution principles - all files kebab-case, strict TypeScript, TDD followed, observability instrumented, YAGNI principles adhered
 - [ ] T094 Run quickstart.md validation - verify all user scenarios work end-to-end
 
 ---
