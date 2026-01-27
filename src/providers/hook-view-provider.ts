@@ -273,6 +273,10 @@ export class HookViewProvider {
 					status: "failed",
 					errorMessage: event.result?.error?.message,
 				});
+			}),
+			this.agentRegistry.onAgentsChanged(() => {
+				// Agent registry changed - notify webview to refresh agent list
+				this.syncAgentsToWebview();
 			})
 		);
 		this.outputChannel.appendLine("[HookViewProvider] Initialized");
@@ -302,6 +306,50 @@ export class HookViewProvider {
 		this.outputChannel.appendLine(
 			`[HookViewProvider] Synced ${hooks.length} hooks to webview`
 		);
+	}
+
+	async syncAgentsToWebview(): Promise<void> {
+		try {
+			// Get agents grouped by type
+			const grouped = this.agentRegistry.getAgentsGroupedByType();
+
+			// Convert to simplified format for webview
+			const local = grouped.local.map((agent) => ({
+				id: agent.id,
+				name: agent.name,
+				displayName: agent.displayName,
+				description: agent.description,
+			}));
+
+			const background = grouped.background.map((agent) => ({
+				id: agent.id,
+				name: agent.name,
+				displayName: agent.displayName,
+				description: agent.description,
+			}));
+
+			await this.sendMessageToWebview({
+				command: "hooks.agents-list",
+				type: "hooks/agents-list",
+				data: { local, background },
+			} as AgentListMessage);
+
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Synced ${local.length} local agents and ${background.length} background agents to webview`
+			);
+		} catch (error) {
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Agent sync error: ${(error as Error).message}`
+			);
+
+			await this.sendMessageToWebview({
+				command: "hooks.agents-error",
+				type: "hooks/agents-error",
+				data: {
+					message: (error as Error).message || "Failed to load agents",
+				},
+			} as AgentErrorMessage);
+		}
 	}
 
 	private async handleWebviewMessage(message: WebviewMessage): Promise<void> {
