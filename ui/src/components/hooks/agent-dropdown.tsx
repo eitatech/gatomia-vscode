@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { vscode } from "@/bridge/vscode";
 
 interface Agent {
 	id: string;
@@ -17,14 +18,6 @@ interface AgentDropdownProps {
 	selectedAgentId?: string;
 	onAgentSelect: (agentId: string) => void;
 	className?: string;
-}
-
-declare global {
-	interface Window {
-		vscode: {
-			postMessage: (message: unknown) => void;
-		};
-	}
 }
 
 /**
@@ -45,7 +38,7 @@ export function AgentDropdown({
 
 	useEffect(() => {
 		// Request agent list from extension
-		window.vscode.postMessage({
+		vscode.postMessage({
 			command: "hooks.agents-request",
 			type: "hooks/agents-request",
 			data: { forceRefresh: false },
