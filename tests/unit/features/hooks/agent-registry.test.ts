@@ -338,7 +338,7 @@ describe("AgentRegistry", () => {
 				expect(agent.type).toBe("local");
 				expect(agent.source).toBe("file");
 				expect(agent.sourcePath).toBeDefined();
-				expect(agent.sourcePath).toMatch(/\.agent\.md$/);
+				expect(agent.sourcePath).toMatch(AGENT_MD_FILE_PATTERN);
 			}
 		});
 
@@ -400,6 +400,123 @@ describe("AgentRegistry", () => {
 					expect(agent.type).toBe("background");
 				}
 			}
+		});
+	});
+
+	// ============================================================================
+	// T076: Unit test for AgentRegistry.checkAgentAvailability()
+	// ============================================================================
+
+	describe("checkAgentAvailability()", () => {
+		it("should return available=true for existing agents", async () => {
+			await registry.initialize();
+
+			const allAgents = registry.getAllAgents();
+			if (allAgents.length === 0) {
+				// Skip test if no agents are available
+				return;
+			}
+
+			const firstAgent = allAgents[0];
+			const availability = await registry.checkAgentAvailability(firstAgent.id);
+
+			expect(availability.agentId).toBe(firstAgent.id);
+			expect(availability.available).toBe(true);
+			expect(availability.checkedAt).toBeGreaterThan(0);
+			expect(availability.reason).toBeUndefined();
+		});
+
+		it("should return available=false for unknown agent ID", async () => {
+			await registry.initialize();
+
+			const availability =
+				await registry.checkAgentAvailability("unknown:agent-id");
+
+			expect(availability.agentId).toBe("unknown:agent-id");
+			expect(availability.available).toBe(false);
+			expect(availability.reason).toBe("UNKNOWN");
+			expect(availability.checkedAt).toBeGreaterThan(0);
+		});
+
+		it("should check file existence for file-based agents", async () => {
+			await registry.initialize();
+
+			const fileAgents = registry.getAllAgents({ source: "file" });
+			if (fileAgents.length === 0) {
+				// Skip test if no file agents are available
+				return;
+			}
+
+			const firstFileAgent = fileAgents[0];
+			const availability = await registry.checkAgentAvailability(
+				firstFileAgent.id
+			);
+
+			// If the agent was discovered, the file should exist
+			expect(availability.available).toBe(true);
+		});
+
+		it("should return FILE_DELETED reason for missing file-based agents", async () => {
+			await registry.initialize();
+
+			// Manually create an agent entry with non-existent file
+			const fakeAgent = {
+				id: "file:fake-agent",
+				name: "fake-agent",
+				displayName: "Fake Agent",
+				type: "local" as const,
+				source: "file" as const,
+				sourcePath: "/path/to/nonexistent/fake-agent.agent.md",
+				description: "Fake agent for testing",
+				available: true,
+			};
+
+			// Add fake agent to registry (access internal state for testing)
+			(registry as any).agents.set(fakeAgent.id, fakeAgent);
+
+			const availability = await registry.checkAgentAvailability(fakeAgent.id);
+
+			expect(availability.agentId).toBe(fakeAgent.id);
+			expect(availability.available).toBe(false);
+			expect(availability.reason).toBe("FILE_DELETED");
+		});
+
+		it("should include timestamp in availability check result", async () => {
+			await registry.initialize();
+
+			const beforeCheck = Date.now();
+			const availability =
+				await registry.checkAgentAvailability("unknown:test");
+			const afterCheck = Date.now();
+
+			expect(availability.checkedAt).toBeGreaterThanOrEqual(beforeCheck);
+			expect(availability.checkedAt).toBeLessThanOrEqual(afterCheck);
+		});
+
+		it("should handle multiple availability checks for the same agent", async () => {
+			await registry.initialize();
+
+			const allAgents = registry.getAllAgents();
+			if (allAgents.length === 0) {
+				return;
+			}
+
+			const firstAgent = allAgents[0];
+
+			// Check availability multiple times
+			const check1 = await registry.checkAgentAvailability(firstAgent.id);
+			const check2 = await registry.checkAgentAvailability(firstAgent.id);
+			const check3 = await registry.checkAgentAvailability(firstAgent.id);
+
+			// All checks should return the same availability status
+			expect(check1.available).toBe(check2.available);
+			expect(check2.available).toBe(check3.available);
+
+			// Timestamps should be different (or at least not all the same)
+			expect(
+				check1.checkedAt !== check2.checkedAt ||
+					check2.checkedAt !== check3.checkedAt
+			).toBe(true);
 		});
 	});
 });
