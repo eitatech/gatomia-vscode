@@ -221,7 +221,6 @@ export async function activate(context: ExtensionContext) {
 		hookManager,
 		hookExecutor,
 		mcpDiscoveryService,
-		agentRegistry,
 		outputChannel,
 	});
 	hookViewProvider.initialize();
