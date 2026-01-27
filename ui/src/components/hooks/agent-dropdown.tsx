@@ -39,8 +39,8 @@ export function AgentDropdown({
 	useEffect(() => {
 		// Request agent list from extension
 		vscode.postMessage({
-			command: "hooks.agents-request",
-			type: "hooks/agents-request",
+			command: "hooks.agents-list",
+			type: "hooks/agents-list",
 			data: { forceRefresh: false },
 		});
 
