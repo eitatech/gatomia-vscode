@@ -136,7 +136,7 @@ export class FileAgentDiscovery {
 		const parsed = matter(content);
 
 		if (!parsed.data || Object.keys(parsed.data).length === 0) {
-			throw new Error("No YAML frontmatter found in file");
+			throw new SchemaValidationError("No YAML frontmatter found in file");
 		}
 
 		// Validate required fields
