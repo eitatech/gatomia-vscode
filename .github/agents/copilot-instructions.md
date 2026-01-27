@@ -16,7 +16,7 @@ tests/
 
 ## Commands
 
-npm test && npm run lint
+npm test && npm run check
 
 ## Code Style
 
@@ -27,4 +27,7 @@ TypeScript 5.3+ with strict mode enabled (target: ES2022): Follow standard conve
 - 010-copilot-agents: Added TypeScript 5.3+ with strict mode enabled (target: ES2022) + VS Code Extension API 1.84.0+, VS Code Chat Participant API, esbuild (bundler), Vite (webview), React 18.3+ (webview only)
 
 <!-- MANUAL ADDITIONS START -->
+## Project Constitution (NON-NEGOTIABLE)
+
+This project follows strict principles defined in [.specify/memory/constitution.md](../../.specify/memory/constitution.md):
 <!-- MANUAL ADDITIONS END -->

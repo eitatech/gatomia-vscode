@@ -14,7 +14,12 @@
  * @see specs/011-custom-agent-hooks/data-model.md
  */
 
-import type * as vscode from "vscode";
+import {
+	workspace,
+	type FileSystemWatcher,
+	type Uri,
+	RelativePattern,
+} from "vscode";
 import { FILE_WATCH_DEBOUNCE_MS } from "./agent-registry-constants";
 
 // ============================================================================
@@ -81,11 +86,10 @@ export class FileWatcherService implements IFileWatcherService {
 	// Internal state
 	private readonly changeListeners: Array<(event: FileChangeEvent) => void> =
 		[];
-	// biome-ignore lint/style/useReadonlyClassProperties: Will be reassigned in Phase 6 (T060)
-	private watcher: vscode.FileSystemWatcher | undefined = undefined;
-	// biome-ignore lint/style/useReadonlyClassProperties: Will be reassigned in Phase 6 (T061)
+	private watcher: FileSystemWatcher | undefined = undefined;
 	private debounceTimer: NodeJS.Timeout | undefined = undefined;
 	private readonly pendingChanges: Map<string, FileChangeEvent> = new Map();
+	private isWatching = false;
 
 	// ============================================================================
 	// Public API
@@ -94,40 +98,60 @@ export class FileWatcherService implements IFileWatcherService {
 	/**
 	 * Start watching the agents directory
 	 *
-	 * TODO: Phase 6 (T060) - Implement file watching
-	 * - Create VS Code FileSystemWatcher for *.agent.md files
-	 * - Use glob pattern from agent-registry-constants (FILE_WATCH_GLOB_PATTERN)
-	 * - Register event handlers for create/change/delete
-	 * - Pass events through debouncing logic
-	 * - Store watcher reference for disposal
-	 *
 	 * @param agentsDir Absolute path to agents directory
 	 */
 	startWatching(agentsDir: string): void {
-		// TODO: Phase 6 (T060) - Implement watcher setup
-		// Stub implementation: do nothing
+		// Dispose existing watcher if present
+		if (this.watcher) {
+			this.watcher.dispose();
+		}
+
+		// Mark as watching
+		this.isWatching = true;
+
+		// Create RelativePattern for *.agent.md files in the agents directory
+		const pattern = new RelativePattern(agentsDir, "**/*.agent.md");
+
+		// Create file system watcher
+		this.watcher = workspace.createFileSystemWatcher(pattern);
+
+		// Register event handlers
+		this.watcher.onDidCreate((uri: Uri) =>
+			this.handleFileChange("created", uri.fsPath)
+		);
+		this.watcher.onDidChange((uri: Uri) =>
+			this.handleFileChange("modified", uri.fsPath)
+		);
+		this.watcher.onDidDelete((uri: Uri) =>
+			this.handleFileChange("deleted", uri.fsPath)
+		);
 	}
 
 	/**
 	 * Stop watching the agents directory
-	 *
-	 * TODO: Phase 6 (T060) - Implement cleanup
-	 * - Dispose of FileSystemWatcher
-	 * - Clear debounce timer
-	 * - Clear pending changes
-	 * - Reset internal state
 	 */
 	stopWatching(): void {
-		// TODO: Phase 6 (T060) - Implement cleanup
-		// Stub implementation: do nothing
+		// Mark as not watching
+		this.isWatching = false;
+
+		// Dispose watcher
+		if (this.watcher) {
+			this.watcher.dispose();
+			this.watcher = undefined;
+		}
+
+		// Clear debounce timer
+		if (this.debounceTimer) {
+			clearTimeout(this.debounceTimer);
+			this.debounceTimer = undefined;
+		}
+
+		// Clear pending changes
+		this.pendingChanges.clear();
 	}
 
 	/**
 	 * Register callback for file change events
-	 *
-	 * TODO: Phase 6 (T061) - Implement event subscription
-	 * - Add callback to internal listener list
-	 * - Return disposable that removes callback
 	 *
 	 * @param callback Function to call when files change
 	 * @returns Disposable to unregister callback
@@ -135,11 +159,16 @@ export class FileWatcherService implements IFileWatcherService {
 	onDidChangeFiles(callback: (event: FileChangeEvent) => void): {
 		dispose: () => void;
 	} {
-		// TODO: Phase 6 (T061) - Implement listener registration
-		// Stub implementation: return no-op disposable
+		// Add callback to listener list
+		this.changeListeners.push(callback);
+
+		// Return disposable that removes callback
 		return {
 			dispose: () => {
-				// TODO: Remove callback from changeListeners
+				const index = this.changeListeners.indexOf(callback);
+				if (index >= 0) {
+					this.changeListeners.splice(index, 1);
+				}
 			},
 		};
 	}
@@ -151,13 +180,6 @@ export class FileWatcherService implements IFileWatcherService {
 	/**
 	 * Handle file system change event with debouncing
 	 *
-	 * TODO: Phase 6 (T061) - Implement debouncing logic
-	 * - Add change event to pendingChanges map
-	 * - Clear existing debounce timer
-	 * - Set new debounce timer (FILE_WATCH_DEBOUNCE_MS = 500ms)
-	 * - After timeout, emit all pending changes
-	 * - Clear pendingChanges map
-	 *
 	 * @param type Change type (created/modified/deleted)
 	 * @param filePath Absolute path to changed file
 	 */
@@ -165,40 +187,75 @@ export class FileWatcherService implements IFileWatcherService {
 		type: "created" | "modified" | "deleted",
 		filePath: string
 	): void {
-		// TODO: Phase 6 (T061) - Implement debouncing
-		// Stub implementation: do nothing
+		// Ignore if not watching
+		if (!this.isWatching) {
+			return;
+		}
+
+		// Extract agent ID from file path
+		const agentId = this.extractAgentIdFromPath(filePath);
+
+		// Add change event to pending changes (overwrites existing for same file)
+		this.pendingChanges.set(filePath, {
+			type,
+			filePath,
+			affectedAgentIds: [agentId],
+			timestamp: Date.now(),
+		});
+
+		// Clear existing debounce timer
+		if (this.debounceTimer) {
+			clearTimeout(this.debounceTimer);
+		}
+
+		// Set new debounce timer
+		this.debounceTimer = setTimeout(() => {
+			this.flushPendingChanges();
+		}, FILE_WATCH_DEBOUNCE_MS);
 	}
 
 	/**
 	 * Flush pending changes and emit events to listeners
-	 *
-	 * TODO: Phase 6 (T061) - Implement event emission
-	 * - Iterate over pendingChanges
-	 * - For each change, extract agent ID from filename
-	 * - Create FileChangeEvent with affected agent IDs
-	 * - Emit event to all registered listeners
-	 * - Clear pendingChanges map
 	 */
 	private flushPendingChanges(): void {
-		// TODO: Phase 6 (T061) - Implement flush logic
-		// Stub implementation: do nothing
+		// Get all pending changes
+		const changes = Array.from(this.pendingChanges.values());
+
+		// Clear pending changes map
+		this.pendingChanges.clear();
+
+		// Clear debounce timer
+		this.debounceTimer = undefined;
+
+		// Emit each change to all listeners
+		for (const change of changes) {
+			for (const listener of this.changeListeners) {
+				try {
+					listener(change);
+				} catch (error) {
+					// Log error but don't interrupt other listeners
+					console.error("File watcher listener error:", error);
+				}
+			}
+		}
 	}
 
 	/**
 	 * Extract agent ID from file path
 	 *
-	 * TODO: Phase 6 (T061) - Implement agent ID extraction
-	 * - Extract filename from path
-	 * - Remove .agent.md extension
-	 * - Return agent ID in format "local:{name}"
-	 *
 	 * @param filePath Absolute path to agent file
 	 * @returns Agent ID (format: "local:agent-name")
 	 */
 	private extractAgentIdFromPath(filePath: string): string {
-		// TODO: Phase 6 (T061) - Implement extraction
-		// Stub implementation: return empty string
-		return "";
+		// Extract filename from path
+		const filename =
+			filePath.split("/").pop() || filePath.split("\\").pop() || "";
+
+		// Remove .agent.md extension
+		const agentName = filename.replace(AGENT_FILE_EXTENSION_PATTERN, "");
+
+		// Return agent ID in format "local:{name}"
+		return `local:${agentName}`;
 	}
 
 	// ============================================================================
@@ -209,12 +266,8 @@ export class FileWatcherService implements IFileWatcherService {
 	 * Dispose of all resources
 	 *
 	 * Called when extension is deactivated
-	 * TODO: Phase 6 (T060) - Implement disposal
-	 * - Call stopWatching()
-	 * - Clear all listeners
 	 */
 	dispose(): void {
-		// TODO: Phase 6 (T060) - Implement disposal
 		this.stopWatching();
 		this.changeListeners.length = 0;
 	}
@@ -223,6 +276,11 @@ export class FileWatcherService implements IFileWatcherService {
 // ============================================================================
 // Configuration Constants
 // ============================================================================
+
+/**
+ * Regex pattern to match .agent.md file extension
+ */
+const AGENT_FILE_EXTENSION_PATTERN = /\.agent\.md$/;
 
 /**
  * Debounce delay for file change events (milliseconds)

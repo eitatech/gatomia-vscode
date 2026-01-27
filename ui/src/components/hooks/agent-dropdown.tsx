@@ -51,7 +51,11 @@ export function AgentDropdown({
 			data: { forceRefresh: false },
 		});
 
-		// Listen for agent list response
+		// Listen for agent list response and real-time updates
+		// The extension will send updates when:
+		// - Initial agent list is loaded
+		// - Agent files are added/modified/deleted (.agent.md files)
+		// - Extensions are installed/uninstalled
 		const handleMessage = (event: MessageEvent) => {
 			const msg = event.data;
 
