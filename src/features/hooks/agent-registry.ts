@@ -101,6 +101,8 @@ export class AgentRegistry {
 	 * @returns Promise resolving to initial discovery result
 	 */
 	async initialize(): Promise<AgentDiscoveryResult[]> {
+		// T083: Track agent discovery performance
+		const discoveryStartTime = Date.now();
 		const results: AgentDiscoveryResult[] = [];
 
 		// Discover local agents from .github/agents/
@@ -122,6 +124,28 @@ export class AgentRegistry {
 		for (const agent of disambiguatedAgents) {
 			this.agents.set(agent.id, agent);
 		}
+
+		// T083: Log discovery telemetry
+		const discoveryDuration = Date.now() - discoveryStartTime;
+		const totalAgents = this.agents.size;
+		const fileAgents = Array.from(this.agents.values()).filter(
+			(a) => a.source === "file"
+		).length;
+		const extensionAgents = Array.from(this.agents.values()).filter(
+			(a) => a.source === "extension"
+		).length;
+
+		console.log("[AgentRegistry] Discovery complete", {
+			duration: `${discoveryDuration}ms`,
+			totalAgents,
+			fileAgents,
+			extensionAgents,
+			results: results.map((r) => ({
+				source: r.source,
+				count: r.agents.length,
+				errors: r.errors.length,
+			})),
+		});
 
 		// Start file watcher to detect agent file changes
 		const agentsDir = `${this.workspaceRoot}/${AGENTS_DIR_RELATIVE_PATH}`;
