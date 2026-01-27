@@ -258,8 +258,9 @@ export class TemplateVariableParser implements ITemplateVariableParser {
 			}
 		}
 
-		// Check for empty variables (lone $ without identifier)
-		const emptyVarPattern = /\$(?![a-zA-Z_])/g;
+		// Check for empty variables ($ followed by whitespace or end of string)
+		// This explicitly allows $100, $$$, etc. as literal text
+		const emptyVarPattern = /\$(?=\s|$)/g;
 		const emptyMatches = Array.from(template.matchAll(emptyVarPattern));
 		for (const match of emptyMatches) {
 			errors.push({

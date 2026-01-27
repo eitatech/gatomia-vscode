@@ -816,72 +816,20 @@ export class HookExecutor {
 		triggerData?: Record<string, unknown>
 	): Promise<ParserTemplateContext> {
 		try {
-			// Get Git extension
-			const gitExtension = extensions.getExtension("vscode.git");
-			const git = gitExtension?.exports.getAPI(1);
-
-			const repository = git?.repositories[0];
-			const branch = repository?.state.HEAD?.name;
-			const user = await repository?.getConfig("user.name");
-
-			// Extract feature name from branch (pattern: NNN-feature-name)
-			const feature = branch ? this.extractFeatureName(branch) : undefined;
-
-			// Get workspace path
+			const gitContext = await this.buildGitContext();
 			const workspacePath = workspace.workspaceFolders?.[0]?.uri.fsPath || "";
-
-			// Extract repository owner and name from remote URL
-			const remoteUrl = await repository?.getConfig("remote.origin.url");
-			const repoInfo = this.parseGitRemoteUrl(remoteUrl || "");
 
 			// Build base context with standard variables
 			const baseContext: ParserTemplateContext = {
 				timestamp: new Date().toISOString(),
 				triggerType: triggerOperation as OperationType,
-				feature,
-				branch,
-				user,
+				...gitContext,
 				workspacePath,
-				repoOwner: repoInfo.owner,
-				repoName: repoInfo.name,
 			};
 
-			// Add spec-related variables if present in trigger data
+			// Add trigger-specific data if available
 			if (triggerData) {
-				if (triggerData.specId) {
-					baseContext.specId = triggerData.specId as string;
-				}
-				if (triggerData.specPath) {
-					baseContext.specPath = triggerData.specPath as string;
-				}
-				if (triggerData.oldStatus) {
-					baseContext.oldStatus = triggerData.oldStatus as string;
-				}
-				if (triggerData.newStatus) {
-					baseContext.newStatus = triggerData.newStatus as string;
-				}
-				if (triggerData.changeAuthor) {
-					baseContext.changeAuthor = triggerData.changeAuthor as string;
-				}
-
-				// Add spec artifact variables (if available)
-				if (triggerData.useCaseId) {
-					baseContext.useCaseId = triggerData.useCaseId as string;
-				}
-				if (triggerData.taskId) {
-					baseContext.taskId = triggerData.taskId as string;
-				}
-				if (triggerData.requirementId) {
-					baseContext.requirementId = triggerData.requirementId as string;
-				}
-
-				// Add agent metadata (if executing custom action)
-				if (triggerData.agentId) {
-					baseContext.agentId = triggerData.agentId as string;
-				}
-				if (triggerData.agentType) {
-					baseContext.agentType = triggerData.agentType as string;
-				}
+				this.enrichContextWithTriggerData(baseContext, triggerData);
 			}
 
 			return baseContext;
@@ -890,13 +838,119 @@ export class HookExecutor {
 				`[HookExecutor] Warning: Failed to build template context: ${error}`
 			);
 
-			// Return minimal context
-			return {
-				timestamp: new Date().toISOString(),
-				triggerType: triggerOperation as OperationType,
-				workspacePath: workspace.workspaceFolders?.[0]?.uri.fsPath || "",
-			};
+			// Return minimal context on error
+			return this.buildMinimalContext(triggerOperation);
 		}
+	}
+
+	/**
+	 * Build Git-related context variables
+	 */
+	private async buildGitContext(): Promise<Partial<ParserTemplateContext>> {
+		const gitExtension = extensions.getExtension("vscode.git");
+		const git = gitExtension?.exports.getAPI(1);
+		const repository = git?.repositories[0];
+
+		if (!repository) {
+			return {};
+		}
+
+		const branch = repository.state.HEAD?.name;
+		const user = await repository.getConfig("user.name");
+		const feature = branch ? this.extractFeatureName(branch) : undefined;
+
+		// Extract repository info from remote URL
+		const remoteUrl = await repository.getConfig("remote.origin.url");
+		const repoInfo = this.parseGitRemoteUrl(remoteUrl || "");
+
+		return {
+			branch,
+			user,
+			feature,
+			repoOwner: repoInfo.owner,
+			repoName: repoInfo.name,
+		};
+	}
+
+	/**
+	 * Enrich context with trigger-specific data
+	 */
+	private enrichContextWithTriggerData(
+		context: ParserTemplateContext,
+		triggerData: Record<string, unknown>
+	): void {
+		// Spec-related variables
+		this.addSpecVariables(context, triggerData);
+
+		// Spec artifact variables
+		this.addArtifactVariables(context, triggerData);
+
+		// Agent metadata
+		this.addAgentMetadata(context, triggerData);
+	}
+
+	/**
+	 * Add spec-related variables to context
+	 */
+	private addSpecVariables(
+		context: ParserTemplateContext,
+		data: Record<string, unknown>
+	): void {
+		const specFields = [
+			"specId",
+			"specPath",
+			"oldStatus",
+			"newStatus",
+			"changeAuthor",
+		] as const;
+
+		for (const field of specFields) {
+			if (data[field]) {
+				context[field] = data[field] as string;
+			}
+		}
+	}
+
+	/**
+	 * Add spec artifact variables to context
+	 */
+	private addArtifactVariables(
+		context: ParserTemplateContext,
+		data: Record<string, unknown>
+	): void {
+		const artifactFields = ["useCaseId", "taskId", "requirementId"] as const;
+
+		for (const field of artifactFields) {
+			if (data[field]) {
+				context[field] = data[field] as string;
+			}
+		}
+	}
+
+	/**
+	 * Add agent metadata to context
+	 */
+	private addAgentMetadata(
+		context: ParserTemplateContext,
+		data: Record<string, unknown>
+	): void {
+		if (data.agentId) {
+			context.agentId = data.agentId as string;
+		}
+		if (data.agentType) {
+			context.agentType = data.agentType as string;
+		}
+	}
+
+	/**
+	 * Build minimal fallback context
+	 */
+	private buildMinimalContext(triggerOperation: string): ParserTemplateContext {
+		return {
+			timestamp: new Date().toISOString(),
+			triggerType: triggerOperation as OperationType,
+			workspacePath: workspace.workspaceFolders?.[0]?.uri.fsPath || "",
+		};
 	}
 
 	/**
