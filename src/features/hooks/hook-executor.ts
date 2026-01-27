@@ -264,6 +264,92 @@ export class HookExecutor {
 			}
 		}
 
+		// T081: Check agent availability before execution for custom hooks
+		if (hook.action.type === "custom") {
+			const customParams = hook.action.parameters as CustomActionParams;
+			const agentId = customParams.agentId || customParams.agentName;
+
+			if (agentId && this.agentRegistry) {
+				try {
+					// Check agent availability
+					const availability =
+						await this.agentRegistry.checkAgentAvailability(agentId);
+
+					if (!availability.available) {
+						// Determine reason text
+						let reasonText: string;
+						if (availability.reason === "FILE_DELETED") {
+							reasonText = "agent file was deleted";
+						} else if (availability.reason === "EXTENSION_UNINSTALLED") {
+							reasonText = "extension is uninstalled";
+						} else {
+							reasonText = "agent is unavailable";
+						}
+
+						const errorMessage = `Agent "${agentId}" is not available: ${reasonText}`;
+
+						// T082: Log detailed error information
+						this.outputChannel.appendLine(
+							`[HookExecutor] Agent unavailable - Hook: ${hook.name} (${hook.id})`
+						);
+						this.outputChannel.appendLine(
+							`[HookExecutor] Agent ID: ${agentId}, Reason: ${availability.reason}`
+						);
+						this.outputChannel.appendLine(
+							`[HookExecutor] Trigger: ${hook.trigger.agent}.${hook.trigger.operation} (${hook.trigger.timing})`
+						);
+
+						// Emit execution failed event
+						const errorResult: ExecutionResult = {
+							hookId: hook.id,
+							hookName: hook.name,
+							status: "failure",
+							duration: Date.now() - startTime,
+							error: {
+								message: errorMessage,
+								code: "AgentUnavailable",
+								details: {
+									agentId,
+									reason: availability.reason,
+									checkedAt: availability.checkedAt,
+								},
+							},
+						};
+
+						this._onExecutionFailed.fire({
+							hook,
+							context: context || this.createExecutionContext(),
+							result: errorResult,
+						});
+
+						// Show error notification with retry option
+						const action = await window.showErrorMessage(
+							`Hook "${hook.name}" failed: ${errorMessage}`,
+							"Retry",
+							"Update Hook",
+							"Cancel"
+						);
+
+						if (action === "Retry") {
+							// Retry execution
+							return await this.executeHook(hook, context);
+						}
+						if (action === "Update Hook") {
+							await commands.executeCommand("gatomia.hooks.editHook", hook.id);
+						}
+
+						return errorResult;
+					}
+				} catch (error) {
+					// Graceful degradation - log error and continue
+					const err = error as Error;
+					this.outputChannel.appendLine(
+						`[HookExecutor] Warning: Failed to check agent availability: ${err.message}`
+					);
+				}
+			}
+		}
+
 		// Create or use existing context
 		const execContext = context || this.createExecutionContext();
 
@@ -439,7 +525,72 @@ export class HookExecutor {
 						`MCP Tool "${mcpParams.toolName}" executed successfully (${duration}ms)`
 					);
 				}
+
+				this.outputChannel.appendLine(
+					`[HookExecutor] ✓ Hook execution success: ${hook.name} (${duration}ms)`
+				);
 			} else {
+				// T084: Enhanced failure logging with full context
+				this.outputChannel.appendLine(
+					"[HookExecutor] ==================== HOOK EXECUTION FAILURE ===================="
+				);
+				this.outputChannel.appendLine(
+					`[HookExecutor] Hook: ${hook.name} (${hook.id})`
+				);
+				this.outputChannel.appendLine(
+					`[HookExecutor] Trigger: ${hook.trigger.agent}.${hook.trigger.operation} (${hook.trigger.timing})`
+				);
+				this.outputChannel.appendLine(
+					`[HookExecutor] Action Type: ${hook.action.type}`
+				);
+
+				// Add action-specific context
+				if (hook.action.type === "custom") {
+					const customParams = hook.action.parameters as CustomActionParams;
+					this.outputChannel.appendLine(
+						`[HookExecutor] Agent ID: ${customParams.agentId || customParams.agentName || "unknown"}`
+					);
+					this.outputChannel.appendLine(
+						`[HookExecutor] Agent Type: ${customParams.agentType || "unknown"}`
+					);
+				} else if (hook.action.type === "mcp") {
+					const mcpParams = hook.action.parameters as MCPActionParams;
+					this.outputChannel.appendLine(
+						`[HookExecutor] MCP Server: ${mcpParams.serverId}`
+					);
+					this.outputChannel.appendLine(
+						`[HookExecutor] MCP Tool: ${mcpParams.toolName}`
+					);
+				}
+
+				if (result.error) {
+					this.outputChannel.appendLine(
+						`[HookExecutor] Error Code: ${result.error.code}`
+					);
+					this.outputChannel.appendLine(
+						`[HookExecutor] Error Message: ${result.error.message}`
+					);
+
+					// Log stack trace if available in details
+					const errorDetails = result.error.details as any;
+					if (errorDetails?.stack) {
+						this.outputChannel.appendLine(
+							`[HookExecutor] Stack Trace:\n${errorDetails.stack}`
+						);
+					}
+				}
+
+				this.outputChannel.appendLine(`[HookExecutor] Duration: ${duration}ms`);
+				this.outputChannel.appendLine(
+					`[HookExecutor] Execution ID: ${execContext.executionId}`
+				);
+				this.outputChannel.appendLine(
+					`[HookExecutor] Chain Depth: ${execContext.chainDepth}`
+				);
+				this.outputChannel.appendLine(
+					"[HookExecutor] ================================================================"
+				);
+
 				this._onExecutionFailed.fire({
 					hook,
 					context: execContext,
@@ -456,28 +607,64 @@ export class HookExecutor {
 				}
 			}
 
-			this.outputChannel.appendLine(
-				`[HookExecutor] Hook execution ${result.status}: ${hook.name} (${duration}ms)`
-			);
-
-			// T074: Additional logging for MCP actions
-			if (hook.action.type === "mcp") {
-				const mcpParams = hook.action.parameters as MCPActionParams;
-				if (result.status === "success") {
-					this.outputChannel.appendLine(
-						`[HookExecutor] MCP Tool ${mcpParams.serverId}/${mcpParams.toolName} completed successfully`
-					);
-				} else if (result.error) {
-					this.outputChannel.appendLine(
-						`[HookExecutor] MCP Tool ${mcpParams.serverId}/${mcpParams.toolName} failed: ${result.error.code} - ${result.error.message}`
-					);
-				}
-			}
-
 			return result;
 		} catch (error) {
 			const duration = Date.now() - startTime;
 			const err = error as Error;
+
+			// T084: Enhanced error logging with full context
+			this.outputChannel.appendLine(
+				"[HookExecutor] ==================== HOOK EXECUTION ERROR ===================="
+			);
+			this.outputChannel.appendLine(
+				`[HookExecutor] Hook: ${hook.name} (${hook.id})`
+			);
+			this.outputChannel.appendLine(
+				`[HookExecutor] Trigger: ${hook.trigger.agent}.${hook.trigger.operation} (${hook.trigger.timing})`
+			);
+			this.outputChannel.appendLine(
+				`[HookExecutor] Action Type: ${hook.action.type}`
+			);
+
+			// Add action-specific context
+			if (hook.action.type === "custom") {
+				const customParams = hook.action.parameters as CustomActionParams;
+				this.outputChannel.appendLine(
+					`[HookExecutor] Agent ID: ${customParams.agentId || customParams.agentName || "unknown"}`
+				);
+				this.outputChannel.appendLine(
+					`[HookExecutor] Agent Type: ${customParams.agentType || "unknown"}`
+				);
+			} else if (hook.action.type === "mcp") {
+				const mcpParams = hook.action.parameters as MCPActionParams;
+				this.outputChannel.appendLine(
+					`[HookExecutor] MCP Server: ${mcpParams.serverId}`
+				);
+				this.outputChannel.appendLine(
+					`[HookExecutor] MCP Tool: ${mcpParams.toolName}`
+				);
+			}
+
+			this.outputChannel.appendLine(`[HookExecutor] Error: ${err.name}`);
+			this.outputChannel.appendLine(`[HookExecutor] Message: ${err.message}`);
+
+			// Include stack trace for debugging
+			if (err.stack) {
+				this.outputChannel.appendLine(
+					`[HookExecutor] Stack Trace:\n${err.stack}`
+				);
+			}
+
+			this.outputChannel.appendLine(`[HookExecutor] Duration: ${duration}ms`);
+			this.outputChannel.appendLine(
+				`[HookExecutor] Execution ID: ${execContext.executionId}`
+			);
+			this.outputChannel.appendLine(
+				`[HookExecutor] Chain Depth: ${execContext.chainDepth}`
+			);
+			this.outputChannel.appendLine(
+				"[HookExecutor] ================================================================"
+			);
 
 			const result: ExecutionResult = {
 				hookId: hook.id,
@@ -511,10 +698,6 @@ export class HookExecutor {
 				context: execContext,
 				result,
 			});
-
-			this.outputChannel.appendLine(
-				`[HookExecutor] Hook execution failed: ${hook.name} - ${err.message}`
-			);
 
 			return result;
 		}

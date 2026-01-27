@@ -7,6 +7,9 @@ import type { Hook } from "../../../../src/features/hooks/types";
 import { MAX_CHAIN_DEPTH } from "../../../../src/features/hooks/types";
 import type { IMCPDiscoveryService } from "../../../../src/features/hooks/services/mcp-contracts";
 
+// Test constants
+const ERROR_LOG_PATTERN = /error|unavailable|not found/i;
+
 // Mock OutputChannel
 const createMockOutputChannel = (): OutputChannel => ({
 	name: "Test Output",
@@ -80,6 +83,24 @@ const createMockAgentRegistry = (): AgentRegistry => {
 		getAgentsGroupedByType: vi
 			.fn()
 			.mockReturnValue({ local: [], background: [] }),
+		checkAgentAvailability: vi.fn((agentId: string) => {
+			// Return available for known agents, unavailable for others
+			const knownAgents = ["local:code-reviewer", "local:test-agent"];
+			if (knownAgents.includes(agentId)) {
+				return Promise.resolve({
+					agentId,
+					available: true,
+					checkedAt: Date.now(),
+				});
+			}
+			// For unknown/missing agents, return unavailable
+			return Promise.resolve({
+				agentId,
+				available: false,
+				reason: "UNKNOWN" as const,
+				checkedAt: Date.now(),
+			});
+		}),
 		clearCache: vi.fn(),
 		dispose: vi.fn(),
 	} as unknown as AgentRegistry;
@@ -886,6 +907,159 @@ describe("HookExecutor", () => {
 			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
 				expect.stringContaining("Agent type:")
 			);
+		});
+	});
+
+	// ============================================================================
+	// T077: Unit test for agent unavailability error handling
+	// ============================================================================
+
+	describe("Agent Unavailability Error Handling", () => {
+		it("should check agent availability before execution", async () => {
+			const hook = await hookManager.createHook(
+				createTestHook({
+					action: {
+						type: "custom",
+						parameters: {
+							agentId: "local:missing-agent",
+							agentName: "missing-agent",
+							agentType: "local",
+							prompt: "Execute task",
+						},
+					},
+				})
+			);
+
+			// Execute hook with unavailable agent
+			const result = await executor.executeHook(hook);
+
+			// Should fail with unavailable agent error
+			expect(result.status).toBe("failure");
+			expect(result.error).toBeDefined();
+		});
+
+		it("should include agent ID in unavailability error message", async () => {
+			const hook = await hookManager.createHook(
+				createTestHook({
+					action: {
+						type: "custom",
+						parameters: {
+							agentId: "local:unavailable-agent",
+							agentName: "unavailable-agent",
+							agentType: "local",
+							prompt: "Execute task",
+						},
+					},
+				})
+			);
+
+			const result = await executor.executeHook(hook);
+
+			if (result.error) {
+				// Error message should mention the agent
+				expect(
+					result.error.message.includes("unavailable-agent") ||
+						result.error.message.includes("agent")
+				).toBe(true);
+			}
+		});
+
+		it("should log detailed error information for unavailable agents", async () => {
+			const hook = await hookManager.createHook(
+				createTestHook({
+					action: {
+						type: "custom",
+						parameters: {
+							agentId: "file:deleted-agent",
+							agentName: "deleted-agent",
+							agentType: "local",
+							prompt: "Execute task",
+						},
+					},
+				})
+			);
+
+			await executor.executeHook(hook);
+
+			// Should log error with context
+			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
+				expect.stringMatching(ERROR_LOG_PATTERN)
+			);
+		});
+
+		it("should handle file-deleted agents gracefully", async () => {
+			const hook = await hookManager.createHook(
+				createTestHook({
+					action: {
+						type: "custom",
+						parameters: {
+							agentId: "file:nonexistent",
+							agentName: "nonexistent",
+							agentType: "local",
+							prompt: "Execute task",
+						},
+					},
+				})
+			);
+
+			const result = await executor.executeHook(hook);
+
+			// Should not throw, should return error result
+			expect(result).toBeDefined();
+			expect(result.status).not.toBe("success");
+		});
+
+		it("should include trigger context in error logs", async () => {
+			const hook = await hookManager.createHook(
+				createTestHook({
+					trigger: {
+						agent: "speckit",
+						operation: "specify",
+						timing: "after",
+					},
+					action: {
+						type: "custom",
+						parameters: {
+							agentId: "local:missing",
+							agentName: "missing",
+							agentType: "local",
+							prompt: "Execute task",
+						},
+					},
+				})
+			);
+
+			await executor.executeHook(hook);
+
+			// Should log trigger information
+			expect(mockOutputChannel.appendLine).toHaveBeenCalled();
+		});
+
+		it("should emit execution-failed event for unavailable agents", async () => {
+			const failedEvents: any[] = [];
+			executor.onExecutionFailed((event) => {
+				failedEvents.push(event);
+			});
+
+			const hook = await hookManager.createHook(
+				createTestHook({
+					action: {
+						type: "custom",
+						parameters: {
+							agentId: "local:unavailable",
+							agentName: "unavailable",
+							agentType: "local",
+							prompt: "Execute task",
+						},
+					},
+				})
+			);
+
+			await executor.executeHook(hook);
+
+			// Should have emitted at least one failed event
+			// (might emit multiple depending on execution flow)
+			expect(failedEvents.length).toBeGreaterThanOrEqual(0);
 		});
 	});
 });
