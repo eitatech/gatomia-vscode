@@ -603,7 +603,7 @@ describe("HookExecutor", () => {
 	describe("template expansion", () => {
 		it("should expand template variables", async () => {
 			const templateContext = await executor.buildTemplateContext("clarify");
-			const template = "Branch: {branch}, User: {user}";
+			const template = "Branch: $branch, User: $user";
 
 			const expanded = executor.expandTemplate(template, templateContext);
 
@@ -613,18 +613,18 @@ describe("HookExecutor", () => {
 
 		it("should handle missing variables gracefully", async () => {
 			const templateContext = await executor.buildTemplateContext("clarify");
-			const template = "Feature: {feature}, Missing: {missing}";
+			const template = "Feature: $feature, Missing: $missing";
 
 			const expanded = executor.expandTemplate(template, templateContext);
 
 			// Missing variables should be replaced with empty string (graceful degradation)
-			expect(expanded).not.toContain("{missing}");
+			expect(expanded).not.toContain("$missing");
 			expect(expanded).toBe("Feature: test-feature, Missing: ");
 		});
 
 		it("should expand multiple occurrences", async () => {
 			const templateContext = await executor.buildTemplateContext("clarify");
-			const template = "{branch} and {branch} again";
+			const template = "$branch and $branch again";
 
 			const expanded = executor.expandTemplate(template, templateContext);
 
