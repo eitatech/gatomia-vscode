@@ -470,11 +470,32 @@ export class HookViewProvider {
 				throw new Error("No workspace folder found");
 			}
 
-			const agentsDir = join(workspaceRoot, ".github", "agents");
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Workspace root: ${workspaceRoot}`
+			);
 
-			const files = await fs.readdir(agentsDir).catch(() => []);
+			const agentsDir = join(workspaceRoot, ".github", "agents");
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Looking for agents in: ${agentsDir}`
+			);
+
+			const files = await fs.readdir(agentsDir).catch((err) => {
+				this.outputChannel.appendLine(
+					`[HookViewProvider] Error reading directory: ${err.message}`
+				);
+				return [];
+			});
+
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Found ${files.length} files in directory`
+			);
+
 			const agentFiles = files.filter(
 				(file) => file.endsWith(".agent.md") && !file.startsWith(".")
+			);
+
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Filtered to ${agentFiles.length} .agent.md files`
 			);
 
 			const agents = await Promise.all(
@@ -502,11 +523,24 @@ export class HookViewProvider {
 				(a): a is NonNullable<typeof a> => a !== null
 			);
 
-			await this.sendMessageToWebview({
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Sending ${validAgents.length} agents to webview`
+			);
+
+			// Send directly to webview if available, bypassing ready check
+			// This is needed because AgentDropdown mounts before hooks.ready is sent
+			const message: AgentListMessage = {
 				command: "hooks.agents-list",
 				type: "hooks/agents-list",
 				data: { local: validAgents, background: [] },
-			} as AgentListMessage);
+			};
+
+			if (this.webview) {
+				await this.webview.postMessage(message);
+			} else {
+				// If webview doesn't exist yet, queue it
+				this.pendingMessages.push(message);
+			}
 
 			this.outputChannel.appendLine(
 				`[HookViewProvider] Sent ${validAgents.length} agents from .github/agents/ to webview`
@@ -515,14 +549,24 @@ export class HookViewProvider {
 			this.outputChannel.appendLine(
 				`[HookViewProvider] Agent list error: ${(error as Error).message}`
 			);
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Stack: ${(error as Error).stack}`
+			);
 
-			await this.sendMessageToWebview({
+			// Send error directly to webview if available
+			const errorMessage: AgentErrorMessage = {
 				command: "hooks.agents-error",
 				type: "hooks/agents-error",
 				data: {
 					message: (error as Error).message || "Failed to load agents",
 				},
-			} as AgentErrorMessage);
+			};
+
+			if (this.webview) {
+				await this.webview.postMessage(errorMessage);
+			} else {
+				this.pendingMessages.push(errorMessage);
+			}
 		}
 	}
 
