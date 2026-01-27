@@ -160,21 +160,21 @@
 
 ### Tests for Real-Time Refresh (TDD - Write First)
 
-- [ ] T056 [P] Unit test for `FileWatcherService.startWatching()` in `tests/unit/features/hooks/file-watcher-service.test.ts`
-- [ ] T057 [P] Unit test for file change event handling in `tests/unit/features/hooks/file-watcher-service.test.ts`
-- [ ] T058 [P] Unit test for debouncing logic in `tests/unit/features/hooks/file-watcher-service.test.ts`
-- [ ] T059 [P] Integration test for file watcher → registry refresh flow in `tests/integration/agent-refresh.integration.test.ts`
+- [x] T056 [P] Unit test for `FileWatcherService.startWatching()` in `tests/unit/features/hooks/file-watcher-service.test.ts`
+- [x] T057 [P] Unit test for file change event handling in `tests/unit/features/hooks/file-watcher-service.test.ts`
+- [x] T058 [P] Unit test for debouncing logic in `tests/unit/features/hooks/file-watcher-service.test.ts`
+- [x] T059 [P] Integration test for file watcher → registry refresh flow in `tests/integration/agent-refresh.integration.test.ts`
 
 ### Implementation for Real-Time Refresh
 
-- [ ] T060 [P] Implement `FileWatcherService.startWatching()` using VS Code `FileSystemWatcher` in `src/features/hooks/file-watcher-service.ts`
-- [ ] T061 [P] Implement debouncing logic (500ms) for file change events in `src/features/hooks/file-watcher-service.ts`
-- [ ] T062 [US1] Integrate file watcher with agent registry in `AgentRegistry.initialize()` at `src/features/hooks/agent-registry.ts`
-- [ ] T063 [US1] Implement `AgentRegistry.onAgentsChanged` event emitter in `src/features/hooks/agent-registry.ts`
-- [ ] T064 [US1] Subscribe to registry changes in webview and update dropdown in `ui/src/components/hooks-view/agent-dropdown.tsx`
-- [ ] T065 [P] Create `ExtensionMonitorService` skeleton in `src/features/hooks/extension-monitor-service.ts`
-- [ ] T066 [P] Implement extension install/uninstall event listeners in `ExtensionMonitorService` at `src/features/hooks/extension-monitor-service.ts`
-- [ ] T067 Integrate extension monitor with agent registry in `AgentRegistry.initialize()` at `src/features/hooks/agent-registry.ts`
+- [x] T060 [P] Implement `FileWatcherService.startWatching()` using VS Code `FileSystemWatcher` in `src/features/hooks/file-watcher-service.ts`
+- [x] T061 [P] Implement debouncing logic (500ms) for file change events in `src/features/hooks/file-watcher-service.ts`
+- [x] T062 [US1] Integrate file watcher with agent registry in `AgentRegistry.initialize()` at `src/features/hooks/agent-registry.ts`
+- [x] T063 [US1] Implement `AgentRegistry.onAgentsChanged` event emitter in `src/features/hooks/agent-registry.ts`
+- [x] T064 [US1] Subscribe to registry changes in webview and update dropdown in `ui/src/components/hooks-view/agent-dropdown.tsx`
+- [x] T065 [P] Create `ExtensionMonitorService` skeleton in `src/features/hooks/extension-monitor-service.ts`
+- [x] T066 [P] Implement extension install/uninstall event listeners in `ExtensionMonitorService` at `src/features/hooks/extension-monitor-service.ts`
+- [x] T067 Integrate extension monitor with agent registry in `AgentRegistry.initialize()` at `src/features/hooks/agent-registry.ts`
 
 **Checkpoint**: Real-time refresh working - agent list updates automatically when files or extensions change
 
@@ -190,17 +190,17 @@
 
 ### Tests for User Story 4 (TDD - Write First)
 
-- [ ] T068 [P] [US4] Unit test for extension manifest scanning in `tests/unit/features/hooks/extension-agent-discovery.test.ts`
-- [ ] T069 [P] [US4] Unit test for `chatParticipants` extraction in `tests/unit/features/hooks/extension-agent-discovery.test.ts`
-- [ ] T070 [P] [US4] Integration test for extension-registered agents appearing in dropdown in `tests/integration/extension-agents.integration.test.ts`
+- [x] T068 [P] [US4] Unit test for extension manifest scanning in `tests/unit/features/hooks/extension-agent-discovery.test.ts` ✅
+- [x] T069 [P] [US4] Unit test for `chatParticipants` extraction in `tests/unit/features/hooks/extension-agent-discovery.test.ts` ✅
+- [x] T070 [P] [US4] Integration test for extension-registered agents appearing in dropdown in `tests/integration/extension-agents.integration.test.ts` ✅
 
 ### Implementation for User Story 4
 
-- [ ] T071 [P] [US4] Create `ExtensionAgentDiscovery` class in `src/features/hooks/extension-agent-discovery.ts`
-- [ ] T072 [P] [US4] Implement extension manifest scanning via `vscode.extensions.all` in `src/features/hooks/extension-agent-discovery.ts`
-- [ ] T073 [P] [US4] Implement `chatParticipants` contribution point parsing in `ExtensionAgentDiscovery`
-- [ ] T074 [US4] Integrate extension discovery into `AgentRegistry.discoverAll()` at `src/features/hooks/agent-registry.ts`
-- [ ] T075 [US4] Add extension agent validation logic in `AgentRegistry` at `src/features/hooks/agent-registry.ts`
+- [x] T071 [P] [US4] Create `ExtensionAgentDiscovery` class in `src/features/hooks/extension-agent-discovery.ts` ✅
+- [x] T072 [P] [US4] Implement extension manifest scanning via `vscode.extensions.all` in `src/features/hooks/extension-agent-discovery.ts` ✅
+- [x] T073 [P] [US4] Implement `chatParticipants` contribution point parsing in `ExtensionAgentDiscovery` ✅
+- [x] T074 [US4] Integrate extension discovery into `AgentRegistry.discoverAll()` at `src/features/hooks/agent-registry.ts` ✅
+- [x] T075 [US4] Add extension agent validation logic in `AgentRegistry` at `src/features/hooks/agent-registry.ts` ✅
 
 **Checkpoint**: Extension agents now discoverable - full agent registry functionality complete
 
