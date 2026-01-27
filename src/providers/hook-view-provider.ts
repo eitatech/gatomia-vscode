@@ -463,8 +463,13 @@ export class HookViewProvider {
 			const { promises: fs } = await import("node:fs");
 			const { join } = await import("node:path");
 			const matter = (await import("gray-matter")).default;
-			const workspaceRoot =
-				this.context.workspaceState.get<string>("workspaceRoot") || "";
+			const { workspace } = await import("vscode");
+
+			const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
+			if (!workspaceRoot) {
+				throw new Error("No workspace folder found");
+			}
+
 			const agentsDir = join(workspaceRoot, ".github", "agents");
 
 			const files = await fs.readdir(agentsDir).catch(() => []);
