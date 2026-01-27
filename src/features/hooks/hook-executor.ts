@@ -68,6 +68,11 @@ import {
 const FEATURE_NAME_PATTERN = /^\d+-(.+)$/;
 
 /**
+ * Regex pattern for extracting agent name from agentId (format: "file:agent-name")
+ */
+const AGENT_ID_PREFIX_PATTERN = /^file:/;
+
+/**
  * ExecutionStatus - Status of hook execution
  */
 export type ExecutionStatus = "success" | "failure" | "skipped" | "timeout";
@@ -955,13 +960,61 @@ export class HookExecutor {
 
 		return (async () => {
 			try {
-				// Expand template variables in prompt
-				const prompt = params.prompt
+				// Extract agent name from agentId (format: "file:agent-name")
+				const agentName =
+					params.agentId?.replace(AGENT_ID_PREFIX_PATTERN, "") ||
+					params.agentName;
+				if (!agentName) {
+					throw new Error("Agent name is required for local execution");
+				}
+
+				// Read the agent file from .github/agents/
+				const { promises: fs } = await import("node:fs");
+				const { join } = await import("node:path");
+				const { workspace } = await import("vscode");
+
+				const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
+				if (!workspaceRoot) {
+					throw new Error("No workspace folder found");
+				}
+
+				const agentFilePath = join(
+					workspaceRoot,
+					".github",
+					"agents",
+					`${agentName}.agent.md`
+				);
+
+				this.outputChannel.appendLine(
+					`[HookExecutor] Reading agent file: ${agentFilePath}`
+				);
+
+				const agentContent = await fs.readFile(agentFilePath, "utf-8");
+
+				// Expand template variables in prompt and arguments
+				const userPrompt = params.prompt
 					? this.expandTemplate(params.prompt, templateContext)
 					: "";
+				const userArgs = params.arguments
+					? this.expandTemplate(params.arguments, templateContext)
+					: "";
+
+				// Combine agent content with user input
+				// Format: Agent content + user prompt + arguments
+				let finalPrompt = agentContent;
+				if (userPrompt) {
+					finalPrompt += `\n\n${userPrompt}`;
+				}
+				if (userArgs) {
+					finalPrompt += `\n\nArguments: ${userArgs}`;
+				}
+
+				this.outputChannel.appendLine(
+					`[HookExecutor] Sending agent prompt to Copilot Chat (length: ${finalPrompt.length} chars)`
+				);
 
 				// Send prompt to GitHub Copilot Chat (in-process execution)
-				await sendPromptToChat(prompt);
+				await sendPromptToChat(finalPrompt);
 
 				this.outputChannel.appendLine(
 					"[HookExecutor] Local agent execution completed successfully"
@@ -990,78 +1043,130 @@ export class HookExecutor {
 			`[HookExecutor] Executing background agent: ${params.agentId}`
 		);
 
-		try {
-			// Get agent from registry to determine executable path
-			const agent = params.agentId
-				? this.agentRegistry.getAgentById(params.agentId)
-				: undefined;
+		return (async () => {
+			try {
+				// Extract agent name from agentId (format: "file:agent-name")
+				const agentName =
+					params.agentId?.replace(AGENT_ID_PREFIX_PATTERN, "") ||
+					params.agentName;
+				if (!agentName) {
+					throw new Error("Agent name is required for background execution");
+				}
 
-			if (!agent) {
-				throw new Error(`Agent not found in registry: ${params.agentId}`);
+				// Read the agent file from .github/agents/
+				const { promises: fs } = await import("node:fs");
+				const { join } = await import("node:path");
+				const { workspace } = await import("vscode");
+
+				const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
+				if (!workspaceRoot) {
+					throw new Error("No workspace folder found");
+				}
+
+				const agentFilePath = join(
+					workspaceRoot,
+					".github",
+					"agents",
+					`${agentName}.agent.md`
+				);
+
+				this.outputChannel.appendLine(
+					`[HookExecutor] Reading agent file: ${agentFilePath}`
+				);
+
+				// Verify agent file exists
+				await fs.access(agentFilePath);
+
+				// Expand template variables in prompt and arguments
+				const userPrompt = params.prompt
+					? this.expandTemplate(params.prompt, templateContext)
+					: "";
+				const userArgs = params.arguments
+					? this.expandTemplate(params.arguments, templateContext)
+					: "";
+
+				// Build the gh copilot command
+				// Format: gh copilot --agent-file <path> [user-prompt] [user-args]
+				const commandArgs = ["copilot", "--agent-file", agentFilePath];
+
+				// Add user prompt if provided
+				if (userPrompt) {
+					commandArgs.push(userPrompt);
+				}
+
+				// Add user args if provided
+				if (userArgs) {
+					commandArgs.push(userArgs);
+				}
+
+				this.outputChannel.appendLine(
+					`[HookExecutor] Executing: gh ${commandArgs.slice(1).join(" ")}`
+				);
+
+				// Execute gh copilot command
+				const proc = spawn("gh", commandArgs, {
+					cwd: workspaceRoot,
+					shell: true,
+				});
+
+				return new Promise((resolve) => {
+					let stdout = "";
+					let stderr = "";
+
+					proc.stdout.on("data", (data: Buffer) => {
+						const text = data.toString();
+						stdout += text;
+						this.outputChannel.append(text);
+					});
+
+					proc.stderr.on("data", (data: Buffer) => {
+						const text = data.toString();
+						stderr += text;
+						this.outputChannel.append(text);
+					});
+
+					proc.on("exit", (code: number | null) => {
+						if (code === 0) {
+							this.outputChannel.appendLine(
+								"[HookExecutor] Background agent execution completed successfully"
+							);
+							this.outputChannel.appendLine(
+								`[HookExecutor] Output: ${stdout.trim()}`
+							);
+							resolve({ success: true });
+						} else {
+							const error = new Error(
+								`Background agent failed with exit code ${code}: ${stderr.trim()}`
+							);
+							this.outputChannel.appendLine(
+								`[HookExecutor] Background agent execution failed: ${error.message}`
+							);
+							resolve({ success: false, error });
+						}
+					});
+
+					proc.on("error", (error: Error) => {
+						this.outputChannel.appendLine(
+							`[HookExecutor] Background agent execution error: ${error.message}`
+						);
+						// Check if it's a "command not found" error
+						if (error.message.includes("ENOENT")) {
+							const enhancedError = new Error(
+								"GitHub CLI (gh) not found. Please install it: https://cli.github.com/"
+							);
+							resolve({ success: false, error: enhancedError });
+						} else {
+							resolve({ success: false, error });
+						}
+					});
+				});
+			} catch (error) {
+				const err = error as Error;
+				this.outputChannel.appendLine(
+					`[HookExecutor] Background agent execution failed: ${err.message}`
+				);
+				return { success: false, error: err };
 			}
-
-			// Expand template variables in arguments
-			const args = params.arguments
-				? this.expandTemplate(params.arguments, templateContext)
-				: "";
-
-			// Expand prompt if provided
-			const prompt = params.prompt
-				? this.expandTemplate(params.prompt, templateContext)
-				: "";
-
-			// For file-based agents, we simulate background execution
-			// In a real implementation, extension-based agents would provide executable paths
-			const proc = spawn("echo", [
-				`Background agent executed: ${agent.name}`,
-				prompt,
-				args,
-			]);
-
-			return new Promise((resolve) => {
-				let stdout = "";
-				let stderr = "";
-
-				proc.stdout.on("data", (data: Buffer) => {
-					stdout += data.toString();
-					this.outputChannel.append(data.toString());
-				});
-
-				proc.stderr.on("data", (data: Buffer) => {
-					stderr += data.toString();
-					this.outputChannel.append(data.toString());
-				});
-
-				proc.on("exit", (code: number | null) => {
-					if (code === 0) {
-						this.outputChannel.appendLine(
-							"[HookExecutor] Background agent execution completed successfully"
-						);
-						resolve({ success: true });
-					} else {
-						const error = new Error(
-							`Background agent failed with exit code ${code}: ${stderr}`
-						);
-						this.outputChannel.appendLine(
-							`[HookExecutor] Background agent execution failed: ${error.message}`
-						);
-						resolve({ success: false, error });
-					}
-				});
-
-				proc.on("error", (error: Error) => {
-					this.outputChannel.appendLine(
-						`[HookExecutor] Background agent execution error: ${error.message}`
-					);
-					resolve({ success: false, error });
-				});
-			});
-		} catch (error) {
-			const err = error as Error;
-			this.outputChannel.appendLine(
-				`[HookExecutor] Background agent execution failed: ${err.message}`
-			);
-			return Promise.resolve({ success: false, error: err });
-		}
+		})();
 	}
 }
