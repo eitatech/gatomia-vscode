@@ -135,20 +135,20 @@
 - [x] T044 [P] [US2] Unit test for automatic agent type detection in `tests/unit/features/hooks/agent-registry.test.ts`
 - [x] T045 [P] [US2] Unit test for agent type override in hook configuration in `tests/unit/features/hooks/hook-manager.test.ts`
 - [x] T046 [P] [US2] Unit test for background agent execution logic in `tests/unit/features/hooks/hook-executor.test.ts`
-- [ ] T047 [US2] Integration test for local vs background agent invocation in `tests/integration/agent-execution.integration.test.ts`
+- [x] T047 [US2] Integration test for local vs background agent invocation in `tests/integration/agent-execution.integration.test.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T048 [P] [US2] Implement automatic agent type detection logic in `AgentRegistry.discoverLocalAgents()` at `src/features/hooks/agent-registry.ts`
-- [ ] T049 [P] [US2] Create React `AgentTypeSelector` component in `ui/src/components/hooks-view/agent-type-selector.tsx`
-- [ ] T050 [US2] Add agent type selector to hook configuration form in `ui/src/components/hooks-view/hook-config-form.tsx`
+- [x] T048 [P] [US2] Implement automatic agent type detection logic in `AgentRegistry.discoverLocalAgents()` at `src/features/hooks/agent-registry.ts`
+- [x] T049 [P] [US2] Create React `AgentTypeSelector` component in `ui/src/components/hooks-view/agent-type-selector.tsx`
+- [x] T050 [US2] Add agent type selector to hook configuration form in `ui/src/components/hooks-view/hook-config-form.tsx`
 - [x] T051 [US2] Implement agent type override handling in `HookManager.validateHook()` at `src/features/hooks/hook-manager.ts`
-- [ ] T052 [US2] Update `HookExecutor` to route based on agent type (local vs background) in `src/features/hooks/hook-executor.ts`
-- [ ] T053 [P] [US2] Implement local agent execution path in `HookExecutor` at `src/features/hooks/hook-executor.ts`
-- [ ] T054 [P] [US2] Implement background agent execution path (CLI invocation) in `HookExecutor` at `src/features/hooks/hook-executor.ts`
-- [ ] T055 [US2] Add agent type validation before hook save in `HookManager` at `src/features/hooks/hook-manager.ts`
+- [x] T052 [US2] Update `HookExecutor` to route based on agent type (local vs background) in `src/features/hooks/hook-executor.ts`
+- [x] T053 [P] [US2] Implement local agent execution path in `HookExecutor` at `src/features/hooks/hook-executor.ts`
+- [x] T054 [P] [US2] Implement background agent execution path (CLI invocation) in `HookExecutor` at `src/features/hooks/hook-executor.ts`
+- [x] T055 [US2] Add agent type validation before hook save in `HookManager` at `src/features/hooks/hook-manager.ts`
 
-**Checkpoint**: All P1 and P2 user stories now complete - agent selection, template variables, and agent type handling fully functional
+**Checkpoint**: ✅ All P1 and P2 user stories now complete - agent selection, template variables, and agent type handling fully functional
 
 ---
 
