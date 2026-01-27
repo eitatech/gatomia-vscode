@@ -511,37 +511,51 @@ export class HookViewProvider {
 				`[HookViewProvider] Agent list requested (forceRefresh: ${forceRefresh})`
 			);
 
-			// Refresh registry if requested
-			if (forceRefresh) {
-				await this.agentRegistry.refresh();
-			}
+			const { promises: fs } = await import("node:fs");
+			const { join } = await import("node:path");
+			const matter = (await import("gray-matter")).default;
+			const workspaceRoot =
+				this.context.workspaceState.get<string>("workspaceRoot") || "";
+			const agentsDir = join(workspaceRoot, ".github", "agents");
 
-			// Get agents grouped by type
-			const grouped = this.agentRegistry.getAgentsGroupedByType();
+			const files = await fs.readdir(agentsDir).catch(() => []);
+			const agentFiles = files.filter(
+				(file) => file.endsWith(".agent.md") && !file.startsWith(".")
+			);
 
-			// Convert to simplified format for webview
-			const local = grouped.local.map((agent) => ({
-				id: agent.id,
-				name: agent.name,
-				displayName: agent.displayName,
-				description: agent.description,
-			}));
+			const agents = await Promise.all(
+				agentFiles.map(async (filename) => {
+					try {
+						const filePath = join(agentsDir, filename);
+						const content = await fs.readFile(filePath, "utf-8");
+						const parsed = matter(content);
+						const name = filename.replace(".agent.md", "");
+						const description =
+							typeof parsed.data.description === "string"
+								? parsed.data.description
+								: "No description available";
+						return { id: `file:${name}`, name, displayName: name, description };
+					} catch (error) {
+						this.outputChannel.appendLine(
+							`[HookViewProvider] Failed to parse ${filename}: ${(error as Error).message}`
+						);
+						return null;
+					}
+				})
+			);
 
-			const background = grouped.background.map((agent) => ({
-				id: agent.id,
-				name: agent.name,
-				displayName: agent.displayName,
-				description: agent.description,
-			}));
+			const validAgents = agents.filter(
+				(a): a is NonNullable<typeof a> => a !== null
+			);
 
 			await this.sendMessageToWebview({
 				command: "hooks.agents-list",
 				type: "hooks/agents-list",
-				data: { local, background },
+				data: { local: validAgents, background: [] },
 			} as AgentListMessage);
 
 			this.outputChannel.appendLine(
-				`[HookViewProvider] Sent ${local.length} local agents and ${background.length} background agents to webview`
+				`[HookViewProvider] Sent ${validAgents.length} agents from .github/agents/ to webview`
 			);
 		} catch (error) {
 			this.outputChannel.appendLine(
