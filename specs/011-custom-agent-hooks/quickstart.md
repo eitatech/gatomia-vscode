@@ -164,6 +164,109 @@ Spec file: /path/to/specs/011-custom-agent-hooks/spec.md
 
 ---
 
+### Complete Real-World Example
+
+This example demonstrates setting up an automated spec review workflow using custom agent hooks.
+
+#### Scenario
+
+You want to automatically review specs after clarification to ensure quality before planning implementation.
+
+#### Step 1: Create the Review Agent
+
+Create `.github/agents/example-review-agent.agent.md`:
+
+```markdown
+---
+description: Example agent for reviewing specs after clarification. This is a simple template demonstrating custom agent usage with hooks.
+---
+
+## User Input
+
+\`\`\`text
+$ARGUMENTS
+\`\`\`
+
+## Review Instructions
+
+When invoked with template variables, this agent should:
+
+1. **Load the Spec**: Read the spec file at {specPath}
+2. **Verify Completeness**: Check that all required sections are present
+3. **Validate Status**: Confirm the status transition is appropriate
+4. **Check Clarity**: Ensure requirements are specific and testable
+5. **Review Success Criteria**: Verify that success criteria are measurable
+
+### Output Format
+
+\`\`\`markdown
+## Spec Review: {specId}
+
+**Status**: ✅ Ready / ⚠️ Needs Work
+
+### Completeness
+- [ ] Problem statement defined
+- [ ] Success criteria specified
+...
+\`\`\`
+```
+
+#### Step 2: Configure the Hook
+
+1. Open Command Palette → "GatomIA: Configure Hooks"
+2. Click "Create New Hook"
+3. Fill in fields:
+   - **Name**: "Auto-Review After Clarify"
+   - **Trigger Agent**: `SpecKit`
+   - **Trigger Operation**: `clarify`
+   - **Trigger Timing**: `after`
+   - **Action Type**: `Custom Agent`
+   - **Agent Name**: Select "Example Review Agent" from dropdown
+   - **Agent Type**: Auto-detected as "Local Agent"
+   - **Arguments**: 
+     ```
+     Please review spec {specId} which changed from {oldStatus} to {newStatus}. 
+     File: {specPath}. Changed by {changeAuthor} at {timestamp}.
+     ```
+4. Click "Save Hook"
+
+#### Step 3: Test the Hook
+
+1. Open a spec file (e.g., `specs/011-custom-agent-hooks/spec.md`)
+2. Run `/speckit.clarify` with questions
+3. After clarification completes, the hook automatically triggers:
+   - System detects `clarify` operation completed
+   - Hook matches trigger criteria
+   - Template variables are substituted with actual values
+   - Agent receives: 
+     ```
+     Please review spec 011-custom-agent-hooks which changed from draft to review.
+     File: /workspace/specs/011-custom-agent-hooks/spec.md. 
+     Changed by john-doe at 2026-01-27T10:30:00Z.
+     ```
+   - Agent performs review and outputs feedback
+
+#### Step 4: View Execution Logs
+
+1. Open Output Panel: View → Output → "GatomIA"
+2. Look for hook execution logs:
+   ```
+   [HookExecutor] Executing hook: Auto-Review After Clarify (abc-123)
+   [HookExecutor] Trigger: speckit.clarify (after)
+   [HookExecutor] Agent: local:example-review-agent (Local Agent)
+   [HookExecutor] Arguments: Please review spec 011-custom-agent-hooks...
+   [HookExecutor] ✓ Hook executed successfully in 2.3s
+   ```
+
+#### Additional Examples
+
+See these example agents in `.github/agents/`:
+- `example-review-agent.agent.md` - Auto-review specs after clarification
+- `example-test-generator.agent.md` - Generate test stubs when files are saved
+- `example-notification-agent.agent.md` - Notify team channels of spec changes
+
+---
+
 ### Troubleshooting
 
 #### Agent Not Appearing in Dropdown

@@ -1,3 +1,24 @@
+/**
+ * Hook Executor Service
+ *
+ * Orchestrates the execution of hooks triggered by various events in the system.
+ * Handles validation, context building, action execution, error handling, and logging.
+ *
+ * Responsibilities:
+ * - Execute hooks triggered by spec lifecycle, MCP server, or custom events
+ * - Build template contexts from trigger events
+ * - Validate hooks before execution (agent availability, MCP server availability)
+ * - Execute actions (agent prompts, MCP tools, Git operations, GitHub operations)
+ * - Handle execution errors with user notifications and retry options
+ * - Manage execution chains (hook triggers another hook)
+ * - Prevent circular dependencies
+ * - Log all executions with comprehensive context
+ * - Emit execution events for external listeners
+ *
+ * @see specs/011-custom-agent-hooks/data-model.md
+ * @see src/features/hooks/hook-manager.ts
+ */
+
 import {
 	EventEmitter,
 	type Event,
