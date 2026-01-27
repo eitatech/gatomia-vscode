@@ -26,6 +26,7 @@ import {
 	extensions,
 	window,
 	commands,
+	workspace,
 } from "vscode";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
@@ -71,6 +72,12 @@ const FEATURE_NAME_PATTERN = /^\d+-(.+)$/;
  * Regex pattern for extracting agent name from agentId (format: "file:agent-name")
  */
 const AGENT_ID_PREFIX_PATTERN = /^file:/;
+
+/**
+ * Regex patterns for parsing Git remote URLs
+ */
+const GIT_HTTPS_REMOTE_PATTERN = /github\.com\/([^/]+)\/([^/.]+)(\.git)?$/;
+const GIT_SSH_REMOTE_PATTERN = /github\.com:([^/]+)\/([^/.]+)(\.git)?$/;
 
 /**
  * ExecutionStatus - Status of hook execution
@@ -805,7 +812,8 @@ export class HookExecutor {
 	 * Build template context with runtime variables
 	 */
 	async buildTemplateContext(
-		triggerOperation: string
+		triggerOperation: string,
+		triggerData?: Record<string, unknown>
 	): Promise<ParserTemplateContext> {
 		try {
 			// Get Git extension
@@ -819,13 +827,64 @@ export class HookExecutor {
 			// Extract feature name from branch (pattern: NNN-feature-name)
 			const feature = branch ? this.extractFeatureName(branch) : undefined;
 
-			return {
+			// Get workspace path
+			const workspacePath = workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+
+			// Extract repository owner and name from remote URL
+			const remoteUrl = await repository?.getConfig("remote.origin.url");
+			const repoInfo = this.parseGitRemoteUrl(remoteUrl || "");
+
+			// Build base context with standard variables
+			const baseContext: ParserTemplateContext = {
 				timestamp: new Date().toISOString(),
 				triggerType: triggerOperation as OperationType,
 				feature,
 				branch,
 				user,
+				workspacePath,
+				repoOwner: repoInfo.owner,
+				repoName: repoInfo.name,
 			};
+
+			// Add spec-related variables if present in trigger data
+			if (triggerData) {
+				if (triggerData.specId) {
+					baseContext.specId = triggerData.specId as string;
+				}
+				if (triggerData.specPath) {
+					baseContext.specPath = triggerData.specPath as string;
+				}
+				if (triggerData.oldStatus) {
+					baseContext.oldStatus = triggerData.oldStatus as string;
+				}
+				if (triggerData.newStatus) {
+					baseContext.newStatus = triggerData.newStatus as string;
+				}
+				if (triggerData.changeAuthor) {
+					baseContext.changeAuthor = triggerData.changeAuthor as string;
+				}
+
+				// Add spec artifact variables (if available)
+				if (triggerData.useCaseId) {
+					baseContext.useCaseId = triggerData.useCaseId as string;
+				}
+				if (triggerData.taskId) {
+					baseContext.taskId = triggerData.taskId as string;
+				}
+				if (triggerData.requirementId) {
+					baseContext.requirementId = triggerData.requirementId as string;
+				}
+
+				// Add agent metadata (if executing custom action)
+				if (triggerData.agentId) {
+					baseContext.agentId = triggerData.agentId as string;
+				}
+				if (triggerData.agentType) {
+					baseContext.agentType = triggerData.agentType as string;
+				}
+			}
+
+			return baseContext;
 		} catch (error) {
 			this.outputChannel.appendLine(
 				`[HookExecutor] Warning: Failed to build template context: ${error}`
@@ -835,8 +894,29 @@ export class HookExecutor {
 			return {
 				timestamp: new Date().toISOString(),
 				triggerType: triggerOperation as OperationType,
+				workspacePath: workspace.workspaceFolders?.[0]?.uri.fsPath || "",
 			};
 		}
+	}
+
+	/**
+	 * Parse Git remote URL to extract owner and repo name
+	 * Supports both HTTPS and SSH formats
+	 */
+	private parseGitRemoteUrl(url: string): { owner: string; name: string } {
+		// HTTPS: https://github.com/owner/repo.git
+		const httpsMatch = url.match(GIT_HTTPS_REMOTE_PATTERN);
+		if (httpsMatch) {
+			return { owner: httpsMatch[1], name: httpsMatch[2] };
+		}
+
+		// SSH: git@github.com:owner/repo.git
+		const sshMatch = url.match(GIT_SSH_REMOTE_PATTERN);
+		if (sshMatch) {
+			return { owner: sshMatch[1], name: sshMatch[2] };
+		}
+
+		return { owner: "", name: "" };
 	}
 
 	/**
@@ -850,7 +930,7 @@ export class HookExecutor {
 
 	/**
 	 * Expand template variables in a string
-	 * Uses TemplateVariableParser to replace {variable} with values from context
+	 * Uses TemplateVariableParser to replace $variable with values from context
 	 */
 	expandTemplate(template: string, context: ParserTemplateContext): string {
 		// Log template expansion for debugging
@@ -971,7 +1051,6 @@ export class HookExecutor {
 				// Read the agent file from .github/agents/
 				const { promises: fs } = await import("node:fs");
 				const { join } = await import("node:path");
-				const { workspace } = await import("vscode");
 
 				const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
 				if (!workspaceRoot) {
@@ -1056,7 +1135,6 @@ export class HookExecutor {
 				// Read the agent file from .github/agents/
 				const { promises: fs } = await import("node:fs");
 				const { join } = await import("node:path");
-				const { workspace } = await import("vscode");
 
 				const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
 				if (!workspaceRoot) {

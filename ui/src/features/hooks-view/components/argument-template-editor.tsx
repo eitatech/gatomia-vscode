@@ -12,8 +12,8 @@ import type { OperationType } from "../types";
  * - Inline error display
  * - VSCode theming integration
  *
- * Template Syntax: {variableName}
- * Example: "/speckit.clarify --spec {specId} --author {changeAuthor}"
+ * Template Syntax: $variableName
+ * Example: "/speckit.clarify --spec $specId --author $changeAuthor"
  *
  * @see specs/011-custom-agent-hooks/tasks.md:T040-T041
  */
@@ -36,10 +36,9 @@ interface TemplateVariable {
 // Template Validation (ported from backend parser)
 // ============================================================================
 
-const TEMPLATE_VARIABLE_PATTERN = /\{([a-zA-Z0-9_]+)\}/g;
-const VALID_VARIABLE_NAME_PATTERN = /^[a-zA-Z0-9_]+$/;
-const NESTED_BRACES_PATTERN = /\{\{|\}\}/;
-const EMPTY_VARIABLE_PATTERN = /\{\s*\}/;
+const TEMPLATE_VARIABLE_PATTERN = /\$([a-zA-Z_][a-zA-Z0-9_]*)/g;
+const VALID_VARIABLE_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+const EMPTY_VARIABLE_PATTERN = /\$(?![a-zA-Z_])/;
 
 interface ValidationError {
 	message: string;
@@ -51,38 +50,22 @@ interface ValidationError {
  * Ported from: src/features/hooks/template-variable-parser.ts
  */
 function validateTemplateSyntax(template: string): ValidationError | null {
-	// Check for unclosed braces
-	const openBraces = (template.match(/\{/g) || []).length;
-	const closeBraces = (template.match(/\}/g) || []).length;
-	if (openBraces !== closeBraces) {
-		return {
-			message: "Unclosed braces - ensure all { have matching }",
-		};
-	}
-
 	// Check for invalid variable names
 	const matches = Array.from(template.matchAll(TEMPLATE_VARIABLE_PATTERN));
 	for (const match of matches) {
 		const varName = match[1];
 		if (!VALID_VARIABLE_NAME_PATTERN.test(varName)) {
 			return {
-				message: `Invalid variable name "${varName}" - use only letters, numbers, and underscores`,
+				message: `Invalid variable name "$${varName}" - must start with letter or underscore`,
 				position: match.index,
 			};
 		}
 	}
 
-	// Check for nested braces
-	if (NESTED_BRACES_PATTERN.test(template)) {
-		return {
-			message: "Nested braces not allowed - use single { } for variables",
-		};
-	}
-
-	// Check for empty variable names
+	// Check for empty variables (lone $ without identifier)
 	if (EMPTY_VARIABLE_PATTERN.test(template)) {
 		return {
-			message: "Empty variable name - provide a name between { }",
+			message: "Empty variable name - $ must be followed by a valid identifier",
 		};
 	}
 
@@ -145,6 +128,51 @@ const STANDARD_VARIABLES: TemplateVariable[] = [
 		availableFor: [],
 		required: false,
 		example: "custom-agent-hooks",
+		category: "standard",
+	},
+	{
+		name: "workspacePath",
+		description: "Absolute path to workspace root",
+		valueType: "path",
+		availableFor: [],
+		required: true,
+		example: "/Users/john/projects/my-app",
+		category: "standard",
+	},
+	{
+		name: "repoOwner",
+		description: "GitHub repository owner/organization",
+		valueType: "string",
+		availableFor: [],
+		required: false,
+		example: "anomalyco",
+		category: "git",
+	},
+	{
+		name: "repoName",
+		description: "GitHub repository name",
+		valueType: "string",
+		availableFor: [],
+		required: false,
+		example: "gatomia-vscode",
+		category: "git",
+	},
+	{
+		name: "agentId",
+		description: "ID of the agent being invoked",
+		valueType: "string",
+		availableFor: [],
+		required: false,
+		example: "custom-review-agent",
+		category: "standard",
+	},
+	{
+		name: "agentType",
+		description: "Execution type of agent (local or background)",
+		valueType: "string",
+		availableFor: [],
+		required: false,
+		example: "local",
 		category: "standard",
 	},
 ];
@@ -215,6 +243,33 @@ const SPEC_VARIABLES: TemplateVariable[] = [
 		example: "john-doe",
 		category: "user",
 	},
+	{
+		name: "useCaseId",
+		description: "Current use case identifier (if in use case context)",
+		valueType: "string",
+		availableFor: ["specify", "clarify", "plan"],
+		required: false,
+		example: "uc-001-user-authentication",
+		category: "spec",
+	},
+	{
+		name: "taskId",
+		description: "Current task identifier (if in task context)",
+		valueType: "string",
+		availableFor: ["tasks", "plan"],
+		required: false,
+		example: "t-042-implement-login",
+		category: "spec",
+	},
+	{
+		name: "requirementId",
+		description: "Current requirement identifier (if in requirement context)",
+		valueType: "string",
+		availableFor: ["specify", "clarify"],
+		required: false,
+		example: "req-003-secure-auth",
+		category: "spec",
+	},
 ];
 
 const ALL_VARIABLES = [...STANDARD_VARIABLES, ...SPEC_VARIABLES];
@@ -253,7 +308,7 @@ export const ArgumentTemplateEditor = ({
 	triggerType,
 	error,
 	disabled = false,
-	placeholder = "Enter command with {variables}",
+	placeholder = "Enter command with $variables",
 }: ArgumentTemplateEditorProps) => {
 	const [validationError, setValidationError] = useState<string>();
 	const [showVariableHints, setShowVariableHints] = useState(false);
@@ -302,14 +357,14 @@ export const ArgumentTemplateEditor = ({
 
 			const start = input.selectionStart ?? value.length;
 			const end = input.selectionEnd ?? value.length;
-			const newValue = `${value.slice(0, start)}{${varName}}${value.slice(end)}`;
+			const newValue = `${value.slice(0, start)}$${varName}${value.slice(end)}`;
 
 			onChange(newValue);
 
 			// Restore focus and move cursor after inserted variable
 			setTimeout(() => {
 				input.focus();
-				const newCursorPos = start + varName.length + 2; // +2 for braces
+				const newCursorPos = start + varName.length + 1; // +1 for $
 				input.setSelectionRange(newCursorPos, newCursorPos);
 			}, 0);
 		},
@@ -360,14 +415,14 @@ export const ArgumentTemplateEditor = ({
 									title={`${variable.description}\nExample: ${variable.example || "N/A"}`}
 									type="button"
 								>
-									{`{${variable.name}}`}
+									{`$${variable.name}`}
 								</button>
 							);
 						})}
 					</div>
 					{usedVariables.length > 0 && (
 						<div className="mt-2 border-[color:var(--vscode-panel-border)] border-t pt-2 text-[color:var(--vscode-descriptionForeground)]">
-							Using: {usedVariables.map((v) => `{${v}}`).join(", ")}
+							Using: {usedVariables.map((v) => `$${v}`).join(", ")}
 						</div>
 					)}
 				</div>
@@ -375,7 +430,7 @@ export const ArgumentTemplateEditor = ({
 
 			{/* Help Text */}
 			<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.6))] text-xs">
-				Use <span className="font-mono">{"{variableName}"}</span> syntax to
+				Use <span className="font-mono">{"$variableName"}</span> syntax to
 				insert dynamic values. Click a variable below to insert it.
 			</p>
 		</div>

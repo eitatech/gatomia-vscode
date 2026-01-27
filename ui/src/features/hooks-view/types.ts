@@ -47,11 +47,12 @@ export interface GitHubActionParams {
 }
 
 export interface CustomActionParams {
-	agentId?: string; // Optional: GitHub Copilot agent ID
-	agentName: string;
+	agentId?: string; // Optional: Agent ID from agent registry
+	agentName: string; // Custom agent identifier
+	agentType?: "local" | "background"; // Explicit execution type override
 	prompt?: string; // Instruction/action text for the agent
 	selectedTools?: SelectedMCPTool[]; // Optional: MCP tools available to agent
-	arguments?: string;
+	arguments?: string; // Template string with $variable syntax for passing trigger context
 }
 
 export interface MCPActionParams {

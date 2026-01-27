@@ -17,6 +17,7 @@ interface GroupedAgents {
 interface AgentDropdownProps {
 	selectedAgentId?: string;
 	onAgentSelect: (agentId: string) => void;
+	disabled?: boolean;
 	className?: string;
 }
 
@@ -27,6 +28,7 @@ interface AgentDropdownProps {
 export function AgentDropdown({
 	selectedAgentId,
 	onAgentSelect,
+	disabled = false,
 	className,
 }: AgentDropdownProps): JSX.Element {
 	const [agents, setAgents] = useState<GroupedAgents>({
@@ -153,6 +155,7 @@ export function AgentDropdown({
 				"cursor-pointer",
 				className
 			)}
+			disabled={disabled}
 			onChange={handleChange}
 			value={selectedAgentId || ""}
 		>
