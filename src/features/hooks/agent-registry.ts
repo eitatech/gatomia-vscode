@@ -21,6 +21,9 @@ import type {
 	AgentSourceEnum,
 } from "./agent-registry-types";
 import { FileAgentDiscovery } from "./file-agent-discovery";
+import { FileWatcherService } from "./file-watcher-service";
+import { ExtensionMonitorService } from "./extension-monitor-service";
+import { ExtensionAgentDiscovery } from "./extension-agent-discovery";
 import { AGENTS_DIR_RELATIVE_PATH } from "./agent-registry-constants";
 
 // ============================================================================
@@ -80,11 +83,17 @@ export class AgentRegistry {
 		(event: RegistryChangeEvent) => void
 	> = [];
 	private readonly fileDiscovery: FileAgentDiscovery;
+	private readonly extensionDiscovery: ExtensionAgentDiscovery;
+	private readonly fileWatcher: FileWatcherService;
+	private readonly extensionMonitor: ExtensionMonitorService;
 	private readonly workspaceRoot: string;
 
 	constructor(workspaceRoot: string) {
 		this.workspaceRoot = workspaceRoot;
 		this.fileDiscovery = new FileAgentDiscovery();
+		this.extensionDiscovery = new ExtensionAgentDiscovery();
+		this.fileWatcher = new FileWatcherService();
+		this.extensionMonitor = new ExtensionMonitorService();
 	}
 
 	/**
@@ -98,9 +107,9 @@ export class AgentRegistry {
 		const localResult = await this.discoverLocalAgents();
 		results.push(localResult);
 
-		// TODO: Phase 7 (T074) - Discover extension agents
-		// const extensionResult = await this.discoverExtensionAgents();
-		// results.push(extensionResult);
+		// Phase 7 (T074) - Discover extension agents
+		const extensionResult = await this.discoverExtensionAgents();
+		results.push(extensionResult);
 
 		// Populate internal registry with all discovered agents
 		const allAgents: AgentRegistryEntry[] = [];
@@ -113,6 +122,23 @@ export class AgentRegistry {
 		for (const agent of disambiguatedAgents) {
 			this.agents.set(agent.id, agent);
 		}
+
+		// Start file watcher to detect agent file changes
+		const agentsDir = `${this.workspaceRoot}/${AGENTS_DIR_RELATIVE_PATH}`;
+		this.fileWatcher.startWatching(agentsDir);
+
+		// Subscribe to file change events to trigger refresh
+		this.fileWatcher.onDidChangeFiles(async () => {
+			await this.refresh();
+		});
+
+		// Start extension monitor to detect extension install/uninstall
+		this.extensionMonitor.startMonitoring();
+
+		// Subscribe to extension change events to trigger refresh
+		this.extensionMonitor.onDidChangeExtensions(async () => {
+			await this.refresh();
+		});
 
 		// Emit registry-changed event
 		this.emitChange({
@@ -226,7 +252,24 @@ export class AgentRegistry {
 			}
 		}
 
-		// Agent exists and file is accessible (or not file-based)
+		// T075: For extension-based agents, check if extension is still installed
+		if (agent.source === "extension") {
+			const extensionId = agent.extensionId;
+			if (extensionId) {
+				const isStillAgent =
+					this.extensionDiscovery.isAgentExtension(extensionId);
+				if (!isStillAgent) {
+					return {
+						agentId,
+						available: false,
+						reason: "EXTENSION_UNINSTALLED",
+						checkedAt: Date.now(),
+					};
+				}
+			}
+		}
+
+		// Agent exists and is accessible
 		return {
 			agentId,
 			available: true,
@@ -271,6 +314,39 @@ export class AgentRegistry {
 		};
 	}
 
+	/**
+	 * Convenience method to subscribe to agent list changes
+	 * Similar to onDidChangeRegistry but provides the full agent list in the callback
+	 * @param callback Function to call with updated agent list when registry changes
+	 * @returns Disposable to unregister callback
+	 */
+	onAgentsChanged(callback: (agents: AgentRegistryEntry[]) => void): {
+		dispose: () => void;
+	} {
+		return this.onDidChangeRegistry(() => {
+			const agents = this.getAllAgents();
+			callback(agents);
+		});
+	}
+
+	/**
+	 * Dispose of all resources and stop watching for changes
+	 * Called when the extension is deactivated
+	 */
+	dispose(): void {
+		// Stop file watcher
+		this.fileWatcher.dispose();
+
+		// Stop extension monitor
+		this.extensionMonitor.dispose();
+
+		// Clear all listeners
+		this.changeListeners.length = 0;
+
+		// Clear registry
+		this.agents.clear();
+	}
+
 	// ========================================================================
 	// Internal Methods (to be implemented in later phases)
 	// ========================================================================
@@ -282,6 +358,14 @@ export class AgentRegistry {
 	private async discoverLocalAgents(): Promise<AgentDiscoveryResult> {
 		const agentsDir = `${this.workspaceRoot}/${AGENTS_DIR_RELATIVE_PATH}`;
 		return await this.fileDiscovery.discoverFromDirectory(agentsDir);
+	}
+
+	/**
+	 * Discover extension agents from VS Code extensions
+	 * @returns Discovery result with extension agents
+	 */
+	private async discoverExtensionAgents(): Promise<AgentDiscoveryResult> {
+		return await this.extensionDiscovery.discoverAgents();
 	}
 
 	/**
