@@ -16,12 +16,7 @@ import type {
 	SelectedMCPTool,
 	TriggerCondition,
 } from "../types";
-import type {
-	ChangeEvent,
-	HTMLInputElement,
-	HTMLSelectElement,
-	HTMLTextAreaElement,
-} from "react";
+import type { ChangeEvent } from "react";
 import { useMCPServers } from "../hooks/use-mcp-servers";
 import { MCPToolsSelector } from "./mcp-tools-selector";
 import { ArgumentTemplateEditor } from "./argument-template-editor";
@@ -252,7 +247,7 @@ export const TriggerActionSelector = ({
 								});
 								onClearActionError?.();
 							}}
-							placeholder="/speckit.clarify --spec {specId}"
+							placeholder="/speckit.clarify --spec $specId"
 							triggerType={trigger.operation}
 							value={params.command || ""}
 						/>
@@ -294,15 +289,14 @@ export const TriggerActionSelector = ({
 									<TextareaPanel
 										disabled={disabled}
 										onChange={handleActionParamChange("messageTemplate")}
-										placeholder="feat({feature}): automated update at {timestamp}"
+										placeholder="feat($feature): automated update at $timestamp"
 										rows={2}
 										textareaClassName="min-h-[4rem] text-sm"
 										textareaProps={{ id: "git-message-template" }}
 										value={params.messageTemplate || ""}
 									/>
 									<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.6))] text-xs">
-										Available variables: {"{feature}"}, {"{branch}"},{" "}
-										{"{timestamp}"}, {"{user}"}
+										Available variables: $feature, $branch, $timestamp, $user
 									</p>
 								</div>
 								<VSCodeCheckbox
@@ -378,7 +372,7 @@ export const TriggerActionSelector = ({
 										disabled={disabled}
 										id="github-title-template"
 										onChange={handleActionParamChange("titleTemplate")}
-										placeholder="Spec created for {feature}"
+										placeholder="Spec created for $feature"
 										type="text"
 										value={params.titleTemplate || ""}
 									/>
@@ -393,15 +387,14 @@ export const TriggerActionSelector = ({
 									<TextareaPanel
 										disabled={disabled}
 										onChange={handleActionParamChange("bodyTemplate")}
-										placeholder="Specification created at {timestamp} by {user}"
+										placeholder="Specification created at $timestamp by $user"
 										rows={3}
 										textareaClassName="min-h-[6rem] text-sm"
 										textareaProps={{ id: "github-body-template" }}
 										value={params.bodyTemplate || ""}
 									/>
 									<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.6))] text-xs">
-										Available variables: {"{feature}"}, {"{branch}"},{" "}
-										{"{timestamp}"}, {"{user}"}
+										Available variables: $feature, $branch, $timestamp, $user
 									</p>
 								</div>
 							</>
@@ -458,7 +451,7 @@ export const TriggerActionSelector = ({
 							</div>
 							<AgentDropdown
 								disabled={disabled}
-								onAgentChange={(agentId) => {
+								onAgentSelect={(agentId) => {
 									onActionChange({
 										...action,
 										parameters: {
@@ -490,19 +483,29 @@ export const TriggerActionSelector = ({
 						/>
 
 						<div className="flex flex-col gap-2">
-							<label
-								className="font-medium text-[color:var(--vscode-foreground)] text-sm"
-								htmlFor="custom-arguments"
-							>
-								Arguments
-							</label>
-							<TextareaPanel
+							<div className="flex items-center gap-1">
+								<label
+									className="font-medium text-[color:var(--vscode-foreground)] text-sm"
+									htmlFor="custom-arguments"
+								>
+									Arguments
+								</label>
+							</div>
+							<ArgumentTemplateEditor
 								disabled={disabled}
-								onChange={handleActionParamChange("arguments")}
-								placeholder="--mode=auto --feature={feature}"
-								rows={2}
-								textareaClassName="min-h-[4rem] text-sm"
-								textareaProps={{ id: "custom-arguments" }}
+								error={actionError}
+								onChange={(value) => {
+									onActionChange({
+										...action,
+										parameters: {
+											...params,
+											arguments: value,
+										} as CustomActionParams,
+									});
+									onClearActionError?.();
+								}}
+								placeholder="--mode=auto --feature=$feature --spec=$specId"
+								triggerType={trigger.operation}
 								value={params.arguments || ""}
 							/>
 						</div>

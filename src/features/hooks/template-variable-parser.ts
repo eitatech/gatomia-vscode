@@ -1,7 +1,7 @@
 /**
  * Template Variable Parser
  *
- * Parses and substitutes template variables in hook arguments using the syntax: {variableName}
+ * Parses and substitutes template variables in hook arguments using the syntax: $variableName
  *
  * Features:
  * - Extract variable references from template strings
@@ -9,8 +9,8 @@
  * - Substitute variables with runtime context values
  * - Handle missing variables gracefully (replace with empty string)
  *
- * Template Syntax: {variableName}
- * Example: "Review spec {specId} changed to {newStatus} by {changeAuthor}"
+ * Template Syntax: $variableName
+ * Example: "Review spec $specId changed to $newStatus by $changeAuthor"
  *
  * @see specs/011-custom-agent-hooks/contracts/template-variable-schema.ts
  * @see specs/011-custom-agent-hooks/data-model.md
@@ -78,11 +78,9 @@ export interface TemplateValidationWarning {
  * TemplateErrorCode - Syntax error types
  */
 export type TemplateErrorCode =
-	| "UNCLOSED_BRACE" // {variable without closing }
-	| "UNOPENED_BRACE" // variable} without opening {
-	| "EMPTY_VARIABLE" // {} with no name
-	| "INVALID_VARIABLE_NAME" // {123abc} or {var-name} (invalid characters)
-	| "NESTED_BRACES"; // {{variable}} or {var{iable}}
+	| "INVALID_VARIABLE_NAME" // $123abc or $var-name (invalid characters)
+	| "EMPTY_VARIABLE" // $ with no name following
+	| "DEPRECATED_VARIABLE"; // Variable will be removed in future
 
 /**
  * TemplateWarningCode - Non-blocking issue types
@@ -169,12 +167,12 @@ export class TemplateVariableParser implements ITemplateVariableParser {
 	 * Parse template string to extract all variable references
 	 *
 	 * TODO: Phase 4 (T032) - Implement variable extraction
-	 * - Use TEMPLATE_VARIABLE_PATTERN regex to find all {variableName} patterns
+	 * - Use TEMPLATE_VARIABLE_PATTERN regex to find all $variableName patterns
 	 * - Extract variable names from capture groups
 	 * - Remove duplicates and return unique variable names
 	 * - Handle edge cases: empty template, no variables, etc.
 	 *
-	 * @param template Template string with {variable} syntax
+	 * @param template Template string with $variable syntax
 	 * @returns Array of extracted variable names
 	 */
 	extractVariables(template: string): string[] {
@@ -183,8 +181,8 @@ export class TemplateVariableParser implements ITemplateVariableParser {
 			return [];
 		}
 
-		// Use regex to find all {variableName} patterns
-		// TEMPLATE_VARIABLE_PATTERN = /\{([a-zA-Z0-9_]+)\}/g
+		// Use regex to find all $variableName patterns
+		// TEMPLATE_VARIABLE_PATTERN = /\$([a-zA-Z_][a-zA-Z0-9_]*)/g
 		const matches = template.matchAll(TEMPLATE_VARIABLE_PATTERN);
 
 		// Extract variable names from capture groups
@@ -198,13 +196,13 @@ export class TemplateVariableParser implements ITemplateVariableParser {
 	 * Substitute variables in template with values from context
 	 *
 	 * TODO: Phase 4 (T034) - Implement variable substitution
-	 * - Use TEMPLATE_VARIABLE_PATTERN regex to find all {variableName} patterns
+	 * - Use TEMPLATE_VARIABLE_PATTERN regex to find all $variableName patterns
 	 * - Replace each pattern with corresponding context value
 	 * - Use empty string for missing variables (graceful degradation)
 	 * - Handle type coercion (convert numbers/booleans to strings)
 	 * - Preserve original template if no variables found
 	 *
-	 * @param template Template string with {variable} syntax
+	 * @param template Template string with $variable syntax
 	 * @param context Context object with variable values
 	 * @returns Resolved string with variables replaced
 	 */
@@ -214,7 +212,7 @@ export class TemplateVariableParser implements ITemplateVariableParser {
 			return "";
 		}
 
-		// Replace each {variableName} with corresponding context value
+		// Replace each $variableName with corresponding context value
 		// Use empty string for missing/undefined variables (graceful degradation)
 		return template.replace(
 			TEMPLATE_VARIABLE_PATTERN,
@@ -246,121 +244,37 @@ export class TemplateVariableParser implements ITemplateVariableParser {
 			return { valid: true, errors: [], warnings: [] };
 		}
 
-		// Check for brace-related syntax errors
-		const braceErrors = this.validateBraces(template);
-		errors.push(...braceErrors);
+		// Check for invalid variable names
+		const matches = Array.from(template.matchAll(TEMPLATE_VARIABLE_PATTERN));
+		for (const match of matches) {
+			const varName = match[1];
+			if (!VALID_VARIABLE_NAME_PATTERN.test(varName)) {
+				errors.push({
+					code: "INVALID_VARIABLE_NAME",
+					message: `Invalid variable name "$${varName}" - must start with letter or underscore, followed by letters, numbers, or underscores`,
+					position: match.index,
+					variable: varName,
+				});
+			}
+		}
+
+		// Check for empty variables (lone $ without identifier)
+		const emptyVarPattern = /\$(?![a-zA-Z_])/g;
+		const emptyMatches = Array.from(template.matchAll(emptyVarPattern));
+		for (const match of emptyMatches) {
+			errors.push({
+				code: "EMPTY_VARIABLE",
+				message:
+					"Empty variable name - $ must be followed by a valid identifier",
+				position: match.index,
+			});
+		}
 
 		return {
 			valid: errors.length === 0,
 			errors,
 			warnings: [],
 		};
-	}
-
-	/**
-	 * Validate braces and variable names in template
-	 * @private
-	 */
-	private validateBraces(template: string): TemplateValidationError[] {
-		const errors: TemplateValidationError[] = [];
-		let braceDepth = 0;
-		let lastOpenBrace = -1;
-
-		for (let i = 0; i < template.length; i += 1) {
-			const char = template[i];
-
-			if (char === "{") {
-				const openBraceError = this.handleOpenBrace(braceDepth, i);
-				if (openBraceError) {
-					errors.push(openBraceError);
-				}
-				braceDepth += 1;
-				lastOpenBrace = i;
-			} else if (char === "}") {
-				const closeBraceErrors = this.handleCloseBrace(
-					braceDepth,
-					i,
-					lastOpenBrace,
-					template
-				);
-				errors.push(...closeBraceErrors);
-				if (braceDepth > 0) {
-					braceDepth -= 1;
-				}
-			}
-		}
-
-		// Check for unclosed braces at end
-		if (braceDepth > 0) {
-			errors.push({
-				code: "UNCLOSED_BRACE",
-				message: "Opening brace '{' without matching closing brace '}'",
-				position: lastOpenBrace,
-			});
-		}
-
-		return errors;
-	}
-
-	/**
-	 * Handle opening brace validation
-	 * @private
-	 */
-	private handleOpenBrace(
-		braceDepth: number,
-		position: number
-	): TemplateValidationError | null {
-		if (braceDepth > 0) {
-			// Nested opening brace
-			return {
-				code: "NESTED_BRACES",
-				message: "Nested braces are not allowed",
-				position,
-			};
-		}
-		return null;
-	}
-
-	/**
-	 * Handle closing brace validation
-	 * @private
-	 */
-	private handleCloseBrace(
-		braceDepth: number,
-		position: number,
-		lastOpenBrace: number,
-		template: string
-	): TemplateValidationError[] {
-		const errors: TemplateValidationError[] = [];
-
-		if (braceDepth === 0) {
-			// Closing brace without opening
-			errors.push({
-				code: "UNOPENED_BRACE",
-				message: "Closing brace '}' without matching opening brace '{'",
-				position,
-			});
-		} else if (position === lastOpenBrace + 1) {
-			// Check for empty variable: {}
-			errors.push({
-				code: "EMPTY_VARIABLE",
-				message: "Empty variable name: {}",
-				position: lastOpenBrace,
-			});
-		} else {
-			// Validate variable name
-			const variableName = template.substring(lastOpenBrace + 1, position);
-			if (!VALID_VARIABLE_NAME_PATTERN.test(variableName)) {
-				errors.push({
-					code: "INVALID_VARIABLE_NAME",
-					message: `Invalid variable name: {${variableName}}. Variable names must contain only letters, numbers, and underscores.`,
-					position: lastOpenBrace,
-					variable: variableName,
-				});
-			}
-		}
-
-		return errors;
 	}
 
 	/**
