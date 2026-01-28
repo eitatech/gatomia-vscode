@@ -1296,19 +1296,13 @@ export class HookExecutor {
 					? this.expandTemplate(params.arguments, templateContext)
 					: "";
 
-				// Build the gh copilot command
-				// Format: gh copilot --agent-file <path> [user-prompt] [user-args]
-				const commandArgs = ["copilot", "--agent-file", agentFilePath];
-
-				// Add user prompt if provided
-				if (userPrompt) {
-					commandArgs.push(userPrompt);
-				}
-
-				// Add user args if provided
-				if (userArgs) {
-					commandArgs.push(userArgs);
-				}
+				// Build the gh copilot command with CLI options
+				const commandArgs = this.buildCopilotCliArgs(
+					params,
+					agentFilePath,
+					userPrompt,
+					userArgs
+				);
 
 				this.outputChannel.appendLine(
 					`[HookExecutor] Executing: gh ${commandArgs.slice(1).join(" ")}`
@@ -1379,5 +1373,235 @@ export class HookExecutor {
 				return { success: false, error: err };
 			}
 		})();
+	}
+
+	/**
+	 * Build GitHub Copilot CLI arguments with all supported options
+	 */
+	private buildCopilotCliArgs(
+		params: CustomActionParams,
+		agentFilePath: string,
+		userPrompt: string,
+		userArgs: string
+	): string[] {
+		const args = ["copilot", "-p"];
+
+		// Start with prompt
+		if (userPrompt) {
+			args.push(userPrompt);
+		}
+
+		// Add agent file
+		args.push("--agent", agentFilePath);
+
+		// Add user arguments
+		if (userArgs) {
+			args.push(userArgs);
+		}
+
+		// Add CLI options if provided
+		const opts = params.cliOptions;
+		if (!opts) {
+			return args;
+		}
+
+		// Combined flags (--allow-all / --yolo)
+		if (opts.allowAll) {
+			args.push("--allow-all");
+			return args; // No need to add individual permissions
+		}
+
+		// Add all option groups
+		this.addPathOptions(args, opts);
+		this.addToolPermissions(args, opts);
+		this.addUrlPermissions(args, opts);
+		this.addGithubMcpOptions(args, opts);
+		this.addMcpServerOptions(args, opts);
+		this.addExecutionOptions(args, opts);
+		this.addOutputOptions(args, opts);
+		this.addSessionOptions(args, opts);
+		this.addConfigOptions(args, opts);
+
+		return args;
+	}
+
+	private addPathOptions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.addDir) {
+			for (const dir of opts.addDir) {
+				args.push("--add-dir", dir);
+			}
+		}
+		if (opts.allowAllPaths) {
+			args.push("--allow-all-paths");
+		}
+		if (opts.disallowTempDir) {
+			args.push("--disallow-temp-dir");
+		}
+	}
+
+	private addToolPermissions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.allowAllTools) {
+			args.push("--allow-all-tools");
+		}
+		if (opts.allowTool) {
+			args.push("--allow-tool", ...opts.allowTool);
+		}
+		if (opts.availableTools) {
+			args.push("--available-tools", ...opts.availableTools);
+		}
+		if (opts.excludedTools) {
+			args.push("--excluded-tools", ...opts.excludedTools);
+		}
+		if (opts.denyTool) {
+			args.push("--deny-tool", ...opts.denyTool);
+		}
+	}
+
+	private addUrlPermissions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.allowAllUrls) {
+			args.push("--allow-all-urls");
+		}
+		if (opts.allowUrl) {
+			args.push("--allow-url", ...opts.allowUrl);
+		}
+		if (opts.denyUrl) {
+			args.push("--deny-url", ...opts.denyUrl);
+		}
+	}
+
+	private addGithubMcpOptions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.enableAllGithubMcpTools) {
+			args.push("--enable-all-github-mcp-tools");
+		}
+		if (opts.addGithubMcpTool) {
+			for (const tool of opts.addGithubMcpTool) {
+				args.push("--add-github-mcp-tool", tool);
+			}
+		}
+		if (opts.addGithubMcpToolset) {
+			for (const toolset of opts.addGithubMcpToolset) {
+				args.push("--add-github-mcp-toolset", toolset);
+			}
+		}
+	}
+
+	private addMcpServerOptions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.additionalMcpConfig) {
+			for (const config of opts.additionalMcpConfig) {
+				args.push("--additional-mcp-config", config);
+			}
+		}
+		if (opts.disableBuiltinMcps) {
+			args.push("--disable-builtin-mcps");
+		}
+		if (opts.disableMcpServer) {
+			for (const server of opts.disableMcpServer) {
+				args.push("--disable-mcp-server", server);
+			}
+		}
+	}
+
+	private addExecutionOptions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.agent) {
+			args.push("--agent", opts.agent);
+		}
+		if (opts.model) {
+			args.push("--model", opts.model);
+		}
+		if (opts.noAskUser) {
+			args.push("--no-ask-user");
+		}
+		if (opts.disableParallelToolsExecution) {
+			args.push("--disable-parallel-tools-execution");
+		}
+		if (opts.noCustomInstructions) {
+			args.push("--no-custom-instructions");
+		}
+	}
+
+	private addOutputOptions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.silent) {
+			args.push("--silent");
+		}
+		if (opts.logLevel) {
+			args.push("--log-level", opts.logLevel);
+		}
+		if (opts.logDir) {
+			args.push("--log-dir", opts.logDir);
+		}
+		if (opts.noColor) {
+			args.push("--no-color");
+		}
+		if (opts.plainDiff) {
+			args.push("--plain-diff");
+		}
+		if (opts.screenReader) {
+			args.push("--screen-reader");
+		}
+		if (opts.stream) {
+			args.push("--stream", opts.stream);
+		}
+	}
+
+	private addSessionOptions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.resume) {
+			if (typeof opts.resume === "string") {
+				args.push("--resume", opts.resume);
+			} else {
+				args.push("--resume");
+			}
+		}
+		if (opts.continue) {
+			args.push("--continue");
+		}
+		if (opts.share) {
+			if (typeof opts.share === "string") {
+				args.push("--share", opts.share);
+			} else {
+				args.push("--share");
+			}
+		}
+		if (opts.shareGist) {
+			args.push("--share-gist");
+		}
+	}
+
+	private addConfigOptions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.configDir) {
+			args.push("--config-dir", opts.configDir);
+		}
+		if (opts.banner) {
+			args.push("--banner");
+		}
+		if (opts.noAutoUpdate) {
+			args.push("--no-auto-update");
+		}
 	}
 }
