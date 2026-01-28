@@ -1,0 +1,53 @@
+.copilot-cli-options-panel {
+	margin-top: 16px;
+}
+
+.copilot-cli-options-content {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+}
+
+.copilot-cli-options-tabs {
+	display: flex;
+	border-bottom: 1px solid var(--vscode-widget-border);
+	gap: 0;
+}
+
+.copilot-cli-tab {
+	padding: 10px 16px;
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	color: var(--vscode-descriptionForeground);
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.2s;
+	white-space: nowrap;
+}
+
+.copilot-cli-tab:hover:not(:disabled) {
+	color: var(--vscode-foreground);
+	background-color: var(--vscode-list-hoverBackground);
+}
+
+.copilot-cli-tab.active {
+	color: var(--vscode-foreground);
+	border-bottom-color: var(--vscode-focusBorder);
+}
+
+.copilot-cli-tab:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.copilot-cli-tab:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.copilot-cli-options-tab-content {
+	padding: 20px 16px;
+	min-height: 200px;
+}

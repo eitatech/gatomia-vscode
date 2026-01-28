@@ -58,7 +58,8 @@
         "noUnusedPrivateClassMembers": "off"
       },
       "performance": {
-        "useTopLevelRegex": "warn"
+        "useTopLevelRegex": "warn",
+        "noBarrelFile": "off"
       },
       "a11y": {
         "noSvgWithoutTitle": "warn"

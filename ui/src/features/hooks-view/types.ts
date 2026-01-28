@@ -18,12 +18,13 @@ export type OperationType =
 	| "unit-test"
 	| "integration-test";
 
-export type TriggerTiming = "after";
+export type TriggerTiming = "before" | "after";
 
 export interface TriggerCondition {
 	agent: AgentType;
 	operation: OperationType;
 	timing: TriggerTiming;
+	waitForCompletion?: boolean; // Only for "before" timing: block operation until hook completes
 }
 
 export type ActionType = "agent" | "git" | "github" | "custom" | "mcp";
@@ -47,12 +48,100 @@ export interface GitHubActionParams {
 }
 
 export interface CustomActionParams {
-	agentId?: string; // Optional: GitHub Copilot agent ID
-	agentName: string;
+	agentId?: string; // Optional: Agent ID from agent registry
+	agentName: string; // Custom agent identifier
+	agentType?: "local" | "background"; // Explicit execution type override
 	prompt?: string; // Instruction/action text for the agent
 	selectedTools?: SelectedMCPTool[]; // Optional: MCP tools available to agent
-	arguments?: string;
+	arguments?: string; // Template string with $variable syntax for passing trigger context
+	cliOptions?: CopilotCliOptions; // GitHub Copilot CLI options
 }
+
+/**
+ * GitHub Copilot CLI Options - All available CLI parameters
+ */
+export interface CopilotCliOptions {
+	// Directory and Path Options
+	addDir?: string[];
+	allowAllPaths?: boolean;
+	disallowTempDir?: boolean;
+
+	// Tool Permissions
+	allowAllTools?: boolean;
+	allowTool?: string[];
+	availableTools?: string[];
+	excludedTools?: string[];
+	denyTool?: string[];
+
+	// URL Permissions
+	allowAllUrls?: boolean;
+	allowUrl?: string[];
+	denyUrl?: string[];
+
+	// GitHub MCP Server Options
+	addGithubMcpTool?: string[];
+	addGithubMcpToolset?: string[];
+	enableAllGithubMcpTools?: boolean;
+
+	// MCP Server Configuration
+	additionalMcpConfig?: string[];
+	disableBuiltinMcps?: boolean;
+	disableMcpServer?: string[];
+
+	// Execution Options
+	agent?: string;
+	model?: CopilotModel;
+	noAskUser?: boolean;
+	disableParallelToolsExecution?: boolean;
+	noCustomInstructions?: boolean;
+
+	// Output and Logging Options
+	silent?: boolean;
+	logLevel?: CopilotLogLevel;
+	logDir?: string;
+	noColor?: boolean;
+	plainDiff?: boolean;
+	screenReader?: boolean;
+	stream?: "on" | "off";
+
+	// Session Options
+	resume?: boolean | string;
+	continue?: boolean;
+	share?: boolean | string;
+	shareGist?: boolean;
+
+	// Configuration
+	configDir?: string;
+	banner?: boolean;
+	noAutoUpdate?: boolean;
+
+	// Combined Flags
+	allowAll?: boolean;
+}
+
+export type CopilotModel =
+	| "claude-sonnet-4.5"
+	| "claude-haiku-4.5"
+	| "claude-opus-4.5"
+	| "claude-sonnet-4"
+	| "gpt-5.2-codex"
+	| "gpt-5.1-codex-max"
+	| "gpt-5.1-codex"
+	| "gpt-5.2"
+	| "gpt-5.1"
+	| "gpt-5"
+	| "gpt-5.1-codex-mini"
+	| "gpt-5-mini"
+	| "gpt-4.1";
+
+export type CopilotLogLevel =
+	| "none"
+	| "error"
+	| "warning"
+	| "info"
+	| "debug"
+	| "all"
+	| "default";
 
 export interface MCPActionParams {
 	// Agent and instruction

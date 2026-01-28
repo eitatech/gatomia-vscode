@@ -1,3 +1,24 @@
+/**
+ * Hook Executor Service
+ *
+ * Orchestrates the execution of hooks triggered by various events in the system.
+ * Handles validation, context building, action execution, error handling, and logging.
+ *
+ * Responsibilities:
+ * - Execute hooks triggered by spec lifecycle, MCP server, or custom events
+ * - Build template contexts from trigger events
+ * - Validate hooks before execution (agent availability, MCP server availability)
+ * - Execute actions (agent prompts, MCP tools, Git operations, GitHub operations)
+ * - Handle execution errors with user notifications and retry options
+ * - Manage execution chains (hook triggers another hook)
+ * - Prevent circular dependencies
+ * - Log all executions with comprehensive context
+ * - Emit execution events for external listeners
+ *
+ * @see specs/011-custom-agent-hooks/data-model.md
+ * @see src/features/hooks/hook-manager.ts
+ */
+
 import {
 	EventEmitter,
 	type Event,
@@ -5,10 +26,15 @@ import {
 	extensions,
 	window,
 	commands,
+	workspace,
+	env,
 } from "vscode";
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import type { HookManager } from "./hook-manager";
 import type { TriggerRegistry } from "./trigger-registry";
+import type { AgentRegistry } from "./agent-registry";
+import { sendPromptToChat } from "../../utils/chat-prompt-runner";
 import { AgentActionExecutor } from "./actions/agent-action";
 import { GitActionExecutor } from "./actions/git-action";
 import { GitHubActionExecutor } from "./actions/github-action";
@@ -17,15 +43,21 @@ import { MCPClientService } from "./services/mcp-client";
 import { MCPParameterResolver } from "./services/mcp-parameter-resolver";
 import { MCPExecutionPool } from "./services/mcp-execution-pool";
 import type { IMCPDiscoveryService } from "./services/mcp-contracts";
+import {
+	TemplateVariableParser,
+	type TemplateContext as ParserTemplateContext,
+} from "./template-variable-parser";
 import type {
 	Hook,
 	ExecutionContext,
 	HookExecutionLog,
-	TemplateContext,
 	AgentActionParams,
 	GitActionParams,
 	GitHubActionParams,
 	MCPActionParams,
+	CustomActionParams,
+	OperationType,
+	TriggerEvent,
 } from "./types";
 import {
 	MAX_CHAIN_DEPTH,
@@ -37,6 +69,17 @@ import {
  * Regex pattern for extracting feature name from branch (NNN-feature-name)
  */
 const FEATURE_NAME_PATTERN = /^\d+-(.+)$/;
+
+/**
+ * Regex pattern for extracting agent name from agentId (format: "file:agent-name")
+ */
+const AGENT_ID_PREFIX_PATTERN = /^file:/;
+
+/**
+ * Regex patterns for parsing Git remote URLs
+ */
+const GIT_HTTPS_REMOTE_PATTERN = /github\.com\/([^/]+)\/([^/.]+)(\.git)?$/;
+const GIT_SSH_REMOTE_PATTERN = /github\.com:([^/]+)\/([^/.]+)(\.git)?$/;
 
 /**
  * ExecutionStatus - Status of hook execution
@@ -105,11 +148,13 @@ export class ExecutionTimeoutError extends Error {
 export class HookExecutor {
 	private readonly hookManager: HookManager;
 	private readonly triggerRegistry: TriggerRegistry;
+	private readonly agentRegistry: AgentRegistry;
 	private readonly outputChannel: OutputChannel;
 	private readonly agentExecutor: AgentActionExecutor;
 	private readonly gitExecutor: GitActionExecutor;
 	private readonly githubExecutor: GitHubActionExecutor;
 	private readonly mcpExecutor: MCPActionExecutor;
+	private readonly templateParser: TemplateVariableParser;
 	private executionLogs: HookExecutionLog[] = [];
 
 	// Event emitters
@@ -125,18 +170,22 @@ export class HookExecutor {
 	readonly onExecutionFailed: Event<ExecutionEvent> =
 		this._onExecutionFailed.event;
 
+	// biome-ignore lint/nursery/useMaxParams: Dependency injection pattern requires multiple constructor parameters
 	constructor(
 		hookManager: HookManager,
 		triggerRegistry: TriggerRegistry,
 		outputChannel: OutputChannel,
-		mcpDiscoveryService: IMCPDiscoveryService
+		mcpDiscoveryService: IMCPDiscoveryService,
+		agentRegistry: AgentRegistry
 	) {
 		this.hookManager = hookManager;
 		this.triggerRegistry = triggerRegistry;
 		this.outputChannel = outputChannel;
+		this.agentRegistry = agentRegistry;
 		this.agentExecutor = new AgentActionExecutor();
 		this.gitExecutor = new GitActionExecutor();
 		this.githubExecutor = new GitHubActionExecutor();
+		this.templateParser = new TemplateVariableParser();
 
 		// Initialize MCP executor with all required services
 		const clientService = new MCPClientService(mcpDiscoveryService);
@@ -159,7 +208,13 @@ export class HookExecutor {
 	initialize(): void {
 		// Subscribe to trigger events
 		this.triggerRegistry.onTrigger(async (event) => {
-			await this.executeHooksForTrigger(event.agent, event.operation);
+			const timing = event.timing || "after";
+			await this.executeHooksForTrigger(
+				event.agent,
+				event.operation,
+				timing,
+				event
+			);
 		});
 
 		this.outputChannel.appendLine("[HookExecutor] Initialized");
@@ -182,7 +237,8 @@ export class HookExecutor {
 	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: The hook pipeline coordinates validation, execution, logging, and retries within a single flow.
 	async executeHook(
 		hook: Hook,
-		context?: ExecutionContext
+		context?: ExecutionContext,
+		triggerEvent?: TriggerEvent
 	): Promise<ExecutionResult> {
 		const startTime = Date.now();
 
@@ -250,6 +306,92 @@ export class HookExecutor {
 			}
 		}
 
+		// T081: Check agent availability before execution for custom hooks
+		if (hook.action.type === "custom") {
+			const customParams = hook.action.parameters as CustomActionParams;
+			const agentId = customParams.agentId || customParams.agentName;
+
+			if (agentId && this.agentRegistry) {
+				try {
+					// Check agent availability
+					const availability =
+						await this.agentRegistry.checkAgentAvailability(agentId);
+
+					if (!availability.available) {
+						// Determine reason text
+						let reasonText: string;
+						if (availability.reason === "FILE_DELETED") {
+							reasonText = "agent file was deleted";
+						} else if (availability.reason === "EXTENSION_UNINSTALLED") {
+							reasonText = "extension is uninstalled";
+						} else {
+							reasonText = "agent is unavailable";
+						}
+
+						const errorMessage = `Agent "${agentId}" is not available: ${reasonText}`;
+
+						// T082: Log detailed error information
+						this.outputChannel.appendLine(
+							`[HookExecutor] Agent unavailable - Hook: ${hook.name} (${hook.id})`
+						);
+						this.outputChannel.appendLine(
+							`[HookExecutor] Agent ID: ${agentId}, Reason: ${availability.reason}`
+						);
+						this.outputChannel.appendLine(
+							`[HookExecutor] Trigger: ${hook.trigger.agent}.${hook.trigger.operation} (${hook.trigger.timing})`
+						);
+
+						// Emit execution failed event
+						const errorResult: ExecutionResult = {
+							hookId: hook.id,
+							hookName: hook.name,
+							status: "failure",
+							duration: Date.now() - startTime,
+							error: {
+								message: errorMessage,
+								code: "AgentUnavailable",
+								details: {
+									agentId,
+									reason: availability.reason,
+									checkedAt: availability.checkedAt,
+								},
+							},
+						};
+
+						this._onExecutionFailed.fire({
+							hook,
+							context: context || this.createExecutionContext(),
+							result: errorResult,
+						});
+
+						// Show error notification with retry option
+						const action = await window.showErrorMessage(
+							`Hook "${hook.name}" failed: ${errorMessage}`,
+							"Retry",
+							"Update Hook",
+							"Cancel"
+						);
+
+						if (action === "Retry") {
+							// Retry execution
+							return await this.executeHook(hook, context, triggerEvent);
+						}
+						if (action === "Update Hook") {
+							await commands.executeCommand("gatomia.hooks.editHook", hook.id);
+						}
+
+						return errorResult;
+					}
+				} catch (error) {
+					// Graceful degradation - log error and continue
+					const err = error as Error;
+					this.outputChannel.appendLine(
+						`[HookExecutor] Warning: Failed to check agent availability: ${err.message}`
+					);
+				}
+			}
+		}
+
 		// Create or use existing context
 		const execContext = context || this.createExecutionContext();
 
@@ -273,7 +415,12 @@ export class HookExecutor {
 			execContext.chainDepth += 1;
 
 			// Build template context
-			const templateContext = await this.buildTemplateContext();
+			// Extract trigger type from hook's trigger configuration
+			const templateContext = await this.buildTemplateContext(
+				hook.trigger.operation,
+				undefined,
+				triggerEvent
+			);
 
 			// Emit execution started event
 			this._onExecutionStarted.fire({
@@ -339,6 +486,38 @@ export class HookExecutor {
 					);
 					break;
 				}
+				case "custom": {
+					const customParams = hook.action.parameters as CustomActionParams;
+
+					// Determine agent type (override or default from registry)
+					let agentType = customParams.agentType;
+					if (!agentType && customParams.agentId) {
+						const agent = this.agentRegistry.getAgentById(customParams.agentId);
+						agentType = agent?.type;
+					}
+
+					this.outputChannel.appendLine(
+						`[HookExecutor] Custom action - Agent type: ${agentType || "unknown"}`
+					);
+
+					// Route based on agent type
+					if (agentType === "local") {
+						actionResult = await this.executeWithTimeout(
+							() => this.executeLocalAgent(customParams, templateContext),
+							ACTION_TIMEOUT_MS
+						);
+					} else if (agentType === "background") {
+						actionResult = await this.executeWithTimeout(
+							() => this.executeBackgroundAgent(customParams, templateContext),
+							ACTION_TIMEOUT_MS
+						);
+					} else {
+						throw new Error(
+							`Unknown agent type: ${agentType}. Agent ID: ${customParams.agentId}`
+						);
+					}
+					break;
+				}
 
 				default:
 					throw new Error(`Unsupported action type: ${hook.action.type}`);
@@ -390,7 +569,72 @@ export class HookExecutor {
 						`MCP Tool "${mcpParams.toolName}" executed successfully (${duration}ms)`
 					);
 				}
+
+				this.outputChannel.appendLine(
+					`[HookExecutor] ✓ Hook execution success: ${hook.name} (${duration}ms)`
+				);
 			} else {
+				// T084: Enhanced failure logging with full context
+				this.outputChannel.appendLine(
+					"[HookExecutor] ==================== HOOK EXECUTION FAILURE ===================="
+				);
+				this.outputChannel.appendLine(
+					`[HookExecutor] Hook: ${hook.name} (${hook.id})`
+				);
+				this.outputChannel.appendLine(
+					`[HookExecutor] Trigger: ${hook.trigger.agent}.${hook.trigger.operation} (${hook.trigger.timing})`
+				);
+				this.outputChannel.appendLine(
+					`[HookExecutor] Action Type: ${hook.action.type}`
+				);
+
+				// Add action-specific context
+				if (hook.action.type === "custom") {
+					const customParams = hook.action.parameters as CustomActionParams;
+					this.outputChannel.appendLine(
+						`[HookExecutor] Agent ID: ${customParams.agentId || customParams.agentName || "unknown"}`
+					);
+					this.outputChannel.appendLine(
+						`[HookExecutor] Agent Type: ${customParams.agentType || "unknown"}`
+					);
+				} else if (hook.action.type === "mcp") {
+					const mcpParams = hook.action.parameters as MCPActionParams;
+					this.outputChannel.appendLine(
+						`[HookExecutor] MCP Server: ${mcpParams.serverId}`
+					);
+					this.outputChannel.appendLine(
+						`[HookExecutor] MCP Tool: ${mcpParams.toolName}`
+					);
+				}
+
+				if (result.error) {
+					this.outputChannel.appendLine(
+						`[HookExecutor] Error Code: ${result.error.code}`
+					);
+					this.outputChannel.appendLine(
+						`[HookExecutor] Error Message: ${result.error.message}`
+					);
+
+					// Log stack trace if available in details
+					const errorDetails = result.error.details as any;
+					if (errorDetails?.stack) {
+						this.outputChannel.appendLine(
+							`[HookExecutor] Stack Trace:\n${errorDetails.stack}`
+						);
+					}
+				}
+
+				this.outputChannel.appendLine(`[HookExecutor] Duration: ${duration}ms`);
+				this.outputChannel.appendLine(
+					`[HookExecutor] Execution ID: ${execContext.executionId}`
+				);
+				this.outputChannel.appendLine(
+					`[HookExecutor] Chain Depth: ${execContext.chainDepth}`
+				);
+				this.outputChannel.appendLine(
+					"[HookExecutor] ================================================================"
+				);
+
 				this._onExecutionFailed.fire({
 					hook,
 					context: execContext,
@@ -407,28 +651,64 @@ export class HookExecutor {
 				}
 			}
 
-			this.outputChannel.appendLine(
-				`[HookExecutor] Hook execution ${result.status}: ${hook.name} (${duration}ms)`
-			);
-
-			// T074: Additional logging for MCP actions
-			if (hook.action.type === "mcp") {
-				const mcpParams = hook.action.parameters as MCPActionParams;
-				if (result.status === "success") {
-					this.outputChannel.appendLine(
-						`[HookExecutor] MCP Tool ${mcpParams.serverId}/${mcpParams.toolName} completed successfully`
-					);
-				} else if (result.error) {
-					this.outputChannel.appendLine(
-						`[HookExecutor] MCP Tool ${mcpParams.serverId}/${mcpParams.toolName} failed: ${result.error.code} - ${result.error.message}`
-					);
-				}
-			}
-
 			return result;
 		} catch (error) {
 			const duration = Date.now() - startTime;
 			const err = error as Error;
+
+			// T084: Enhanced error logging with full context
+			this.outputChannel.appendLine(
+				"[HookExecutor] ==================== HOOK EXECUTION ERROR ===================="
+			);
+			this.outputChannel.appendLine(
+				`[HookExecutor] Hook: ${hook.name} (${hook.id})`
+			);
+			this.outputChannel.appendLine(
+				`[HookExecutor] Trigger: ${hook.trigger.agent}.${hook.trigger.operation} (${hook.trigger.timing})`
+			);
+			this.outputChannel.appendLine(
+				`[HookExecutor] Action Type: ${hook.action.type}`
+			);
+
+			// Add action-specific context
+			if (hook.action.type === "custom") {
+				const customParams = hook.action.parameters as CustomActionParams;
+				this.outputChannel.appendLine(
+					`[HookExecutor] Agent ID: ${customParams.agentId || customParams.agentName || "unknown"}`
+				);
+				this.outputChannel.appendLine(
+					`[HookExecutor] Agent Type: ${customParams.agentType || "unknown"}`
+				);
+			} else if (hook.action.type === "mcp") {
+				const mcpParams = hook.action.parameters as MCPActionParams;
+				this.outputChannel.appendLine(
+					`[HookExecutor] MCP Server: ${mcpParams.serverId}`
+				);
+				this.outputChannel.appendLine(
+					`[HookExecutor] MCP Tool: ${mcpParams.toolName}`
+				);
+			}
+
+			this.outputChannel.appendLine(`[HookExecutor] Error: ${err.name}`);
+			this.outputChannel.appendLine(`[HookExecutor] Message: ${err.message}`);
+
+			// Include stack trace for debugging
+			if (err.stack) {
+				this.outputChannel.appendLine(
+					`[HookExecutor] Stack Trace:\n${err.stack}`
+				);
+			}
+
+			this.outputChannel.appendLine(`[HookExecutor] Duration: ${duration}ms`);
+			this.outputChannel.appendLine(
+				`[HookExecutor] Execution ID: ${execContext.executionId}`
+			);
+			this.outputChannel.appendLine(
+				`[HookExecutor] Chain Depth: ${execContext.chainDepth}`
+			);
+			this.outputChannel.appendLine(
+				"[HookExecutor] ================================================================"
+			);
 
 			const result: ExecutionResult = {
 				hookId: hook.id,
@@ -463,10 +743,6 @@ export class HookExecutor {
 				result,
 			});
 
-			this.outputChannel.appendLine(
-				`[HookExecutor] Hook execution failed: ${hook.name} - ${err.message}`
-			);
-
 			return result;
 		}
 	}
@@ -476,26 +752,29 @@ export class HookExecutor {
 	 */
 	async executeHooksForTrigger(
 		agent: string,
-		operation: string
+		operation: string,
+		timing: "before" | "after" = "after",
+		triggerEvent?: TriggerEvent
 	): Promise<ExecutionResult[]> {
 		this.outputChannel.appendLine(
-			`[HookExecutor] Executing hooks for trigger: ${agent}.${operation}`
+			`[HookExecutor] Executing hooks for trigger: ${agent}.${operation} (${timing})`
 		);
 
-		// Get all enabled hooks matching trigger
+		// Get all enabled hooks matching trigger and timing
 		const allHooks = await this.hookManager.getAllHooks();
 		const matchingHooks = allHooks
 			.filter(
 				(h) =>
 					h.enabled &&
 					h.trigger.agent === agent &&
-					h.trigger.operation === operation
+					h.trigger.operation === operation &&
+					h.trigger.timing === timing
 			)
 			.sort((a, b) => a.createdAt - b.createdAt); // Deterministic order
 
 		if (matchingHooks.length === 0) {
 			this.outputChannel.appendLine(
-				`[HookExecutor] No enabled hooks found for trigger: ${agent}.${operation}`
+				`[HookExecutor] No enabled hooks found for trigger: ${agent}.${operation} (${timing})`
 			);
 			return [];
 		}
@@ -503,15 +782,25 @@ export class HookExecutor {
 		// Create shared execution context
 		const context = this.createExecutionContext();
 
-		// Execute each hook with shared context
+		// Execute hooks based on waitForCompletion setting
 		const results: ExecutionResult[] = [];
 		for (const hook of matchingHooks) {
-			const result = await this.executeHook(hook, context);
-			results.push(result);
+			if (timing === "before" && hook.trigger.waitForCompletion) {
+				// Blocking execution: wait for hook to complete
+				this.outputChannel.appendLine(
+					`[HookExecutor] Executing blocking before hook: ${hook.name}`
+				);
+				const result = await this.executeHook(hook, context, triggerEvent);
+				results.push(result);
+			} else {
+				// Non-blocking execution: execute in parallel
+				const result = await this.executeHook(hook, context, triggerEvent);
+				results.push(result);
+			}
 		}
 
 		this.outputChannel.appendLine(
-			`[HookExecutor] Executed ${results.length} hooks for trigger: ${agent}.${operation}`
+			`[HookExecutor] Executed ${results.length} hooks for trigger: ${agent}.${operation} (${timing})`
 		);
 
 		return results;
@@ -546,35 +835,221 @@ export class HookExecutor {
 	/**
 	 * Build template context with runtime variables
 	 */
-	async buildTemplateContext(): Promise<TemplateContext> {
+	async buildTemplateContext(
+		triggerOperation: string,
+		triggerData?: Record<string, unknown>,
+		triggerEvent?: TriggerEvent
+	): Promise<ParserTemplateContext> {
 		try {
-			// Get Git extension
-			const gitExtension = extensions.getExtension("vscode.git");
-			const git = gitExtension?.exports.getAPI(1);
+			const gitContext = await this.buildGitContext();
+			const workspacePath = workspace.workspaceFolders?.[0]?.uri.fsPath || "";
 
-			const repository = git?.repositories[0];
-			const branch = repository?.state.HEAD?.name;
-			const user = await repository?.getConfig("user.name");
-
-			// Extract feature name from branch (pattern: NNN-feature-name)
-			const feature = branch ? this.extractFeatureName(branch) : undefined;
-
-			return {
-				feature,
-				branch,
+			// Build base context with standard variables
+			const baseContext: ParserTemplateContext = {
 				timestamp: new Date().toISOString(),
-				user,
+				triggerType: triggerOperation as OperationType,
+				...gitContext,
+				workspacePath,
 			};
+
+			// Add trigger-specific data if available
+			if (triggerData) {
+				this.enrichContextWithTriggerData(baseContext, triggerData);
+			}
+
+			// Add output capture variables
+			if (triggerEvent) {
+				await this.addOutputVariables(baseContext, triggerEvent);
+			}
+
+			return baseContext;
 		} catch (error) {
 			this.outputChannel.appendLine(
 				`[HookExecutor] Warning: Failed to build template context: ${error}`
 			);
 
-			// Return minimal context
-			return {
-				timestamp: new Date().toISOString(),
-			};
+			// Return minimal context on error
+			return this.buildMinimalContext(triggerOperation);
 		}
+	}
+
+	/**
+	 * Build Git-related context variables
+	 */
+	private async buildGitContext(): Promise<Partial<ParserTemplateContext>> {
+		const gitExtension = extensions.getExtension("vscode.git");
+		const git = gitExtension?.exports.getAPI(1);
+		const repository = git?.repositories[0];
+
+		if (!repository) {
+			return {};
+		}
+
+		const branch = repository.state.HEAD?.name;
+		const user = await repository.getConfig("user.name");
+		const feature = branch ? this.extractFeatureName(branch) : undefined;
+
+		// Extract repository info from remote URL
+		const remoteUrl = await repository.getConfig("remote.origin.url");
+		const repoInfo = this.parseGitRemoteUrl(remoteUrl || "");
+
+		return {
+			branch,
+			user,
+			feature,
+			repoOwner: repoInfo.owner,
+			repoName: repoInfo.name,
+		};
+	}
+
+	/**
+	 * Enrich context with trigger-specific data
+	 */
+	private enrichContextWithTriggerData(
+		context: ParserTemplateContext,
+		triggerData: Record<string, unknown>
+	): void {
+		// Spec-related variables
+		this.addSpecVariables(context, triggerData);
+
+		// Spec artifact variables
+		this.addArtifactVariables(context, triggerData);
+
+		// Agent metadata
+		this.addAgentMetadata(context, triggerData);
+	}
+
+	/**
+	 * Add spec-related variables to context
+	 */
+	private addSpecVariables(
+		context: ParserTemplateContext,
+		data: Record<string, unknown>
+	): void {
+		const specFields = [
+			"specId",
+			"specPath",
+			"oldStatus",
+			"newStatus",
+			"changeAuthor",
+		] as const;
+
+		for (const field of specFields) {
+			if (data[field]) {
+				context[field] = data[field] as string;
+			}
+		}
+	}
+
+	/**
+	 * Add spec artifact variables to context
+	 */
+	private addArtifactVariables(
+		context: ParserTemplateContext,
+		data: Record<string, unknown>
+	): void {
+		const artifactFields = ["useCaseId", "taskId", "requirementId"] as const;
+
+		for (const field of artifactFields) {
+			if (data[field]) {
+				context[field] = data[field] as string;
+			}
+		}
+	}
+
+	/**
+	 * Add agent metadata to context
+	 */
+	private addAgentMetadata(
+		context: ParserTemplateContext,
+		data: Record<string, unknown>
+	): void {
+		if (data.agentId) {
+			context.agentId = data.agentId as string;
+		}
+		if (data.agentType) {
+			context.agentType = data.agentType as string;
+		}
+	}
+
+	/**
+	 * Build minimal fallback context
+	 */
+	private buildMinimalContext(triggerOperation: string): ParserTemplateContext {
+		return {
+			timestamp: new Date().toISOString(),
+			triggerType: triggerOperation as OperationType,
+			workspacePath: workspace.workspaceFolders?.[0]?.uri.fsPath || "",
+		};
+	}
+
+	/**
+	 * Add output capture variables to context
+	 */
+	private async addOutputVariables(
+		context: ParserTemplateContext,
+		event: TriggerEvent
+	): Promise<void> {
+		// 1. Add clipboard content
+		try {
+			const clipboardText = await env.clipboard.readText();
+			context.clipboardContent = clipboardText;
+			this.outputChannel.appendLine(
+				`[HookExecutor] Captured clipboard content (${clipboardText.length} chars)`
+			);
+		} catch (error) {
+			this.outputChannel.appendLine(
+				`[HookExecutor] Failed to read clipboard: ${error}`
+			);
+			context.clipboardContent = "";
+		}
+
+		// 2. Add agent output from file (if available)
+		if (event.outputPath) {
+			try {
+				const { promises: fs } = await import("node:fs");
+				const content = await fs.readFile(event.outputPath, "utf-8");
+				context.agentOutput = content;
+				context.outputPath = event.outputPath;
+				this.outputChannel.appendLine(
+					`[HookExecutor] Captured agent output from file: ${event.outputPath} (${content.length} chars)`
+				);
+			} catch (error) {
+				this.outputChannel.appendLine(
+					`[HookExecutor] Failed to read output file ${event.outputPath}: ${error}`
+				);
+				context.agentOutput = "";
+			}
+		} else if (event.outputContent) {
+			// Use pre-loaded content if provided
+			context.agentOutput = event.outputContent;
+			this.outputChannel.appendLine(
+				`[HookExecutor] Using pre-loaded agent output (${event.outputContent.length} chars)`
+			);
+		} else {
+			// No output available
+			context.agentOutput = "";
+		}
+	}
+
+	/**
+	 * Parse Git remote URL to extract owner and repo name
+	 * Supports both HTTPS and SSH formats
+	 */
+	private parseGitRemoteUrl(url: string): { owner: string; name: string } {
+		// HTTPS: https://github.com/owner/repo.git
+		const httpsMatch = url.match(GIT_HTTPS_REMOTE_PATTERN);
+		if (httpsMatch) {
+			return { owner: httpsMatch[1], name: httpsMatch[2] };
+		}
+
+		// SSH: git@github.com:owner/repo.git
+		const sshMatch = url.match(GIT_SSH_REMOTE_PATTERN);
+		if (sshMatch) {
+			return { owner: sshMatch[1], name: sshMatch[2] };
+		}
+
+		return { owner: "", name: "" };
 	}
 
 	/**
@@ -588,23 +1063,40 @@ export class HookExecutor {
 
 	/**
 	 * Expand template variables in a string
-	 * Replaces {variable} with values from context
+	 * Uses TemplateVariableParser to replace $variable with values from context
 	 */
-	expandTemplate(template: string, context: TemplateContext): string {
-		let expanded = template;
+	expandTemplate(template: string, context: ParserTemplateContext): string {
+		// Log template expansion for debugging
+		this.outputChannel.appendLine(
+			`[HookExecutor] Expanding template: "${template}"`
+		);
 
-		// Replace each variable
-		for (const [key, value] of Object.entries(context)) {
-			if (value !== undefined) {
-				const placeholder = `{${key}}`;
-				expanded = expanded.replace(
-					new RegExp(placeholder, "g"),
-					String(value)
-				);
-			}
+		// Extract and log variables found
+		const variables = this.templateParser.extractVariables(template);
+		this.outputChannel.appendLine(
+			`[HookExecutor] Variables found: ${variables.length > 0 ? variables.join(", ") : "(none)"}`
+		);
+
+		// Log context values for found variables
+		if (variables.length > 0) {
+			const contextValues = variables
+				.map((varName) => {
+					const value = context[varName];
+					return `${varName}=${value !== undefined ? JSON.stringify(value) : "(undefined)"}`;
+				})
+				.join(", ");
+			this.outputChannel.appendLine(
+				`[HookExecutor] Context values: ${contextValues}`
+			);
 		}
 
-		return expanded;
+		// Perform substitution
+		const result = this.templateParser.substitute(template, context);
+
+		// Log final result
+		this.outputChannel.appendLine(`[HookExecutor] Result: "${result}"`);
+
+		return result;
 	}
 
 	/**
@@ -665,5 +1157,451 @@ export class HookExecutor {
 	clearExecutionLogs(): void {
 		this.executionLogs = [];
 		this.outputChannel.appendLine("[HookExecutor] Execution logs cleared");
+	}
+
+	/**
+	 * Execute a local agent (in-process via sendPromptToChat)
+	 * T053: Implement local agent execution path
+	 */
+	private executeLocalAgent(
+		params: CustomActionParams,
+		templateContext: ParserTemplateContext
+	): Promise<{ success: boolean; error?: Error }> {
+		this.outputChannel.appendLine(
+			`[HookExecutor] Executing local agent: ${params.agentId}`
+		);
+
+		return (async () => {
+			try {
+				// Extract agent name from agentId (format: "file:agent-name")
+				const agentName =
+					params.agentId?.replace(AGENT_ID_PREFIX_PATTERN, "") ||
+					params.agentName;
+				if (!agentName) {
+					throw new Error("Agent name is required for local execution");
+				}
+
+				// Read the agent file from .github/agents/
+				const { promises: fs } = await import("node:fs");
+				const { join } = await import("node:path");
+
+				const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
+				if (!workspaceRoot) {
+					throw new Error("No workspace folder found");
+				}
+
+				const agentFilePath = join(
+					workspaceRoot,
+					".github",
+					"agents",
+					`${agentName}.agent.md`
+				);
+
+				this.outputChannel.appendLine(
+					`[HookExecutor] Reading agent file: ${agentFilePath}`
+				);
+
+				const agentContent = await fs.readFile(agentFilePath, "utf-8");
+
+				// Expand template variables in prompt and arguments
+				const userPrompt = params.prompt
+					? this.expandTemplate(params.prompt, templateContext)
+					: "";
+				const userArgs = params.arguments
+					? this.expandTemplate(params.arguments, templateContext)
+					: "";
+
+				// Combine agent content with user input
+				// Format: Agent content + user prompt + arguments
+				let finalPrompt = agentContent;
+				if (userPrompt) {
+					finalPrompt += `\n\n${userPrompt}`;
+				}
+				if (userArgs) {
+					finalPrompt += `\n\nArguments: ${userArgs}`;
+				}
+
+				this.outputChannel.appendLine(
+					`[HookExecutor] Sending agent prompt to Copilot Chat (length: ${finalPrompt.length} chars)`
+				);
+
+				// Send prompt to GitHub Copilot Chat (in-process execution)
+				await sendPromptToChat(finalPrompt);
+
+				this.outputChannel.appendLine(
+					"[HookExecutor] Local agent execution completed successfully"
+				);
+
+				return { success: true };
+			} catch (error) {
+				const err = error as Error;
+				this.outputChannel.appendLine(
+					`[HookExecutor] Local agent execution failed: ${err.message}`
+				);
+				return { success: false, error: err };
+			}
+		})();
+	}
+
+	/**
+	 * Execute a background agent (external CLI process)
+	 * T054: Implement background agent execution path
+	 */
+	private executeBackgroundAgent(
+		params: CustomActionParams,
+		templateContext: ParserTemplateContext
+	): Promise<{ success: boolean; error?: Error }> {
+		this.outputChannel.appendLine(
+			`[HookExecutor] Executing background agent: ${params.agentId}`
+		);
+
+		return (async () => {
+			try {
+				// Extract agent name from agentId (format: "file:agent-name")
+				const agentName =
+					params.agentId?.replace(AGENT_ID_PREFIX_PATTERN, "") ||
+					params.agentName;
+				if (!agentName) {
+					throw new Error("Agent name is required for background execution");
+				}
+
+				// Read the agent file from .github/agents/
+				const { promises: fs } = await import("node:fs");
+				const { join } = await import("node:path");
+
+				const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
+				if (!workspaceRoot) {
+					throw new Error("No workspace folder found");
+				}
+
+				const agentFilePath = join(
+					workspaceRoot,
+					".github",
+					"agents",
+					`${agentName}.agent.md`
+				);
+
+				this.outputChannel.appendLine(
+					`[HookExecutor] Reading agent file: ${agentFilePath}`
+				);
+
+				// Verify agent file exists
+				await fs.access(agentFilePath);
+
+				// Expand template variables in prompt and arguments
+				const userPrompt = params.prompt
+					? this.expandTemplate(params.prompt, templateContext)
+					: "";
+				const userArgs = params.arguments
+					? this.expandTemplate(params.arguments, templateContext)
+					: "";
+
+				// Build the gh copilot command with CLI options
+				const commandArgs = this.buildCopilotCliArgs(
+					params,
+					agentFilePath,
+					userPrompt,
+					userArgs
+				);
+
+				this.outputChannel.appendLine(
+					`[HookExecutor] Executing: gh ${commandArgs.slice(1).join(" ")}`
+				);
+
+				// Execute gh copilot command
+				const proc = spawn("gh", commandArgs, {
+					cwd: workspaceRoot,
+					shell: true,
+				});
+
+				return new Promise((resolve) => {
+					let stdout = "";
+					let stderr = "";
+
+					proc.stdout.on("data", (data: Buffer) => {
+						const text = data.toString();
+						stdout += text;
+						this.outputChannel.append(text);
+					});
+
+					proc.stderr.on("data", (data: Buffer) => {
+						const text = data.toString();
+						stderr += text;
+						this.outputChannel.append(text);
+					});
+
+					proc.on("exit", (code: number | null) => {
+						if (code === 0) {
+							this.outputChannel.appendLine(
+								"[HookExecutor] Background agent execution completed successfully"
+							);
+							this.outputChannel.appendLine(
+								`[HookExecutor] Output: ${stdout.trim()}`
+							);
+							resolve({ success: true });
+						} else {
+							const error = new Error(
+								`Background agent failed with exit code ${code}: ${stderr.trim()}`
+							);
+							this.outputChannel.appendLine(
+								`[HookExecutor] Background agent execution failed: ${error.message}`
+							);
+							resolve({ success: false, error });
+						}
+					});
+
+					proc.on("error", (error: Error) => {
+						this.outputChannel.appendLine(
+							`[HookExecutor] Background agent execution error: ${error.message}`
+						);
+						// Check if it's a "command not found" error
+						if (error.message.includes("ENOENT")) {
+							const enhancedError = new Error(
+								"GitHub CLI (gh) not found. Please install it: https://cli.github.com/"
+							);
+							resolve({ success: false, error: enhancedError });
+						} else {
+							resolve({ success: false, error });
+						}
+					});
+				});
+			} catch (error) {
+				const err = error as Error;
+				this.outputChannel.appendLine(
+					`[HookExecutor] Background agent execution failed: ${err.message}`
+				);
+				return { success: false, error: err };
+			}
+		})();
+	}
+
+	/**
+	 * Build GitHub Copilot CLI arguments with all supported options
+	 */
+	private buildCopilotCliArgs(
+		params: CustomActionParams,
+		agentFilePath: string,
+		userPrompt: string,
+		userArgs: string
+	): string[] {
+		const args = ["copilot", "-p"];
+
+		// Start with prompt
+		if (userPrompt) {
+			args.push(userPrompt);
+		}
+
+		// Add agent file
+		args.push("--agent", agentFilePath);
+
+		// Add user arguments
+		if (userArgs) {
+			args.push(userArgs);
+		}
+
+		// Add CLI options if provided
+		const opts = params.cliOptions;
+		if (!opts) {
+			return args;
+		}
+
+		// Combined flags (--allow-all / --yolo)
+		if (opts.allowAll) {
+			args.push("--allow-all");
+			return args; // No need to add individual permissions
+		}
+
+		// Add all option groups
+		this.addPathOptions(args, opts);
+		this.addToolPermissions(args, opts);
+		this.addUrlPermissions(args, opts);
+		this.addGithubMcpOptions(args, opts);
+		this.addMcpServerOptions(args, opts);
+		this.addExecutionOptions(args, opts);
+		this.addOutputOptions(args, opts);
+		this.addSessionOptions(args, opts);
+		this.addConfigOptions(args, opts);
+
+		return args;
+	}
+
+	private addPathOptions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.addDir) {
+			for (const dir of opts.addDir) {
+				args.push("--add-dir", dir);
+			}
+		}
+		if (opts.allowAllPaths) {
+			args.push("--allow-all-paths");
+		}
+		if (opts.disallowTempDir) {
+			args.push("--disallow-temp-dir");
+		}
+	}
+
+	private addToolPermissions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.allowAllTools) {
+			args.push("--allow-all-tools");
+		}
+		if (opts.allowTool) {
+			args.push("--allow-tool", ...opts.allowTool);
+		}
+		if (opts.availableTools) {
+			args.push("--available-tools", ...opts.availableTools);
+		}
+		if (opts.excludedTools) {
+			args.push("--excluded-tools", ...opts.excludedTools);
+		}
+		if (opts.denyTool) {
+			args.push("--deny-tool", ...opts.denyTool);
+		}
+	}
+
+	private addUrlPermissions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.allowAllUrls) {
+			args.push("--allow-all-urls");
+		}
+		if (opts.allowUrl) {
+			args.push("--allow-url", ...opts.allowUrl);
+		}
+		if (opts.denyUrl) {
+			args.push("--deny-url", ...opts.denyUrl);
+		}
+	}
+
+	private addGithubMcpOptions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.enableAllGithubMcpTools) {
+			args.push("--enable-all-github-mcp-tools");
+		}
+		if (opts.addGithubMcpTool) {
+			for (const tool of opts.addGithubMcpTool) {
+				args.push("--add-github-mcp-tool", tool);
+			}
+		}
+		if (opts.addGithubMcpToolset) {
+			for (const toolset of opts.addGithubMcpToolset) {
+				args.push("--add-github-mcp-toolset", toolset);
+			}
+		}
+	}
+
+	private addMcpServerOptions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.additionalMcpConfig) {
+			for (const config of opts.additionalMcpConfig) {
+				args.push("--additional-mcp-config", config);
+			}
+		}
+		if (opts.disableBuiltinMcps) {
+			args.push("--disable-builtin-mcps");
+		}
+		if (opts.disableMcpServer) {
+			for (const server of opts.disableMcpServer) {
+				args.push("--disable-mcp-server", server);
+			}
+		}
+	}
+
+	private addExecutionOptions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.agent) {
+			args.push("--agent", opts.agent);
+		}
+		if (opts.model) {
+			args.push("--model", opts.model);
+		}
+		if (opts.noAskUser) {
+			args.push("--no-ask-user");
+		}
+		if (opts.disableParallelToolsExecution) {
+			args.push("--disable-parallel-tools-execution");
+		}
+		if (opts.noCustomInstructions) {
+			args.push("--no-custom-instructions");
+		}
+	}
+
+	private addOutputOptions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.silent) {
+			args.push("--silent");
+		}
+		if (opts.logLevel) {
+			args.push("--log-level", opts.logLevel);
+		}
+		if (opts.logDir) {
+			args.push("--log-dir", opts.logDir);
+		}
+		if (opts.noColor) {
+			args.push("--no-color");
+		}
+		if (opts.plainDiff) {
+			args.push("--plain-diff");
+		}
+		if (opts.screenReader) {
+			args.push("--screen-reader");
+		}
+		if (opts.stream) {
+			args.push("--stream", opts.stream);
+		}
+	}
+
+	private addSessionOptions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.resume) {
+			if (typeof opts.resume === "string") {
+				args.push("--resume", opts.resume);
+			} else {
+				args.push("--resume");
+			}
+		}
+		if (opts.continue) {
+			args.push("--continue");
+		}
+		if (opts.share) {
+			if (typeof opts.share === "string") {
+				args.push("--share", opts.share);
+			} else {
+				args.push("--share");
+			}
+		}
+		if (opts.shareGist) {
+			args.push("--share-gist");
+		}
+	}
+
+	private addConfigOptions(
+		args: string[],
+		opts: NonNullable<CustomActionParams["cliOptions"]>
+	): void {
+		if (opts.configDir) {
+			args.push("--config-dir", opts.configDir);
+		}
+		if (opts.banner) {
+			args.push("--banner");
+		}
+		if (opts.noAutoUpdate) {
+			args.push("--no-auto-update");
+		}
 	}
 }
