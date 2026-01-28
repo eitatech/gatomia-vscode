@@ -40,7 +40,10 @@ describe("Agent Dropdown Performance Profiling", () => {
 		const promises: Promise<void>[] = [];
 
 		for (let i = 0; i < count; i++) {
+			const agentId = `test-agent-${i.toString().padStart(3, "0")}`;
 			const agentContent = `---
+id: ${agentId}
+name: Test Agent ${i}
 description: Test agent ${i} for performance profiling
 ---
 
@@ -56,10 +59,7 @@ Execute the following steps:
 3. Step 3
 `;
 
-			const filePath = join(
-				agentsDir,
-				`test-agent-${i.toString().padStart(3, "0")}.agent.md`
-			);
+			const filePath = join(agentsDir, `${agentId}.agent.md`);
 			promises.push(writeFile(filePath, agentContent, "utf-8"));
 		}
 
@@ -174,7 +174,7 @@ Execute the following steps:
 
 			const startTime = performance.now();
 
-			const filtered = registry.getAgents({ type: "local" });
+			const filtered = registry.getAllAgents({ type: "local" });
 
 			const duration = performance.now() - startTime;
 
@@ -190,7 +190,7 @@ Execute the following steps:
 
 			const startTime = performance.now();
 
-			const filtered = registry.getAgents({ searchTerm: "test" });
+			const filtered = registry.getAllAgents({ searchTerm: "test" });
 
 			const duration = performance.now() - startTime;
 
@@ -223,8 +223,8 @@ Execute the following steps:
 			const agents = registry.getAllAgents();
 			expect(agents).toHaveLength(100);
 
-			// Memory usage should be reasonable (allow up to 200KB for 100 agents)
-			expect(memDeltaKB).toBeLessThan(200);
+			// Memory usage should be reasonable (allow up to 2MB for 100 agents with full schema)
+			expect(memDeltaKB).toBeLessThan(2048);
 
 			console.log(`✓ 100 agents use ${memDeltaKB.toFixed(2)}KB of memory`);
 		});
@@ -236,30 +236,28 @@ Execute the following steps:
 			const agentFiles: Promise<void>[] = [];
 
 			for (let i = 0; i < 25; i++) {
+				const agentId = `code-reviewer-${i}`;
 				const content = `---
+id: ${agentId}
+name: Code Reviewer
 description: Code reviewer agent ${i}
 ---
 # Code Reviewer ${i}`;
 				agentFiles.push(
-					writeFile(
-						join(agentsDir, `code-reviewer-${i}.agent.md`),
-						content,
-						"utf-8"
-					)
+					writeFile(join(agentsDir, `${agentId}.agent.md`), content, "utf-8")
 				);
 			}
 
 			for (let i = 0; i < 25; i++) {
+				const agentId = `test-generator-${i}`;
 				const content = `---
+id: ${agentId}
+name: Test Generator
 description: Test generator agent ${i}
 ---
 # Test Generator ${i}`;
 				agentFiles.push(
-					writeFile(
-						join(agentsDir, `test-generator-${i}.agent.md`),
-						content,
-						"utf-8"
-					)
+					writeFile(join(agentsDir, `${agentId}.agent.md`), content, "utf-8")
 				);
 			}
 

@@ -125,6 +125,41 @@ describe("HookManager", () => {
 			expect(hooks).toHaveLength(1);
 			expect(hooks[0].name).toBe("Existing Hook");
 		});
+
+		it("should migrate old hooks without timing field to default 'after'", async () => {
+			const { randomUUID } = await import("node:crypto");
+			// Old hook without timing field (created before timing feature)
+			const oldHook = {
+				id: randomUUID(),
+				name: "Old Hook",
+				enabled: true,
+				trigger: {
+					agent: "speckit",
+					operation: "specify",
+					// No timing field - simulates old hook
+				},
+				action: {
+					type: "agent",
+					parameters: {
+						command: "/speckit.clarify",
+					},
+				},
+				createdAt: Date.now(),
+				modifiedAt: Date.now(),
+				executionCount: 0,
+			};
+
+			await mockContext.workspaceState.update("gatomia.hooks.configurations", [
+				oldHook,
+			]);
+
+			const newManager = new HookManager(mockContext, mockOutputChannel);
+			await newManager.initialize();
+
+			const hooks = await newManager.getAllHooks();
+			expect(hooks).toHaveLength(1);
+			expect(hooks[0].trigger.timing).toBe("after");
+		});
 	});
 
 	describe("createHook", () => {

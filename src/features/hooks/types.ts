@@ -37,6 +37,7 @@ export interface TriggerCondition {
 	agent: AgentType; // Which agent system
 	operation: OperationType; // Which operation
 	timing: TriggerTiming; // When to trigger
+	waitForCompletion?: boolean; // Only for "before" timing: block operation until hook completes
 }
 
 /**
@@ -83,7 +84,7 @@ export const SUPPORTED_SPECKIT_OPERATIONS: OperationType[] = [
 /**
  * TriggerTiming - When the trigger should fire
  */
-export type TriggerTiming = "after"; // MVP: only 'after' supported
+export type TriggerTiming = "before" | "after";
 
 /**
  * ActionConfig - Defines the operation to execute when triggered
@@ -322,6 +323,10 @@ export interface TemplateContext {
 	branch?: string; // Current git branch (e.g., '001-hooks-module')
 	timestamp?: string; // ISO 8601 format
 	user?: string; // Git user name from config
+	// Output capture variables
+	agentOutput?: string; // Output content from triggering agent
+	clipboardContent?: string; // Current clipboard content
+	outputPath?: string; // Path to output file
 }
 
 /**
@@ -331,7 +336,11 @@ export interface TriggerEvent {
 	agent: string; // 'speckit' | 'openspec'
 	operation: string; // Operation name
 	timestamp: number; // Unix timestamp (milliseconds)
+	timing?: TriggerTiming; // When the trigger fired (before/after)
 	metadata?: Record<string, unknown>; // Optional context data
+	// Output capture fields
+	outputPath?: string; // Path to generated file (for file operations)
+	outputContent?: string; // File content or captured output
 }
 
 // ============================================================================
@@ -434,13 +443,17 @@ export function isValidTrigger(obj: unknown): obj is TriggerCondition {
 	const trigger = obj as TriggerCondition;
 
 	const validAgents: AgentType[] = ["speckit", "openspec"];
+	const validTimings: TriggerTiming[] = ["before", "after"];
 
 	return (
 		typeof trigger.agent === "string" &&
 		validAgents.includes(trigger.agent) &&
 		typeof trigger.operation === "string" &&
 		SUPPORTED_SPECKIT_OPERATIONS.includes(trigger.operation) &&
-		trigger.timing === "after"
+		typeof trigger.timing === "string" &&
+		validTimings.includes(trigger.timing) &&
+		(trigger.waitForCompletion === undefined ||
+			typeof trigger.waitForCompletion === "boolean")
 	);
 }
 
@@ -634,7 +647,7 @@ export function isValidTriggerEvent(obj: unknown): obj is TriggerEvent {
 	}
 	const event = obj as TriggerEvent;
 
-	const validAgents: AgentType[] = ["speckit", "openspec"];
+	const validAgents: string[] = ["speckit", "openspec"];
 
 	return (
 		typeof event.agent === "string" &&
