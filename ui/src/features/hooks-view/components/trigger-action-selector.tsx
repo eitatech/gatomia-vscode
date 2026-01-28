@@ -20,6 +20,7 @@ import type { ChangeEvent } from "react";
 import { useMCPServers } from "../hooks/use-mcp-servers";
 import { MCPToolsSelector } from "./mcp-tools-selector";
 import { ArgumentTemplateEditor } from "./argument-template-editor";
+import { CopilotCliOptionsPanel } from "./cli-options/copilot-cli-options-panel";
 
 interface TriggerActionSelectorProps {
 	trigger: TriggerCondition;
@@ -525,6 +526,26 @@ export const TriggerActionSelector = ({
 								value={params.arguments || ""}
 							/>
 						</div>
+
+						{/* CLI Options Panel - Only show for background agents */}
+						{params.agentType === "background" && (
+							<CopilotCliOptionsPanel
+								disabled={disabled}
+								onChange={(
+									cliOptions: import("../types").CopilotCliOptions
+								) => {
+									onActionChange({
+										...action,
+										parameters: {
+											...params,
+											cliOptions,
+										} as CustomActionParams,
+									});
+									onClearActionError?.();
+								}}
+								value={params.cliOptions || {}}
+							/>
+						)}
 					</>
 				);
 			}
