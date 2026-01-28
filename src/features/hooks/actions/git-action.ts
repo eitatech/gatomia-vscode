@@ -109,7 +109,7 @@ export class GitActionExecutor {
 			return template;
 		}
 
-		return template.replace(/\{(\w+)\}/g, (_match, key) => {
+		return template.replace(/\$([a-zA-Z_][a-zA-Z0-9_]*)/g, (_match, key) => {
 			const value = context[key as keyof TemplateContext];
 			if (value === undefined || value === null) {
 				return "";

@@ -60,6 +60,34 @@ export const HookListItem = ({
 		}
 	};
 
+	// Render timing badge
+	const renderTimingBadge = () => {
+		const timing = hook.trigger.timing || "after"; // Default to "after" for backward compatibility
+		const isBlocking = timing === "before" && hook.trigger.waitForCompletion;
+
+		const timingColors = {
+			before: "text-[color:var(--vscode-charts-blue,#3794ff)]",
+			after: "text-[color:var(--vscode-charts-green,#89d185)]",
+		};
+
+		let tooltipText = "Runs after operation completes";
+		if (timing === "before") {
+			tooltipText = isBlocking
+				? "Runs before operation and blocks until complete"
+				: "Runs before operation (non-blocking)";
+		}
+
+		return (
+			<span
+				className={`rounded border border-[color:color-mix(in_srgb,var(--vscode-foreground)_20%,transparent)] px-2 py-0.5 ${timingColors[timing]}`}
+				title={tooltipText}
+			>
+				{timing}
+				{isBlocking && " (blocking)"}
+			</span>
+		);
+	};
+
 	const renderExecutionStatus = () => {
 		if (!executionStatus) {
 			return null;
@@ -174,6 +202,7 @@ export const HookListItem = ({
 					<span className="rounded border border-[color:color-mix(in_srgb,var(--vscode-foreground)_20%,transparent)] px-2 py-0.5">
 						{triggerDisplay}
 					</span>
+					{renderTimingBadge()}
 					<span className="rounded border border-[color:color-mix(in_srgb,var(--vscode-foreground)_20%,transparent)] px-2 py-0.5">
 						{hook.action.type} action
 					</span>

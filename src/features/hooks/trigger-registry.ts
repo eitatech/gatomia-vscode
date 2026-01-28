@@ -51,12 +51,25 @@ export class TriggerRegistry {
 	 *
 	 * @param agent - Agent system ('speckit' | 'openspec')
 	 * @param operation - Operation name ('specify' | 'clarify' | 'plan' | 'analyze' | 'checklist')
+	 * @param timing - When the trigger fires ('before' | 'after')
+	 * @param outputData - Optional output capture data
 	 */
-	fireTrigger(agent: string, operation: string): void {
+	fireTrigger(
+		agent: string,
+		operation: string,
+		timing: "before" | "after" = "after",
+		outputData?: {
+			outputPath?: string;
+			outputContent?: string;
+		}
+	): void {
 		const event: TriggerEvent = {
 			agent,
 			operation,
 			timestamp: Date.now(),
+			timing,
+			outputPath: outputData?.outputPath,
+			outputContent: outputData?.outputContent,
 		};
 
 		this.fireTriggerWithContext(event);
@@ -85,7 +98,7 @@ export class TriggerRegistry {
 
 		// Log trigger
 		this.outputChannel.appendLine(
-			`[TriggerRegistry] Trigger fired: ${event.agent}.${event.operation} at ${new Date(event.timestamp).toISOString()}`
+			`[TriggerRegistry] Trigger fired: ${event.agent}.${event.operation} (${event.timing || "after"}) at ${new Date(event.timestamp).toISOString()}`
 		);
 
 		// Store in history (FIFO)
