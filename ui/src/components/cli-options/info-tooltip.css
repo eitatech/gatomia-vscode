@@ -1,0 +1,106 @@
+.info-tooltip-wrapper {
+	display: inline-flex;
+	align-items: center;
+	position: relative;
+}
+
+.info-tooltip-icon {
+	background: none;
+	border: none;
+	padding: 0;
+	margin: 0 0 0 4px;
+	cursor: pointer;
+	color: var(--vscode-descriptionForeground);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	transition: color 0.2s;
+	line-height: 1;
+}
+
+.info-tooltip-icon:hover {
+	color: var(--vscode-foreground);
+}
+
+.info-tooltip-icon:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 2px;
+}
+
+.info-tooltip-content {
+	position: fixed;
+	z-index: 10000;
+	max-width: 320px;
+	padding: 12px;
+	background-color: var(--vscode-editorHoverWidget-background);
+	border: 1px solid var(--vscode-editorHoverWidget-border);
+	border-radius: 3px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--vscode-editorHoverWidget-foreground);
+	animation: tooltipFadeIn 0.15s ease-out;
+}
+
+@keyframes tooltipFadeIn {
+	from {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.info-tooltip-title {
+	font-weight: 600;
+	margin-bottom: 6px;
+	color: var(--vscode-editorHoverWidget-foreground);
+	font-family: var(--vscode-editor-font-family);
+	font-size: 13px;
+}
+
+.info-tooltip-description {
+	margin-bottom: 8px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.info-tooltip-warning {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	padding: 8px;
+	margin: 8px 0;
+	background-color: var(--vscode-inputValidation-warningBackground);
+	border: 1px solid var(--vscode-inputValidation-warningBorder);
+	border-radius: 2px;
+	color: var(--vscode-inputValidation-warningForeground);
+	font-size: 12px;
+}
+
+.info-tooltip-warning svg {
+	flex-shrink: 0;
+	margin-top: 2px;
+}
+
+.info-tooltip-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--vscode-textLink-foreground);
+	text-decoration: none;
+	font-size: 12px;
+	margin-top: 8px;
+	transition: color 0.2s;
+}
+
+.info-tooltip-link:hover {
+	color: var(--vscode-textLink-activeForeground);
+	text-decoration: underline;
+}
+
+.info-tooltip-link:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 2px;
+}
