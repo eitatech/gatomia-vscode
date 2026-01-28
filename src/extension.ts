@@ -23,7 +23,7 @@ import { SteeringManager } from "./features/steering/steering-manager";
 import { AgentService } from "./services/agent-service";
 import { CopilotProvider } from "./providers/copilot-provider";
 import { QuickAccessExplorerProvider } from "./providers/quick-access-explorer-provider";
-import { PromptsExplorerProvider } from "./providers/prompts-explorer-provider";
+import { ActionsExplorerProvider } from "./providers/actions-explorer-provider";
 import { SpecExplorerProvider } from "./providers/spec-explorer-provider";
 import { SpecTaskCodeLensProvider } from "./providers/spec-task-code-lens-provider";
 import { SteeringExplorerProvider } from "./providers/steering-explorer-provider";
@@ -109,8 +109,8 @@ export async function activate(context: ExtensionContext) {
 		promptLoader.initialize();
 		outputChannel.appendLine("PromptLoader initialized successfully");
 	} catch (error) {
-		outputChannel.appendLine(`Failed to initialize PromptLoader: ${error}`);
-		window.showErrorMessage(`Failed to initialize prompt system: ${error}`);
+		outputChannel.appendLine(`Failed to initialize PromptLoader: ${error} `);
+		window.showErrorMessage(`Failed to initialize prompt system: ${error} `);
 	}
 
 	// Check workspace status
@@ -130,16 +130,16 @@ export async function activate(context: ExtensionContext) {
 		const adapter = getSpecSystemAdapter();
 		await adapter.initialize();
 		outputChannel.appendLine(
-			`Spec System Adapter initialized. Active system: ${adapter.getActiveSystem()}`
+			`Spec System Adapter initialized.Active system: ${adapter.getActiveSystem()} `
 		);
 
 		// Load prompts from active system
 		const promptsPath = adapter.getPromptsBasePath();
 		PromptLoader.getInstance().loadPromptsFromDirectory(promptsPath);
-		outputChannel.appendLine(`Loaded prompts from: ${promptsPath}`);
+		outputChannel.appendLine(`Loaded prompts from: ${promptsPath} `);
 	} catch (error) {
 		outputChannel.appendLine(
-			`Failed to initialize Spec System Adapter: ${error}`
+			`Failed to initialize Spec System Adapter: ${error} `
 		);
 	}
 
@@ -257,7 +257,7 @@ export async function activate(context: ExtensionContext) {
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				outputChannel.appendLine(
-					`[Preview] Failed to persist form submission: ${message}`
+					`[Preview] Failed to persist form submission: ${message} `
 				);
 				return { status: "error" as const, message };
 			}
@@ -274,7 +274,7 @@ export async function activate(context: ExtensionContext) {
 				return await refinementGateway.submitRequest(payload);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				outputChannel.appendLine(`[RefinementGateway] Failed: ${message}`);
+				outputChannel.appendLine(`[RefinementGateway] Failed: ${message} `);
 				return { status: "error" as const, message };
 			}
 		},
@@ -304,8 +304,9 @@ export async function activate(context: ExtensionContext) {
 				const tasksFilePath = getTasksFilePath(specName);
 				if (!tasksFilePath) {
 					window.showErrorMessage(
-						`Could not find tasks.md for spec: ${specName}`
+						`Could not find tasks.md for spec: ${specName} `
 					);
+					return;
 				}
 
 				const taskGroups = parseTasksFromFile(tasksFilePath);
@@ -318,22 +319,22 @@ export async function activate(context: ExtensionContext) {
 				);
 
 				if (!matchingGroup || matchingGroup.tasks.length === 0) {
-					window.showErrorMessage(`No tasks found for group: ${groupName}`);
+					window.showErrorMessage(`No tasks found for group: ${groupName} `);
 					return;
 				}
 
 				// Aggregate task IDs
 				const taskDescriptions = matchingGroup.tasks
-					.map((t) => `${t.id}: ${t.title}`)
+					.map((t) => `${t.id}: ${t.title} `)
 					.join("\n- ");
 
 				// Send to Copilot with all task IDs
-				const prompt = `/speckit.implement ${groupName}\n\nTasks:\n- ${taskDescriptions}`;
+				const prompt = `/ speckit.implement ${groupName} \n\nTasks: \n - ${taskDescriptions} `;
 				await sendPromptToChat(prompt);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				window.showErrorMessage(`Failed to execute task group: ${message}`);
-				outputChannel.appendLine(`[Execute Task Group] Failed: ${message}`);
+				window.showErrorMessage(`Failed to execute task group: ${message} `);
+				outputChannel.appendLine(`[Execute Task Group]Failed: ${message} `);
 			}
 		},
 		onOpenFile: async (filePath: string) => {
@@ -352,7 +353,7 @@ export async function activate(context: ExtensionContext) {
 				let absolutePath: Uri;
 
 				outputChannel.appendLine(
-					`[Open File] Processing: ${filePath}, activePreviewUri: ${activePreviewUri?.fsPath}`
+					`[Open File]Processing: ${filePath}, activePreviewUri: ${activePreviewUri?.fsPath} `
 				);
 
 				// If the path is absolute, use it directly
@@ -367,13 +368,13 @@ export async function activate(context: ExtensionContext) {
 					absolutePath = Uri.file(resolvedPath);
 
 					outputChannel.appendLine(
-						`[Open File] Resolved relative path: ${filePath} -> ${resolvedPath}`
+						`[Open File] Resolved relative path: ${filePath} -> ${resolvedPath} `
 					);
 				} else {
 					// Fallback: try to resolve from workspace root
 					absolutePath = Uri.file(join(workspaceRoot, filePath));
 					outputChannel.appendLine(
-						`[Open File] Using workspace root fallback: ${absolutePath.fsPath}`
+						`[Open File] Using workspace root fallback: ${absolutePath.fsPath} `
 					);
 				}
 
@@ -381,10 +382,12 @@ export async function activate(context: ExtensionContext) {
 				try {
 					await workspace.fs.stat(absolutePath);
 				} catch {
-					const suggestion = `Path: ${absolutePath.fsPath}`;
-					outputChannel.appendLine(`[Open File] File not found: ${suggestion}`);
+					const suggestion = `Path: ${absolutePath.fsPath} `;
+					outputChannel.appendLine(
+						`[Open File] File not found: ${suggestion} `
+					);
 					window.showErrorMessage(
-						`File not found: ${filePath}\n\nResolved to: ${absolutePath.fsPath}`
+						`File not found: ${filePath} \n\nResolved to: ${absolutePath.fsPath} `
 					);
 					return;
 				}
@@ -393,8 +396,8 @@ export async function activate(context: ExtensionContext) {
 				await renderPreviewForUri(absolutePath);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				window.showErrorMessage(`Failed to open file: ${message}`);
-				outputChannel.appendLine(`[Open File] Failed: ${message}`);
+				window.showErrorMessage(`Failed to open file: ${message} `);
+				outputChannel.appendLine(`[Open File]Failed: ${message} `);
 			}
 		},
 	});
@@ -404,7 +407,7 @@ export async function activate(context: ExtensionContext) {
 	const quickAccessExplorer = new QuickAccessExplorerProvider();
 	const specExplorer = new SpecExplorerProvider(context);
 	const steeringExplorer = new SteeringExplorerProvider(context);
-	const promptsExplorer = new PromptsExplorerProvider(context);
+	const actionsExplorer = new ActionsExplorerProvider(context);
 	const hooksExplorer = new HooksExplorerProvider(hookManager);
 	hooksExplorer.initialize();
 
@@ -426,8 +429,8 @@ export async function activate(context: ExtensionContext) {
 			steeringExplorer
 		),
 		window.registerTreeDataProvider(
-			"gatomia.views.promptsExplorer",
-			promptsExplorer
+			"gatomia.views.actionsExplorer",
+			actionsExplorer
 		),
 		window.registerTreeDataProvider(HooksExplorerProvider.viewId, hooksExplorer)
 	);
@@ -446,12 +449,12 @@ export async function activate(context: ExtensionContext) {
 		context,
 		specExplorer,
 		steeringExplorer,
-		promptsExplorer,
+		actionsExplorer,
 		hooksExplorer,
 	});
 
 	// Set up file watchers
-	setupFileWatchers(context, specExplorer, steeringExplorer, promptsExplorer);
+	setupFileWatchers(context, specExplorer, steeringExplorer, actionsExplorer);
 
 	// Register CodeLens provider for spec tasks
 	const specTaskCodeLensProvider = new SpecTaskCodeLensProvider();
@@ -472,7 +475,7 @@ export async function activate(context: ExtensionContext) {
 	// T019-T020: First-time welcome screen activation
 	try {
 		const shouldShow = shouldShowWelcomeAutomatically(context);
-		outputChannel.appendLine(`[Welcome] First-time check: ${shouldShow}`);
+		outputChannel.appendLine(`[Welcome] First - time check: ${shouldShow} `);
 
 		if (shouldShow) {
 			outputChannel.appendLine(
@@ -508,7 +511,7 @@ export async function activate(context: ExtensionContext) {
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		outputChannel.appendLine(
-			`[Welcome] Failed to show first-time screen: ${message}`
+			`[Welcome] Failed to show first - time screen: ${message} `
 		);
 		// Don't show error to user - welcome screen is optional
 	}
@@ -535,7 +538,7 @@ async function syncAllSpecReviewFlowSummaries(
 		}
 	} catch (error) {
 		outputChannel.appendLine(
-			`[ReviewFlow] Failed to sync initial pending summaries: ${error}`
+			`[ReviewFlow] Failed to sync initial pending summaries: ${error} `
 		);
 	}
 }
@@ -633,7 +636,7 @@ interface RegisterCommandsOptions {
 	context: ExtensionContext;
 	specExplorer: SpecExplorerProvider;
 	steeringExplorer: SteeringExplorerProvider;
-	promptsExplorer: PromptsExplorerProvider;
+	actionsExplorer: ActionsExplorerProvider;
 	hooksExplorer: HooksExplorerProvider;
 }
 
@@ -641,22 +644,22 @@ function registerCommands({
 	context,
 	specExplorer,
 	steeringExplorer,
-	promptsExplorer,
+	actionsExplorer,
 	hooksExplorer,
 }: RegisterCommandsOptions) {
 	const createSpecCommand = commands.registerCommand(
 		"gatomia.spec.create",
 		async () => {
 			outputChannel.appendLine(
-				`[Spec] create command triggered at ${new Date().toISOString()}`
+				`[Spec] create command triggered at ${new Date().toISOString()} `
 			);
 
 			try {
 				await specManager.create();
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				outputChannel.appendLine(`[Spec] create command failed: ${message}`);
-				window.showErrorMessage(`Failed to create spec prompt: ${message}`);
+				outputChannel.appendLine(`[Spec] create command failed: ${message} `);
+				window.showErrorMessage(`Failed to create spec prompt: ${message} `);
 			}
 		}
 	);
@@ -704,7 +707,7 @@ function registerCommands({
 			"gatomia.spec.implTask",
 			async (documentUri: Uri) => {
 				outputChannel.appendLine(
-					`[Task Execute] Generating GatomIA apply prompt for: ${documentUri.fsPath}`
+					`[Task Execute] Generating GatomIA apply prompt for: ${documentUri.fsPath} `
 				);
 				await specManager.runOpenSpecApply(documentUri);
 			}
@@ -719,18 +722,18 @@ function registerCommands({
 				}
 
 				const { id, title } = item.task;
-				const taskDescription = `${id}: ${title}`;
+				const taskDescription = `${id}: ${title} `;
 				outputChannel.appendLine(
-					`[Run Task] Triggering speckit.implement for task: ${taskDescription}`
+					`[Run Task] Triggering speckit.implement for task: ${taskDescription} `
 				);
 
 				try {
-					await sendPromptToChat(`/speckit.implement ${taskDescription}`);
+					await sendPromptToChat(`/ speckit.implement ${taskDescription} `);
 				} catch (error) {
 					const message =
 						error instanceof Error ? error.message : String(error);
-					window.showErrorMessage(`Failed to run task: ${message}`);
-					outputChannel.appendLine(`[Run Task] Failed: ${message}`);
+					window.showErrorMessage(`Failed to run task: ${message} `);
+					outputChannel.appendLine(`[Run Task]Failed: ${message} `);
 				}
 			}
 		),
@@ -745,16 +748,16 @@ function registerCommands({
 
 				const groupName = args.parentName;
 				outputChannel.appendLine(
-					`[Run Task Group] Triggering speckit.implement for group: ${groupName}`
+					`[Run Task Group] Triggering speckit.implement for group: ${groupName} `
 				);
 
 				try {
-					await sendPromptToChat(`/speckit.implement ${groupName}`);
+					await sendPromptToChat(`/ speckit.implement ${groupName} `);
 				} catch (error) {
 					const message =
 						error instanceof Error ? error.message : String(error);
-					window.showErrorMessage(`Failed to run task group: ${message}`);
-					outputChannel.appendLine(`[Run Task Group] Failed: ${message}`);
+					window.showErrorMessage(`Failed to run task group: ${message} `);
+					outputChannel.appendLine(`[Run Task Group]Failed: ${message} `);
 				}
 			}
 		),
@@ -831,13 +834,13 @@ function registerCommands({
 				const json = hookManager.exportHooks();
 				await workspace.fs.writeFile(saveUri, Buffer.from(json, "utf8"));
 
-				const message = `Exported hooks to ${saveUri.fsPath}`;
+				const message = `Exported hooks to ${saveUri.fsPath} `;
 				window.showInformationMessage(message);
-				outputChannel.appendLine(`[Hooks] ${message}`);
+				outputChannel.appendLine(`[Hooks] ${message} `);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				window.showErrorMessage(`Failed to export hooks: ${message}`);
-				outputChannel.appendLine(`[Hooks] Failed to export hooks: ${message}`);
+				window.showErrorMessage(`Failed to export hooks: ${message} `);
+				outputChannel.appendLine(`[Hooks] Failed to export hooks: ${message} `);
 			}
 		}),
 		commands.registerCommand("gatomia.hooks.import", async () => {
@@ -897,7 +900,7 @@ function registerCommands({
 				} catch (error) {
 					const message =
 						error instanceof Error ? error.message : String(error);
-					window.showErrorMessage(`Failed to enable hook: ${message}`);
+					window.showErrorMessage(`Failed to enable hook: ${message} `);
 				}
 			}
 		),
@@ -917,7 +920,7 @@ function registerCommands({
 				} catch (error) {
 					const message =
 						error instanceof Error ? error.message : String(error);
-					window.showErrorMessage(`Failed to pause hook: ${message}`);
+					window.showErrorMessage(`Failed to pause hook: ${message} `);
 				}
 			}
 		),
@@ -945,7 +948,7 @@ function registerCommands({
 				} catch (error) {
 					const message =
 						error instanceof Error ? error.message : String(error);
-					window.showErrorMessage(`Failed to delete hook: ${message}`);
+					window.showErrorMessage(`Failed to delete hook: ${message} `);
 				}
 			}
 		)
@@ -1007,6 +1010,19 @@ function registerCommands({
 					event.waitUntil(new Promise(() => {}));
 				}
 			}
+		})
+	);
+
+	// Context menu for folders
+	context.subscriptions.push(
+		commands.registerCommand("gatomia.newSpec", async (uri: Uri) => {
+			await createNewFile(uri, ".spec.md");
+		})
+	);
+
+	context.subscriptions.push(
+		commands.registerCommand("gatomia.newChecklist", async (uri: Uri) => {
+			await createNewFile(uri, ".checklist.md");
 		})
 	);
 
@@ -1072,15 +1088,15 @@ function registerCommands({
 				try {
 					const promptContent = await workspace.fs.readFile(promptPath);
 					const promptString = new TextDecoder().decode(promptContent);
-					const fullPrompt = `${promptString}\n\nid: ${changeId}`;
+					const fullPrompt = `${promptString} \n\nid: ${changeId} `;
 
 					outputChannel.appendLine(
-						`[Archive Change] Archiving change: ${changeId}`
+						`[Archive Change] Archiving change: ${changeId} `
 					);
 					await sendPromptToChat(fullPrompt);
 				} catch (error) {
 					window.showErrorMessage(
-						`Failed to read archive prompt: ${error instanceof Error ? error.message : String(error)}`
+						`Failed to read archive prompt: ${error instanceof Error ? error.message : String(error)} `
 					);
 				}
 			}
@@ -1090,24 +1106,24 @@ function registerCommands({
 	// Copilot integration commands
 	// Copilot CLI integration commands
 
-	// Prompts commands
+	// Actions commands
 	context.subscriptions.push(
-		commands.registerCommand("gatomia.prompts.refresh", () => {
+		commands.registerCommand("gatomia.actions.refresh", () => {
 			outputChannel.appendLine(
-				"[Manual Refresh] Refreshing prompts explorer..."
+				"[Manual Refresh] Refreshing actions explorer..."
 			);
-			promptsExplorer.refresh();
+			actionsExplorer.refresh();
 		}),
-		commands.registerCommand("gatomia.prompts.createInstructions", async () => {
+		commands.registerCommand("gatomia.actions.createInstructions", async () => {
 			await commands.executeCommand("workbench.command.new.instructions");
 		}),
 		commands.registerCommand(
-			"gatomia.prompts.createCopilotPrompt",
+			"gatomia.actions.createCopilotPrompt",
 			async () => {
 				await commands.executeCommand("workbench.command.new.prompt");
 			}
 		),
-		commands.registerCommand("gatomia.prompts.create", async (item?: any) => {
+		commands.registerCommand("gatomia.actions.create", async (item?: any) => {
 			const ws = workspace.workspaceFolders?.[0];
 			if (!ws) {
 				window.showErrorMessage("No workspace folder found");
@@ -1116,29 +1132,18 @@ function registerCommands({
 			const configManager = ConfigManager.getInstance();
 
 			let targetDir: Uri;
-			let promptsPathLabel: string;
-
-			// Determine target directory based on the item source
-			if (item?.source === "global") {
-				const home = homedir();
-				const globalPath = join(home, ".github", "prompts");
-				targetDir = Uri.file(globalPath);
-				promptsPathLabel = globalPath;
-			} else {
-				// Default to project scope
-				promptsPathLabel = configManager.getPath("prompts");
-				targetDir = Uri.joinPath(ws.uri, ".copilot", "prompts");
-				try {
-					targetDir = Uri.file(configManager.getAbsolutePath("prompts"));
-				} catch {
-					// fall back to default under workspace
-				}
+			const actionsPathLabel = configManager.getPath("prompts");
+			targetDir = Uri.joinPath(ws.uri, ".copilot", "prompts");
+			try {
+				targetDir = Uri.file(configManager.getAbsolutePath("prompts"));
+			} catch {
+				// fall back to default under workspace
 			}
 
 			const name = await window.showInputBox({
-				title: "Create Prompt",
-				placeHolder: "prompt name (kebab-case)",
-				prompt: `A markdown file will be created under ${promptsPathLabel}`,
+				title: "Create Action",
+				placeHolder: "action name (kebab-case)",
+				prompt: `A markdown file will be created under ${actionsPathLabel} `,
 				validateInput: (v) => (v ? undefined : "Name is required"),
 			});
 			if (!name) {
@@ -1149,18 +1154,18 @@ function registerCommands({
 			try {
 				await workspace.fs.createDirectory(targetDir);
 				const content = Buffer.from(
-					`# ${name}\n\nDescribe your prompt here. This file will be sent to Copilot when executed.\n`
+					`# ${name} \n\nDescribe your action here.This file will be sent to Copilot when executed.\n`
 				);
 				await workspace.fs.writeFile(file, content);
 				const doc = await workspace.openTextDocument(file);
 				await window.showTextDocument(doc);
-				promptsExplorer.refresh();
+				actionsExplorer.refresh();
 			} catch (e) {
-				window.showErrorMessage(`Failed to create prompt: ${e}`);
+				window.showErrorMessage(`Failed to create action: ${e} `);
 			}
 		}),
 		commands.registerCommand(
-			"gatomia.prompts.run",
+			"gatomia.actions.run",
 			// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ignore
 			async (filePathOrItem?: any) => {
 				try {
@@ -1185,7 +1190,7 @@ function registerCommands({
 					}
 
 					if (!targetUri) {
-						window.showErrorMessage("No prompt file selected");
+						window.showErrorMessage("No action selection found");
 						return;
 					}
 
@@ -1195,20 +1200,20 @@ function registerCommands({
 						instructionType: "runPrompt",
 					});
 				} catch (e) {
-					window.showErrorMessage(`Failed to run prompt: ${e}`);
+					window.showErrorMessage(`Failed to run action: ${e} `);
 				}
 			}
 		),
-		commands.registerCommand("gatomia.prompts.rename", async (item?: any) => {
-			await promptsExplorer.renamePrompt(item);
+		commands.registerCommand("gatomia.actions.rename", async (item?: any) => {
+			await actionsExplorer.renamePrompt(item);
 		}),
-		commands.registerCommand("gatomia.prompts.delete", async (item: any) => {
+		commands.registerCommand("gatomia.actions.delete", async (item: any) => {
 			if (!item?.resourceUri) {
 				return;
 			}
 			const uri = item.resourceUri as Uri;
 			const confirm = await window.showWarningMessage(
-				`Are you sure you want to delete '${basename(uri.fsPath)}'?`,
+				`Are you sure you want to delete '${basename(uri.fsPath)}' ? `,
 				{ modal: true },
 				"Delete"
 			);
@@ -1217,12 +1222,12 @@ function registerCommands({
 			}
 			try {
 				await workspace.fs.delete(uri);
-				promptsExplorer.refresh();
+				actionsExplorer.refresh();
 			} catch (e) {
-				window.showErrorMessage(`Failed to delete prompt: ${e}`);
+				window.showErrorMessage(`Failed to delete action: ${e} `);
 			}
 		}),
-		commands.registerCommand("gatomia.prompts.createAgentFile", async () => {
+		commands.registerCommand("gatomia.actions.createAgentFile", async () => {
 			await commands.executeCommand("workbench.command.new.agent");
 		}),
 
@@ -1307,7 +1312,7 @@ function registerCommands({
 				await window.showTextDocument(document, { preview: false });
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				window.showErrorMessage(`Failed to open MCP config: ${message}`);
+				window.showErrorMessage(`Failed to open MCP config: ${message} `);
 			}
 		}),
 
@@ -1350,8 +1355,8 @@ function registerCommands({
 				}
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				outputChannel.appendLine(`[Welcome] Failed to show: ${message}`);
-				window.showErrorMessage(`Failed to show welcome screen: ${message}`);
+				outputChannel.appendLine(`[Welcome] Failed to show: ${message} `);
+				window.showErrorMessage(`Failed to show welcome screen: ${message} `);
 			}
 		}),
 
@@ -1392,7 +1397,7 @@ function registerCommands({
 			const migration = new SpecKitMigration(ws.uri.fsPath);
 			const backupPath = migration.createBackup();
 			if (backupPath) {
-				window.showInformationMessage(`Backup created at: ${backupPath}`);
+				window.showInformationMessage(`Backup created at: ${backupPath} `);
 			} else {
 				window.showWarningMessage(
 					"No OpenSpec directory found to backup, or backup failed."
@@ -1408,6 +1413,7 @@ async function toggleViews() {
 		specs: config.get("views.specs.visible", true),
 		hooks: config.get("views.hooks.visible", false),
 		steering: config.get("views.steering.visible", true),
+		actions: config.get("views.actions.visible", true),
 		mcp: config.get("views.mcp.visible", false),
 	};
 
@@ -1416,6 +1422,11 @@ async function toggleViews() {
 			label: `$(${currentVisibility.specs ? "check" : "blank"}) Specs`,
 			picked: currentVisibility.specs,
 			id: "specs",
+		},
+		{
+			label: `$(${currentVisibility.actions ? "check" : "blank"}) Actions`,
+			picked: currentVisibility.actions,
+			id: "actions",
 		},
 		{
 			label: `$(${currentVisibility.hooks ? "check" : "blank"}) Hooks`,
@@ -1439,6 +1450,7 @@ async function toggleViews() {
 			specs: selected.some((item) => item.id === "specs"),
 			hooks: selected.some((item) => item.id === "hooks"),
 			steering: selected.some((item) => item.id === "steering"),
+			actions: selected.some((item) => item.id === "actions"),
 			mcp: selected.some((item) => item.id === "mcp"),
 		};
 
@@ -1448,8 +1460,8 @@ async function toggleViews() {
 			ConfigurationTarget.Workspace
 		);
 		await config.update(
-			"views.hooks.visible",
-			newVisibility.hooks,
+			"views.actions.visible",
+			newVisibility.actions,
 			ConfigurationTarget.Workspace
 		);
 		await config.update(
@@ -1471,7 +1483,7 @@ function setupFileWatchers(
 	context: ExtensionContext,
 	specExplorer: SpecExplorerProvider,
 	steeringExplorer: SteeringExplorerProvider,
-	promptsExplorer: PromptsExplorerProvider
+	actionsExplorer: ActionsExplorerProvider
 ) {
 	// Watch for changes in .copilot directories with debouncing
 	const copilotWatcher = workspace.createFileSystemWatcher("**/.copilot/**/*");
@@ -1479,7 +1491,7 @@ function setupFileWatchers(
 	let refreshTimeout: NodeJS.Timeout | undefined;
 	const pendingReviewFlowSpecIds = new Set<string>();
 	const debouncedRefresh = (event: string, uri: Uri) => {
-		outputChannel.appendLine(`[FileWatcher] ${event}: ${uri.fsPath}`);
+		outputChannel.appendLine(`[FileWatcher] ${event}: ${uri.fsPath} `);
 		const specId = extractSpecIdFromPath(uri.fsPath);
 		if (specId) {
 			const isTasksFile = uri.fsPath.endsWith("/tasks.md");
@@ -1496,7 +1508,7 @@ function setupFileWatchers(
 		refreshTimeout = setTimeout(() => {
 			specExplorer.refresh();
 			steeringExplorer.refresh();
-			promptsExplorer.refresh();
+			actionsExplorer.refresh();
 
 			const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
 			if (workspaceRoot && pendingReviewFlowSpecIds.size > 0) {
@@ -1504,7 +1516,7 @@ function setupFileWatchers(
 				pendingReviewFlowSpecIds.clear();
 				processReviewFlowSync(workspaceRoot, specIds).catch((error) => {
 					outputChannel.appendLine(
-						`[ReviewFlow] Failed to process pending summary sync: ${error}`
+						`[ReviewFlow] Failed to process pending summary sync: ${error} `
 					);
 				});
 			}
@@ -1524,7 +1536,7 @@ function setupFileWatchers(
 				});
 			} catch (error) {
 				outputChannel.appendLine(
-					`[ReviewFlow] Failed to sync pending summary for ${id}: ${error}`
+					`[ReviewFlow] Failed to sync pending summary for ${id}: ${error} `
 				);
 			}
 		}
@@ -1569,7 +1581,7 @@ function setupFileWatchers(
 			if (normalized === ".copilot" || normalized.startsWith(".copilot/")) {
 				continue;
 			}
-			extraPatterns.add(`${normalized}/**/*`);
+			extraPatterns.add(`${normalized}/**/* `);
 		}
 
 		for (const pattern of extraPatterns) {
@@ -1611,7 +1623,7 @@ function getDefaultWorkspaceFileUri(fileName: string): Uri | undefined {
 
 function getHooksExportFileName(): string {
 	const timestamp = new Date().toISOString().replace(/[:]/g, "-");
-	return `gatomia-hooks-${timestamp}.json`;
+	return `gatomia - hooks - ${timestamp}.json`;
 }
 
 async function handleHooksImport(): Promise<void> {
@@ -1643,14 +1655,14 @@ async function handleHooksImport(): Promise<void> {
 		const summary =
 			importedCount === 0
 				? "No new hooks imported"
-				: `Imported ${importedCount} hook${importedCount === 1 ? "" : "s"}`;
+				: `Imported ${importedCount} hook${importedCount === 1 ? "" : "s"} `;
 
-		window.showInformationMessage(`${summary} from ${hooksFile.fsPath}`);
-		outputChannel.appendLine(`[Hooks] ${summary} from ${hooksFile.fsPath}`);
+		window.showInformationMessage(`${summary} from ${hooksFile.fsPath} `);
+		outputChannel.appendLine(`[Hooks] ${summary} from ${hooksFile.fsPath} `);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		window.showErrorMessage(`Failed to import hooks: ${message}`);
-		outputChannel.appendLine(`[Hooks] Failed to import hooks: ${message}`);
+		window.showErrorMessage(`Failed to import hooks: ${message} `);
+		outputChannel.appendLine(`[Hooks] Failed to import hooks: ${message} `);
 	}
 }
 
@@ -1660,28 +1672,57 @@ export function deactivate() {}
 function setupDocumentPreviewWatchers(context: ExtensionContext) {
 	const watcher = workspace.createFileSystemWatcher("**/*.md");
 
-	const handleChange = async (uri: Uri) => {
-		if (!activePreviewUri || uri.fsPath !== activePreviewUri.fsPath) {
-			return;
-		}
-		documentPreviewService?.markDocumentChanged(uri);
-		await documentPreviewPanel?.markDocumentStale(
-			"Document changed outside the preview. Reload to view the latest version."
-		);
-		window
-			.showWarningMessage(
-				"Document changed outside the preview.",
-				"Reload Preview"
-			)
-			.then(async (selection) => {
-				if (selection === "Reload Preview" && activePreviewUri) {
-					await renderPreviewForUri(activePreviewUri);
-				}
-			});
+	const SPEC_FILES = new Set([
+		"spec.md",
+		"plan.md",
+		"research.md",
+		"data-model.md",
+		"datamodel.md",
+		"quickstart.md",
+		"tasks.md",
+	]);
+
+	const isSpecOrChecklistFile = (uri: Uri): boolean => {
+		const fileName = basename(uri.fsPath).toLowerCase();
+		const isSpecFile = SPEC_FILES.has(fileName);
+		const isChecklistFile =
+			uri.fsPath.includes("/checklists/") && fileName.endsWith(".md");
+
+		// Ensure it's within a spec folder (matching 001-...)
+		const hasSpecId = extractSpecIdFromPath(uri.fsPath) !== null;
+
+		return hasSpecId && (isSpecFile || isChecklistFile);
 	};
 
-	watcher.onDidChange(handleChange);
-	watcher.onDidDelete(handleChange);
+	const handleChangeOrDelete = async (uri: Uri) => {
+		if (activePreviewUri && uri.fsPath === activePreviewUri.fsPath) {
+			outputChannel.appendLine(
+				`[Preview] Auto - reloading active document: ${uri.fsPath} `
+			);
+			await renderPreviewForUri(uri);
+		}
+	};
+
+	const handleCreate = (uri: Uri) => {
+		if (isSpecOrChecklistFile(uri)) {
+			const fileName = basename(uri.fsPath);
+			window
+				.showInformationMessage(
+					`New document created: ${fileName}. Do you want to open it ? `,
+					"Open"
+				)
+				.then((selection) => {
+					if (selection === "Open") {
+						renderPreviewForUri(uri);
+					}
+				});
+		}
+	};
+
+	watcher.onDidChange(handleChangeOrDelete);
+	watcher.onDidDelete(handleChangeOrDelete);
+	watcher.onDidCreate(handleCreate);
+
 	context.subscriptions.push(watcher);
 }
 
@@ -1702,8 +1743,34 @@ async function renderPreviewForUri(
 		return artifact;
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		window.showErrorMessage(`Failed to open document preview: ${message}`);
-		outputChannel.appendLine(`[Preview] Failed to open document: ${message}`);
+		window.showErrorMessage(`Failed to open document preview: ${message} `);
+		outputChannel.appendLine(`[Preview] Failed to open document: ${message} `);
+	}
+}
+
+async function createNewFile(uri: Uri, suffix: string): Promise<void> {
+	const folder = uri || workspace.workspaceFolders?.[0]?.uri;
+	if (!folder) {
+		return;
+	}
+
+	const name = await window.showInputBox({
+		prompt: `Enter name for new file (without ${suffix})`,
+		placeHolder: "example",
+	});
+
+	if (!name) {
+		return;
+	}
+
+	const fileName = name.endsWith(suffix) ? name : `${name}${suffix}`;
+	const targetUri = Uri.joinPath(folder, fileName);
+
+	try {
+		await workspace.fs.writeFile(targetUri, new Uint8Array());
+		await window.showTextDocument(targetUri);
+	} catch (error) {
+		window.showErrorMessage(`Failed to create file: ${error}`);
 	}
 }
 
