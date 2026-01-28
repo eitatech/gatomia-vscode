@@ -18,12 +18,13 @@ export type OperationType =
 	| "unit-test"
 	| "integration-test";
 
-export type TriggerTiming = "after";
+export type TriggerTiming = "before" | "after";
 
 export interface TriggerCondition {
 	agent: AgentType;
 	operation: OperationType;
 	timing: TriggerTiming;
+	waitForCompletion?: boolean; // Only for "before" timing: block operation until hook completes
 }
 
 export type ActionType = "agent" | "git" | "github" | "custom" | "mcp";

@@ -128,6 +128,22 @@ export const TriggerActionSelector = ({
 		});
 	};
 
+	const handleTriggerTimingChange = (event: ChangeEvent<HTMLSelectElement>) => {
+		onTriggerChange({
+			...trigger,
+			timing: event.target.value as "before" | "after",
+		});
+	};
+
+	const handleWaitForCompletionChange = (
+		event: ChangeEvent<HTMLInputElement>
+	) => {
+		onTriggerChange({
+			...trigger,
+			waitForCompletion: event.target.checked,
+		});
+	};
+
 	const handleActionTypeChange = (event: ChangeEvent<HTMLSelectElement>) => {
 		const newType = event.target.value as ActionType;
 		onActionChange({
@@ -653,6 +669,32 @@ export const TriggerActionSelector = ({
 						</VSCodeSelect>
 					</div>
 				</div>
+				<div className="flex gap-3">
+					<div className="flex-1">
+						<VSCodeSelect
+							disabled={disabled}
+							id="trigger-timing"
+							label="When to Execute"
+							onChange={handleTriggerTimingChange}
+							size="sm"
+							value={trigger.timing}
+						>
+							<option value="before">Before Operation</option>
+							<option value="after">After Operation</option>
+						</VSCodeSelect>
+					</div>
+				</div>
+				{trigger.timing === "before" && (
+					<div className="flex items-start gap-2">
+						<VSCodeCheckbox
+							checked={trigger.waitForCompletion ?? false}
+							disabled={disabled}
+							onChange={handleWaitForCompletionChange}
+						>
+							Wait for hook to complete before executing operation
+						</VSCodeCheckbox>
+					</div>
+				)}
 			</fieldset>
 
 			<fieldset className="flex flex-col gap-3 rounded border border-[color:var(--vscode-panel-border)] p-3">
