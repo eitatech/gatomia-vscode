@@ -346,9 +346,17 @@ export class HookManager {
 				[]
 			);
 
-			// Validate all loaded hooks
+			// Validate all loaded hooks and migrate old hooks
 			const validHooks: Hook[] = [];
 			for (const hook of stored) {
+				// Migration: Add default timing "after" for hooks created before timing feature
+				if (!hook.trigger.timing) {
+					hook.trigger.timing = "after";
+					this.outputChannel.appendLine(
+						`[HookManager] Migration: Set default timing "after" for hook: ${hook.name}`
+					);
+				}
+
 				if (isValidHook(hook)) {
 					validHooks.push(hook);
 				} else {

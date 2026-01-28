@@ -509,4 +509,128 @@ describe("TemplateVariableParser", () => {
 			expect(result).toBe("UPPER vs lower");
 		});
 	});
+
+	// ============================================================================
+	// Output Capture Variables Tests (Phase 4: 011-custom-agent-hooks)
+	// ============================================================================
+
+	describe("substitute() - output capture variables", () => {
+		it("should substitute agentOutput variable", () => {
+			const template = "Agent output: $agentOutput";
+			const context: TemplateContext = {
+				timestamp: "2026-01-27T10:00:00Z",
+				triggerType: "specify",
+				agentOutput: "# Specification\n\n## Use Case 1",
+			};
+
+			const result = parser.substitute(template, context);
+
+			expect(result).toBe("Agent output: # Specification\n\n## Use Case 1");
+		});
+
+		it("should substitute clipboardContent variable", () => {
+			const template = "Clipboard: $clipboardContent";
+			const context: TemplateContext = {
+				timestamp: "2026-01-27T10:00:00Z",
+				triggerType: "specify",
+				clipboardContent: "Copied text from Copilot Chat",
+			};
+
+			const result = parser.substitute(template, context);
+
+			expect(result).toBe("Clipboard: Copied text from Copilot Chat");
+		});
+
+		it("should substitute outputPath variable", () => {
+			const template = "File: $outputPath";
+			const context: TemplateContext = {
+				timestamp: "2026-01-27T10:00:00Z",
+				triggerType: "specify",
+				outputPath: "/workspace/.specify/specs/011-custom-agent-hooks/spec.md",
+			};
+
+			const result = parser.substitute(template, context);
+
+			expect(result).toBe(
+				"File: /workspace/.specify/specs/011-custom-agent-hooks/spec.md"
+			);
+		});
+
+		it("should substitute all output variables together", () => {
+			const template =
+				"Output: $agentOutput\nFile: $outputPath\nClipboard: $clipboardContent";
+			const context: TemplateContext = {
+				timestamp: "2026-01-27T10:00:00Z",
+				triggerType: "specify",
+				agentOutput: "# Test",
+				outputPath: "/test.md",
+				clipboardContent: "test clipboard",
+			};
+
+			const result = parser.substitute(template, context);
+
+			expect(result).toBe(
+				"Output: # Test\nFile: /test.md\nClipboard: test clipboard"
+			);
+		});
+
+		it("should handle empty output variables gracefully", () => {
+			const template = "Output: $agentOutput, Path: $outputPath";
+			const context: TemplateContext = {
+				timestamp: "2026-01-27T10:00:00Z",
+				triggerType: "specify",
+				agentOutput: "",
+				outputPath: "",
+			};
+
+			const result = parser.substitute(template, context);
+
+			expect(result).toBe("Output: , Path: ");
+		});
+
+		it("should handle missing output variables (replaced with empty string)", () => {
+			const template =
+				"Output: $agentOutput, Clipboard: $clipboardContent, Path: $outputPath";
+			const context: TemplateContext = {
+				timestamp: "2026-01-27T10:00:00Z",
+				triggerType: "specify",
+				// No output variables provided
+			};
+
+			const result = parser.substitute(template, context);
+
+			expect(result).toBe("Output: , Clipboard: , Path: ");
+		});
+
+		it("should combine output variables with standard variables", () => {
+			const template =
+				"Spec $specId changed by $changeAuthor. Output: $agentOutput";
+			const context: TemplateContext = {
+				timestamp: "2026-01-27T10:00:00Z",
+				triggerType: "specify",
+				specId: "011-custom-agent-hooks",
+				changeAuthor: "test-user",
+				agentOutput: "# New Spec Content",
+			};
+
+			const result = parser.substitute(template, context);
+
+			expect(result).toBe(
+				"Spec 011-custom-agent-hooks changed by test-user. Output: # New Spec Content"
+			);
+		});
+
+		it("should handle multiline agentOutput", () => {
+			const template = "Content:\n$agentOutput\n---End---";
+			const context: TemplateContext = {
+				timestamp: "2026-01-27T10:00:00Z",
+				triggerType: "specify",
+				agentOutput: "Line 1\nLine 2\nLine 3",
+			};
+
+			const result = parser.substitute(template, context);
+
+			expect(result).toBe("Content:\nLine 1\nLine 2\nLine 3\n---End---");
+		});
+	});
 });

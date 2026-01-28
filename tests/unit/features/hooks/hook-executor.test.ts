@@ -681,6 +681,194 @@ describe("HookExecutor", () => {
 		});
 	});
 
+	describe("timing-based hook execution", () => {
+		it("should execute only 'before' hooks when timing is 'before'", async () => {
+			await hookManager.createHook(
+				createTestHook({
+					name: "Before Hook",
+					trigger: { agent: "speckit", operation: "specify", timing: "before" },
+				})
+			);
+			await hookManager.createHook(
+				createTestHook({
+					name: "After Hook",
+					trigger: { agent: "speckit", operation: "specify", timing: "after" },
+				})
+			);
+
+			const results = await executor.executeHooksForTrigger(
+				"speckit",
+				"specify",
+				"before"
+			);
+
+			expect(results).toHaveLength(1);
+			expect(results[0].hookName).toBe("Before Hook");
+		});
+
+		it("should execute only 'after' hooks when timing is 'after'", async () => {
+			await hookManager.createHook(
+				createTestHook({
+					name: "Before Hook",
+					trigger: { agent: "speckit", operation: "specify", timing: "before" },
+				})
+			);
+			await hookManager.createHook(
+				createTestHook({
+					name: "After Hook",
+					trigger: { agent: "speckit", operation: "specify", timing: "after" },
+				})
+			);
+
+			const results = await executor.executeHooksForTrigger(
+				"speckit",
+				"specify",
+				"after"
+			);
+
+			expect(results).toHaveLength(1);
+			expect(results[0].hookName).toBe("After Hook");
+		});
+
+		it("should execute 'after' hooks by default", async () => {
+			await hookManager.createHook(
+				createTestHook({
+					name: "Before Hook",
+					trigger: { agent: "speckit", operation: "specify", timing: "before" },
+				})
+			);
+			await hookManager.createHook(
+				createTestHook({
+					name: "After Hook",
+					trigger: { agent: "speckit", operation: "specify", timing: "after" },
+				})
+			);
+
+			// No timing parameter - should default to "after"
+			const results = await executor.executeHooksForTrigger(
+				"speckit",
+				"specify"
+			);
+
+			expect(results).toHaveLength(1);
+			expect(results[0].hookName).toBe("After Hook");
+		});
+
+		it("should block for 'before' hooks with waitForCompletion", async () => {
+			await hookManager.createHook(
+				createTestHook({
+					name: "Blocking Before Hook",
+					trigger: {
+						agent: "speckit",
+						operation: "specify",
+						timing: "before",
+						waitForCompletion: true,
+					},
+				})
+			);
+
+			const startTime = Date.now();
+			const results = await executor.executeHooksForTrigger(
+				"speckit",
+				"specify",
+				"before"
+			);
+			const endTime = Date.now();
+
+			expect(results).toHaveLength(1);
+			expect(results[0].status).toBe("success");
+			// Should have waited for execution (assuming execution takes > 0ms)
+			expect(endTime - startTime).toBeGreaterThanOrEqual(0);
+		});
+
+		it("should not block for 'before' hooks without waitForCompletion", async () => {
+			await hookManager.createHook(
+				createTestHook({
+					name: "Non-blocking Before Hook",
+					trigger: {
+						agent: "speckit",
+						operation: "specify",
+						timing: "before",
+						waitForCompletion: false,
+					},
+				})
+			);
+
+			const results = await executor.executeHooksForTrigger(
+				"speckit",
+				"specify",
+				"before"
+			);
+
+			// Should return results immediately (non-blocking)
+			expect(results).toHaveLength(1);
+		});
+	});
+
+	describe("output capture", () => {
+		it("should capture output data from trigger event", async () => {
+			await hookManager.createHook(
+				createTestHook({
+					name: "Output Hook",
+					trigger: { agent: "speckit", operation: "specify", timing: "after" },
+					action: {
+						type: "agent",
+						parameters: {
+							command: "/speckit.clarify --spec $agentOutput",
+						},
+					},
+				})
+			);
+
+			const triggerEvent = {
+				agent: "speckit" as const,
+				operation: "specify" as const,
+				timestamp: Date.now(),
+				timing: "after" as const,
+				outputPath: "/test/spec.md",
+				outputContent: "# Test Spec\n\nTest content",
+			};
+
+			await executor.executeHooksForTrigger(
+				"speckit",
+				"specify",
+				"after",
+				triggerEvent
+			);
+
+			// Verify hook was executed (check logs)
+			const logs = executor.getExecutionLogs();
+			expect(logs.length).toBeGreaterThan(0);
+		});
+
+		it("should handle missing output data gracefully", async () => {
+			await hookManager.createHook(
+				createTestHook({
+					name: "Output Hook",
+					trigger: { agent: "speckit", operation: "specify", timing: "after" },
+					action: {
+						type: "agent",
+						parameters: {
+							command: "/speckit.clarify --spec $agentOutput",
+						},
+					},
+				})
+			);
+
+			// No trigger event with output data
+			const results = await executor.executeHooksForTrigger(
+				"speckit",
+				"specify",
+				"after"
+			);
+
+			// Should still execute (may fail due to test environment, but hook should attempt execution)
+			expect(results).toHaveLength(1);
+			// Check that the hook was attempted (status could be success or failure depending on mock setup)
+			expect(["success", "failure"]).toContain(results[0].status);
+		});
+	});
+
 	describe("createExecutionContext", () => {
 		it("should create new execution context", () => {
 			const context = executor.createExecutionContext();

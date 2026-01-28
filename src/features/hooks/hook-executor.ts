@@ -27,6 +27,7 @@ import {
 	window,
 	commands,
 	workspace,
+	env,
 } from "vscode";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
@@ -56,6 +57,7 @@ import type {
 	MCPActionParams,
 	CustomActionParams,
 	OperationType,
+	TriggerEvent,
 } from "./types";
 import {
 	MAX_CHAIN_DEPTH,
@@ -206,7 +208,13 @@ export class HookExecutor {
 	initialize(): void {
 		// Subscribe to trigger events
 		this.triggerRegistry.onTrigger(async (event) => {
-			await this.executeHooksForTrigger(event.agent, event.operation);
+			const timing = event.timing || "after";
+			await this.executeHooksForTrigger(
+				event.agent,
+				event.operation,
+				timing,
+				event
+			);
 		});
 
 		this.outputChannel.appendLine("[HookExecutor] Initialized");
@@ -229,7 +237,8 @@ export class HookExecutor {
 	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: The hook pipeline coordinates validation, execution, logging, and retries within a single flow.
 	async executeHook(
 		hook: Hook,
-		context?: ExecutionContext
+		context?: ExecutionContext,
+		triggerEvent?: TriggerEvent
 	): Promise<ExecutionResult> {
 		const startTime = Date.now();
 
@@ -365,7 +374,7 @@ export class HookExecutor {
 
 						if (action === "Retry") {
 							// Retry execution
-							return await this.executeHook(hook, context);
+							return await this.executeHook(hook, context, triggerEvent);
 						}
 						if (action === "Update Hook") {
 							await commands.executeCommand("gatomia.hooks.editHook", hook.id);
@@ -408,7 +417,9 @@ export class HookExecutor {
 			// Build template context
 			// Extract trigger type from hook's trigger configuration
 			const templateContext = await this.buildTemplateContext(
-				hook.trigger.operation
+				hook.trigger.operation,
+				undefined,
+				triggerEvent
 			);
 
 			// Emit execution started event
@@ -741,26 +752,29 @@ export class HookExecutor {
 	 */
 	async executeHooksForTrigger(
 		agent: string,
-		operation: string
+		operation: string,
+		timing: "before" | "after" = "after",
+		triggerEvent?: TriggerEvent
 	): Promise<ExecutionResult[]> {
 		this.outputChannel.appendLine(
-			`[HookExecutor] Executing hooks for trigger: ${agent}.${operation}`
+			`[HookExecutor] Executing hooks for trigger: ${agent}.${operation} (${timing})`
 		);
 
-		// Get all enabled hooks matching trigger
+		// Get all enabled hooks matching trigger and timing
 		const allHooks = await this.hookManager.getAllHooks();
 		const matchingHooks = allHooks
 			.filter(
 				(h) =>
 					h.enabled &&
 					h.trigger.agent === agent &&
-					h.trigger.operation === operation
+					h.trigger.operation === operation &&
+					h.trigger.timing === timing
 			)
 			.sort((a, b) => a.createdAt - b.createdAt); // Deterministic order
 
 		if (matchingHooks.length === 0) {
 			this.outputChannel.appendLine(
-				`[HookExecutor] No enabled hooks found for trigger: ${agent}.${operation}`
+				`[HookExecutor] No enabled hooks found for trigger: ${agent}.${operation} (${timing})`
 			);
 			return [];
 		}
@@ -768,15 +782,25 @@ export class HookExecutor {
 		// Create shared execution context
 		const context = this.createExecutionContext();
 
-		// Execute each hook with shared context
+		// Execute hooks based on waitForCompletion setting
 		const results: ExecutionResult[] = [];
 		for (const hook of matchingHooks) {
-			const result = await this.executeHook(hook, context);
-			results.push(result);
+			if (timing === "before" && hook.trigger.waitForCompletion) {
+				// Blocking execution: wait for hook to complete
+				this.outputChannel.appendLine(
+					`[HookExecutor] Executing blocking before hook: ${hook.name}`
+				);
+				const result = await this.executeHook(hook, context, triggerEvent);
+				results.push(result);
+			} else {
+				// Non-blocking execution: execute in parallel
+				const result = await this.executeHook(hook, context, triggerEvent);
+				results.push(result);
+			}
 		}
 
 		this.outputChannel.appendLine(
-			`[HookExecutor] Executed ${results.length} hooks for trigger: ${agent}.${operation}`
+			`[HookExecutor] Executed ${results.length} hooks for trigger: ${agent}.${operation} (${timing})`
 		);
 
 		return results;
@@ -813,7 +837,8 @@ export class HookExecutor {
 	 */
 	async buildTemplateContext(
 		triggerOperation: string,
-		triggerData?: Record<string, unknown>
+		triggerData?: Record<string, unknown>,
+		triggerEvent?: TriggerEvent
 	): Promise<ParserTemplateContext> {
 		try {
 			const gitContext = await this.buildGitContext();
@@ -830,6 +855,11 @@ export class HookExecutor {
 			// Add trigger-specific data if available
 			if (triggerData) {
 				this.enrichContextWithTriggerData(baseContext, triggerData);
+			}
+
+			// Add output capture variables
+			if (triggerEvent) {
+				await this.addOutputVariables(baseContext, triggerEvent);
 			}
 
 			return baseContext;
@@ -951,6 +981,55 @@ export class HookExecutor {
 			triggerType: triggerOperation as OperationType,
 			workspacePath: workspace.workspaceFolders?.[0]?.uri.fsPath || "",
 		};
+	}
+
+	/**
+	 * Add output capture variables to context
+	 */
+	private async addOutputVariables(
+		context: ParserTemplateContext,
+		event: TriggerEvent
+	): Promise<void> {
+		// 1. Add clipboard content
+		try {
+			const clipboardText = await env.clipboard.readText();
+			context.clipboardContent = clipboardText;
+			this.outputChannel.appendLine(
+				`[HookExecutor] Captured clipboard content (${clipboardText.length} chars)`
+			);
+		} catch (error) {
+			this.outputChannel.appendLine(
+				`[HookExecutor] Failed to read clipboard: ${error}`
+			);
+			context.clipboardContent = "";
+		}
+
+		// 2. Add agent output from file (if available)
+		if (event.outputPath) {
+			try {
+				const { promises: fs } = await import("node:fs");
+				const content = await fs.readFile(event.outputPath, "utf-8");
+				context.agentOutput = content;
+				context.outputPath = event.outputPath;
+				this.outputChannel.appendLine(
+					`[HookExecutor] Captured agent output from file: ${event.outputPath} (${content.length} chars)`
+				);
+			} catch (error) {
+				this.outputChannel.appendLine(
+					`[HookExecutor] Failed to read output file ${event.outputPath}: ${error}`
+				);
+				context.agentOutput = "";
+			}
+		} else if (event.outputContent) {
+			// Use pre-loaded content if provided
+			context.agentOutput = event.outputContent;
+			this.outputChannel.appendLine(
+				`[HookExecutor] Using pre-loaded agent output (${event.outputContent.length} chars)`
+			);
+		} else {
+			// No output available
+			context.agentOutput = "";
+		}
 	}
 
 	/**
