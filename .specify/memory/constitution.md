@@ -9,7 +9,7 @@ This file provides guidance to AI agents when working with code in this reposito
 
 ## Project Constitution (NON-NEGOTIABLE)
 
-This project follows strict principles defined in [.specify/memory/constitution.md](../../.specify/memory/constitution.md):
+This constitution applies to all source code, tests, documentation, and configuration files within the GatomIA project. It governs naming conventions, coding practices, testing strategies, and overall code quality standards.
 
 ### I. Kebab-Case File Naming (MANDATORY)
 

@@ -1,5 +1,6 @@
 ---
 description: 'Generic code review instructions that can be customized for any project using GitHub Copilot'
+name: 'Generic Code Review'
 applyTo: '**'
 excludeAgent: ["coding-agent"]
 ---

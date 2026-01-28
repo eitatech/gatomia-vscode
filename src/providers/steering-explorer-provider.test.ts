@@ -44,13 +44,13 @@ describe("SteeringExplorerProvider - instruction rules", () => {
 	it("shows project + user instruction rules groups at the root", async () => {
 		const rootItems = await provider.getChildren();
 		const projectGroup = rootItems.find(
-			(item) => item.contextValue === "project-instruction-rules-group"
+			(item) => item.contextValue === "group-project"
 		);
 		const userGroup = rootItems.find(
-			(item) => item.contextValue === "user-instructions-group"
+			(item) => item.contextValue === "group-user"
 		);
 
-		expect(projectGroup?.label).toBe("Project Instructions");
+		expect(projectGroup?.label).toBe("Rules");
 		expect(userGroup?.label).toBe("User Instructions");
 	});
 
@@ -69,12 +69,18 @@ describe("SteeringExplorerProvider - instruction rules", () => {
 
 		const rootItems = await provider.getChildren();
 		const projectGroup = rootItems.find(
-			(item) => item.contextValue === "project-instruction-rules-group"
+			(item) => item.contextValue === "group-rules"
 		);
+		// Note: group-rules is "Rules", group-project is "Custom Instructions".
+		// The test says "lists only *.instructions.md files for project rules".
+		// In code, `group-rules` handles `*.instructions.md` from `.github/instructions`.
+		// `group-project` handles `copilot-instructions.md`, `constitution.md`, `AGENTS.md`.
+		// So if the test wants `*.instructions.md`, it should look at `group-rules`.
+
 		expect(projectGroup).toBeTruthy();
 
 		const children = await provider.getChildren(projectGroup as any);
-		expect(children.map((c) => c.label)).toEqual(["alpha"]);
+		expect(children.map((c) => c.label)).toEqual(["Alpha"]);
 		expect(children.every((c) => c.contextValue === "instruction-rule")).toBe(
 			true
 		);
@@ -82,6 +88,25 @@ describe("SteeringExplorerProvider - instruction rules", () => {
 
 	it("lists only *.instructions.md files for user rules", async () => {
 		const userRulesRoot = "/home/test/.github/instructions";
+		// global rules are commented out in code currently?
+		// Code:
+		// if (element.contextValue === "group-rules") {
+		//    // User Instruction Rules (*.instructions.md)
+		//    // const globalRulesRoot = joinPath(Uri.file(homeDir), ".github", "instructions");
+		//    // items.push(...await this.getInstructionRules(globalRulesRoot));
+		//    ...
+		// }
+		// So user rules are NOT listed in group-rules anymore?
+		// But wait, `group-user` (User Instructions) handles `copilot-instructions.md` (global) AND `rulesRoot`?
+		// Code:
+		// if (element.contextValue === "group-user") {
+		//    ... globalCopilotMd ...
+		//    const rulesRoot = joinPath(Uri.file(homeDir), ".github", "instructions");
+		//    items.push(...(await this.getInstructionRules(rulesRoot)));
+		//    return items;
+		// }
+		// Yes! `group-user` lists user rules.
+
 		vi.mocked(workspace.fs.readDirectory).mockImplementation((uri) => {
 			if (uri.fsPath === userRulesRoot) {
 				return Promise.resolve([
@@ -94,7 +119,7 @@ describe("SteeringExplorerProvider - instruction rules", () => {
 
 		const rootItems = await provider.getChildren();
 		const userGroup = rootItems.find(
-			(item) => item.contextValue === "user-instructions-group"
+			(item) => item.contextValue === "group-user"
 		);
 		expect(userGroup).toBeTruthy();
 
@@ -102,7 +127,7 @@ describe("SteeringExplorerProvider - instruction rules", () => {
 		const ruleItems = children.filter(
 			(c) => c.contextValue === "instruction-rule"
 		);
-		expect(ruleItems.map((c) => c.label)).toEqual(["typescript"]);
+		expect(ruleItems.map((c) => c.label)).toEqual(["Typescript"]);
 	});
 
 	it("instruction rule items open the underlying file", async () => {
@@ -118,8 +143,10 @@ describe("SteeringExplorerProvider - instruction rules", () => {
 
 		const rootItems = await provider.getChildren();
 		const projectGroup = rootItems.find(
-			(item) => item.contextValue === "project-instruction-rules-group"
+			(item) => item.contextValue === "group-rules"
 		);
+		// group-rules lists project instructions rules.
+
 		const children = await provider.getChildren(projectGroup as any);
 		const childItem = children[0];
 
