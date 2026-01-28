@@ -28,7 +28,8 @@ type WebviewMessage =
 	| HookListRequestMessage
 	| HookReadyMessage
 	| HookLogsRequestMessage
-	| MCPDiscoveryRequestMessage;
+	| MCPDiscoveryRequestMessage
+	| AgentListRequestMessage;
 
 interface HookCreateMessage {
 	command?: "hooks.create";
@@ -77,6 +78,13 @@ interface HookLogsRequestMessage {
 interface MCPDiscoveryRequestMessage {
 	command?: "hooks.mcp-discover";
 	type?: "hooks/mcp-discover";
+	data?: { forceRefresh?: boolean };
+	payload?: { forceRefresh?: boolean };
+}
+
+interface AgentListRequestMessage {
+	command?: "hooks.agents-list";
+	type?: "hooks/agents-list";
 	data?: { forceRefresh?: boolean };
 	payload?: { forceRefresh?: boolean };
 }
@@ -147,6 +155,31 @@ interface MCPErrorMessage {
 	data: { message: string };
 }
 
+interface AgentListMessage {
+	command: "hooks.agents-list";
+	type: "hooks/agents-list";
+	data: {
+		local: Array<{
+			id: string;
+			name: string;
+			displayName: string;
+			description?: string;
+		}>;
+		background: Array<{
+			id: string;
+			name: string;
+			displayName: string;
+			description?: string;
+		}>;
+	};
+}
+
+interface AgentErrorMessage {
+	command: "hooks.agents-error";
+	type: "hooks/agents-error";
+	data: { message: string };
+}
+
 type ExtensionMessage =
 	| HooksSyncMessage
 	| HookCreatedMessage
@@ -157,6 +190,8 @@ type ExtensionMessage =
 	| ExecutionLogsMessage
 	| MCPServersMessage
 	| MCPErrorMessage
+	| AgentListMessage
+	| AgentErrorMessage
 	| ShowFormMessage
 	| ShowLogsPanelMessage;
 
@@ -303,6 +338,9 @@ export class HookViewProvider {
 				case "hooks.mcp-discover":
 					await this.handleMCPDiscovery(messageData?.forceRefresh ?? false);
 					break;
+				case "hooks.agents-list":
+					await this.handleAgentListRequest(messageData?.forceRefresh ?? false);
+					break;
 				default:
 					this.outputChannel.appendLine(
 						`[HookViewProvider] Unknown command: ${(message as any).command ?? (message as any).type}`
@@ -413,6 +451,122 @@ export class HookViewProvider {
 					message: (error as Error).message || "Failed to discover MCP servers",
 				},
 			} as MCPErrorMessage);
+		}
+	}
+
+	private async handleAgentListRequest(forceRefresh: boolean): Promise<void> {
+		try {
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Agent list requested (forceRefresh: ${forceRefresh})`
+			);
+
+			const { promises: fs } = await import("node:fs");
+			const { join } = await import("node:path");
+			const matter = (await import("gray-matter")).default;
+			const { workspace } = await import("vscode");
+
+			const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
+			if (!workspaceRoot) {
+				throw new Error("No workspace folder found");
+			}
+
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Workspace root: ${workspaceRoot}`
+			);
+
+			const agentsDir = join(workspaceRoot, ".github", "agents");
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Looking for agents in: ${agentsDir}`
+			);
+
+			const files = await fs.readdir(agentsDir).catch((err) => {
+				this.outputChannel.appendLine(
+					`[HookViewProvider] Error reading directory: ${err.message}`
+				);
+				return [];
+			});
+
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Found ${files.length} files in directory`
+			);
+
+			const agentFiles = files.filter(
+				(file) => file.endsWith(".agent.md") && !file.startsWith(".")
+			);
+
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Filtered to ${agentFiles.length} .agent.md files`
+			);
+
+			const agents = await Promise.all(
+				agentFiles.map(async (filename) => {
+					try {
+						const filePath = join(agentsDir, filename);
+						const content = await fs.readFile(filePath, "utf-8");
+						const parsed = matter(content);
+						const name = filename.replace(".agent.md", "");
+						const description =
+							typeof parsed.data.description === "string"
+								? parsed.data.description
+								: "No description available";
+						return { id: `file:${name}`, name, displayName: name, description };
+					} catch (error) {
+						this.outputChannel.appendLine(
+							`[HookViewProvider] Failed to parse ${filename}: ${(error as Error).message}`
+						);
+						return null;
+					}
+				})
+			);
+
+			const validAgents = agents.filter(
+				(a): a is NonNullable<typeof a> => a !== null
+			);
+
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Sending ${validAgents.length} agents to webview`
+			);
+
+			// Send directly to webview if available, bypassing ready check
+			// This is needed because AgentDropdown mounts before hooks.ready is sent
+			const message: AgentListMessage = {
+				command: "hooks.agents-list",
+				type: "hooks/agents-list",
+				data: { local: validAgents, background: [] },
+			};
+
+			if (this.webview) {
+				await this.webview.postMessage(message);
+			} else {
+				// If webview doesn't exist yet, queue it
+				this.pendingMessages.push(message);
+			}
+
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Sent ${validAgents.length} agents from .github/agents/ to webview`
+			);
+		} catch (error) {
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Agent list error: ${(error as Error).message}`
+			);
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Stack: ${(error as Error).stack}`
+			);
+
+			// Send error directly to webview if available
+			const errorMessage: AgentErrorMessage = {
+				command: "hooks.agents-error",
+				type: "hooks/agents-error",
+				data: {
+					message: (error as Error).message || "Failed to load agents",
+				},
+			};
+
+			if (this.webview) {
+				await this.webview.postMessage(errorMessage);
+			} else {
+				this.pendingMessages.push(errorMessage);
+			}
 		}
 	}
 

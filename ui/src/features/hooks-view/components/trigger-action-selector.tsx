@@ -1,6 +1,8 @@
 import { TextareaPanel } from "@/components/textarea-panel";
 import { VSCodeCheckbox } from "@/components/ui/vscode-checkbox";
 import { VSCodeSelect } from "@/components/ui/vscode-select";
+import { AgentDropdown } from "@/components/hooks/agent-dropdown";
+import { AgentTypeSelector } from "./agent-type-selector";
 import type {
 	ActionConfig,
 	ActionType,
@@ -14,14 +16,11 @@ import type {
 	SelectedMCPTool,
 	TriggerCondition,
 } from "../types";
-import type {
-	ChangeEvent,
-	HTMLInputElement,
-	HTMLSelectElement,
-	HTMLTextAreaElement,
-} from "react";
+import type { ChangeEvent } from "react";
 import { useMCPServers } from "../hooks/use-mcp-servers";
 import { MCPToolsSelector } from "./mcp-tools-selector";
+import { ArgumentTemplateEditor } from "./argument-template-editor";
+import { CopilotCliOptionsPanel } from "./cli-options/copilot-cli-options-panel";
 
 interface TriggerActionSelectorProps {
 	trigger: TriggerCondition;
@@ -130,6 +129,22 @@ export const TriggerActionSelector = ({
 		});
 	};
 
+	const handleTriggerTimingChange = (event: ChangeEvent<HTMLSelectElement>) => {
+		onTriggerChange({
+			...trigger,
+			timing: event.target.value as "before" | "after",
+		});
+	};
+
+	const handleWaitForCompletionChange = (
+		event: ChangeEvent<HTMLInputElement>
+	) => {
+		onTriggerChange({
+			...trigger,
+			waitForCompletion: event.target.checked,
+		});
+	};
+
 	const handleActionTypeChange = (event: ChangeEvent<HTMLSelectElement>) => {
 		const newType = event.target.value as ActionType;
 		onActionChange({
@@ -220,7 +235,6 @@ export const TriggerActionSelector = ({
 		switch (action.type) {
 			case "agent": {
 				const params = action.parameters as AgentActionParams;
-				const commandListId = "hooks-agent-commands";
 				return (
 					<div className="flex flex-col gap-2">
 						<div className="flex items-center gap-1">
@@ -237,21 +251,23 @@ export const TriggerActionSelector = ({
 								*
 							</span>
 						</div>
-						<input
-							className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-input-background)] px-3 py-2 text-[color:var(--vscode-input-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
+						<ArgumentTemplateEditor
 							disabled={disabled}
-							id="action-command"
-							list={commandListId}
-							onChange={handleActionParamChange("command")}
-							placeholder="/speckit.clarify or /openspec.analyze"
-							type="text"
+							error={actionError}
+							onChange={(value) => {
+								onActionChange({
+									...action,
+									parameters: {
+										...params,
+										command: value,
+									},
+								});
+								onClearActionError?.();
+							}}
+							placeholder="/speckit.clarify --spec $specId"
+							triggerType={trigger.operation}
 							value={params.command || ""}
 						/>
-						<datalist id={commandListId}>
-							{AGENT_COMMAND_SUGGESTIONS.map((cmd) => (
-								<option key={cmd} value={cmd} />
-							))}
-						</datalist>
 					</div>
 				);
 			}
@@ -290,15 +306,14 @@ export const TriggerActionSelector = ({
 									<TextareaPanel
 										disabled={disabled}
 										onChange={handleActionParamChange("messageTemplate")}
-										placeholder="feat({feature}): automated update at {timestamp}"
+										placeholder="feat($feature): automated update at $timestamp"
 										rows={2}
 										textareaClassName="min-h-[4rem] text-sm"
 										textareaProps={{ id: "git-message-template" }}
 										value={params.messageTemplate || ""}
 									/>
 									<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.6))] text-xs">
-										Available variables: {"{feature}"}, {"{branch}"},{" "}
-										{"{timestamp}"}, {"{user}"}
+										Available variables: $feature, $branch, $timestamp, $user
 									</p>
 								</div>
 								<VSCodeCheckbox
@@ -374,7 +389,7 @@ export const TriggerActionSelector = ({
 										disabled={disabled}
 										id="github-title-template"
 										onChange={handleActionParamChange("titleTemplate")}
-										placeholder="Spec created for {feature}"
+										placeholder="Spec created for $feature"
 										type="text"
 										value={params.titleTemplate || ""}
 									/>
@@ -389,15 +404,14 @@ export const TriggerActionSelector = ({
 									<TextareaPanel
 										disabled={disabled}
 										onChange={handleActionParamChange("bodyTemplate")}
-										placeholder="Specification created at {timestamp} by {user}"
+										placeholder="Specification created at $timestamp by $user"
 										rows={3}
 										textareaClassName="min-h-[6rem] text-sm"
 										textareaProps={{ id: "github-body-template" }}
 										value={params.bodyTemplate || ""}
 									/>
 									<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.6))] text-xs">
-										Available variables: {"{feature}"}, {"{branch}"},{" "}
-										{"{timestamp}"}, {"{user}"}
+										Available variables: $feature, $branch, $timestamp, $user
 									</p>
 								</div>
 							</>
@@ -443,7 +457,7 @@ export const TriggerActionSelector = ({
 									className="font-medium text-[color:var(--vscode-foreground)] text-sm"
 									htmlFor="custom-agent-name"
 								>
-									Agent Name
+									Agent
 								</label>
 								<span
 									aria-hidden="true"
@@ -452,33 +466,86 @@ export const TriggerActionSelector = ({
 									*
 								</span>
 							</div>
-							<input
-								className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-input-background)] px-3 py-2 text-[color:var(--vscode-input-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
+							<AgentDropdown
 								disabled={disabled}
-								id="custom-agent-name"
-								onChange={handleActionParamChange("agentName")}
-								placeholder="my-custom-agent"
-								type="text"
-								value={params.agentName || ""}
+								onAgentSelect={(agentId) => {
+									onActionChange({
+										...action,
+										parameters: {
+											...params,
+											agentId,
+											agentName: agentId, // Keep backward compatibility
+										} as CustomActionParams,
+									});
+									onClearActionError?.();
+								}}
+								selectedAgentId={params.agentId || params.agentName}
 							/>
 						</div>
+
+						{/* Agent Type Selector - Manual override for agent execution type */}
+						<AgentTypeSelector
+							disabled={disabled}
+							onChange={(agentType) => {
+								onActionChange({
+									...action,
+									parameters: {
+										...params,
+										agentType,
+									} as CustomActionParams,
+								});
+								onClearActionError?.();
+							}}
+							value={params.agentType}
+						/>
+
 						<div className="flex flex-col gap-2">
-							<label
-								className="font-medium text-[color:var(--vscode-foreground)] text-sm"
-								htmlFor="custom-arguments"
-							>
-								Arguments
-							</label>
-							<TextareaPanel
+							<div className="flex items-center gap-1">
+								<label
+									className="font-medium text-[color:var(--vscode-foreground)] text-sm"
+									htmlFor="custom-arguments"
+								>
+									Arguments
+								</label>
+							</div>
+							<ArgumentTemplateEditor
 								disabled={disabled}
-								onChange={handleActionParamChange("arguments")}
-								placeholder="--mode=auto --feature={feature}"
-								rows={2}
-								textareaClassName="min-h-[4rem] text-sm"
-								textareaProps={{ id: "custom-arguments" }}
+								error={actionError}
+								onChange={(value) => {
+									onActionChange({
+										...action,
+										parameters: {
+											...params,
+											arguments: value,
+										} as CustomActionParams,
+									});
+									onClearActionError?.();
+								}}
+								placeholder="--mode=auto --feature=$feature --spec=$specId"
+								triggerType={trigger.operation}
 								value={params.arguments || ""}
 							/>
 						</div>
+
+						{/* CLI Options Panel - Only show for background agents */}
+						{params.agentType === "background" && (
+							<CopilotCliOptionsPanel
+								disabled={disabled}
+								onChange={(
+									cliOptions: import("../types").CopilotCliOptions
+								) => {
+									onActionChange({
+										...action,
+										parameters: {
+											...params,
+											cliOptions,
+										} as CustomActionParams,
+									});
+									onClearActionError?.();
+								}}
+								value={params.cliOptions || {}}
+							/>
+						)}
 					</>
 				);
 			}
@@ -623,6 +690,32 @@ export const TriggerActionSelector = ({
 						</VSCodeSelect>
 					</div>
 				</div>
+				<div className="flex gap-3">
+					<div className="flex-1">
+						<VSCodeSelect
+							disabled={disabled}
+							id="trigger-timing"
+							label="When to Execute"
+							onChange={handleTriggerTimingChange}
+							size="sm"
+							value={trigger.timing}
+						>
+							<option value="before">Before Operation</option>
+							<option value="after">After Operation</option>
+						</VSCodeSelect>
+					</div>
+				</div>
+				{trigger.timing === "before" && (
+					<div className="flex items-start gap-2">
+						<VSCodeCheckbox
+							checked={trigger.waitForCompletion ?? false}
+							disabled={disabled}
+							onChange={handleWaitForCompletionChange}
+						>
+							Wait for hook to complete before executing operation
+						</VSCodeCheckbox>
+					</div>
+				)}
 			</fieldset>
 
 			<fieldset className="flex flex-col gap-3 rounded border border-[color:var(--vscode-panel-border)] p-3">

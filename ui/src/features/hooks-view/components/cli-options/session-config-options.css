@@ -1,0 +1,91 @@
+.session-config-options {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.session-config-header h4 {
+	display: flex;
+	align-items: center;
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+}
+
+.session-config-options-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+}
+
+@media (max-width: 768px) {
+	.session-config-options-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+.session-config-option {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.session-config-option label {
+	display: flex;
+	align-items: center;
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--vscode-foreground);
+}
+
+.session-config-input {
+	padding: 6px 8px;
+	background-color: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 2px;
+	font-size: 13px;
+	font-family: inherit;
+}
+
+.session-config-input:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.session-config-input:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.session-config-checkbox {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.session-config-checkbox input[type="checkbox"] {
+	width: 16px;
+	height: 16px;
+	cursor: pointer;
+}
+
+.session-config-checkbox input[type="checkbox"]:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.session-config-checkbox label {
+	display: flex;
+	align-items: center;
+	cursor: pointer;
+	font-size: 13px;
+	color: var(--vscode-foreground);
+	margin: 0;
+}
+
+.session-config-checkbox input[type="checkbox"]:disabled + label {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
