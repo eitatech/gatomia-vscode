@@ -37,6 +37,7 @@ export interface TriggerCondition {
 	agent: AgentType; // Which agent system
 	operation: OperationType; // Which operation
 	timing: TriggerTiming; // When to trigger
+	waitForCompletion?: boolean; // Only for "before" timing: block operation until hook completes
 }
 
 /**
@@ -83,7 +84,7 @@ export const SUPPORTED_SPECKIT_OPERATIONS: OperationType[] = [
 /**
  * TriggerTiming - When the trigger should fire
  */
-export type TriggerTiming = "after"; // MVP: only 'after' supported
+export type TriggerTiming = "before" | "after";
 
 /**
  * ActionConfig - Defines the operation to execute when triggered
@@ -162,12 +163,112 @@ export type GitHubOperation =
  * CustomActionParams - Parameters for custom agent invocations
  */
 export interface CustomActionParams {
-	agentId?: string; // Optional: GitHub Copilot agent ID
-	agentName: string; // Custom agent identifier
+	// NEW: Agent Registry Integration (for custom-agent-hooks refactoring)
+	agentId?: string; // Agent ID from agent registry (format: "source:name")
+	agentType?: "local" | "background"; // Explicit type override
+
+	// EXISTING: Legacy GitHub Copilot agent support
+	agentName: string; // Custom agent identifier (will be deprecated in favor of agentId)
 	prompt?: string; // Instruction/action text for the agent
 	selectedTools?: SelectedMCPTool[]; // Optional: MCP tools available to agent
-	arguments?: string; // Legacy: Arguments to pass to agent
+	arguments?: string; // Template string with {variable} syntax for passing trigger context
+
+	// GitHub Copilot CLI Options
+	cliOptions?: CopilotCliOptions; // All CLI parameters supported by GitHub Copilot
 }
+
+/**
+ * CopilotCliOptions - All available GitHub Copilot CLI parameters
+ * Based on copilot --help output
+ */
+export interface CopilotCliOptions {
+	// Directory and Path Options
+	addDir?: string[]; // --add-dir: Additional directories for file access
+	allowAllPaths?: boolean; // --allow-all-paths: Disable file path verification
+	disallowTempDir?: boolean; // --disallow-temp-dir: Prevent temp directory access
+
+	// Tool Permissions
+	allowAllTools?: boolean; // --allow-all-tools: Allow all tools without confirmation
+	allowTool?: string[]; // --allow-tool: Specific tools allowed
+	availableTools?: string[]; // --available-tools: Only these tools available
+	excludedTools?: string[]; // --excluded-tools: These tools not available
+	denyTool?: string[]; // --deny-tool: Tools denied
+
+	// URL Permissions
+	allowAllUrls?: boolean; // --allow-all-urls: Allow all URLs
+	allowUrl?: string[]; // --allow-url: Specific URLs allowed
+	denyUrl?: string[]; // --deny-url: Specific URLs denied
+
+	// GitHub MCP Server Options
+	addGithubMcpTool?: string[]; // --add-github-mcp-tool: Enable specific GitHub MCP tools
+	addGithubMcpToolset?: string[]; // --add-github-mcp-toolset: Enable GitHub MCP toolsets
+	enableAllGithubMcpTools?: boolean; // --enable-all-github-mcp-tools: Enable all GitHub MCP tools
+
+	// MCP Server Configuration
+	additionalMcpConfig?: string[]; // --additional-mcp-config: Additional MCP config JSON
+	disableBuiltinMcps?: boolean; // --disable-builtin-mcps: Disable built-in MCP servers
+	disableMcpServer?: string[]; // --disable-mcp-server: Disable specific MCP servers
+
+	// Execution Options
+	agent?: string; // --agent: Custom agent to use
+	model?: CopilotModel; // --model: AI model to use
+	noAskUser?: boolean; // --no-ask-user: Disable ask_user tool (autonomous mode)
+	disableParallelToolsExecution?: boolean; // --disable-parallel-tools-execution: Sequential tool execution
+	noCustomInstructions?: boolean; // --no-custom-instructions: Disable AGENTS.md loading
+
+	// Output and Logging Options
+	silent?: boolean; // --silent / -s: Output only agent response
+	logLevel?: CopilotLogLevel; // --log-level: Set log level
+	logDir?: string; // --log-dir: Log file directory
+	noColor?: boolean; // --no-color: Disable color output
+	plainDiff?: boolean; // --plain-diff: Disable rich diff rendering
+	screenReader?: boolean; // --screen-reader: Enable screen reader optimizations
+	stream?: "on" | "off"; // --stream: Enable/disable streaming
+
+	// Session Options
+	resume?: boolean | string; // --resume: Resume previous session (true or session ID)
+	continue?: boolean; // --continue: Resume most recent session
+	share?: boolean | string; // --share: Share to markdown (true or custom path)
+	shareGist?: boolean; // --share-gist: Share to GitHub gist
+
+	// Configuration
+	configDir?: string; // --config-dir: Configuration directory
+	banner?: boolean; // --banner: Show startup banner
+	noAutoUpdate?: boolean; // --no-auto-update: Disable auto-update
+
+	// Combined Flags
+	allowAll?: boolean; // --allow-all or --yolo: Enable all permissions
+}
+
+/**
+ * CopilotModel - Available AI models in GitHub Copilot
+ */
+export type CopilotModel =
+	| "claude-sonnet-4.5"
+	| "claude-haiku-4.5"
+	| "claude-opus-4.5"
+	| "claude-sonnet-4"
+	| "gpt-5.2-codex"
+	| "gpt-5.1-codex-max"
+	| "gpt-5.1-codex"
+	| "gpt-5.2"
+	| "gpt-5.1"
+	| "gpt-5"
+	| "gpt-5.1-codex-mini"
+	| "gpt-5-mini"
+	| "gpt-4.1";
+
+/**
+ * CopilotLogLevel - Log level options
+ */
+export type CopilotLogLevel =
+	| "none"
+	| "error"
+	| "warning"
+	| "info"
+	| "debug"
+	| "all"
+	| "default";
 
 /**
  * MCPActionParams - Parameters for MCP server tool execution
@@ -318,6 +419,10 @@ export interface TemplateContext {
 	branch?: string; // Current git branch (e.g., '001-hooks-module')
 	timestamp?: string; // ISO 8601 format
 	user?: string; // Git user name from config
+	// Output capture variables
+	agentOutput?: string; // Output content from triggering agent
+	clipboardContent?: string; // Current clipboard content
+	outputPath?: string; // Path to output file
 }
 
 /**
@@ -327,7 +432,11 @@ export interface TriggerEvent {
 	agent: string; // 'speckit' | 'openspec'
 	operation: string; // Operation name
 	timestamp: number; // Unix timestamp (milliseconds)
+	timing?: TriggerTiming; // When the trigger fired (before/after)
 	metadata?: Record<string, unknown>; // Optional context data
+	// Output capture fields
+	outputPath?: string; // Path to generated file (for file operations)
+	outputContent?: string; // File content or captured output
 }
 
 // ============================================================================
@@ -430,13 +539,17 @@ export function isValidTrigger(obj: unknown): obj is TriggerCondition {
 	const trigger = obj as TriggerCondition;
 
 	const validAgents: AgentType[] = ["speckit", "openspec"];
+	const validTimings: TriggerTiming[] = ["before", "after"];
 
 	return (
 		typeof trigger.agent === "string" &&
 		validAgents.includes(trigger.agent) &&
 		typeof trigger.operation === "string" &&
 		SUPPORTED_SPECKIT_OPERATIONS.includes(trigger.operation) &&
-		trigger.timing === "after"
+		typeof trigger.timing === "string" &&
+		validTimings.includes(trigger.timing) &&
+		(trigger.waitForCompletion === undefined ||
+			typeof trigger.waitForCompletion === "boolean")
 	);
 }
 
@@ -630,7 +743,7 @@ export function isValidTriggerEvent(obj: unknown): obj is TriggerEvent {
 	}
 	const event = obj as TriggerEvent;
 
-	const validAgents: AgentType[] = ["speckit", "openspec"];
+	const validAgents: string[] = ["speckit", "openspec"];
 
 	return (
 		typeof event.agent === "string" &&

@@ -1,8 +1,26 @@
+/**
+ * Git Utilities
+ *
+ * Provides Git integration utilities for accessing repository information
+ * and performing Git operations via the VS Code Git extension.
+ *
+ * Features:
+ * - Access VS Code Git API
+ * - Get current repository and branch information
+ * - Extract GitHub repository slugs from remote URLs
+ * - Perform Git operations (commit, push)
+ *
+ * @see https://github.com/microsoft/vscode/tree/main/extensions/git
+ */
+
 import { extensions } from "vscode";
 
 // Top-level regex for GitHub slug extraction (performance optimization)
 const GITHUB_SLUG_REGEX = /github\.com[:/](.+?)(?:\.git)?$/i;
 
+/**
+ * GitRemote - Represents a Git remote (e.g., origin)
+ */
 export interface GitRemote {
 	name?: string;
 	fetchUrl?: string;

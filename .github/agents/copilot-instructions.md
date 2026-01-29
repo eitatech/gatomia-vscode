@@ -7,10 +7,6 @@ This file provides guidance to AI agents when working with code in this reposito
 - Always run `npm run check` before marking any task as complete. This ensures code quality and formatting standards are met.
 - Never use emoji in source code files (from global user instructions).
 
-## Project Constitution (NON-NEGOTIABLE)
-
-This project follows strict principles defined in [.specify/memory/constitution.md](../../.specify/memory/constitution.md):
-
 ### I. Kebab-Case File Naming (MANDATORY)
 
 - **All source files MUST use kebab-case** (e.g., `preview-store.ts`, `document-preview-panel.ts`)
@@ -228,6 +224,7 @@ npm test -- -t "MCP"
 
 ### SpecKit / OpenSpec
 
+npm test && npm run check
 - Extension detects spec system automatically
 - Adapters in `utils/spec-kit-adapter.ts` provide unified interface
 - SpecKit: `.specify/` directory structure
@@ -264,6 +261,8 @@ npm test -- -t "MCP"
 - 001-steering-instructions-rules: Added TypeScript 5.x (strict), target ES2022 + VS Code Extension API, Node.js (extension host), React 18 + Vite (webview), Biome
 
 
-## Active Technologies
-- TypeScript 5.x (strict), target ES2022 + VS Code Extension API, Node.js (extension host), React 18 + Vite (webview), Biome (001-steering-instructions-rules)
-- TypeScript 5.3 (target: ES2022, strict mode enabled) (010-copilot-agents)
+<!-- MANUAL ADDITIONS START -->
+## Project Constitution (NON-NEGOTIABLE)
+
+This project follows strict principles defined in [.specify/memory/constitution.md](../../.specify/memory/constitution.md):
+<!-- MANUAL ADDITIONS END -->
