@@ -257,6 +257,7 @@ npm test && npm run check
 - Verify bridge communication in extension logs
 
 ## Recent Changes
+- 012-spec-version-tracking: Added TypeScript 5.3+ (ES2022 target, strict mode) + VS Code Extension API 1.84.0+, gray-matter (YAML frontmatter parsing), Node.js child_process (Git CLI)
 - 010-copilot-agents: Added TypeScript 5.3 (target: ES2022, strict mode enabled)
 - 001-steering-instructions-rules: Added TypeScript 5.x (strict), target ES2022 + VS Code Extension API, Node.js (extension host), React 18 + Vite (webview), Biome
 
@@ -266,3 +267,7 @@ npm test && npm run check
 
 This project follows strict principles defined in [.specify/memory/constitution.md](../../.specify/memory/constitution.md):
 <!-- MANUAL ADDITIONS END -->
+
+## Active Technologies
+- TypeScript 5.3+ (ES2022 target, strict mode) + VS Code Extension API 1.84.0+, gray-matter (YAML frontmatter parsing), Node.js child_process (Git CLI) (012-spec-version-tracking)
+- VS Code Workspace State API (version history metadata, 50 entries per document with FIFO) (012-spec-version-tracking)
