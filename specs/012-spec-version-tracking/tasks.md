@@ -27,10 +27,10 @@ owner: "Italo <182202+italoag@users.noreply.github.com>"
 
 **Purpose**: Create directory structure and install dependencies
 
-- [ ] T001 Create feature directory structure in src/features/documents/version-tracking/
-- [ ] T002 Create test directory structure in tests/unit/features/documents/version-tracking/ and tests/integration/
-- [ ] T003 [P] Install gray-matter dependency for YAML frontmatter parsing (verify in package.json)
-- [ ] T004 [P] Create TypeScript type definitions from contracts/document-version-service.api.ts in src/features/documents/version-tracking/types.ts
+- [x] T001 Create feature directory structure in src/features/documents/version-tracking/
+- [x] T002 Create test directory structure in tests/unit/features/documents/version-tracking/ and tests/integration/
+- [x] T003 [P] Install gray-matter dependency for YAML frontmatter parsing (verify in package.json)
+- [x] T004 [P] Create TypeScript type definitions from contracts/document-version-service.api.ts in src/features/documents/version-tracking/types.ts
 
 ---
 
