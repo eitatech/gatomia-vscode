@@ -2,6 +2,25 @@
 
 ---
 
+## v0.33.0 2026-01-29
+
+### Fixed
+
+- **MCP Configuration Path Detection**: Fixed "Open MCP Config" command to correctly detect IDE-specific configuration paths
+  - **IDE-Aware Path Resolution**: Now automatically detects VS Code, VS Code Insiders, Cursor, Windsurf, Positron, VSCodium and other forks
+  - **Cross-Platform Support**: Works correctly on macOS, Linux, Windows, and WSL
+  - **Dynamic Detection**: Uses `vscode.env.appName` to determine correct configuration directory
+  - **Backward Compatible**: Falls back to standard "Code" directory for unknown IDE forks
+
+### Tests
+
+- Added comprehensive test suite for platform-specific path detection (14 tests)
+- Tests cover macOS, Linux, and Windows platforms
+- Tests validate correct paths for VS Code, VS Code Insiders, Cursor, Windsurf, Positron, and VSCodium
+- All existing tests continue passing (1566 tests)
+
+---
+
 ## v0.32.0 2026-01-27
 
 ### Added

@@ -459,7 +459,7 @@
         "command": "gatomia.settings.openGlobalConfig",
         "title": "Open MCP Config (mcp.json)",
         "category": "GatomIA",
-        "icon": "$(file-text)"
+        "icon": "$(mcp)"
       },
       {
         "command": "gatomia.settings.selectSpecSystem",
