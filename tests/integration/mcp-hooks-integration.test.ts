@@ -17,7 +17,7 @@ vi.mock("../../src/features/hooks/services/mcp-discovery", () => {
 	const mockServers: MCPServer[] = [
 		{
 			id: "github-mcp",
-			name: "GitHub MCP",
+			name: "GitHub Tools",
 			description: "GitHub operations via MCP",
 			status: "available",
 			tools: [
