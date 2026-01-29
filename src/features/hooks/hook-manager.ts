@@ -476,65 +476,127 @@ export class HookManager {
 			return { valid: false, errors };
 		}
 
-		// Name validation
+		// Collect all validation errors
 		errors.push(...this.validateHookName(hook.name));
-
-		// T051: Validate agent type override
 		errors.push(...this.validateAgentTypeParam(hook));
+		errors.push(...this.validateHookStructure(hook));
 
-		// Validate using type guard for deeper validation
-		if (!isValidHook(hook)) {
-			// Provide more detailed error messages by checking individual fields
-			if (!hook.id || typeof hook.id !== "string") {
-				errors.push({ field: "id", message: "Hook ID is missing or invalid" });
-			}
-			if (!hook.trigger || typeof hook.trigger !== "object") {
-				errors.push({
-					field: "trigger",
-					message: "Trigger configuration is invalid",
-				});
-			}
-			if (!hook.action || typeof hook.action !== "object") {
-				errors.push({
-					field: "action",
-					message: "Action configuration is invalid",
-				});
-			} else if (!isValidAction(hook.action)) {
-				// More specific action validation
-				if (hook.action.type === "custom") {
-					const params = hook.action.parameters as any;
-					if (!(params?.agentId || params?.agentName)) {
-						errors.push({
-							field: "action.parameters.agentId",
-							message: "Agent ID or agent name is required",
-						});
-					}
-				}
-				if (errors.length === 0) {
-					errors.push({
-						field: "action",
-						message: "Action parameters are invalid",
-					});
-				}
-			}
-		}
-
-		// T085: Validate MCP server references if action type is "mcp"
-		if (hook.action.type === "mcp" && this.mcpDiscoveryService) {
-			const mcpErrors = await this.validateMCPServerRef(hook);
-			errors.push(...mcpErrors);
-		}
-
-		// T025: Validate custom agent references if action type is "custom"
-		if (hook.action.type === "custom" && this.agentRegistry) {
-			const customErrors = await this.validateCustomAgentRef(hook);
-			errors.push(...customErrors);
-		}
+		// Async validations
+		const asyncErrors = await this.performAsyncValidations(hook);
+		errors.push(...asyncErrors);
 
 		return {
 			valid: errors.length === 0,
 			errors,
 		};
+	}
+
+	/**
+	 * Validate hook structure using type guards
+	 */
+	private validateHookStructure(hook: Hook): ValidationError[] {
+		if (isValidHook(hook)) {
+			return [];
+		}
+
+		const errors: ValidationError[] = [];
+		errors.push(...this.validateHookId(hook));
+		errors.push(...this.validateHookTrigger(hook));
+		errors.push(...this.validateHookAction(hook));
+
+		return errors;
+	}
+
+	/**
+	 * Validate hook ID field
+	 */
+	private validateHookId(hook: Hook): ValidationError[] {
+		if (!hook.id || typeof hook.id !== "string") {
+			return [{ field: "id", message: "Hook ID is missing or invalid" }];
+		}
+		return [];
+	}
+
+	/**
+	 * Validate hook trigger configuration
+	 */
+	private validateHookTrigger(hook: Hook): ValidationError[] {
+		if (!hook.trigger || typeof hook.trigger !== "object") {
+			return [
+				{
+					field: "trigger",
+					message: "Trigger configuration is invalid",
+				},
+			];
+		}
+		return [];
+	}
+
+	/**
+	 * Validate hook action configuration
+	 */
+	private validateHookAction(hook: Hook): ValidationError[] {
+		if (!hook.action || typeof hook.action !== "object") {
+			return [
+				{
+					field: "action",
+					message: "Action configuration is invalid",
+				},
+			];
+		}
+
+		if (!isValidAction(hook.action)) {
+			return this.validateActionParameters(hook.action);
+		}
+
+		return [];
+	}
+
+	/**
+	 * Validate action parameters for specific action types
+	 */
+	private validateActionParameters(action: HookAction): ValidationError[] {
+		if (action.type === "custom") {
+			const params = action.parameters as any;
+			if (!(params?.agentId || params?.agentName)) {
+				return [
+					{
+						field: "action.parameters.agentId",
+						message: "Agent ID or agent name is required",
+					},
+				];
+			}
+		}
+
+		return [
+			{
+				field: "action",
+				message: "Action parameters are invalid",
+			},
+		];
+	}
+
+	/**
+	 * Perform all async validations (MCP and custom agents)
+	 */
+	private async performAsyncValidations(
+		hook: Hook
+	): Promise<ValidationError[]> {
+		const errors: ValidationError[] = [];
+
+		// T085: Validate MCP server references
+		if (hook.action.type === "mcp" && this.mcpDiscoveryService) {
+			const mcpErrors = await this.validateMCPServerRef(hook);
+			errors.push(...mcpErrors);
+		}
+
+		// T025: Validate custom agent references
+		if (hook.action.type === "custom" && this.agentRegistry) {
+			const customErrors = await this.validateCustomAgentRef(hook);
+			errors.push(...customErrors);
+		}
+
+		return errors;
 	}
 
 	/**

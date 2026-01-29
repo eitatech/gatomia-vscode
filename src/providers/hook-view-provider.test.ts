@@ -186,8 +186,9 @@ describe("HookViewProvider (panel)", () => {
 		});
 
 		expect(mockHookManager.createHook).toHaveBeenCalled();
+		// After create, we sync the hook list
 		expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
-			expect.objectContaining({ command: "hooks.created" })
+			expect.objectContaining({ command: "hooks.sync" })
 		);
 	});
 
