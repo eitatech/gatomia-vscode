@@ -2,50 +2,6 @@
 
 ---
 
-## v0.32.0 2026-01-29
-
-### Added
-
-- implement automatic MCP config path detection for multiple IDEs; add testing guide and comprehensive tests
-- add model execution, output logging, permission, and session configuration options components
-- Add GitHub Copilot CLI options and refactor command argument construction
-- Enhance trigger timing and output capture functionality
-- enhance custom agent hooks UI with template variables
-- implement LOCAL and BACKGROUND agent execution
-- add Phase 6-9 test suites and extension monitor
-- complete Phase 8 - agent availability & error handling
-- implement extension agent discovery (Phase 7, User Story 4)
-- implement agent type selection (Phase 5, User Story 2)
-
-### Fixed
-
-- resolve 13 pre-existing test failures in hooks tests
-- update template expansion to use $variableName syntax
-- send agent list directly to webview bypassing ready check
-- use workspace.workspaceFolders for agent directory path
-- remove AgentRegistry dependency from HookViewProvider
-- remove AgentRegistry dependency from extension initialization
-- load agents from .github/agents/*.agent.md files directly
-- correct agent list request command name
-- resolve postMessage error in agent dropdown
-
-### Changed
-
-- refactor: enhance hook validation and error handling; update tests for hook creation and agent discovery
-- add agent names to example agents and update GitHub MCP references to GitHub Tools
-- fix dependencies
-- fix dependencies
-- Implement feature X to enhance user experience and optimize performance
-- docs: add manual testing guide for custom agent hooks UI
-- refactor: reduce buildTemplateContext complexity and fix template edge cases
-- chore: update project documentation and code for Phase 8/9 integration
-- docs(hooks): complete final Phase 9 tasks (T089-T094) - ALL PHASES COMPLETE
-- docs(hooks): complete Phase 9 polish tasks (T085-T089, T092-T093)
-- docs: mark Phase 5 (User Story 2) tasks as complete
-
----
-
-
 ## v0.33.0 2026-01-29
 
 ### Fixed
