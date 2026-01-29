@@ -49,7 +49,7 @@ export interface GitHubActionParams {
 
 export interface CustomActionParams {
 	agentId?: string; // Optional: Agent ID from agent registry
-	agentName: string; // Custom agent identifier
+	agentName?: string; // Custom agent identifier (deprecated - use agentId)
 	agentType?: "local" | "background"; // Explicit execution type override
 	prompt?: string; // Instruction/action text for the agent
 	selectedTools?: SelectedMCPTool[]; // Optional: MCP tools available to agent
@@ -144,8 +144,8 @@ export type CopilotLogLevel =
 	| "default";
 
 export interface MCPActionParams {
-	// Agent and instruction
-	agentId?: string; // Optional: GitHub Copilot agent ID (e.g., 'copilot', 'workspace')
+	// Model and instruction
+	modelId?: string; // Optional: LLM model ID from GitHub subscription (e.g., 'gpt-4o', 'claude-3-5-sonnet')
 	prompt: string; // Instruction/action text for the agent to execute
 
 	// Selected tools (multiple selection supported)
@@ -250,7 +250,10 @@ export type HooksExtensionMessage =
 	| {
 			type: "hooks/error";
 			command?: "hooks.error";
-			payload: { message: string };
+			payload: {
+				message: string;
+				validationErrors?: Array<{ field: string; message: string }>;
+			};
 	  }
 	| {
 			type: "hooks/execution-status";

@@ -354,45 +354,29 @@ export class HookViewProvider {
 	private async handleCreateHook(
 		hookData: Omit<Hook, "id" | "createdAt" | "modifiedAt" | "executionCount">
 	): Promise<void> {
-		const hook = await this.hookManager.createHook(hookData);
-		await this.sendMessageToWebview({
-			command: "hooks.created",
-			type: "hooks/created",
-			data: { hook },
-		} as HookCreatedMessage);
+		await this.hookManager.createHook(hookData);
+		// Hook list is automatically synced via onHooksChanged event
 	}
 
 	private async handleUpdateHook(
 		hookId: string,
 		updates: Partial<Hook>
 	): Promise<void> {
-		const hook = await this.hookManager.updateHook(hookId, updates);
-		await this.sendMessageToWebview({
-			command: "hooks.updated",
-			type: "hooks/updated",
-			data: { hook },
-		} as HookUpdatedMessage);
+		await this.hookManager.updateHook(hookId, updates);
+		// Hook list is automatically synced via onHooksChanged event
 	}
 
 	private async handleDeleteHook(hookId: string): Promise<void> {
 		await this.hookManager.deleteHook(hookId);
-		await this.sendMessageToWebview({
-			command: "hooks.deleted",
-			type: "hooks/deleted",
-			data: { id: hookId },
-		} as HookDeletedMessage);
+		// Hook list is automatically synced via onHooksChanged event
 	}
 
 	private async handleToggleHook(
 		hookId: string,
 		enabled: boolean
 	): Promise<void> {
-		const hook = await this.hookManager.updateHook(hookId, { enabled });
-		await this.sendMessageToWebview({
-			command: "hooks.updated",
-			type: "hooks/updated",
-			data: { hook },
-		} as HookUpdatedMessage);
+		await this.hookManager.updateHook(hookId, { enabled });
+		// Hook list is automatically synced via onHooksChanged event
 	}
 
 	private async sendExecutionLogs(hookId?: string): Promise<void> {
@@ -411,12 +395,27 @@ export class HookViewProvider {
 			`[HookViewProvider] Webview error: ${error.message}`
 		);
 
+		// Extract validation errors if this is a HookValidationError
+		const validationErrors =
+			(error as any).errors &&
+			Array.isArray((error as any).errors) &&
+			(error as any).errors.length > 0
+				? (error as any).errors
+				: undefined;
+
+		if (validationErrors) {
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Validation errors: ${JSON.stringify(validationErrors)}`
+			);
+		}
+
 		await this.sendMessageToWebview({
 			command: "hooks.error",
 			type: "hooks/error",
 			data: {
 				message: error.message,
 				code: (error as any).code,
+				validationErrors,
 			},
 		} as ErrorMessage);
 	}
@@ -504,12 +503,23 @@ export class HookViewProvider {
 						const filePath = join(agentsDir, filename);
 						const content = await fs.readFile(filePath, "utf-8");
 						const parsed = matter(content);
+						// Extract agent ID from frontmatter, fallback to filename
+						const agentId =
+							typeof parsed.data.id === "string"
+								? parsed.data.id
+								: filename.replace(".agent.md", "");
 						const name = filename.replace(".agent.md", "");
 						const description =
 							typeof parsed.data.description === "string"
 								? parsed.data.description
 								: "No description available";
-						return { id: `file:${name}`, name, displayName: name, description };
+						// Use 'local:' prefix to match AgentRegistry convention (AGENT_ID_PREFIX.FILE = "local")
+						return {
+							id: `local:${agentId}`,
+							name,
+							displayName: name,
+							description,
+						};
 					} catch (error) {
 						this.outputChannel.appendLine(
 							`[HookViewProvider] Failed to parse ${filename}: ${(error as Error).message}`
@@ -620,8 +630,19 @@ export class HookViewProvider {
 	}
 
 	async showCreateHookForm(): Promise<void> {
+		const panelExisted = !!this.panel;
 		await this.ensurePanel();
-		await this.syncHooksToWebview();
+
+		// Only sync if panel was just created (webview needs initial data)
+		// If panel already existed, avoid sync to prevent race condition
+		if (!panelExisted) {
+			await this.syncHooksToWebview();
+			// Wait for webview to be fully ready after panel creation
+			if (!this.isWebviewReady) {
+				await new Promise((resolve) => setTimeout(resolve, 100));
+			}
+		}
+
 		await this.sendMessageToWebview({
 			command: "hooks.show-form",
 			type: "hooks/show-form",
@@ -630,8 +651,19 @@ export class HookViewProvider {
 	}
 
 	async showEditHookForm(hook: Hook): Promise<void> {
+		const panelExisted = !!this.panel;
 		await this.ensurePanel();
-		await this.syncHooksToWebview();
+
+		// Only sync if panel was just created (webview needs initial data)
+		// If panel already existed, avoid sync to prevent race condition
+		if (!panelExisted) {
+			await this.syncHooksToWebview();
+			// Wait for webview to be fully ready after panel creation
+			if (!this.isWebviewReady) {
+				await new Promise((resolve) => setTimeout(resolve, 100));
+			}
+		}
+
 		await this.sendMessageToWebview({
 			command: "hooks.show-form",
 			type: "hooks/show-form",
@@ -640,8 +672,19 @@ export class HookViewProvider {
 	}
 
 	async showLogsPanel(hookId?: string): Promise<void> {
+		const panelExisted = !!this.panel;
 		await this.ensurePanel();
-		await this.syncHooksToWebview();
+
+		// Only sync if panel was just created (webview needs initial data)
+		// If panel already existed, avoid sync to prevent race condition
+		if (!panelExisted) {
+			await this.syncHooksToWebview();
+			// Wait for webview to be fully ready after panel creation
+			if (!this.isWebviewReady) {
+				await new Promise((resolve) => setTimeout(resolve, 100));
+			}
+		}
+
 		await this.sendMessageToWebview({
 			command: "hooks.show-logs",
 			type: "hooks/show-logs",

@@ -46,7 +46,7 @@ export interface GitHubActionExecutorOptions {
 export class GitHubIntegrationUnavailableError extends Error {
 	constructor() {
 		super(
-			"GitHub MCP integration is not available. Configure the MCP server to enable GitHub actions."
+			"GitHub Tools integration is not available. Configure the MCP server to enable GitHub actions."
 		);
 		this.name = "GitHubIntegrationUnavailableError";
 	}

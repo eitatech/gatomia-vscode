@@ -23,7 +23,6 @@ interface HookFormProps {
 		>
 	) => void;
 	onCancel: () => void;
-	error?: string;
 }
 
 interface FormData {
@@ -43,7 +42,6 @@ export const HookForm = ({
 	initialData,
 	onSubmit,
 	onCancel,
-	error,
 }: HookFormProps) => {
 	const [formData, setFormData] = useState<FormData>(() => {
 		if (mode === "edit" && initialData) {
@@ -222,15 +220,6 @@ export const HookForm = ({
 						Configure automation rules for SpecKit/OpenSpec workflows
 					</p>
 				</header>
-
-				{error && (
-					<div
-						className="rounded border border-[color:var(--vscode-inputValidation-errorBorder)] bg-[color:var(--vscode-inputValidation-errorBackground)] px-3 py-2 text-[color:var(--vscode-inputValidation-errorForeground)] text-sm"
-						role="alert"
-					>
-						{error}
-					</div>
-				)}
 
 				<div className="flex flex-col gap-2">
 					<div className="flex items-center gap-1">

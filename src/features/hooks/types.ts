@@ -168,7 +168,7 @@ export interface CustomActionParams {
 	agentType?: "local" | "background"; // Explicit type override
 
 	// EXISTING: Legacy GitHub Copilot agent support
-	agentName: string; // Custom agent identifier (will be deprecated in favor of agentId)
+	agentName?: string; // Custom agent identifier (deprecated - use agentId instead)
 	prompt?: string; // Instruction/action text for the agent
 	selectedTools?: SelectedMCPTool[]; // Optional: MCP tools available to agent
 	arguments?: string; // Template string with {variable} syntax for passing trigger context
@@ -274,8 +274,8 @@ export type CopilotLogLevel =
  * MCPActionParams - Parameters for MCP server tool execution
  */
 export interface MCPActionParams {
-	// Agent and instruction
-	agentId?: string; // Optional: GitHub Copilot agent ID (e.g., 'copilot', 'workspace')
+	// Model and instruction
+	modelId?: string; // Optional: LLM model ID from GitHub subscription (e.g., 'gpt-4o', 'claude-3-5-sonnet')
 	prompt: string; // Instruction/action text for the agent to execute
 
 	// Selected tools (multiple selection supported)
@@ -723,15 +723,35 @@ export function isValidCustomParams(obj: unknown): obj is CustomActionParams {
 	}
 	const params = obj as CustomActionParams;
 
-	return (
-		typeof params.agentName === "string" &&
-		params.agentName.length > 0 &&
-		params.agentName.length <= MAX_AGENT_NAME_LENGTH &&
-		AGENT_NAME_PATTERN.test(params.agentName) &&
-		(params.arguments === undefined ||
-			(typeof params.arguments === "string" &&
-				params.arguments.length <= MAX_ARGUMENTS_LENGTH))
-	);
+	// Must have either agentId (preferred) or agentName (legacy)
+	const hasAgentId =
+		typeof params.agentId === "string" && params.agentId.length > 0;
+	const hasAgentName =
+		typeof params.agentName === "string" && params.agentName.length > 0;
+
+	if (!(hasAgentId || hasAgentName)) {
+		return false;
+	}
+
+	// Validate agentName if present (legacy format without prefix)
+	if (
+		hasAgentName &&
+		(params.agentName!.length > MAX_AGENT_NAME_LENGTH ||
+			!AGENT_NAME_PATTERN.test(params.agentName!))
+	) {
+		return false;
+	}
+
+	// Validate arguments if present
+	if (
+		params.arguments !== undefined &&
+		(typeof params.arguments !== "string" ||
+			params.arguments.length > MAX_ARGUMENTS_LENGTH)
+	) {
+		return false;
+	}
+
+	return true;
 }
 
 /**
@@ -784,7 +804,7 @@ export function isValidMCPParams(obj: unknown): obj is MCPActionParams {
 
 	// Validate optional fields
 	const hasValidOptionalFields =
-		(params.agentId === undefined || typeof params.agentId === "string") &&
+		(params.modelId === undefined || typeof params.modelId === "string") &&
 		(params.parameterMappings === undefined ||
 			(Array.isArray(params.parameterMappings) &&
 				params.parameterMappings.every(isValidParameterMapping))) &&

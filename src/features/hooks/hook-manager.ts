@@ -12,6 +12,7 @@ import {
 	type MCPActionParams,
 	type CustomActionParams,
 	isValidHook,
+	isValidAction,
 	HOOKS_STORAGE_KEY,
 	MAX_HOOK_NAME_LENGTH,
 } from "./types";
@@ -357,6 +358,17 @@ export class HookManager {
 					);
 				}
 
+				// Migration: Rename agentId to modelId in MCP actions
+				if (hook.action.type === "mcp") {
+					const mcpParams = hook.action.parameters as any;
+					if (mcpParams.agentId && !mcpParams.modelId) {
+						mcpParams.modelId = mcpParams.agentId;
+						mcpParams.agentId = undefined;
+						this.outputChannel.appendLine(
+							`[HookManager] Migration: Renamed agentId to modelId for MCP hook: ${hook.name}`
+						);
+					}
+				}
 				if (isValidHook(hook)) {
 					validHooks.push(hook);
 				} else {
@@ -472,10 +484,39 @@ export class HookManager {
 
 		// Validate using type guard for deeper validation
 		if (!isValidHook(hook)) {
-			errors.push({
-				field: "hook",
-				message: "Hook structure is invalid",
-			});
+			// Provide more detailed error messages by checking individual fields
+			if (!hook.id || typeof hook.id !== "string") {
+				errors.push({ field: "id", message: "Hook ID is missing or invalid" });
+			}
+			if (!hook.trigger || typeof hook.trigger !== "object") {
+				errors.push({
+					field: "trigger",
+					message: "Trigger configuration is invalid",
+				});
+			}
+			if (!hook.action || typeof hook.action !== "object") {
+				errors.push({
+					field: "action",
+					message: "Action configuration is invalid",
+				});
+			} else if (!isValidAction(hook.action)) {
+				// More specific action validation
+				if (hook.action.type === "custom") {
+					const params = hook.action.parameters as any;
+					if (!(params?.agentId || params?.agentName)) {
+						errors.push({
+							field: "action.parameters.agentId",
+							message: "Agent ID or agent name is required",
+						});
+					}
+				}
+				if (errors.length === 0) {
+					errors.push({
+						field: "action",
+						message: "Action parameters are invalid",
+					});
+				}
+			}
 		}
 
 		// T085: Validate MCP server references if action type is "mcp"
