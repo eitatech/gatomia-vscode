@@ -14,8 +14,7 @@ import {
 	version,
 } from "vscode";
 import { existsSync, readFileSync } from "fs";
-import { join } from "path";
-import { getVSCodeUserDataPath } from "./platform-utils";
+import { getMcpConfigPath } from "./platform-utils";
 import type { MCPServer, MCPTool } from "../features/hooks/types";
 
 // Regex constant moved to top level for performance
@@ -40,14 +39,14 @@ interface MCPServerConfig {
  *
  * Dynamically detects the correct path for the current VS Code profile
  * and platform (Windows, macOS, Linux, WSL).
+ * Automatically finds the active profile's mcp.json if using VS Code profiles.
  *
  * @returns Map of server IDs to their configuration, or empty map if config not found
  */
 async function loadMCPConfig(): Promise<Map<string, MCPServerConfig>> {
 	try {
-		// Get the VS Code User Data path dynamically (works across all platforms and profiles)
-		const userDataPath = await getVSCodeUserDataPath();
-		const mcpConfigPath = join(userDataPath, "mcp.json");
+		// Get the MCP config path (automatically handles profiles)
+		const mcpConfigPath = await getMcpConfigPath();
 
 		console.info(`[MCP] Looking for config at: ${mcpConfigPath}`);
 

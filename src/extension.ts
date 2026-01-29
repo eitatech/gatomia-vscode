@@ -30,7 +30,7 @@ import { SteeringExplorerProvider } from "./providers/steering-explorer-provider
 import { PromptLoader } from "./services/prompt-loader";
 import { sendPromptToChat } from "./utils/chat-prompt-runner";
 import { ConfigManager } from "./utils/config-manager";
-import { getVSCodeUserDataPath } from "./utils/platform-utils";
+import { getMcpConfigPath } from "./utils/platform-utils";
 import { getSpecSystemAdapter } from "./utils/spec-kit-adapter";
 import { parseTasksFromFile, getTasksFilePath } from "./utils/task-parser";
 import { getChecklistStatusFromFile } from "./utils/checklist-parser";
@@ -1472,11 +1472,6 @@ async function toggleViews() {
 
 		window.showInformationMessage("View visibility updated!");
 	}
-}
-
-async function getMcpConfigPath(): Promise<string> {
-	const userDataPath = await getVSCodeUserDataPath();
-	return join(userDataPath, "mcp.json");
 }
 
 function setupFileWatchers(
