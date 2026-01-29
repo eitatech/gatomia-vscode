@@ -130,7 +130,7 @@ describe("MCPActionExecutor", () => {
 					{
 						toolParam: "message",
 						source: "template",
-						value: "Feature: $feature",
+						value: "Feature: {feature}",
 					},
 				],
 			};
@@ -234,7 +234,7 @@ describe("MCPActionExecutor", () => {
 					{
 						toolParam: "timestamp",
 						source: "template",
-						value: "Generated at $timestamp",
+						value: "Generated at {timestamp}",
 					},
 				],
 			};

@@ -61,8 +61,8 @@ describe("GitHubActionExecutor", () => {
 		const params: GitHubActionParams = {
 			operation: "open-issue",
 			repository: undefined,
-			titleTemplate: "Spec ready for $feature",
-			bodyTemplate: "Generated from $branch at $timestamp",
+			titleTemplate: "Spec ready for {feature}",
+			bodyTemplate: "Generated from {branch} at {timestamp}",
 		};
 
 		const result = await executor.execute(params, templateContext);
@@ -86,8 +86,8 @@ describe("GitHubActionExecutor", () => {
 		const params: GitHubActionParams = {
 			operation: "create-pr",
 			repository: undefined,
-			titleTemplate: "PR for $branch",
-			bodyTemplate: "Automated by $user",
+			titleTemplate: "PR for {branch}",
+			bodyTemplate: "Automated by {user}",
 		};
 
 		const result = await executor.execute(params, templateContext);

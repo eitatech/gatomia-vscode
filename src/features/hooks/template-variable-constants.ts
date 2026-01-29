@@ -450,13 +450,13 @@ export const VARIABLES_BY_CATEGORY: Record<
 
 /**
  * Template variable pattern
- * Matches: $variableName
+ * Matches: {variableName}
  * Captures: variableName (group 1)
  * Pattern allows: letters, numbers, underscores (must start with letter or underscore)
- * Word boundary ensures we don't over-match (e.g., $var in "$varyyyy" should only match "var")
+ * Curly braces ensure exact variable boundaries (no over-matching)
  * @see specs/011-custom-agent-hooks/research.md:L164-L180 (custom regex chosen)
  */
-export const TEMPLATE_VARIABLE_PATTERN = /\$([a-zA-Z_][a-zA-Z0-9_]*)\b/g;
+export const TEMPLATE_VARIABLE_PATTERN = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
 
 /**
  * Valid variable name pattern

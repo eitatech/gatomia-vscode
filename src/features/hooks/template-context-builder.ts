@@ -52,7 +52,7 @@ export interface ContextBuildOptions {
  *
  * Implementation phases:
  * - Phase 2 (T008): Skeleton created (FUTURE)
- * - Phase 4 (T035-T036): Full implementation ✅ CURRENT
+ * - Phase 4 (T035-T036): Full implementation (CURRENT)
  */
 export class TemplateContextBuilder {
 	/**

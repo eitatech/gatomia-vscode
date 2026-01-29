@@ -73,7 +73,7 @@ describe("CustomActionExecutor", () => {
 
 			const params: CustomActionParams = {
 				agentName: "feature-helper",
-				arguments: "--feature=$feature --branch=$branch --user=$user",
+				arguments: "--feature={feature} --branch={branch} --user={user}",
 			};
 
 			const result = await executor.execute(params, templateContext);
@@ -93,7 +93,7 @@ describe("CustomActionExecutor", () => {
 
 			const params: CustomActionParams = {
 				agentName: "test-agent",
-				arguments: "--unknown=$nonexistent --feature=$feature",
+				arguments: "--unknown={nonexistent} --feature={feature}",
 			};
 
 			const emptyContext: TemplateContext = {
@@ -447,7 +447,8 @@ describe("CustomActionExecutor", () => {
 
 			const params: CustomActionParams = {
 				agentName: "builder",
-				arguments: "build $feature from branch $branch by $user at $timestamp",
+				arguments:
+					"build {feature} from branch {branch} by {user} at {timestamp}",
 			};
 
 			const result = await executor.execute(params, templateContext);

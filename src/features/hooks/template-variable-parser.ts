@@ -1,7 +1,7 @@
 /**
  * Template Variable Parser
  *
- * Parses and substitutes template variables in hook arguments using the syntax: $variableName
+ * Parses and substitutes template variables in hook arguments using the syntax: {variableName}
  *
  * Features:
  * - Extract variable references from template strings
@@ -9,8 +9,8 @@
  * - Substitute variables with runtime context values
  * - Handle missing variables gracefully (replace with empty string)
  *
- * Template Syntax: $variableName
- * Example: "Review spec $specId changed to $newStatus by $changeAuthor"
+ * Template Syntax: {variableName}
+ * Example: "Review spec {specId} changed to {newStatus} by {changeAuthor}"
  *
  * @see specs/011-custom-agent-hooks/contracts/template-variable-schema.ts
  * @see specs/011-custom-agent-hooks/data-model.md
@@ -167,12 +167,12 @@ export class TemplateVariableParser implements ITemplateVariableParser {
 	 * Parse template string to extract all variable references
 	 *
 	 * TODO: Phase 4 (T032) - Implement variable extraction
-	 * - Use TEMPLATE_VARIABLE_PATTERN regex to find all $variableName patterns
+	 * - Use TEMPLATE_VARIABLE_PATTERN regex to find all {variableName} patterns
 	 * - Extract variable names from capture groups
 	 * - Remove duplicates and return unique variable names
 	 * - Handle edge cases: empty template, no variables, etc.
 	 *
-	 * @param template Template string with $variable syntax
+	 * @param template Template string with {variable} syntax
 	 * @returns Array of extracted variable names
 	 */
 	extractVariables(template: string): string[] {
@@ -181,8 +181,8 @@ export class TemplateVariableParser implements ITemplateVariableParser {
 			return [];
 		}
 
-		// Use regex to find all $variableName patterns
-		// TEMPLATE_VARIABLE_PATTERN = /\$([a-zA-Z_][a-zA-Z0-9_]*)/g
+		// Use regex to find all {variableName} patterns
+		// TEMPLATE_VARIABLE_PATTERN = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g
 		const matches = template.matchAll(TEMPLATE_VARIABLE_PATTERN);
 
 		// Extract variable names from capture groups
@@ -196,13 +196,13 @@ export class TemplateVariableParser implements ITemplateVariableParser {
 	 * Substitute variables in template with values from context
 	 *
 	 * TODO: Phase 4 (T034) - Implement variable substitution
-	 * - Use TEMPLATE_VARIABLE_PATTERN regex to find all $variableName patterns
+	 * - Use TEMPLATE_VARIABLE_PATTERN regex to find all {variableName} patterns
 	 * - Replace each pattern with corresponding context value
 	 * - Use empty string for missing variables (graceful degradation)
 	 * - Handle type coercion (convert numbers/booleans to strings)
 	 * - Preserve original template if no variables found
 	 *
-	 * @param template Template string with $variable syntax
+	 * @param template Template string with {variable} syntax
 	 * @param context Context object with variable values
 	 * @returns Resolved string with variables replaced
 	 */
@@ -212,7 +212,7 @@ export class TemplateVariableParser implements ITemplateVariableParser {
 			return "";
 		}
 
-		// Replace each $variableName with corresponding context value
+		// Replace each {variableName} with corresponding context value
 		// Use empty string for missing/undefined variables (graceful degradation)
 		return template.replace(
 			TEMPLATE_VARIABLE_PATTERN,
@@ -251,25 +251,15 @@ export class TemplateVariableParser implements ITemplateVariableParser {
 			if (!VALID_VARIABLE_NAME_PATTERN.test(varName)) {
 				errors.push({
 					code: "INVALID_VARIABLE_NAME",
-					message: `Invalid variable name "$${varName}" - must start with letter or underscore, followed by letters, numbers, or underscores`,
+					message: `Invalid variable name "{${varName}}" - must start with letter or underscore, followed by letters, numbers, or underscores`,
 					position: match.index,
 					variable: varName,
 				});
 			}
 		}
 
-		// Check for empty variables ($ followed by whitespace or end of string)
-		// This explicitly allows $100, $$$, etc. as literal text
-		const emptyVarPattern = /\$(?=\s|$)/g;
-		const emptyMatches = Array.from(template.matchAll(emptyVarPattern));
-		for (const match of emptyMatches) {
-			errors.push({
-				code: "EMPTY_VARIABLE",
-				message:
-					"Empty variable name - $ must be followed by a valid identifier",
-				position: match.index,
-			});
-		}
+		// With {variableName} syntax, $ has no special meaning and is just a literal character
+		// No need to check for empty $ patterns - they're valid literal text
 
 		return {
 			valid: errors.length === 0,

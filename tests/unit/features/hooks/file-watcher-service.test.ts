@@ -64,7 +64,7 @@ function createMockWatcher() {
 describe("FileWatcherService", () => {
 	let service: FileWatcherService;
 	const testAgentsDir = "/test/workspace/.github/agents";
-	const testAgentFile = `${testAgentsDir}/test-agent.agent.md`;
+	const testAgentFile = "{testAgentsDir}/test-agent.agent.md";
 
 	beforeEach(() => {
 		service = new FileWatcherService();
@@ -147,7 +147,7 @@ describe("FileWatcherService", () => {
 			service.startWatching(testAgentsDir);
 
 			// Simulate file creation
-			const uri = mockUri.file(`${testAgentsDir}/new-agent.agent.md`);
+			const uri = mockUri.file("{testAgentsDir}/new-agent.agent.md");
 			callbacks.onCreate?.(uri);
 
 			// Wait for debounce (500ms + buffer)
@@ -209,7 +209,7 @@ describe("FileWatcherService", () => {
 
 			service.startWatching(testAgentsDir);
 
-			const uri = mockUri.file(`${testAgentsDir}/code-reviewer.agent.md`);
+			const uri = mockUri.file("{testAgentsDir}/code-reviewer.agent.md");
 			callbacks.onCreate?.(uri);
 
 			await new Promise((resolve) => setTimeout(resolve, 600));
@@ -306,9 +306,9 @@ describe("FileWatcherService", () => {
 			service.startWatching(testAgentsDir);
 
 			// Simulate multiple file changes rapidly
-			callbacks.onCreate?.(mockUri.file(`${testAgentsDir}/agent1.agent.md`));
-			callbacks.onCreate?.(mockUri.file(`${testAgentsDir}/agent2.agent.md`));
-			callbacks.onChange?.(mockUri.file(`${testAgentsDir}/agent3.agent.md`));
+			callbacks.onCreate?.(mockUri.file("{testAgentsDir}/agent1.agent.md"));
+			callbacks.onCreate?.(mockUri.file("{testAgentsDir}/agent2.agent.md"));
+			callbacks.onChange?.(mockUri.file("{testAgentsDir}/agent3.agent.md"));
 
 			// Wait for debounce
 			await new Promise((resolve) => setTimeout(resolve, 600));
@@ -485,7 +485,7 @@ describe("FileWatcherService", () => {
 			service.startWatching(testAgentsDir);
 
 			const uri = mockUri.file(
-				`${testAgentsDir}/subfolder/nested-agent.agent.md`
+				"{testAgentsDir}/subfolder/nested-agent.agent.md"
 			);
 			callbacks.onCreate?.(uri);
 

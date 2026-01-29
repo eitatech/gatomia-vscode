@@ -31,7 +31,7 @@ describe("Agent Registry Performance Profiling (Unit)", () => {
 				displayName: `Test Agent ${i}`,
 				type: i % 2 === 0 ? "local" : "background",
 				source: "file",
-				filePath: `/test/.github/agents/test-agent-${i}.agent.md`,
+				sourcePath: `/test/.github/agents/test-agent-${i}.agent.md`,
 				description: `Test agent ${i} for performance profiling`,
 				discoveredAt: now,
 				available: true,
@@ -214,13 +214,13 @@ describe("Agent Registry Performance Profiling (Unit)", () => {
 			// Create 25 agents with name "code-reviewer"
 			for (let i = 0; i < 25; i++) {
 				agents.push({
-					id: `file:code-reviewer-${i}`,
+					id: "file:code-reviewer-{i}",
 					name: "code-reviewer",
 					displayName: "Code Reviewer",
 					type: "local",
 					source: "file",
-					filePath: `/test/.github/agents/code-reviewer-${i}.agent.md`,
-					description: `Code reviewer ${i}`,
+					sourcePath: "/test/.github/agents/code-reviewer-{i}.agent.md",
+					description: "Code reviewer {i}",
 					discoveredAt: now,
 					available: true,
 				});
@@ -229,13 +229,13 @@ describe("Agent Registry Performance Profiling (Unit)", () => {
 			// Create 25 agents with name "test-generator"
 			for (let i = 0; i < 25; i++) {
 				agents.push({
-					id: `file:test-generator-${i}`,
+					id: "file:test-generator-{i}",
 					name: "test-generator",
 					displayName: "Test Generator",
 					type: "local",
 					source: "file",
-					filePath: `/test/.github/agents/test-generator-${i}.agent.md`,
-					description: `Test generator ${i}`,
+					sourcePath: "/test/.github/agents/test-generator-{i}.agent.md",
+					description: "Test generator {i}",
 					discoveredAt: now,
 					available: true,
 				});
@@ -262,12 +262,12 @@ describe("Agent Registry Performance Profiling (Unit)", () => {
 			// 50 unique agents
 			for (let i = 0; i < 50; i++) {
 				agents.push({
-					id: `file:unique-agent-${i}`,
-					name: `unique-agent-${i}`,
-					displayName: `Unique Agent ${i}`,
+					id: "file:unique-agent-{i}",
+					name: "unique-agent-{i}",
+					displayName: "Unique Agent {i}",
 					type: "local",
 					source: "file",
-					filePath: `/test/.github/agents/unique-${i}.agent.md`,
+					sourcePath: "/test/.github/agents/unique-{i}.agent.md",
 					discoveredAt: now,
 					available: true,
 				});
@@ -276,22 +276,22 @@ describe("Agent Registry Performance Profiling (Unit)", () => {
 			// 25 pairs of duplicates (50 agents total)
 			for (let i = 0; i < 25; i++) {
 				agents.push({
-					id: `file:duplicate-${i}`,
-					name: `duplicate-${i}`,
-					displayName: `Duplicate ${i}`,
+					id: "file:duplicate-{i}",
+					name: "duplicate-{i}",
+					displayName: "Duplicate {i}",
 					type: "local",
 					source: "file",
-					filePath: `/test/.github/agents/dup-${i}-1.agent.md`,
+					sourcePath: "/test/.github/agents/dup-{i}-1.agent.md",
 					discoveredAt: now,
 					available: true,
 				});
 				agents.push({
-					id: `extension:duplicate-${i}`,
-					name: `duplicate-${i}`,
-					displayName: `Duplicate ${i}`,
+					id: "extension:duplicate-{i}",
+					name: "duplicate-{i}",
+					displayName: "Duplicate {i}",
 					type: "background",
 					source: "extension",
-					extensionId: `ext.duplicate-${i}`,
+					extensionId: "ext.duplicate-{i}",
 					discoveredAt: now,
 					available: true,
 				});
@@ -322,7 +322,7 @@ describe("Agent Registry Performance Profiling (Unit)", () => {
 			const totalKB = totalBytes / 1024;
 
 			console.log("\n📊 Memory Estimation for 100 agents:");
-			console.log(`   - Bytes per agent: ~${bytesPerAgent}`);
+			console.log("   - Bytes per agent: ~{bytesPerAgent}");
 			console.log(`   - Total memory: ~${totalKB.toFixed(2)}KB`);
 			console.log(
 				`   - Per agent overhead: ~${(totalKB / 100).toFixed(2)}KB\n`

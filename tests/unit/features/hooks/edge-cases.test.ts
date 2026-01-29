@@ -338,12 +338,8 @@ description: "Agent with unicode content: 你好世界 🌍"
 
 			const validation = parser.validateSyntax(template);
 
-			// With $variableName syntax, a lone $ is valid (just a literal character)
-			// or should trigger EMPTY_VARIABLE error if followed by non-letter
-			expect(validation.valid).toBe(false);
-			expect(validation.errors.some((e) => e.code === "EMPTY_VARIABLE")).toBe(
-				true
-			);
+			// With {variableName} syntax, a lone $ is valid (just a literal character)
+			expect(validation.valid).toBe(true);
 		});
 
 		it("should handle dollar signs without variable names", () => {
@@ -360,14 +356,11 @@ description: "Agent with unicode content: 你好世界 🌍"
 
 			const validation = parser.validateSyntax(template);
 
-			expect(validation.valid).toBe(false);
-			expect(validation.errors.some((e) => e.code === "EMPTY_VARIABLE")).toBe(
-				true
-			);
+			expect(validation.valid).toBe(true); // $ followed by space is valid literal text
 		});
 
 		it("should handle invalid variable names", () => {
-			const template = "Value: $invalid-name-with-hyphens";
+			const template = "Value: {invalid}-name-with-hyphens";
 
 			const validation = parser.validateSyntax(template);
 
@@ -377,7 +370,7 @@ description: "Agent with unicode content: 你好世界 🌍"
 		});
 
 		it("should handle very long template strings", () => {
-			const longTemplate = `${"x".repeat(10_000)} $var ${"y".repeat(10_000)}`;
+			const longTemplate = `${"x".repeat(10_000)} {var} ${"y".repeat(10_000)}`;
 			const context: TemplateContext = {
 				timestamp: "2026-01-27T10:00:00Z",
 				triggerType: "clarify",
@@ -397,7 +390,7 @@ description: "Agent with unicode content: 你好世界 🌍"
 
 			// Create template with 100 variables
 			for (let i = 0; i < 100; i++) {
-				template += `$var${i} `;
+				template += `{var${i}} `;
 				context[`var${i}`] = `value${i}`;
 			}
 
@@ -407,7 +400,7 @@ description: "Agent with unicode content: 你好世界 🌍"
 		});
 
 		it("should handle undefined context values", () => {
-			const template = "$undefined $null $missing";
+			const template = "{undefined} {null} {missing}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-27T10:00:00Z",
 				triggerType: "clarify",
@@ -420,7 +413,7 @@ description: "Agent with unicode content: 你好世界 🌍"
 		});
 
 		it("should handle numeric values in context", () => {
-			const template = "$count items";
+			const template = "{count} items";
 			const context: TemplateContext = {
 				timestamp: "2026-01-27T10:00:00Z",
 				triggerType: "clarify",
@@ -432,7 +425,7 @@ description: "Agent with unicode content: 你好世界 🌍"
 		});
 
 		it("should handle boolean values in context", () => {
-			const template = "Success: $success";
+			const template = "Success: {success}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-27T10:00:00Z",
 				triggerType: "clarify",
@@ -444,7 +437,7 @@ description: "Agent with unicode content: 你好世界 🌍"
 		});
 
 		it("should handle special characters in variable values", () => {
-			const template = "Path: $path";
+			const template = "Path: {path}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-27T10:00:00Z",
 				triggerType: "clarify",

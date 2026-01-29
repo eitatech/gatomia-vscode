@@ -60,7 +60,7 @@ describe("GitActionExecutor", () => {
 
 		const params: GitActionParams = {
 			operation: "commit",
-			messageTemplate: "feat($feature): update $branch",
+			messageTemplate: "feat({feature}): update {branch}",
 			pushToRemote: false,
 		};
 
@@ -132,7 +132,7 @@ describe("GitActionExecutor", () => {
 
 		const params: GitActionParams = {
 			operation: "commit",
-			messageTemplate: "   $user   ",
+			messageTemplate: "   {user}   ",
 			pushToRemote: false,
 		};
 

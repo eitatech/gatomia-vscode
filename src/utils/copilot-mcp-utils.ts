@@ -540,7 +540,7 @@ function formatServerName(serverId: string): string {
 		}
 	}
 
-	// Handle dot notation (io.github.org → Io Github Org)
+	// Handle dot notation (io.github.org → Io GitHub Org)
 	if (serverId.includes(".")) {
 		return serverId
 			.split(".")

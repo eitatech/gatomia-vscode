@@ -34,21 +34,21 @@ describe("TemplateVariableParser", () => {
 
 	describe("extractVariables()", () => {
 		it("should extract single variable from template", () => {
-			const template = "Spec: $specId";
+			const template = "Spec: {specId}";
 			const variables = parser.extractVariables(template);
 
 			expect(variables).toEqual(["specId"]);
 		});
 
 		it("should extract multiple variables from template", () => {
-			const template = "Spec $specId changed to $newStatus";
+			const template = "Spec {specId} changed to {newStatus}";
 			const variables = parser.extractVariables(template);
 
 			expect(variables).toEqual(["specId", "newStatus"]);
 		});
 
 		it("should extract all variables including duplicates removed", () => {
-			const template = "Review $specId status: $newStatus for $specId";
+			const template = "Review {specId} status: {newStatus} for {specId}";
 			const variables = parser.extractVariables(template);
 
 			// Should remove duplicates and return unique variables
@@ -70,21 +70,21 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should handle variables with underscores", () => {
-			const template = "User: $user_name, ID: $user_id";
+			const template = "User: {user_name}, ID: {user_id}";
 			const variables = parser.extractVariables(template);
 
 			expect(variables).toEqual(["user_name", "user_id"]);
 		});
 
 		it("should handle variables with numbers", () => {
-			const template = "Version $version2 released on $date123";
+			const template = "Version {version2} released on {date123}";
 			const variables = parser.extractVariables(template);
 
 			expect(variables).toEqual(["version2", "date123"]);
 		});
 
 		it("should ignore malformed variables with spaces after $", () => {
-			const template = "Valid: $specId Invalid: $ spaced";
+			const template = "Valid: {specId} Invalid: $ spaced";
 			const variables = parser.extractVariables(template);
 
 			// Should only extract valid variables (no spaces after $)
@@ -92,7 +92,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should extract partial variable before hyphen", () => {
-			const template = "Valid: $specId Invalid: $spec-id";
+			const template = "Valid: {specId} Invalid: {spec}-id";
 			const variables = parser.extractVariables(template);
 
 			// Regex extracts 'spec' before the hyphen (hyphen terminates variable)
@@ -100,21 +100,21 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should handle adjacent variables without spaces", () => {
-			const template = "$var1$var2$var3";
+			const template = "{var1}{var2}{var3}";
 			const variables = parser.extractVariables(template);
 
 			expect(variables).toEqual(["var1", "var2", "var3"]);
 		});
 
 		it("should handle variables at start and end of template", () => {
-			const template = "$start middle content $end";
+			const template = "{start} middle content {end}";
 			const variables = parser.extractVariables(template);
 
 			expect(variables).toEqual(["start", "end"]);
 		});
 
 		it("should handle dollar signs in regular text", () => {
-			const template = "Normal $var and literal dollar $100 and $";
+			const template = "Normal {var} and literal dollar $100 and $";
 			const variables = parser.extractVariables(template);
 
 			// Should extract 'var' but not numbers-only variables
@@ -128,7 +128,7 @@ describe("TemplateVariableParser", () => {
 
 	describe("substitute()", () => {
 		it("should substitute single variable with context value", () => {
-			const template = "Spec: $specId";
+			const template = "Spec: {specId}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -141,7 +141,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should substitute multiple variables with context values", () => {
-			const template = "Spec $specId changed to $newStatus";
+			const template = "Spec {specId} changed to {newStatus}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -155,7 +155,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should substitute all occurrences of duplicate variables", () => {
-			const template = "Review $specId status for $specId";
+			const template = "Review {specId} status for {specId}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -194,7 +194,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should substitute standard variables (timestamp, triggerType)", () => {
-			const template = "Triggered at $timestamp for operation $triggerType";
+			const template = "Triggered at {timestamp} for operation {triggerType}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -208,7 +208,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should substitute optional standard variables (user, branch, feature)", () => {
-			const template = "User: $user, Branch: $branch, Feature: $feature";
+			const template = "User: {user}, Branch: {branch}, Feature: {feature}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -226,7 +226,7 @@ describe("TemplateVariableParser", () => {
 
 		it("should substitute spec-specific variables (specId, specPath, oldStatus, newStatus)", () => {
 			const template =
-				"Spec $specId at $specPath changed from $oldStatus to $newStatus";
+				"Spec {specId} at {specPath} changed from {oldStatus} to {newStatus}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -244,7 +244,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should convert number values to strings", () => {
-			const template = "Line: $lineNumber, Count: $count";
+			const template = "Line: {lineNumber}, Count: {count}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -258,7 +258,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should convert boolean values to strings", () => {
-			const template = "Valid: $isValid, Complete: $isComplete";
+			const template = "Valid: {isValid}, Complete: {isComplete}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -272,7 +272,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should handle adjacent variables without spaces", () => {
-			const template = "$var1$var2$var3";
+			const template = "{var1}{var2}{var3}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -287,7 +287,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should handle variables at start and end of template", () => {
-			const template = "$start middle content $end";
+			const template = "{start} middle content {end}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -307,7 +307,7 @@ describe("TemplateVariableParser", () => {
 
 	describe("substitute() - missing variable handling", () => {
 		it("should replace missing variable with empty string", () => {
-			const template = "Spec: $missingVar";
+			const template = "Spec: {missingVar}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -320,7 +320,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should replace multiple missing variables with empty strings", () => {
-			const template = "$missing1 and $missing2 and $missing3";
+			const template = "{missing1} and {missing2} and {missing3}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -333,7 +333,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should handle partial substitution (some present, some missing)", () => {
-			const template = "Present: $present, Missing: $missing";
+			const template = "Present: {present}, Missing: {missing}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -347,7 +347,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should handle all missing variables in complex template", () => {
-			const template = "$a $b $c";
+			const template = "{a} {b} {c}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -360,7 +360,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should replace undefined context values with empty string", () => {
-			const template = "Value: $undefinedValue";
+			const template = "Value: {undefinedValue}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -373,7 +373,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should handle missing optional standard variables", () => {
-			const template = "User: $user, Branch: $branch";
+			const template = "User: {user}, Branch: {branch}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -386,7 +386,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should handle missing spec-specific variables", () => {
-			const template = "Old: $oldStatus, New: $newStatus";
+			const template = "Old: {oldStatus}, New: {newStatus}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -399,7 +399,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should not replace missing variables with 'undefined' or 'null' strings", () => {
-			const template = "$missing";
+			const template = "{missing}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -421,7 +421,7 @@ describe("TemplateVariableParser", () => {
 	describe("edge cases", () => {
 		it("should handle complex real-world template", () => {
 			const template =
-				"[$timestamp] Spec '$specId' transitioned from '$oldStatus' to '$newStatus' by $changeAuthor on branch $branch";
+				"[{timestamp}] Spec '{specId}' transitioned from '{oldStatus}' to '{newStatus}' by {changeAuthor} on branch {branch}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -440,7 +440,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should handle template with only variable placeholders", () => {
-			const template = "$specId";
+			const template = "{specId}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -453,7 +453,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should handle template with special characters around variables", () => {
-			const template = "($specId), [$newStatus], <$timestamp>";
+			const template = "({specId}), [{newStatus}], <{timestamp}>";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -469,7 +469,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should handle empty string values in context", () => {
-			const template = "Value: '$value'";
+			const template = "Value: '{value}'";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -482,7 +482,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should handle whitespace in template around variables", () => {
-			const template = "  $var1  $var2  ";
+			const template = "  {var1}  {var2}  ";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -496,7 +496,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should preserve case sensitivity in variable names", () => {
-			const template = "$SpecId vs $specId";
+			const template = "{SpecId} vs {specId}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-26T10:30:00Z",
 				triggerType: "clarify",
@@ -516,7 +516,7 @@ describe("TemplateVariableParser", () => {
 
 	describe("substitute() - output capture variables", () => {
 		it("should substitute agentOutput variable", () => {
-			const template = "Agent output: $agentOutput";
+			const template = "Agent output: {agentOutput}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-27T10:00:00Z",
 				triggerType: "specify",
@@ -529,7 +529,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should substitute clipboardContent variable", () => {
-			const template = "Clipboard: $clipboardContent";
+			const template = "Clipboard: {clipboardContent}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-27T10:00:00Z",
 				triggerType: "specify",
@@ -542,7 +542,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should substitute outputPath variable", () => {
-			const template = "File: $outputPath";
+			const template = "File: {outputPath}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-27T10:00:00Z",
 				triggerType: "specify",
@@ -558,7 +558,7 @@ describe("TemplateVariableParser", () => {
 
 		it("should substitute all output variables together", () => {
 			const template =
-				"Output: $agentOutput\nFile: $outputPath\nClipboard: $clipboardContent";
+				"Output: {agentOutput}\nFile: {outputPath}\nClipboard: {clipboardContent}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-27T10:00:00Z",
 				triggerType: "specify",
@@ -575,7 +575,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should handle empty output variables gracefully", () => {
-			const template = "Output: $agentOutput, Path: $outputPath";
+			const template = "Output: {agentOutput}, Path: {outputPath}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-27T10:00:00Z",
 				triggerType: "specify",
@@ -590,7 +590,7 @@ describe("TemplateVariableParser", () => {
 
 		it("should handle missing output variables (replaced with empty string)", () => {
 			const template =
-				"Output: $agentOutput, Clipboard: $clipboardContent, Path: $outputPath";
+				"Output: {agentOutput}, Clipboard: {clipboardContent}, Path: {outputPath}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-27T10:00:00Z",
 				triggerType: "specify",
@@ -604,7 +604,7 @@ describe("TemplateVariableParser", () => {
 
 		it("should combine output variables with standard variables", () => {
 			const template =
-				"Spec $specId changed by $changeAuthor. Output: $agentOutput";
+				"Spec {specId} changed by {changeAuthor}. Output: {agentOutput}";
 			const context: TemplateContext = {
 				timestamp: "2026-01-27T10:00:00Z",
 				triggerType: "specify",
@@ -621,7 +621,7 @@ describe("TemplateVariableParser", () => {
 		});
 
 		it("should handle multiline agentOutput", () => {
-			const template = "Content:\n$agentOutput\n---End---";
+			const template = "Content:\n{agentOutput}\n---End---";
 			const context: TemplateContext = {
 				timestamp: "2026-01-27T10:00:00Z",
 				triggerType: "specify",

@@ -66,8 +66,8 @@ export interface IExtensionMonitorService {
  * - Handle graceful degradation if extensions API unavailable
  *
  * Implementation phases:
- * - Phase 6 (T065): Skeleton with lifecycle methods ✅ CURRENT
- * - Phase 6 (T066): Implement extension change listeners ✅ CURRENT
+ * - Phase 6 (T065): Skeleton with lifecycle methods (CURRENT)
+ * - Phase 6 (T066): Implement extension change listeners (CURRENT)
  */
 export class ExtensionMonitorService implements IExtensionMonitorService {
 	// Internal state

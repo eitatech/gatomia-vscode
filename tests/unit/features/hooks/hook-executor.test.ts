@@ -257,7 +257,7 @@ vi.mock("node:fs", async (importOriginal) => {
 					return Promise.resolve("# Test Agent\n\nYou are a test agent.");
 				}
 				return Promise.reject(
-					new Error(`ENOENT: no such file or directory, open '${filePath}'`)
+					new Error(`ENOENT: no such file or directory, open '{filePath}'`)
 				);
 			}),
 			access: vi.fn((filePath: string) => {
@@ -269,7 +269,7 @@ vi.mock("node:fs", async (importOriginal) => {
 					return Promise.resolve(); // File exists
 				}
 				return Promise.reject(
-					new Error(`ENOENT: no such file or directory, access '${filePath}'`)
+					new Error(`ENOENT: no such file or directory, access '{filePath}'`)
 				);
 			}),
 		},
@@ -814,7 +814,7 @@ describe("HookExecutor", () => {
 					action: {
 						type: "agent",
 						parameters: {
-							command: "/speckit.clarify --spec $agentOutput",
+							command: "/speckit.clarify --spec {agentOutput}",
 						},
 					},
 				})
@@ -849,7 +849,7 @@ describe("HookExecutor", () => {
 					action: {
 						type: "agent",
 						parameters: {
-							command: "/speckit.clarify --spec $agentOutput",
+							command: "/speckit.clarify --spec {agentOutput}",
 						},
 					},
 				})
@@ -891,7 +891,7 @@ describe("HookExecutor", () => {
 	describe("template expansion", () => {
 		it("should expand template variables", async () => {
 			const templateContext = await executor.buildTemplateContext("clarify");
-			const template = "Branch: $branch, User: $user";
+			const template = "Branch: {branch}, User: {user}";
 
 			const expanded = executor.expandTemplate(template, templateContext);
 
@@ -901,18 +901,18 @@ describe("HookExecutor", () => {
 
 		it("should handle missing variables gracefully", async () => {
 			const templateContext = await executor.buildTemplateContext("clarify");
-			const template = "Feature: $feature, Missing: $missing";
+			const template = "Feature: {feature}, Missing: {missing}";
 
 			const expanded = executor.expandTemplate(template, templateContext);
 
 			// Missing variables should be replaced with empty string (graceful degradation)
-			expect(expanded).not.toContain("$missing");
+			expect(expanded).not.toContain("{missing}");
 			expect(expanded).toBe("Feature: test-feature, Missing: ");
 		});
 
 		it("should expand multiple occurrences", async () => {
 			const templateContext = await executor.buildTemplateContext("clarify");
-			const template = "$branch and $branch again";
+			const template = "{branch} and {branch} again";
 
 			const expanded = executor.expandTemplate(template, templateContext);
 
