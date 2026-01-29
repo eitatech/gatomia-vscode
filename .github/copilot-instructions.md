@@ -9,7 +9,7 @@ This file provides guidance to AI agents when working with code in this reposito
 
 ## Project Constitution (NON-NEGOTIABLE)
 
-This project follows strict principles defined in [.specify/memory/constitution.md](../../.specify/memory/constitution.md):
+This project follows strict principles defined in [.specify/memory/constitution.md](../.specify/memory/constitution.md):
 
 ### I. Kebab-Case File Naming (MANDATORY)
 
@@ -63,9 +63,8 @@ npm run build:webview  # Build React webview (Vite)
 npm test               # Run all tests (Vitest)
 npm run test:watch     # Watch mode for tests
 npm run test:coverage  # Generate coverage report
-npm run lint           # Lint with Biome
+npm run check           # Run all checks (lint + format validation) - MANDATORY
 npm run format         # Format code with Biome
-npm run check          # Run all checks (lint + format validation) - MANDATORY
 
 # Running specific tests
 npm test -- path/to/test-file.test.ts           # Run single test file
@@ -90,7 +89,7 @@ Press F5 in VS Code to launch the Extension Development Host
 - Double quotes for strings
 - Semicolons required
 - `npm run format` MUST pass before commit
-- `npm run lint` MUST pass before merge
+- `npm run check` MUST pass before merge
 
 ### Documentation
 

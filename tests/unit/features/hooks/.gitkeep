@@ -1,0 +1,17 @@
+# Test directory for hooks feature
+#
+# Phase 3 (User Story 1) tests will be added here:
+# - agent-registry.test.ts (T011, T012, T013)
+# - file-agent-discovery.test.ts (T014)
+#
+# Phase 4 (User Story 3) tests will be added here:
+# - template-variable-parser.test.ts (T027, T028, T029)
+# - template-context-builder.test.ts (T030)
+#
+# Phase 5 (User Story 2) tests will be added here:
+# - Additional agent-registry tests (T044)
+# - hook-manager tests (T045)
+# - hook-executor tests (T046)
+#
+# Phase 6 (Real-Time Refresh) tests will be added here:
+# - file-watcher-service.test.ts (T056, T057, T058)
