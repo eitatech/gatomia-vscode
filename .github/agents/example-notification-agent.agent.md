@@ -1,4 +1,5 @@
 ---
+name: Example Notification Agent
 description: Example agent for sending notifications about spec changes to team channels. Demonstrates integration with external services.
 ---
 

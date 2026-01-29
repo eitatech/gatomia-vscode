@@ -1267,7 +1267,7 @@ describe("HookExecutor", () => {
 					action: {
 						type: "custom",
 						parameters: {
-							agentId: "file:deleted-agent",
+							agentId: "local:deleted-agent",
 							agentName: "deleted-agent",
 							agentType: "local",
 							prompt: "Execute task",
@@ -1290,7 +1290,7 @@ describe("HookExecutor", () => {
 					action: {
 						type: "custom",
 						parameters: {
-							agentId: "file:nonexistent",
+							agentId: "local:nonexistent",
 							agentName: "nonexistent",
 							agentType: "local",
 							prompt: "Execute task",

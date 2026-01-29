@@ -68,7 +68,7 @@ describe("HooksList", () => {
 			.getByText("Git Operations")
 			.closest("div[role='treeitem']");
 		const githubSection = screen
-			.getByText("GitHub MCP")
+			.getByText("GitHub Tools")
 			.closest("div[role='treeitem']");
 
 		expect(agentSection).not.toBeNull();

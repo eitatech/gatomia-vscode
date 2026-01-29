@@ -14,6 +14,7 @@ import type {
 	GitActionParams,
 	GitHubActionParams,
 	CustomActionParams,
+	MCPActionParams,
 } from "../features/hooks/types";
 import type { HookManager } from "../features/hooks/hook-manager";
 
@@ -39,7 +40,7 @@ const GROUPS: HookGroupDefinition[] = [
 	},
 	{
 		type: "github",
-		label: "GitHub MCP",
+		label: "GitHub Tools",
 		description: "Create issues, PRs, or comments via MCP.",
 		icon: new ThemeIcon("github"),
 	},
@@ -48,6 +49,12 @@ const GROUPS: HookGroupDefinition[] = [
 		label: "Custom Agents",
 		description: "Invoke workspace-specific automations.",
 		icon: new ThemeIcon("variable-group"),
+	},
+	{
+		type: "mcp",
+		label: "Custom Tools",
+		description: "Execute custom MCP tools with natural language instructions.",
+		icon: new ThemeIcon("tools"),
 	},
 ];
 
@@ -265,6 +272,11 @@ export class HookTreeItem extends TreeItem {
 				return params.agentName
 					? `Custom: ${params.agentName}`
 					: "Custom Agent";
+			}
+			case "mcp": {
+				const params = hook.action.parameters as MCPActionParams;
+				const toolCount = params.selectedTools?.length || 0;
+				return toolCount > 0 ? `MCP Tools (${toolCount})` : "MCP Action";
 			}
 			default:
 				return "Action";

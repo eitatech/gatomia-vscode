@@ -469,12 +469,17 @@ export const TriggerActionSelector = ({
 							<AgentDropdown
 								disabled={disabled}
 								onAgentSelect={(agentId) => {
+									// Extract agent name without prefix for backward compatibility
+									const agentName = agentId.includes(":")
+										? agentId.split(":")[1]
+										: agentId;
+
 									onActionChange({
 										...action,
 										parameters: {
 											...params,
-											agentId,
-											agentName: agentId, // Keep backward compatibility
+											agentId, // Full ID with prefix (e.g., "local:agent-name")
+											agentName, // Just the name without prefix for legacy validation
 										} as CustomActionParams,
 									});
 									onClearActionError?.();
@@ -589,34 +594,39 @@ export const TriggerActionSelector = ({
 								<span>{params.prompt?.length || 0}/1000</span>
 							</div>
 						</div>
-
-						{/* Agent Selector */}
+						{/* Model Selector */}{" "}
+						{/* TODO: Integrate with VS Code Language Model API to show available models from user's GitHub Copilot subscription */}{" "}
 						<VSCodeSelect
-							description="Select which agent should execute the action (optional, defaults to GitHub Copilot)"
+							description="Select which LLM model to use for executing the instructions (optional, uses default Copilot model if not specified)"
 							disabled={disabled}
-							id="mcp-agent"
-							label="Agent (Optional)"
+							id="mcp-model"
+							label="Model"
 							onChange={(e) => {
 								onActionChange({
 									...action,
 									parameters: {
 										...params,
-										agentId: e.target.value || undefined,
+										modelId: e.target.value || undefined,
 									} as MCPActionParams,
 								});
 								onClearActionError?.();
 							}}
 							size="sm"
-							value={params.agentId || ""}
+							value={params.modelId || ""}
 						>
-							<option value="">Default Agent</option>
+							<option value="">Default Model (Copilot)</option>
 							<option value="gpt-4o">GPT-4o</option>
 							<option value="gpt-4o-mini">GPT-4o Mini</option>
-							<option value="o1-preview">O1 Preview</option>
-							<option value="o1-mini">O1 Mini</option>
-							<option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+							<option value="o1-preview">o1-preview</option>
+							<option value="o1-mini">o1-mini</option>
+							<option value="claude-3-5-sonnet-20241022">
+								Claude 3.5 Sonnet
+							</option>
+							<option value="claude-3-5-haiku-20241022">
+								Claude 3.5 Haiku
+							</option>
+							<option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option>
 						</VSCodeSelect>
-
 						{/* MCP Tools Selector - Multi-select with checkboxes */}
 						<div className="flex flex-col gap-2">
 							<div className="font-medium text-[color:var(--vscode-foreground)] text-xs">
@@ -734,7 +744,7 @@ export const TriggerActionSelector = ({
 					<option value="git">Git Operation</option>
 					<option value="github">GitHub Operation</option>
 					<option value="custom">Custom Agent</option>
-					<option value="mcp">MCP Action</option>
+					<option value="mcp">Custom Tools</option>
 				</VSCodeSelect>
 				{renderActionParameters()}
 				{actionError && (

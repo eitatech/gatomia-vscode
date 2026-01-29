@@ -634,19 +634,8 @@ describe("HookForm", () => {
 	// New UI uses AgentDropdown component with AgentRegistry integration
 
 	describe("Error Handling", () => {
-		it("displays error message from props", () => {
-			render(
-				<HookForm
-					error="Failed to create hook"
-					mode="create"
-					onCancel={mockOnCancel}
-					onSubmit={mockOnSubmit}
-				/>
-			);
-
-			expect(screen.getByText("Failed to create hook")).toBeInTheDocument();
-			expect(screen.getByRole("alert")).toBeInTheDocument();
-		});
+		// Error display removed from HookForm - errors are now shown only in parent component (HooksView)
+		// This prevents duplicate error messages from appearing to the user
 
 		it("clears field errors when input is corrected", async () => {
 			const user = userEvent.setup();

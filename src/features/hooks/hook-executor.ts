@@ -71,9 +71,10 @@ import {
 const FEATURE_NAME_PATTERN = /^\d+-(.+)$/;
 
 /**
- * Regex pattern for extracting agent name from agentId (format: "file:agent-name")
+ * Regex pattern for extracting agent name from agentId (format: "local:agent-name")
+ * Matches the AGENT_ID_PREFIX.FILE constant which is "local"
  */
-const AGENT_ID_PREFIX_PATTERN = /^file:/;
+const AGENT_ID_PREFIX_PATTERN = /^local:/;
 
 /**
  * Regex patterns for parsing Git remote URLs
@@ -1173,7 +1174,7 @@ export class HookExecutor {
 
 		return (async () => {
 			try {
-				// Extract agent name from agentId (format: "file:agent-name")
+				// Extract agent name from agentId (format: "local:agent-name")
 				const agentName =
 					params.agentId?.replace(AGENT_ID_PREFIX_PATTERN, "") ||
 					params.agentName;
@@ -1257,7 +1258,7 @@ export class HookExecutor {
 
 		return (async () => {
 			try {
-				// Extract agent name from agentId (format: "file:agent-name")
+				// Extract agent name from agentId (format: "local:agent-name")
 				const agentName =
 					params.agentId?.replace(AGENT_ID_PREFIX_PATTERN, "") ||
 					params.agentName;
