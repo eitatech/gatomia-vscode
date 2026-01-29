@@ -641,6 +641,114 @@ status: "draft"
 
 ---
 
+## Log Format Specification
+
+### Version Change Log Entry
+
+**Purpose**: Standardized log format for FR-009 compliance ("log all version changes to extension output channel")
+
+**Format**: Structured text output with timestamp, severity level, event type, document path, version change, and author
+
+```typescript
+/**
+ * Log entry format for version tracking events.
+ * Used by FR-009 to maintain audit trail in extension output channel.
+ */
+interface VersionChangeLogEntry {
+  /**
+   * ISO 8601 timestamp in UTC
+   * Example: "2026-01-29T19:45:23.123Z"
+   */
+  timestamp: string;
+  
+  /**
+   * Log severity level
+   * - info: Normal operations (version increment, initialization)
+   * - warning: Recoverable issues (Git unavailable, malformed version)
+   * - error: Operation failures (YAML parse error, file write failure)
+   */
+  level: 'info' | 'warning' | 'error';
+  
+  /**
+   * Event type triggering the log
+   */
+  event: 'increment' | 'reset' | 'normalization' | 'initialization' | 'error';
+  
+  /**
+   * Relative document path from workspace root
+   * Example: "specs/012-spec-version-tracking/spec.md"
+   */
+  document: string;
+  
+  /**
+   * Version before change (omitted for initialization)
+   */
+  previousVersion?: string;
+  
+  /**
+   * Version after change
+   */
+  newVersion: string;
+  
+  /**
+   * User who made the change
+   * Format: "[Name] <[email]>"
+   */
+  author: string;
+  
+  /**
+   * Additional context (optional)
+   * Examples: "debounce blocked", "Git not configured - using fallback"
+   */
+  message?: string;
+}
+```
+
+**Log Output Format**:
+```
+[{timestamp}] [{level}] Version: {document} {previousVersion}→{newVersion} by {author} ({message})
+```
+
+**Examples**:
+```
+[2026-01-29T19:45:23.123Z] [INFO] Version: specs/012/spec.md 1.0→1.1 by Italo <182202+italoag@users.noreply.github.com>
+[2026-01-29T19:46:05.789Z] [INFO] Version: specs/012/spec.md 1.9→2.0 by Italo <email> (major version overflow)
+[2026-01-29T19:47:12.456Z] [WARNING] Version: specs/012/plan.md normalized 1.10→2.0 by Alice <alice@example.com>
+[2026-01-29T19:48:00.321Z] [ERROR] Version: specs/012/tasks.md failed to increment - YAML parse error
+[2026-01-29T19:49:30.654Z] [INFO] Version: specs/012/spec.md reset to 1.0 by Italo <email> (user command)
+```
+
+**Events to Log**:
+- **increment**: Successful auto-increment on save (FR-003, FR-004, FR-005)
+- **reset**: User executed reset command (FR-014)
+- **normalization**: Malformed version corrected (FR-015)
+- **initialization**: New document version tracking enabled (FR-001)
+- **error**: Any operation failure (YAML parse, file write, Git failure)
+
+**Implementation Guideline**:
+```typescript
+function logVersionChange(
+  level: 'info' | 'warning' | 'error',
+  event: string,
+  documentPath: string,
+  previousVersion: string | undefined,
+  newVersion: string,
+  author: string,
+  message?: string
+): void {
+  const timestamp = new Date().toISOString();
+  const relativePath = workspace.asRelativePath(documentPath);
+  const versionChange = previousVersion ? `${previousVersion}→${newVersion}` : newVersion;
+  const contextMsg = message ? ` (${message})` : '';
+  
+  outputChannel.appendLine(
+    `[${timestamp}] [${level.toUpperCase()}] Version: ${relativePath} ${versionChange} by ${author}${contextMsg}`
+  );
+}
+```
+
+---
+
 ## Testing Strategy
 
 ### Unit Tests (data validation)

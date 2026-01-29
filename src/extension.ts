@@ -17,6 +17,7 @@ import {
 	window,
 	workspace,
 } from "vscode";
+import matter from "gray-matter";
 import { VSC_CONFIG_NAMESPACE } from "./constants";
 import { SpecManager } from "./features/spec/spec-manager";
 import { SteeringManager } from "./features/steering/steering-manager";
@@ -29,6 +30,7 @@ import { SpecTaskCodeLensProvider } from "./providers/spec-task-code-lens-provid
 import { SteeringExplorerProvider } from "./providers/steering-explorer-provider";
 import { PromptLoader } from "./services/prompt-loader";
 import { sendPromptToChat } from "./utils/chat-prompt-runner";
+import { registerDocumentVersioningCommands } from "./features/documents/document-versioning-commands";
 import { ConfigManager } from "./utils/config-manager";
 import { getMcpConfigPath } from "./utils/platform-utils";
 import { getSpecSystemAdapter } from "./utils/spec-kit-adapter";
@@ -453,6 +455,10 @@ export async function activate(context: ExtensionContext) {
 		hooksExplorer,
 	});
 
+	// Register document versioning commands
+	registerDocumentVersioningCommands(context);
+	outputChannel.appendLine("Document versioning commands registered");
+
 	// Set up file watchers
 	setupFileWatchers(context, specExplorer, steeringExplorer, actionsExplorer);
 
@@ -617,10 +623,28 @@ async function syncSpecReviewFlowSummary(options: {
 		specId: options.specId,
 	});
 
+	// Try to read owner from spec.md frontmatter
+	let owner = "unknown";
+	try {
+		const specPath = join(
+			options.workspaceRoot,
+			"specs",
+			options.specId,
+			"spec.md"
+		);
+		const specUri = Uri.file(specPath);
+		const bytes = await workspace.fs.readFile(specUri);
+		const content = Buffer.from(bytes).toString("utf8");
+		const parsed = matter(content);
+		owner = (parsed.data?.owner as string | undefined) || "unknown";
+	} catch {
+		// If spec.md doesn't exist or can't be read, use "unknown"
+	}
+
 	upsertSpecState({
 		specId: options.specId,
 		title: options.specTitle,
-		owner: "unknown",
+		owner,
 		links,
 	});
 
@@ -1587,6 +1611,33 @@ function setupFileWatchers(
 			watchers.push(watcher);
 		}
 	}
+
+	// Watch for newly created spec documents to automatically process version/owner
+	const newDocWatcher = workspace.createFileSystemWatcher(
+		"**/specs/**/{spec,plan,tasks}.md"
+	);
+
+	newDocWatcher.onDidCreate(async (uri) => {
+		try {
+			// Import the processor (lazy load to avoid circular dependencies)
+			const { DocumentTemplateProcessor } = await import(
+				"./services/document-template-processor"
+			);
+			const processor = DocumentTemplateProcessor.getInstance(context);
+
+			// Process the new document to inject version and owner
+			await processor.processNewDocument(uri);
+			outputChannel.appendLine(
+				`[Versioning] Auto-processed new document: ${uri.fsPath}`
+			);
+		} catch (error) {
+			outputChannel.appendLine(
+				`[Versioning] Failed to process new document ${uri.fsPath}: ${error}`
+			);
+		}
+	});
+
+	watchers.push(newDocWatcher);
 
 	context.subscriptions.push(...watchers);
 

@@ -1,3 +1,8 @@
+---
+version: "1.0"
+owner: "[AUTHOR]"
+---
+
 # Feature Specification: [FEATURE NAME]
 
 **Feature Branch**: `[###-feature-name]`  

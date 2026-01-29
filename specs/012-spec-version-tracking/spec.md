@@ -10,6 +10,16 @@ owner: "Italo <182202+italoag@users.noreply.github.com>"
 **Status**: Draft  
 **Input**: User description: "Adicionar versionamento automático e informação de autor aos documentos de especificação (spec, plan, tasks). Sistema de versionamento {major}.{minor} (1.0 a 1.9, depois 2.0) e autor obtido do Git. Implementar via pós-processamento para não modificar templates do SpecKit diretamente."
 
+## Clarifications
+
+### Session 2026-01-29
+
+- Q: Quais modificações devem acionar incremento de versão? → A: Incrementa apenas se o conteúdo do corpo (após frontmatter) for modificado
+- Q: Como o comando de reset de versão será acessado? → A: Ambos Command Palette e Context Menu, com diálogo de confirmação obrigatório
+- Q: Como o sistema deve se comportar em múltiplos saves rápidos? → A: Debounce de 30 segundos (versão incrementa apenas se passou >=30s desde último incremento)
+- Q: Quantas entradas de histórico devem ser mantidas? → A: Últimas 50 entradas por documento com rotação automática (FIFO)
+- Q: Qual a semântica do campo OWNER? → A: Representa último editor (atualiza automaticamente com Git user de cada save)
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Automatic Version Initialization on Document Creation (Priority: P1)
@@ -75,6 +85,20 @@ In the Spec Explorer tree view, each document displays its current version numbe
 2. **Given** multiple specs with different versions, **When** sorting by version, **Then** specs are ordered from lowest to highest version number
 3. **Given** a document without a version field, **When** displayed in the explorer, **Then** it shows as "Feature Name (v?.?)" with a warning icon
 
+**UI Acceptance Criteria** (detailed specification for FR-015):
+
+- **Display Format**: Version displayed as suffix in TreeItem.description field: `"Feature Name (v2.3)"`
+- **Visual Style**: Version text styled in muted gray color to avoid distracting from document title
+- **Tooltip Content** (on hover):
+  - Full version history (last 5 entries with timestamps)
+  - Last modified timestamp (human-readable: "2 hours ago")
+  - Current author/owner: `"Italo <182202+italoag@users.noreply.github.com>"`
+  - Created by (original author, immutable)
+- **Refresh Behavior**: Tree view automatically refreshes within 1 second of document save event (fire `onDidChangeTreeData`)
+- **Visual Hierarchy**: Title (bold, default color) > Version (muted gray) > Status badge (if applicable)
+- **Performance**: No performance degradation with 100+ specs in workspace (lazy loading if needed)
+- **Accessibility**: Tooltip content accessible via screen readers
+
 ---
 
 ### Edge Cases
@@ -91,36 +115,43 @@ In the Spec Explorer tree view, each document displays its current version numbe
   - System respects manual version changes; next auto-increment uses the manually set version as base (3.5 → 3.6)
 - How does the system handle version rollback (e.g., via Git revert)?
   - Version field reflects whatever is in the file after revert; system doesn't auto-decrement versions (versions only increment)
+- What happens when only frontmatter formatting or non-content fields are changed?
+  - Version is not incremented; only changes to body content (after frontmatter) trigger version increments
+- What happens when a user saves multiple times within 30 seconds?
+  - Only the first save within a 30-second window increments the version; subsequent saves within that window do not increment version unless debounce period expires
+- What happens when a different user (different Git config) edits and saves a document?
+  - OWNER field updates to reflect the new user's Git information on the save that triggers version increment, maintaining accurate attribution of the last editor
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
 - **FR-001**: System MUST automatically initialize VERSION field to "1.0" in frontmatter when creating new spec, plan, or tasks documents
-- **FR-002**: System MUST automatically populate OWNER field with Git user.name and user.email in format "[Name] <[email]>" when creating new documents
+- **FR-002**: System MUST automatically populate OWNER field with Git user.name and user.email in format "[Name] <[email]>" when creating new documents, and update OWNER field with current Git user on each subsequent save that triggers version increment
 - **FR-003**: System MUST increment version numbers following the {major}.{minor} pattern (1.0 → 1.1 → ... → 1.9 → 2.0 → 2.1)
-- **FR-004**: System MUST detect document modifications and trigger version increment on save
-- **FR-005**: System MUST preserve manually edited OWNER fields and not overwrite them on subsequent saves
-- **FR-006**: System MUST respect manually edited VERSION fields and use them as the base for subsequent auto-increments
-- **FR-007**: System MUST implement version/owner injection via post-processing hooks rather than modifying SpecKit template files
-- **FR-008**: System MUST handle missing or malformed VERSION/OWNER fields by initializing/normalizing them
-- **FR-009**: System MUST log all version changes to the extension output channel for auditing purposes
-- **FR-010**: System MUST fall back to system username when Git user configuration is unavailable
-- **FR-011**: System MUST process all three document types (spec.md, plan.md, tasks.md) consistently with the same logic
-- **FR-012**: System MUST persist version history metadata in workspace state for tracking purposes
-- **FR-013**: System MUST provide a command to manually reset version to 1.0 (for major refactors or clarifications)
-- **FR-014**: System MUST normalize invalid version formats (e.g., "1.10", "v1.0", "abc") to valid format on save
-- **FR-015**: System MUST display document version in Spec Explorer tree view
+- **FR-004**: System MUST detect document modifications to body content (after frontmatter) and trigger version increment on save; changes only to frontmatter formatting or whitespace do not trigger version increment
+- **FR-005**: System MUST implement a 30-second debounce period for version increments; version increments only if at least 30 seconds have passed since the last version increment, preventing version inflation during active editing sessions
+- **FR-006**: System MUST update OWNER field automatically with current Git user information whenever a version increment occurs
+- **FR-007**: System MUST respect manually edited VERSION fields and use them as the base for subsequent auto-increments
+- **FR-008**: System MUST implement version/owner injection via post-processing hooks rather than modifying SpecKit template files
+- **FR-009**: System MUST handle missing or malformed VERSION/OWNER fields by initializing/normalizing them
+- **FR-010**: System MUST log all version changes to the extension output channel for auditing purposes (see Log Format Specification in data-model.md for structured format requirements)
+- **FR-011**: System MUST fall back to system username when Git user configuration is unavailable
+- **FR-012**: System MUST process all three document types (spec.md, plan.md, tasks.md) consistently with the same logic
+- **FR-013**: System MUST persist version history metadata in workspace state for tracking purposes, maintaining the last 50 version history entries per document with automatic FIFO rotation when limit is exceeded
+- **FR-014**: System MUST provide a command to manually reset version to 1.0 accessible via both Command Palette ("SpecKit: Reset Document Version") and Context Menu (right-click in Spec Explorer), with mandatory confirmation dialog before executing reset
+- **FR-015**: System MUST normalize invalid version formats (e.g., "1.10", "v1.0", "abc") to valid format on save (see normalization rules in data-model.md)
+- **FR-016**: System MUST display document version in Spec Explorer tree view with detailed UI specifications (see US4 UI Acceptance Criteria)
 
 ### Key Entities
 
 - **Document Metadata**: Represents version and ownership information for spec documents
   - version: String in format "{major}.{minor}" (e.g., "1.0", "2.5")
-  - owner: String in format "[Name] <[email]>" or fallback format
+  - owner: String in format "[Name] <[email]>" representing the last editor (updated automatically on each version increment)
   - lastModified: Timestamp of last version increment
-  - createdBy: Original document author (immutable after first save)
+  - createdBy: Original document author (immutable after first save, stored in workspace state for historical record)
 
-- **Version History Entry**: Represents a point-in-time snapshot of version changes
+- **Version History Entry**: Represents a point-in-time snapshot of version changes (maximum 50 entries per document with FIFO rotation)
   - documentPath: Absolute path to the document
   - previousVersion: Version before the change
   - newVersion: Version after the change
@@ -180,3 +211,4 @@ In the Spec Explorer tree view, each document displays its current version numbe
 - System must handle large workspaces (100+ specs) without performance degradation
 - Metadata updates must not trigger infinite save loops (watch for save → update → save cycle)
 - Solution must work in both local and remote (SSH, WSL) development environments
+- Version history storage must implement FIFO rotation at 50 entries per document to prevent unbounded workspace state growth

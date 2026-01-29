@@ -1,3 +1,8 @@
+---
+version: "1.0"
+owner: "Italo A. G."
+---
+
 # Specification Quality Checklist: Automatic Document Version and Author Tracking
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning

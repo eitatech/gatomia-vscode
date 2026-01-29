@@ -471,6 +471,35 @@ export interface GitUserInfo {
 }
 
 // ============================================================================
+// Utility Helpers
+// ============================================================================
+
+/**
+ * Check if document is a SpecKit document (spec.md, plan.md, tasks.md).
+ * Used to filter file system watcher events and determine which documents to process.
+ * 
+ * Implementation Strategy:
+ * - Extract filename from absolute or relative path using path.basename()
+ * - Check against SpecKit document name whitelist
+ * - Case-sensitive matching (spec.md !== Spec.md)
+ * 
+ * @param documentPath Absolute or relative file path
+ * @returns true if document matches SpecKit document pattern
+ * 
+ * @example
+ * ```typescript
+ * isSpecKitDocument('/path/to/specs/012/spec.md'); // true
+ * isSpecKitDocument('/path/to/specs/012/plan.md'); // true
+ * isSpecKitDocument('/path/to/specs/012/data-model.md'); // false
+ * isSpecKitDocument('/path/to/README.md'); // false
+ * ```
+ */
+export function isSpecKitDocument(documentPath: string): boolean {
+  // Implementation in src/utils/document-helpers.ts
+  throw new Error('Not implemented - stub for contract definition');
+}
+
+// ============================================================================
 // Service Factory
 // ============================================================================
 
