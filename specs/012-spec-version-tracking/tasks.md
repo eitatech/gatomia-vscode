@@ -42,8 +42,8 @@ owner: "Italo <182202+italoag@users.noreply.github.com>"
 
 ### Pure Logic Components (No I/O)
 
-- [ ] T005 [P] Implement VersionIncrementer class in src/features/documents/version-tracking/version-incrementer.ts (TDD: test increment 1.0→1.1, 1.9→2.0, normalize malformed versions)
-- [ ] T006 [P] Create unit tests for VersionIncrementer in tests/unit/features/documents/version-tracking/version-incrementer.test.ts (cover all version increment scenarios, normalization edge cases)
+- [x] T005 [P] Implement VersionIncrementer class in src/features/documents/version-tracking/version-incrementer.ts (TDD: test increment 1.0→1.1, 1.9→2.0, normalize malformed versions)
+- [x] T006 [P] Create unit tests for VersionIncrementer in tests/unit/features/documents/version-tracking/version-incrementer.test.ts (cover all version increment scenarios, normalization edge cases)
 
 ### Git Integration Component
 
