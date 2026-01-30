@@ -57,8 +57,8 @@ owner: "Italo <182202+italoag@users.noreply.github.com>"
 
 ### Workspace State Management
 
-- [ ] T011 Implement VersionHistoryManager class in src/features/documents/version-tracking/version-history-manager.ts (TDD: test add entry, FIFO rotation at 50 entries, get/update document state, workspace state serialization)
-- [ ] T012 Create unit tests for VersionHistoryManager in tests/unit/features/documents/version-tracking/version-history-manager.test.ts (mock ExtensionContext.workspaceState, verify FIFO rotation)
+- [x] T011 Implement VersionHistoryManager class in src/features/documents/version-tracking/version-history-manager.ts (TDD: test add entry, FIFO rotation at 50 entries, get/update document state, workspace state serialization)
+- [x] T012 Create unit tests for VersionHistoryManager in tests/unit/features/documents/version-tracking/version-history-manager.test.ts (mock ExtensionContext.workspaceState, verify FIFO rotation)
 
 ### Debounce Logic
 
