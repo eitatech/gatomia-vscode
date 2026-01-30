@@ -403,25 +403,25 @@
       },
       {
         "command": "gatomia.actions.create",
-        "title": "Create Action",
+        "title": "Create Prompt",
         "category": "GatomIA",
         "icon": "$(plus)"
       },
       {
         "command": "gatomia.actions.createAgentFile",
-        "title": "New Agent File",
+        "title": "Create Agent",
         "category": "GatomIA",
         "icon": "$(robot)"
       },
       {
-        "command": "gatomia.actions.createInstructions",
-        "title": "New Instructions File",
+        "command": "gatomia.actions.createSkill",
+        "title": "Create Skill",
         "category": "GatomIA",
-        "icon": "$(book)"
+        "icon": "$(tools)"
       },
       {
         "command": "gatomia.actions.createCopilotPrompt",
-        "title": "New Prompt File",
+        "title": "Create Prompt (Built-in)",
         "category": "GatomIA",
         "icon": "$(sparkle)"
       },
@@ -617,7 +617,7 @@
           "group": "navigation@1"
         },
         {
-          "command": "gatomia.actions.createInstructions",
+          "command": "gatomia.actions.createSkill",
           "when": "view == gatomia.views.actionsExplorer",
           "group": "navigation@2"
         },

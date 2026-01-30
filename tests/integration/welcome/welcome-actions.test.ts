@@ -120,40 +120,62 @@ describe("Welcome Screen - Feature Action Execution (Integration)", () => {
 		});
 	});
 
-	describe("Feature Actions - Prompts", () => {
-		it("should execute gatomia.prompts.create when Create Prompt button is clicked", async () => {
+	describe("Feature Actions - Actions", () => {
+		it("should execute gatomia.actions.create when Create Prompt button is clicked", async () => {
 			vi.mocked(vscodeCommands.executeCommand).mockResolvedValue(undefined);
 
 			const callbacks = provider.getCallbacks();
-			await callbacks.onExecuteCommand("gatomia.prompts.create", []);
+			await callbacks.onExecuteCommand("gatomia.actions.create", []);
 
 			expect(vscodeCommands.executeCommand).toHaveBeenCalledWith(
-				"gatomia.prompts.create"
+				"gatomia.actions.create"
 			);
 			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
-				"[WelcomeScreenProvider] Execute command: gatomia.prompts.create"
+				"[WelcomeScreenProvider] Execute command: gatomia.actions.create"
 			);
 		});
 
-		it("should execute gatomia.prompts.refresh when Refresh Prompts button is clicked", async () => {
+		it("should execute gatomia.actions.createAgentFile when Create Agent button is clicked", async () => {
 			vi.mocked(vscodeCommands.executeCommand).mockResolvedValue(undefined);
 
 			const callbacks = provider.getCallbacks();
-			await callbacks.onExecuteCommand("gatomia.prompts.refresh", []);
+			await callbacks.onExecuteCommand("gatomia.actions.createAgentFile", []);
 
 			expect(vscodeCommands.executeCommand).toHaveBeenCalledWith(
-				"gatomia.prompts.refresh"
+				"gatomia.actions.createAgentFile"
 			);
 		});
 
-		it("should log success after prompt command execution", async () => {
+		it("should execute gatomia.actions.createSkill when Create Skill button is clicked", async () => {
 			vi.mocked(vscodeCommands.executeCommand).mockResolvedValue(undefined);
 
 			const callbacks = provider.getCallbacks();
-			await callbacks.onExecuteCommand("gatomia.prompts.refresh", []);
+			await callbacks.onExecuteCommand("gatomia.actions.createSkill", []);
+
+			expect(vscodeCommands.executeCommand).toHaveBeenCalledWith(
+				"gatomia.actions.createSkill"
+			);
+		});
+
+		it("should execute gatomia.actions.refresh when Refresh Actions button is clicked", async () => {
+			vi.mocked(vscodeCommands.executeCommand).mockResolvedValue(undefined);
+
+			const callbacks = provider.getCallbacks();
+			await callbacks.onExecuteCommand("gatomia.actions.refresh", []);
+
+			expect(vscodeCommands.executeCommand).toHaveBeenCalledWith(
+				"gatomia.actions.refresh"
+			);
+		});
+
+		it("should log success after action command execution", async () => {
+			vi.mocked(vscodeCommands.executeCommand).mockResolvedValue(undefined);
+
+			const callbacks = provider.getCallbacks();
+			await callbacks.onExecuteCommand("gatomia.actions.create", []);
 
 			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
-				"[WelcomeScreenProvider] Command executed successfully: gatomia.prompts.refresh"
+				"[WelcomeScreenProvider] Command executed successfully: gatomia.actions.create"
 			);
 		});
 	});
@@ -248,8 +270,10 @@ describe("Welcome Screen - Feature Action Execution (Integration)", () => {
 			const featureCommands = [
 				"gatomia.spec.create",
 				"gatomia.spec.refresh",
-				"gatomia.prompts.create",
-				"gatomia.prompts.refresh",
+				"gatomia.actions.create",
+				"gatomia.actions.createAgentFile",
+				"gatomia.actions.createSkill",
+				"gatomia.actions.refresh",
 				"gatomia.hooks.addHook",
 				"gatomia.hooks.viewLogs",
 				"gatomia.steering.createProjectRule",
@@ -276,7 +300,7 @@ describe("Welcome Screen - Feature Action Execution (Integration)", () => {
 			const callbacks = provider.getCallbacks();
 			const featureCommands = [
 				"gatomia.spec.create",
-				"gatomia.prompts.create",
+				"gatomia.actions.create",
 				"gatomia.hooks.addHook",
 				"gatomia.steering.createProjectRule",
 			];
@@ -320,13 +344,13 @@ describe("Welcome Screen - Feature Action Execution (Integration)", () => {
 
 			const callbacks = provider.getCallbacks();
 			callbacks.setPanel?.(panel); // Ensure panel is set
-			await callbacks.onExecuteCommand("gatomia.prompts.create", []);
+			await callbacks.onExecuteCommand("gatomia.actions.create", []);
 
 			expect(postMessageSpy).toHaveBeenCalledWith(
 				expect.objectContaining({
 					type: "welcome/error",
 					code: "COMMAND_EXECUTION_FAILED",
-					message: "Failed to execute command: gatomia.prompts.create",
+					message: "Failed to execute command: gatomia.actions.create",
 					context: "Extension not activated",
 				})
 			);
@@ -373,7 +397,7 @@ describe("Welcome Screen - Feature Action Execution (Integration)", () => {
 
 			const callbacks = provider.getCallbacks();
 			callbacks.setPanel?.(panel); // Ensure panel is set
-			const commandsList = ["gatomia.spec.create", "gatomia.prompts.create"];
+			const commandsList = ["gatomia.spec.create", "gatomia.actions.create"];
 
 			for (const cmd of commandsList) {
 				await callbacks.onExecuteCommand(cmd, []);
@@ -394,7 +418,7 @@ describe("Welcome Screen - Feature Action Execution (Integration)", () => {
 
 			expect(state.featureActions).toBeDefined();
 			expect(Array.isArray(state.featureActions)).toBe(true);
-			expect(state.featureActions.length).toBe(8);
+			expect(state.featureActions.length).toBe(10);
 		});
 
 		it("should have all feature actions enabled by default", async () => {
@@ -410,7 +434,7 @@ describe("Welcome Screen - Feature Action Execution (Integration)", () => {
 
 			const areas = new Set(state.featureActions.map((a) => a.featureArea));
 			expect(areas).toContain("Specs");
-			expect(areas).toContain("Prompts");
+			expect(areas).toContain("Actions");
 			expect(areas).toContain("Hooks");
 			expect(areas).toContain("Steering");
 		});
@@ -427,7 +451,7 @@ describe("Welcome Screen - Feature Action Execution (Integration)", () => {
 			);
 
 			expect(actionsByArea.Specs).toBe(2);
-			expect(actionsByArea.Prompts).toBe(2);
+			expect(actionsByArea.Actions).toBe(4);
 			expect(actionsByArea.Hooks).toBe(2);
 			expect(actionsByArea.Steering).toBe(2);
 		});
@@ -552,7 +576,7 @@ describe("Welcome Screen - Feature Action Execution (Integration)", () => {
 			const commandsList2 = [
 				"gatomia.spec.create",
 				"gatomia.spec.refresh",
-				"gatomia.prompts.create",
+				"gatomia.actions.create",
 			];
 
 			// Simulate rapid clicks
@@ -597,7 +621,7 @@ describe("Welcome Screen - Feature Action Execution (Integration)", () => {
 			const state = await provider.getWelcomeState();
 
 			expect(state).toHaveProperty("featureActions");
-			expect(state.featureActions).toHaveLength(8);
+			expect(state.featureActions).toHaveLength(10);
 		});
 
 		it("should provide feature actions with all required properties", async () => {

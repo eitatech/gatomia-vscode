@@ -1114,8 +1114,39 @@ function registerCommands({
 			);
 			actionsExplorer.refresh();
 		}),
-		commands.registerCommand("gatomia.actions.createInstructions", async () => {
-			await commands.executeCommand("workbench.command.new.instructions");
+		commands.registerCommand("gatomia.actions.createSkill", async () => {
+			const ws = workspace.workspaceFolders?.[0];
+			if (!ws) {
+				window.showErrorMessage("No workspace folder found");
+				return;
+			}
+
+			const name = await window.showInputBox({
+				title: "Create Skill",
+				placeHolder: "skill-name (kebab-case)",
+				prompt: "A SKILL.md file will be created under .github/skills/<name>/",
+				validateInput: (v) => (v ? undefined : "Name is required"),
+			});
+
+			if (!name) {
+				return;
+			}
+
+			const skillDir = Uri.joinPath(ws.uri, ".github", "skills", name);
+			const skillFile = Uri.joinPath(skillDir, "SKILL.md");
+
+			try {
+				await workspace.fs.createDirectory(skillDir);
+				const content = Buffer.from(
+					`# ${name}\n\n## Description\nDescribe the purpose of this skill.\n\n## Instructions\nProvide specific instructions for Copilot on how to use this skill.\n`
+				);
+				await workspace.fs.writeFile(skillFile, content);
+				const doc = await workspace.openTextDocument(skillFile);
+				await window.showTextDocument(doc);
+				actionsExplorer.refresh();
+			} catch (e) {
+				window.showErrorMessage(`Failed to create skill: ${e}`);
+			}
 		}),
 		commands.registerCommand(
 			"gatomia.actions.createCopilotPrompt",
@@ -1141,8 +1172,8 @@ function registerCommands({
 			}
 
 			const name = await window.showInputBox({
-				title: "Create Action",
-				placeHolder: "action name (kebab-case)",
+				title: "Create Prompt",
+				placeHolder: "prompt-name (kebab-case)",
 				prompt: `A markdown file will be created under ${actionsPathLabel} `,
 				validateInput: (v) => (v ? undefined : "Name is required"),
 			});

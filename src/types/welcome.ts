@@ -193,11 +193,12 @@ export interface LearningResource {
 
 export interface FeatureAction {
 	id: string;
-	featureArea: "Specs" | "Prompts" | "Hooks" | "Steering";
+	featureArea: "Specs" | "Actions" | "Hooks" | "Steering";
 	label: string;
 	description: string;
 	commandId: string;
 	enabled: boolean;
+	icon?: string;
 }
 
 // ============================================================================
@@ -205,6 +206,8 @@ export interface FeatureAction {
 // ============================================================================
 
 export interface WelcomeScreenState {
+	extensionVersion: string;
+	vscodeVersion: string;
 	hasShownBefore: boolean;
 	dontShowOnStartup: boolean;
 	currentView: "setup" | "features" | "configuration" | "status" | "learning";

@@ -40,6 +40,7 @@ import type {
 	WelcomeScreenState,
 	ConfigurationState,
 	FeatureAction,
+	LearningResource,
 	WelcomeErrorCodeType,
 } from "../types/welcome";
 import { WelcomeErrorCode } from "../types/welcome";
@@ -332,9 +333,7 @@ export class WelcomeScreenProvider {
 	/**
 	 * Search learning resources by keyword
 	 */
-	searchResources(
-		query: string
-	): typeof this.learningResources.searchByKeyword {
+	searchResources(query: string): LearningResource[] {
 		// Ensure resources are loaded before searching
 		if (!this.learningResources.isLoaded()) {
 			this.learningResources.loadResources(this.context.extensionPath);
@@ -443,22 +442,40 @@ export class WelcomeScreenProvider {
 				enabled: true,
 				icon: "codicon-refresh",
 			},
-			// Prompts (T047)
+			// Actions (T047)
 			{
 				id: "create-prompt",
-				featureArea: "Prompts",
+				featureArea: "Actions",
 				label: "Create Prompt",
 				description: "Create a new custom prompt file",
-				commandId: "gatomia.prompts.create",
+				commandId: "gatomia.actions.create",
 				enabled: true,
 				icon: "codicon-add",
 			},
 			{
-				id: "refresh-prompts",
-				featureArea: "Prompts",
-				label: "Refresh Prompts",
-				description: "Reload prompts from workspace",
-				commandId: "gatomia.prompts.refresh",
+				id: "create-agent",
+				featureArea: "Actions",
+				label: "Create Agent",
+				description: "Create a new agent definition file",
+				commandId: "gatomia.actions.createAgentFile",
+				enabled: true,
+				icon: "codicon-robot",
+			},
+			{
+				id: "create-skill",
+				featureArea: "Actions",
+				label: "Create Skill",
+				description: "Create a new reusable skill directory",
+				commandId: "gatomia.actions.createSkill",
+				enabled: true,
+				icon: "codicon-tools",
+			},
+			{
+				id: "refresh-actions",
+				featureArea: "Actions",
+				label: "Refresh Actions",
+				description: "Reload actions from workspace",
+				commandId: "gatomia.actions.refresh",
 				enabled: true,
 				icon: "codicon-refresh",
 			},
