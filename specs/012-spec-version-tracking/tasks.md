@@ -67,8 +67,8 @@ owner: "Italo <182202+italoag@users.noreply.github.com>"
 
 ### Change Detection
 
-- [ ] T015 [P] Implement FileChangeDetector class in src/utils/file-change-detector.ts (TDD: test body content comparison, normalize whitespace, ignore frontmatter formatting changes)
-- [ ] T016 [P] Create unit tests for FileChangeDetector in tests/unit/utils/file-change-detector.test.ts (test frontmatter-only changes don't trigger version increment)
+- [x] T015 [P] Implement FileChangeDetector class in src/utils/file-change-detector.ts (TDD: test body content comparison, normalize whitespace, ignore frontmatter formatting changes)
+- [x] T016 [P] Create unit tests for FileChangeDetector in tests/unit/utils/file-change-detector.test.ts (test frontmatter-only changes don't trigger version increment)
 
 **Checkpoint**: Foundation complete. All shared components implemented and tested. User story implementation can now begin.
 
