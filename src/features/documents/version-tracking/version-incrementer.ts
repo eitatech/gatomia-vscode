@@ -1,6 +1,23 @@
 import type { IVersionIncrementer } from "./types";
 
 /**
+ * Valid version regex: {major}.{minor} where minor is single digit (0-9)
+ * Defined at module level for performance (avoid regex recreation)
+ */
+const VERSION_PATTERN = /^(\d+)\.(\d)$/;
+
+/**
+ * Version prefix pattern (v or V)
+ * Defined at module level for performance
+ */
+const VERSION_PREFIX_PATTERN = /^[vV]/;
+
+/**
+ * Maximum minor version before overflow
+ */
+const MAX_MINOR = 9;
+
+/**
  * Pure version increment logic (no I/O, easily testable).
  * Implements {major}.{minor} versioning with overflow rules.
  *
@@ -11,16 +28,6 @@ import type { IVersionIncrementer } from "./types";
  * - 2.5 → 2.6 (continue in major version 2)
  */
 export class VersionIncrementer implements IVersionIncrementer {
-	/**
-	 * Valid version regex: {major}.{minor} where minor is single digit (0-9)
-	 */
-	private readonly VERSION_PATTERN = /^(\d+)\.(\d)$/;
-
-	/**
-	 * Maximum minor version before overflow
-	 */
-	private readonly MAX_MINOR = 9;
-
 	/**
 	 * Increment version according to {major}.{minor} rules.
 	 *
@@ -39,7 +46,7 @@ export class VersionIncrementer implements IVersionIncrementer {
 		}
 
 		// Parse components
-		const match = normalizedVersion.match(this.VERSION_PATTERN);
+		const match = normalizedVersion.match(VERSION_PATTERN);
 		if (!match) {
 			throw new Error(`Failed to parse version: "${normalizedVersion}"`);
 		}
@@ -48,7 +55,7 @@ export class VersionIncrementer implements IVersionIncrementer {
 		const minor = Number.parseInt(match[2], 10);
 
 		// Apply increment rules
-		if (minor < this.MAX_MINOR) {
+		if (minor < MAX_MINOR) {
 			// Normal increment: 1.0 → 1.1, 2.5 → 2.6
 			return `${major}.${minor + 1}`;
 		}
@@ -68,7 +75,7 @@ export class VersionIncrementer implements IVersionIncrementer {
 			return false;
 		}
 
-		return this.VERSION_PATTERN.test(version);
+		return VERSION_PATTERN.test(version);
 	}
 
 	/**
@@ -89,7 +96,7 @@ export class VersionIncrementer implements IVersionIncrementer {
 		}
 
 		// Remove 'v' or 'V' prefix
-		const normalized = version.replace(/^[vV]/, "");
+		const normalized = version.replace(VERSION_PREFIX_PATTERN, "");
 
 		// Try to extract numeric parts
 		const parts = normalized.split(".");
