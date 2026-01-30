@@ -62,8 +62,8 @@ owner: "Italo <182202+italoag@users.noreply.github.com>"
 
 ### Debounce Logic
 
-- [ ] T013 [P] Implement DebounceTracker class in src/features/documents/version-tracking/debounce-tracker.ts (TDD: test 30-second debounce window, per-document tracking, timestamp persistence)
-- [ ] T014 [P] Create unit tests for DebounceTracker in tests/unit/features/documents/version-tracking/debounce-tracker.test.ts (use Vitest fake timers, test blocked saves don't reset timer)
+- [x] T013 [P] Implement DebounceTracker class in src/features/documents/version-tracking/debounce-tracker.ts (TDD: test 30-second debounce window, per-document tracking, timestamp persistence)
+- [x] T014 [P] Create unit tests for DebounceTracker in tests/unit/features/documents/version-tracking/debounce-tracker.test.ts (use Vitest fake timers, test blocked saves don't reset timer)
 
 ### Change Detection
 
