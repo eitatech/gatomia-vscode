@@ -47,8 +47,8 @@ owner: "Italo <182202+italoag@users.noreply.github.com>"
 
 ### Git Integration Component
 
-- [ ] T007 [P] Implement GitUserInfoProvider in src/utils/git-user-info.ts (TDD: test Git config read, fallback to system username, format owner string)
-- [ ] T008 [P] Create unit tests for GitUserInfoProvider in tests/unit/utils/git-user-info.test.ts (mock child_process.execSync, test Git unavailable scenario)
+- [x] T007 [P] Implement GitUserInfoProvider in src/utils/git-user-info.ts (TDD: test Git config read, fallback to system username, format owner string)
+- [x] T008 [P] Create unit tests for GitUserInfoProvider in tests/unit/utils/git-user-info.test.ts (mock child_process.execSync, test Git unavailable scenario)
 
 ### Frontmatter Processing Component
 
