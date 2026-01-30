@@ -52,8 +52,8 @@ owner: "Italo <182202+italoag@users.noreply.github.com>"
 
 ### Frontmatter Processing Component
 
-- [ ] T009 Implement FrontmatterProcessor class in src/features/documents/version-tracking/frontmatter-processor.ts (TDD: test extract metadata, update frontmatter, handle missing/malformed YAML, extract body content)
-- [ ] T010 Create unit tests for FrontmatterProcessor in tests/unit/features/documents/version-tracking/frontmatter-processor.test.ts (use test fixtures in tests/fixtures/)
+- [x] T009 Implement FrontmatterProcessor class in src/features/documents/version-tracking/frontmatter-processor.ts (TDD: test extract metadata, update frontmatter, handle missing/malformed YAML, extract body content)
+- [x] T010 Create unit tests for FrontmatterProcessor in tests/unit/features/documents/version-tracking/frontmatter-processor.test.ts (use test fixtures in tests/fixtures/)
 
 ### Workspace State Management
 
