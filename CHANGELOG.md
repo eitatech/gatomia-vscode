@@ -4,6 +4,21 @@
 
 ## v0.33.0 2026-01-29
 
+### Added
+
+- **Automatic Document Version Tracking**: Automatic version and author tracking for SpecKit documents
+  - **Auto-Initialization**: New documents automatically get VERSION "1.0" and OWNER from Git user
+  - **Auto-Increment**: Documents automatically increment version on save (1.0→1.1→...→1.9→2.0)
+  - **Smart Debounce**: 30-second debounce prevents version inflation during rapid saves
+  - **Change Detection**: Only increments version when document body content changes (excludes frontmatter-only changes)
+  - **Author Attribution**: OWNER field automatically updated with Git username and email on each version
+  - **Version History**: Up to 50 version history entries per document with FIFO rotation
+  - **Spec Explorer Display**: Version numbers displayed as badges in Spec Explorer tree view
+  - **Reset Command**: "Reset Version to 1.0" command available in Spec Explorer context menu
+  - **Structured Logging**: All version changes logged to extension output channel with timestamps
+  - **Error Recovery**: Graceful handling of Git unavailable, YAML parsing failures, and workspace state errors
+  - **Telemetry**: Success/failure metrics for version operations with debounce and skip tracking
+
 ### Fixed
 
 - **MCP Configuration Path Detection**: Fixed "Open MCP Config" command to correctly detect IDE-specific configuration paths
@@ -14,6 +29,8 @@
 
 ### Tests
 
+- Added comprehensive test suite for document version tracking (30+ tests)
+- Tests cover version increment, initialization, reset, debounce, and error recovery scenarios
 - Added comprehensive test suite for platform-specific path detection (14 tests)
 - Tests cover macOS, Linux, and Windows platforms
 - Tests validate correct paths for VS Code, VS Code Insiders, Cursor, Windsurf, Positron, and VSCodium

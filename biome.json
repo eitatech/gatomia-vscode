@@ -50,7 +50,8 @@
       },
       "complexity": {
         "noStaticOnlyClass": "off",
-        "noExcessiveCognitiveComplexity": "warn"
+        "noExcessiveCognitiveComplexity": "warn",
+        "noVoid": "warn"
       },
       "correctness": {
         "noUnusedFunctionParameters": "off",
@@ -59,7 +60,11 @@
       },
       "performance": {
         "useTopLevelRegex": "warn",
-        "noBarrelFile": "off"
+        "noBarrelFile": "off",
+        "noNamespaceImport": "warn"
+      },
+      "nursery": {
+        "useMaxParams": "warn"
       },
       "a11y": {
         "noSvgWithoutTitle": "warn"

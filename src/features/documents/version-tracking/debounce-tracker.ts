@@ -28,8 +28,8 @@ export class DebounceTracker implements IDebounceTracker {
 	 * @param documentPath Absolute path to document
 	 * @returns true if ≥30s since last increment (or no previous increment)
 	 */
-	shouldIncrement(documentPath: string): boolean {
-		const docState = this.historyManager.getDocumentState(documentPath);
+	async shouldIncrement(documentPath: string): Promise<boolean> {
+		const docState = await this.historyManager.getDocumentState(documentPath);
 
 		// No previous state or no timestamp recorded → allow increment
 		if (!docState || docState.lastIncrementTimestamp === undefined) {

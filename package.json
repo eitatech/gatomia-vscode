@@ -324,6 +324,12 @@
         "icon": "$(arrow-up)"
       },
       {
+        "command": "gatomia.resetDocumentVersion",
+        "title": "Reset Version to 1.0",
+        "category": "GatomIA",
+        "icon": "$(debug-restart)"
+      },
+      {
         "command": "gatomia.hooks.export",
         "title": "Export Hooks",
         "category": "GatomIA",
@@ -707,6 +713,11 @@
           "command": "gatomia.spec.delete",
           "when": "view == gatomia.views.specExplorer && (viewItem == spec-current || viewItem == spec-review || viewItem == spec-archived)",
           "group": "inline@9"
+        },
+        {
+          "command": "gatomia.resetDocumentVersion",
+          "when": "view == gatomia.views.specExplorer && (viewItem == spec-current || viewItem == spec-review || viewItem == spec-archived)",
+          "group": "7_modification@3"
         },
         {
           "command": "gatomia.actions.run",

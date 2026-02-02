@@ -1,5 +1,5 @@
 import { type ExtensionContext, type Uri, workspace } from "vscode";
-import { formatGitUser, getGitUserInfo } from "../utils/git-user-info";
+import { GitUserInfoProvider } from "../utils/git-user-info";
 import { DocumentVersionService } from "./document-version-service";
 
 /**
@@ -9,9 +9,11 @@ import { DocumentVersionService } from "./document-version-service";
 export class DocumentTemplateProcessor {
 	private static instance: DocumentTemplateProcessor | null = null;
 	private readonly versionService: DocumentVersionService;
+	private readonly gitUserInfoProvider: GitUserInfoProvider;
 
 	private constructor(context: ExtensionContext) {
 		this.versionService = DocumentVersionService.getInstance(context);
+		this.gitUserInfoProvider = new GitUserInfoProvider();
 	}
 
 	static getInstance(context: ExtensionContext): DocumentTemplateProcessor {
@@ -29,8 +31,8 @@ export class DocumentTemplateProcessor {
 	 * Ensures version is set to 1.0 for new documents.
 	 */
 	async processNewDocument(documentUri: Uri): Promise<void> {
-		const gitUser = await getGitUserInfo();
-		const owner = formatGitUser(gitUser);
+		const gitUser = this.gitUserInfoProvider.getUserInfo();
+		const owner = this.gitUserInfoProvider.formatOwner(gitUser);
 
 		let content = await this.readDocument(documentUri);
 
@@ -54,8 +56,8 @@ export class DocumentTemplateProcessor {
 		const nextVersion = await this.versionService.getNextVersion(documentUri);
 
 		// Get current owner or set from git if not present
-		const gitUser = await getGitUserInfo();
-		const owner = formatGitUser(gitUser);
+		const gitUser = this.gitUserInfoProvider.getUserInfo();
+		const owner = this.gitUserInfoProvider.formatOwner(gitUser);
 
 		// Update frontmatter with new version
 		content = this.versionService.updateFrontmatter(
@@ -77,8 +79,8 @@ export class DocumentTemplateProcessor {
 		version: string;
 		owner: string | undefined;
 	}> {
-		const gitUser = await getGitUserInfo();
-		const defaultOwner = formatGitUser(gitUser);
+		const gitUser = this.gitUserInfoProvider.getUserInfo();
+		const defaultOwner = this.gitUserInfoProvider.formatOwner(gitUser);
 
 		const version = await this.versionService.getCurrentVersion(documentUri);
 

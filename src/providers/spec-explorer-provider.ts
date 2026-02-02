@@ -19,6 +19,7 @@ import {
 } from "../features/spec/review-flow/state";
 import { getSpecSystemAdapter } from "../utils/spec-kit-adapter";
 import { basename, join } from "node:path";
+import type { IDocumentVersionService } from "../features/documents/version-tracking/types";
 import {
 	parseTasksFromFile,
 	getTaskStatusIcon,
@@ -49,9 +50,14 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 
 	private specManager!: SpecManager;
 	private readonly context: ExtensionContext;
+	private readonly versionService?: IDocumentVersionService;
 
-	constructor(context: ExtensionContext) {
+	constructor(
+		context: ExtensionContext,
+		versionService?: IDocumentVersionService
+	) {
 		this.context = context;
+		this.versionService = versionService;
 		// Listen for review flow state changes (e.g. status updates, change requests)
 		// and refresh the tree view to reflect the new state.
 		context.subscriptions.push(
@@ -59,13 +65,21 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 				this.refresh();
 			})
 		);
+		// Listen for version updates and refresh tree view to show new version numbers
+		if (versionService) {
+			context.subscriptions.push(
+				versionService.onDidUpdateVersion(() => {
+					this.refresh();
+				})
+			);
+		}
 	}
 
-	private createSpecItem(
+	private async createSpecItem(
 		label: string,
 		specId: string,
 		system?: SpecSystemMode
-	): SpecItem {
+	): Promise<SpecItem> {
 		const item = new SpecItem(
 			label,
 			TreeItemCollapsibleState.Collapsed,
@@ -85,14 +99,16 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 				item.tooltip = reviewExitTooltip;
 			}
 		}
+		// Add version information if available
+		await this.addVersionInfo(item, specId);
 		return item;
 	}
 
-	private createReviewSpecItem(
+	private async createReviewSpecItem(
 		label: string,
 		specId: string,
 		system?: SpecSystemMode
-	): SpecItem {
+	): Promise<SpecItem> {
 		const item = new SpecItem(
 			label,
 			TreeItemCollapsibleState.Collapsed,
@@ -111,14 +127,92 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 		} else {
 			item.description = "Awaiting review metadata";
 		}
+		// Add version information if available
+		await this.addVersionInfo(item, specId);
 		return item;
 	}
 
-	private createArchivedSpecItem(
+	/**
+	 * Add version information to a spec item.
+	 * Fetches version metadata and history from DocumentVersionService and updates the item's description and tooltip.
+	 *
+	 * @param item - The SpecItem to update with version information
+	 * @param specId - The spec ID (e.g., "001-feature-name")
+	 */
+	private async addVersionInfo(item: SpecItem, specId: string): Promise<void> {
+		if (!this.versionService) {
+			return; // Version service not available
+		}
+
+		try {
+			// Find spec.md file for this spec
+			const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
+			if (!workspaceRoot) {
+				return;
+			}
+
+			// Try both specs/ and .specify/ directory structures
+			const specPaths = [
+				join(workspaceRoot, "specs", specId, "spec.md"),
+				join(workspaceRoot, ".specify", "specs", specId, "spec.md"),
+			];
+
+			for (const specPath of specPaths) {
+				const metadata =
+					await this.versionService.getDocumentMetadata(specPath);
+				if (metadata) {
+					// Add version to description (displays next to item label)
+					const versionSuffix = ` (v${metadata.version})`;
+					item.description = item.description
+						? `${item.description}${versionSuffix}`
+						: `v${metadata.version}`;
+
+					// Fetch version history for tooltip
+					const history = await this.versionService.getVersionHistory(specPath);
+					const recentHistory = history.slice(-5).reverse(); // Last 5 entries, most recent first
+
+					// Build tooltip with current metadata and version history
+					const originalTooltip =
+						typeof item.tooltip === "string" ? item.tooltip : item.label;
+					let versionInfo = `\n\nVersion: ${metadata.version}\nLast modified: ${metadata.lastModified || "Unknown"}\nOwner: ${metadata.owner}`;
+
+					// Add version history if available
+					if (recentHistory.length > 0) {
+						versionInfo += "\n\nRecent Changes:";
+						for (const entry of recentHistory) {
+							const timestamp = new Date(entry.timestamp).toLocaleString(
+								"en-US",
+								{
+									month: "short",
+									day: "numeric",
+									hour: "2-digit",
+									minute: "2-digit",
+								}
+							);
+							const change =
+								entry.previousVersion === ""
+									? `v${entry.newVersion} (created)`
+									: `v${entry.previousVersion} → v${entry.newVersion}`;
+							versionInfo += `\n  ${timestamp}: ${change} by ${entry.author}`;
+						}
+					}
+
+					item.tooltip = `${originalTooltip}${versionInfo}`;
+
+					break; // Found version, no need to check other paths
+				}
+			}
+		} catch (error) {
+			// Silently fail - version info is optional enhancement
+			console.debug("Failed to fetch version info for spec:", specId, error);
+		}
+	}
+
+	private async createArchivedSpecItem(
 		label: string,
 		specId: string,
 		system?: SpecSystemMode
-	): SpecItem {
+	): Promise<SpecItem> {
 		const item = new SpecItem(
 			label,
 			TreeItemCollapsibleState.Collapsed,
@@ -137,6 +231,8 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 		} else {
 			item.description = "Archived";
 		}
+		//Add version information if available
+		await this.addVersionInfo(item, specId);
 		return item;
 	}
 
@@ -281,30 +377,39 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 		const unifiedSpecs = await this.specManager.getAllSpecsUnified();
 
 		if (element.contextValue === "group-current-specs") {
-			return unifiedSpecs
-				.filter((spec) => {
-					const state = getSpecState(spec.id);
-					return (
-						!state || state.status === "current" || state.status === "reopened"
-					);
-				})
-				.map((spec) => this.createSpecItem(spec.name, spec.id, spec.system));
+			const filtered = unifiedSpecs.filter((spec) => {
+				const state = getSpecState(spec.id);
+				return (
+					!state || state.status === "current" || state.status === "reopened"
+				);
+			});
+			return Promise.all(
+				filtered.map((spec) =>
+					this.createSpecItem(spec.name, spec.id, spec.system)
+				)
+			);
 		}
 
 		if (element.contextValue === "group-review-specs") {
-			return unifiedSpecs
-				.filter((spec) => getSpecState(spec.id)?.status === "review")
-				.map((spec) =>
+			const filtered = unifiedSpecs.filter(
+				(spec) => getSpecState(spec.id)?.status === "review"
+			);
+			return Promise.all(
+				filtered.map((spec) =>
 					this.createReviewSpecItem(spec.name, spec.id, spec.system)
-				);
+				)
+			);
 		}
 
 		if (element.contextValue === "group-archived-specs") {
-			return unifiedSpecs
-				.filter((spec) => getSpecState(spec.id)?.status === "archived")
-				.map((spec) =>
+			const filtered = unifiedSpecs.filter(
+				(spec) => getSpecState(spec.id)?.status === "archived"
+			);
+			return Promise.all(
+				filtered.map((spec) =>
 					this.createArchivedSpecItem(spec.name, spec.id, spec.system)
-				);
+				)
+			);
 		}
 
 		if (element.contextValue === "group-changes") {

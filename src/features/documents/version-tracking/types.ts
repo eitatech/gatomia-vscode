@@ -88,6 +88,7 @@ export interface IGitUserInfoProvider {
  * Detects if document body content changed (excludes frontmatter formatting).
  */
 export interface IFileChangeDetector {
+	hasBaseline(documentPath: string): boolean;
 	hasBodyContentChanged(documentPath: string): Promise<boolean>;
 	updateBaseline(documentPath: string): Promise<void>;
 	clearBaseline(documentPath: string): Promise<void>;

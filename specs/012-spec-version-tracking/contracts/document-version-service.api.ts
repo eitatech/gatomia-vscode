@@ -389,6 +389,14 @@ export interface IGitUserInfoProvider {
  */
 export interface IFileChangeDetector {
   /**
+   * Check if a baseline exists for the given document.
+   * 
+   * @param documentPath Absolute path to document
+   * @returns boolean true if baseline exists
+   */
+  hasBaseline(documentPath: string): boolean;
+
+  /**
    * Check if document body content changed since last save.
    * Excludes frontmatter formatting changes (whitespace, field order).
    * 

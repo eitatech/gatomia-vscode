@@ -69,6 +69,7 @@ import {
 	handleSendToArchived,
 	handleUnarchive,
 } from "./features/spec/review-flow/commands/send-to-archived-command";
+import { resetDocumentVersionCommand } from "./features/documents/version-tracking/reset-document-version-command";
 import { WelcomeScreenPanel } from "./panels/welcome-screen-panel";
 import { WelcomeScreenProvider } from "./providers/welcome-screen-provider";
 import {
@@ -91,6 +92,9 @@ let dependenciesViewProvider: DependenciesViewProvider;
 let documentPreviewPanel: DocumentPreviewPanel;
 let documentPreviewService: DocumentPreviewService;
 let refinementGateway: RefinementGateway;
+let documentVersionService: ReturnType<
+	typeof import("./features/documents/version-tracking/document-version-service").createDocumentVersionService
+>;
 let activePreviewUri: Uri | undefined;
 type HookCommandTarget = { hookId?: string } | string;
 
@@ -235,6 +239,70 @@ export async function activate(context: ExtensionContext) {
 
 	documentPreviewService = new DocumentPreviewService(outputChannel, context);
 	refinementGateway = new RefinementGateway(outputChannel);
+
+	// Initialize Document Version Tracking Service (Phase 3: User Story 1 - Automatic Version Initialization)
+	try {
+		const { createDocumentVersionService } = await import(
+			"./features/documents/version-tracking/document-version-service"
+		);
+		const { isSpecKitDocument } = await import(
+			"./features/documents/version-tracking/types"
+		);
+
+		documentVersionService = createDocumentVersionService(
+			context,
+			outputChannel
+		);
+		await documentVersionService.activate();
+		outputChannel.appendLine("DocumentVersionService initialized successfully");
+
+		// Register onDidCreateFiles event to auto-initialize new SpecKit documents
+		const createFilesDisposable = workspace.onDidCreateFiles(async (event) => {
+			for (const uri of event.files) {
+				if (isSpecKitDocument(uri.fsPath)) {
+					try {
+						await documentVersionService.initializeVersionTracking(uri.fsPath);
+						outputChannel.appendLine(
+							`[VersionTracking] Initialized version for new document: ${uri.fsPath}`
+						);
+					} catch (error) {
+						outputChannel.appendLine(
+							`[VersionTracking] Failed to initialize version: ${error}`
+						);
+					}
+				}
+			}
+		});
+
+		context.subscriptions.push(createFilesDisposable);
+		outputChannel.appendLine(
+			"[VersionTracking] onDidCreateFiles event registered"
+		);
+
+		// Register onDidSaveTextDocument event to auto-increment version on save (User Story 2 - Phase 4)
+		const saveDocumentDisposable = workspace.onDidSaveTextDocument(
+			async (document) => {
+				try {
+					await documentVersionService.processDocumentSave(document);
+				} catch (error) {
+					outputChannel.appendLine(
+						`[VersionTracking] Failed to process save event: ${error}`
+					);
+				}
+			}
+		);
+
+		context.subscriptions.push(saveDocumentDisposable);
+		outputChannel.appendLine(
+			"[VersionTracking] onDidSaveTextDocument event registered"
+		);
+	} catch (error) {
+		outputChannel.appendLine(
+			`Failed to initialize DocumentVersionService: ${error}`
+		);
+		// Don't fail extension activation if version tracking fails
+	}
+
 	documentPreviewPanel = new DocumentPreviewPanel(context, outputChannel, {
 		onReloadRequested: async () => {
 			if (activePreviewUri) {
@@ -407,7 +475,10 @@ export async function activate(context: ExtensionContext) {
 
 	// Register tree data providers
 	const quickAccessExplorer = new QuickAccessExplorerProvider();
-	const specExplorer = new SpecExplorerProvider(context);
+	const specExplorer = new SpecExplorerProvider(
+		context,
+		documentVersionService
+	);
 	const steeringExplorer = new SteeringExplorerProvider(context);
 	const actionsExplorer = new ActionsExplorerProvider(context);
 	const hooksExplorer = new HooksExplorerProvider(hookManager);
@@ -834,6 +905,33 @@ function registerCommands({
 			REOPEN_SPEC_COMMAND_ID,
 			async (specArg: unknown) => {
 				await handleReopenSpec(specArg, () => specExplorer.refresh());
+			}
+		),
+		commands.registerCommand(
+			"gatomia.resetDocumentVersion",
+			async (documentPathOrUri?: string | Uri) => {
+				if (!documentVersionService) {
+					window.showErrorMessage(
+						"Document version service is not initialized."
+					);
+					return;
+				}
+				try {
+					await resetDocumentVersionCommand(
+						documentVersionService,
+						documentPathOrUri
+					);
+					specExplorer.refresh();
+				} catch (error) {
+					const message =
+						error instanceof Error ? error.message : String(error);
+					outputChannel.appendLine(
+						`[Version] Reset command failed: ${message}`
+					);
+					window.showErrorMessage(
+						`Failed to reset document version: ${message}`
+					);
+				}
 			}
 		),
 		commands.registerCommand("gatomia.hooks.export", async () => {

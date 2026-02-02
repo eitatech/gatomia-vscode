@@ -1,4 +1,4 @@
-import type { IFileChangeDetector } from "../types/version-tracking";
+import type { IFileChangeDetector } from "../features/documents/version-tracking/types";
 import type { IFrontmatterProcessor } from "../features/documents/version-tracking/types";
 
 /**
@@ -14,8 +14,18 @@ export class FileChangeDetector implements IFileChangeDetector {
 	}
 
 	/**
+	 * Checks if a baseline exists for the given document.
+	 */
+	hasBaseline(documentPath: string): boolean {
+		return this.baselines.has(documentPath);
+	}
+
+	/**
 	 * Checks if the body content has changed compared to the stored baseline.
-	 * Returns true if no baseline exists or if content differs after normalization.
+	 * If no baseline exists, assumes content has changed (returns true) and establishes baseline.
+	 *
+	 * NOTE: Baseline should be established during document initialization via updateBaseline().
+	 * If called without prior baseline, we cannot detect change, so we assume "changed" for safety.
 	 */
 	async hasBodyContentChanged(documentPath: string): Promise<boolean> {
 		const currentBody =
@@ -23,10 +33,16 @@ export class FileChangeDetector implements IFileChangeDetector {
 		const normalized = this.normalizeWhitespace(currentBody);
 
 		if (!this.baselines.has(documentPath)) {
-			return true; // No baseline = treat as changed
+			// No baseline = cannot determine change, assume changed for safety
+			// This handles cases where documents are loaded/created without initialization
+			this.baselines.set(documentPath, normalized);
+			return true; // Treat as changed (no baseline to compare against)
 		}
 
-		return this.baselines.get(documentPath) !== normalized;
+		const hasChanged = this.baselines.get(documentPath) !== normalized;
+
+		// Don't update baseline here - that's done explicitly after successful increment
+		return hasChanged;
 	}
 
 	/**
@@ -41,8 +57,9 @@ export class FileChangeDetector implements IFileChangeDetector {
 	/**
 	 * Clears the stored baseline for a document.
 	 */
-	clearBaseline(documentPath: string): void {
+	clearBaseline(documentPath: string): Promise<void> {
 		this.baselines.delete(documentPath);
+		return Promise.resolve();
 	}
 
 	/**
