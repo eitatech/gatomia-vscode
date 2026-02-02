@@ -219,29 +219,7 @@ export class DocumentVersionService implements IDocumentVersionService {
 	): Promise<DocumentMetadata> {
 		try {
 			// Get Git user info with error recovery
-			let gitInfo: { name: string; email: string };
-			try {
-				gitInfo = this.gitUserInfoProvider.getUserInfo();
-				if (!this.gitUserInfoProvider.isGitConfigured()) {
-					// Log warning if using fallback
-					console.warn(
-						`Git not configured for ${documentPath}, using system username`
-					);
-				}
-			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				this.logVersionChange({
-					level: "error",
-					event: "error",
-					documentPath,
-					newVersion: "1.0",
-					author: "system",
-					previousVersion: undefined,
-					message: `Failed to get Git user info: ${errorMsg}`,
-				});
-				throw error;
-			}
-			const owner = this.gitUserInfoProvider.formatOwner(gitInfo);
+			const owner = await this.getGitUserInfoForInit(documentPath);
 
 			// Initialize metadata
 			const metadata: DocumentMetadata = {
@@ -252,85 +230,18 @@ export class DocumentVersionService implements IDocumentVersionService {
 			};
 
 			// Update document frontmatter with error recovery
-			try {
-				await this.frontmatterProcessor.update(documentPath, {
-					version: metadata.version,
-					owner: metadata.owner,
-				});
-			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				this.logVersionChange({
-					level: "error",
-					event: "error",
-					documentPath,
-					newVersion: "1.0",
-					author: owner,
-					previousVersion: undefined,
-					message: `Failed to update frontmatter during initialization: ${errorMsg}`,
-				});
-				throw error;
-			}
-
-			// Create history entry
-			const historyEntry: VersionHistoryEntry = {
+			await this.updateFrontmatterForInit(
 				documentPath,
-				previousVersion: "", // No previous version (new document)
-				newVersion: "1.0",
-				timestamp: metadata.lastModified || new Date().toISOString(),
-				author: owner,
-				changeType: "initialization",
-			};
+				metadata.version,
+				metadata.owner
+			);
 
-			// Add entry to history with error recovery (non-fatal)
-			try {
-				await this.versionHistoryManager.addEntry(documentPath, historyEntry);
-			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				this.logVersionChange({
-					level: "warning",
-					event: "error",
-					documentPath,
-					newVersion: "1.0",
-					author: owner,
-					previousVersion: undefined,
-					message: `Failed to add history entry (initialization succeeded): ${errorMsg}`,
-				});
-				// Continue - initialization succeeded
-			}
-
-			// Update workspace state with error recovery (non-fatal)
-			try {
-				await this.versionHistoryManager.updateDocumentState(documentPath, {
-					currentVersion: metadata.version,
-					owner: metadata.owner,
-					createdBy: owner,
-					// Don't set lastIncrementTimestamp during initialization
-					// This allows immediate saves after initialization without debounce blocking
-				});
-			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				this.logVersionChange({
-					level: "warning",
-					event: "error",
-					documentPath,
-					newVersion: "1.0",
-					author: owner,
-					previousVersion: undefined,
-					message: `Failed to update workspace state (initialization succeeded): ${errorMsg}`,
-				});
-				// Continue - initialization succeeded
-			}
-
-			// Set baseline for change detection
-			try {
-				await this.fileChangeDetector.updateBaseline(documentPath);
-			} catch (error) {
-				// Non-fatal, log and continue
-				console.warn(
-					`Failed to set baseline for ${documentPath}:`,
-					error instanceof Error ? error.message : String(error)
-				);
-			}
+			// Add history entry and update workspace state (non-fatal)
+			await this.addHistoryAndStateForInit(
+				documentPath,
+				owner,
+				metadata.lastModified
+			);
 
 			// Fire event for UI refresh
 			this._onDidUpdateVersion.fire(documentPath);
@@ -401,187 +312,42 @@ export class DocumentVersionService implements IDocumentVersionService {
 		try {
 			this.processingDocuments.add(documentPath);
 
-			// Check debounce (30s window)
-			if (!(await this.debounceTracker.shouldIncrement(documentPath))) {
+			// Check if save should be processed (debounce + body changes)
+			const shouldProcessResult = await this.shouldProcessSave(documentPath);
+			if (!shouldProcessResult.shouldProcess) {
 				console.info(
-					`Skipping version increment for ${documentPath} (debounce active)`
+					`Skipping version increment for ${documentPath} (${shouldProcessResult.reason})`
 				);
-				// Send telemetry for debounce blocking
-				this.sendTelemetry("version.debounce.blocked", {
-					documentType: basename(documentPath),
-					reason: "debounce_active",
-				});
 				return;
 			}
 
-			// Check if body content changed (exclude frontmatter formatting)
-			const hasChanged =
-				await this.fileChangeDetector.hasBodyContentChanged(documentPath);
-			if (!hasChanged) {
-				console.info(
-					`Skipping version increment for ${documentPath} (no body content change)`
-				);
-				// Send telemetry for skipped increment (no changes)
-				this.sendTelemetry("version.increment.skipped", {
-					documentType: basename(documentPath),
-					reason: "no_body_content_change",
-				});
-				return;
+			// Extract and validate metadata (with error recovery)
+			const metadataResult =
+				await this.extractAndValidateMetadata(documentPath);
+			if (!metadataResult) {
+				return; // Error already logged
 			}
+			const { metadata, validVersion } = metadataResult;
 
-			// Extract current metadata with error recovery
-			let metadata: DocumentMetadata;
-			try {
-				metadata = await this.frontmatterProcessor.extract(documentPath);
-			} catch (error) {
-				// YAML parsing failed - log warning and skip this save
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				this.logVersionChange({
-					level: "warning",
-					event: "error",
-					documentPath,
-					newVersion: "n/a",
-					author: "system",
-					previousVersion: undefined,
-					message: `YAML parse error, skipping version increment: ${errorMsg}`,
-				});
-				return;
-			}
-
-			// Validate and normalize version if needed
-			let validVersion = metadata.version;
-			if (!this.versionIncrementer.isValid(validVersion)) {
-				const normalizedVersion =
-					this.versionIncrementer.normalize(validVersion);
-				this.logVersionChange({
-					level: "warning",
-					event: "normalization",
-					documentPath,
-					newVersion: normalizedVersion,
-					author: metadata.owner,
-					previousVersion: validVersion,
-					message: "malformed version normalized",
-				});
-				validVersion = normalizedVersion;
-			}
-
-			// Increment version with error recovery
-			let newVersion: string;
-			try {
-				newVersion = this.versionIncrementer.increment(validVersion);
-			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				this.logVersionChange({
-					level: "error",
-					event: "error",
-					documentPath,
-					newVersion: "n/a",
-					author: "system",
-					previousVersion: validVersion,
-					message: `Version increment failed: ${errorMsg}`,
-				});
-				return;
-			}
-
-			// Get Git user info with fallback handling
-			let gitInfo: {
-				name: string;
-				email: string;
-			};
-			try {
-				gitInfo = this.gitUserInfoProvider.getUserInfo();
-				if (!this.gitUserInfoProvider.isGitConfigured()) {
-					// Using fallback username - log warning
-					this.logVersionChange({
-						level: "warning",
-						event: "increment",
-						documentPath,
-						newVersion,
-						author: this.gitUserInfoProvider.formatOwner(gitInfo),
-						previousVersion: validVersion,
-						message: "Git not configured - using system username",
-					});
-				}
-			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				this.logVersionChange({
-					level: "error",
-					event: "error",
-					documentPath,
-					newVersion: "n/a",
-					author: "system",
-					previousVersion: validVersion,
-					message: `Git user info failed: ${errorMsg}`,
-				});
-				return;
-			}
-			const newOwner = this.gitUserInfoProvider.formatOwner(gitInfo);
-
-			// Update frontmatter with error recovery
-			try {
-				await this.frontmatterProcessor.update(documentPath, {
-					version: newVersion,
-					owner: newOwner,
-				});
-			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				this.logVersionChange({
-					level: "error",
-					event: "error",
-					documentPath,
-					newVersion,
-					author: newOwner,
-					previousVersion: validVersion,
-					message: `Frontmatter update failed: ${errorMsg}`,
-				});
-				return;
-			}
-
-			// Create history entry
-			const historyEntry: VersionHistoryEntry = {
+			// Increment version and get owner (with error recovery)
+			const incrementResult = this.incrementVersionAndGetOwner(
 				documentPath,
-				previousVersion: validVersion,
-				newVersion,
-				timestamp: new Date().toISOString(),
-				author: newOwner,
-				changeType: "auto-increment",
-			};
-
-			// Add entry to history with error recovery
-			try {
-				await this.versionHistoryManager.addEntry(documentPath, historyEntry);
-			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				this.logVersionChange({
-					level: "warning",
-					event: "error",
-					documentPath,
-					newVersion,
-					author: newOwner,
-					previousVersion: validVersion,
-					message: `History entry failed (version updated but not logged): ${errorMsg}`,
-				});
-				// Continue - version was updated successfully
+				validVersion
+			);
+			if (!incrementResult) {
+				return; // Error already logged
 			}
+			const { newVersion, newOwner } = incrementResult;
 
-			// Update workspace state with error recovery
-			try {
-				await this.versionHistoryManager.updateDocumentState(documentPath, {
-					currentVersion: newVersion,
-					owner: newOwner,
-				});
-			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				this.logVersionChange({
-					level: "warning",
-					event: "error",
-					documentPath,
-					newVersion,
-					author: newOwner,
-					previousVersion: validVersion,
-					message: `Workspace state update failed: ${errorMsg}`,
-				});
-				// Continue - version was updated successfully
+			// Persist version update (frontmatter, history, state)
+			const persistSuccess = await this.persistVersionUpdate(
+				documentPath,
+				newVersion,
+				newOwner,
+				validVersion
+			);
+			if (!persistSuccess) {
+				return; // Error already logged
 			}
 
 			// Record debounce timestamp
@@ -647,136 +413,17 @@ export class DocumentVersionService implements IDocumentVersionService {
 	 */
 	async resetDocumentVersion(documentPath: string): Promise<void> {
 		try {
-			// Get current metadata (or treat as "0.0" if missing)
-			let previousVersion = "0.0";
-			try {
-				const currentMetadata =
-					await this.frontmatterProcessor.extract(documentPath);
-				previousVersion = currentMetadata.version || "0.0";
-			} catch (error) {
-				// File doesn't exist or has no frontmatter - treat as uninitialized
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				this.logVersionChange({
-					level: "warning",
-					event: "reset",
-					documentPath,
-					newVersion: "1.0",
-					author: "system",
-					previousVersion,
-					message: `Failed to read current version: ${errorMsg}`,
-				});
-			}
+			// Get current version (with error recovery)
+			const previousVersion =
+				await this.getCurrentVersionForReset(documentPath);
 
-			// Get current Git user for owner attribution with error recovery
-			let userInfo: { name: string; email: string };
-			try {
-				userInfo = this.gitUserInfoProvider.getUserInfo();
-				if (!this.gitUserInfoProvider.isGitConfigured()) {
-					this.logVersionChange({
-						level: "warning",
-						event: "reset",
-						documentPath,
-						newVersion: "1.0",
-						author: this.gitUserInfoProvider.formatOwner(userInfo),
-						previousVersion,
-						message: "Git not configured - using system username",
-					});
-				}
-			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				this.logVersionChange({
-					level: "error",
-					event: "error",
-					documentPath,
-					newVersion: "1.0",
-					author: "system",
-					previousVersion,
-					message: `Failed to get Git user info: ${errorMsg}`,
-				});
-				throw error;
-			}
-			const owner = this.gitUserInfoProvider.formatOwner(userInfo);
+			// Get Git user info (with error recovery)
+			const owner = this.getGitUserInfoForReset(documentPath, previousVersion);
 
-			// Update frontmatter to version 1.0 with error recovery
-			try {
-				await this.frontmatterProcessor.update(documentPath, {
-					version: "1.0",
-					owner,
-				});
-			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				this.logVersionChange({
-					level: "error",
-					event: "error",
-					documentPath,
-					newVersion: "1.0",
-					author: owner,
-					previousVersion,
-					message: `Failed to update frontmatter during reset: ${errorMsg}`,
-				});
-				throw error;
-			}
+			// Perform reset operations (frontmatter, history, state)
+			await this.performResetOperations(documentPath, owner, previousVersion);
 
-			// Create history entry with changeType = "reset"
-			const historyEntry: VersionHistoryEntry = {
-				documentPath,
-				previousVersion,
-				newVersion: "1.0",
-				timestamp: new Date().toISOString(),
-				author: owner,
-				changeType: "reset",
-			};
-
-			// Add entry to history with error recovery (non-fatal)
-			try {
-				await this.versionHistoryManager.addEntry(documentPath, historyEntry);
-			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				this.logVersionChange({
-					level: "warning",
-					event: "error",
-					documentPath,
-					newVersion: "1.0",
-					author: owner,
-					previousVersion,
-					message: `Failed to add history entry (reset succeeded): ${errorMsg}`,
-				});
-				// Continue - reset succeeded
-			}
-
-			// Update workspace state with error recovery (non-fatal)
-			try {
-				await this.versionHistoryManager.updateDocumentState(documentPath, {
-					currentVersion: "1.0",
-					owner,
-					createdBy: owner, // Update createdBy to current user during reset
-				});
-			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				this.logVersionChange({
-					level: "warning",
-					event: "error",
-					documentPath,
-					newVersion: "1.0",
-					author: owner,
-					previousVersion,
-					message: `Failed to update workspace state (reset succeeded): ${errorMsg}`,
-				});
-				// Continue - reset succeeded
-			}
-
-			// Update baseline for change detection
-			try {
-				await this.fileChangeDetector.updateBaseline(documentPath);
-			} catch (error) {
-				// Non-fatal, log and continue
-				console.warn(
-					`Failed to update baseline for ${documentPath}:`,
-					error instanceof Error ? error.message : String(error)
-				);
-			}
-
-			// Fire event for UI refresh (e.g., Spec Explorer)
+			// Fire event for UI refresh
 			this._onDidUpdateVersion.fire(documentPath);
 
 			// Log reset
@@ -839,6 +486,488 @@ export class DocumentVersionService implements IDocumentVersionService {
 		documentPath: string
 	): Promise<VersionHistoryEntry[]> {
 		return this.versionHistoryManager.getHistory(documentPath);
+	}
+
+	/**
+	 * Extract Git user info for initialization with error recovery.
+	 * @returns Formatted owner string
+	 * @throws Error if Git info cannot be obtained
+	 */
+	private getGitUserInfoForInit(documentPath: string): string {
+		try {
+			const gitInfo = this.gitUserInfoProvider.getUserInfo();
+			if (!this.gitUserInfoProvider.isGitConfigured()) {
+				console.warn(
+					`Git not configured for ${documentPath}, using system username`
+				);
+			}
+			return this.gitUserInfoProvider.formatOwner(gitInfo);
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.logVersionChange({
+				level: "error",
+				event: "error",
+				documentPath,
+				newVersion: "1.0",
+				author: "system",
+				previousVersion: undefined,
+				message: `Failed to get Git user info: ${errorMsg}`,
+			});
+			throw error;
+		}
+	}
+
+	/**
+	 * Update frontmatter for initialization with error recovery.
+	 * @throws Error if frontmatter update fails
+	 */
+	private async updateFrontmatterForInit(
+		documentPath: string,
+		version: string,
+		owner: string
+	): Promise<void> {
+		try {
+			await this.frontmatterProcessor.update(documentPath, { version, owner });
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.logVersionChange({
+				level: "error",
+				event: "error",
+				documentPath,
+				newVersion: "1.0",
+				author: owner,
+				previousVersion: undefined,
+				message: `Failed to update frontmatter during initialization: ${errorMsg}`,
+			});
+			throw error;
+		}
+	}
+
+	/**
+	 * Add history entry and update workspace state for initialization (non-fatal).
+	 */
+	private async addHistoryAndStateForInit(
+		documentPath: string,
+		owner: string,
+		timestamp: string
+	): Promise<void> {
+		const historyEntry: VersionHistoryEntry = {
+			documentPath,
+			previousVersion: "",
+			newVersion: "1.0",
+			timestamp: timestamp || new Date().toISOString(),
+			author: owner,
+			changeType: "initialization",
+		};
+
+		// Add history entry (non-fatal)
+		try {
+			await this.versionHistoryManager.addEntry(documentPath, historyEntry);
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.logVersionChange({
+				level: "warning",
+				event: "error",
+				documentPath,
+				newVersion: "1.0",
+				author: owner,
+				previousVersion: undefined,
+				message: `Failed to add history entry (initialization succeeded): ${errorMsg}`,
+			});
+		}
+
+		// Update workspace state (non-fatal)
+		try {
+			await this.versionHistoryManager.updateDocumentState(documentPath, {
+				currentVersion: "1.0",
+				owner,
+				createdBy: owner,
+			});
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.logVersionChange({
+				level: "warning",
+				event: "error",
+				documentPath,
+				newVersion: "1.0",
+				author: owner,
+				previousVersion: undefined,
+				message: `Failed to update workspace state (initialization succeeded): ${errorMsg}`,
+			});
+		}
+
+		// Update baseline (non-fatal)
+		try {
+			await this.fileChangeDetector.updateBaseline(documentPath);
+		} catch (error) {
+			console.warn(
+				`Failed to set baseline for ${documentPath}:`,
+				error instanceof Error ? error.message : String(error)
+			);
+		}
+	}
+
+	/**
+	 * Check if save should be processed (debounce, body changes).
+	 * @returns true if save should proceed
+	 */
+	private async shouldProcessSave(
+		documentPath: string
+	): Promise<{ shouldProcess: boolean; reason?: string }> {
+		// Check debounce (30s window)
+		if (!(await this.debounceTracker.shouldIncrement(documentPath))) {
+			this.sendTelemetry("version.debounce.blocked", {
+				documentType: basename(documentPath),
+				reason: "debounce_active",
+			});
+			return { shouldProcess: false, reason: "debounce active" };
+		}
+
+		// Check if body content changed
+		const hasChanged =
+			await this.fileChangeDetector.hasBodyContentChanged(documentPath);
+		if (!hasChanged) {
+			this.sendTelemetry("version.increment.skipped", {
+				documentType: basename(documentPath),
+				reason: "no_body_content_change",
+			});
+			return { shouldProcess: false, reason: "no body content change" };
+		}
+
+		return { shouldProcess: true };
+	}
+
+	/**
+	 * Extract and validate metadata with error recovery.
+	 * @returns Metadata and valid version, or null if extraction fails
+	 */
+	private async extractAndValidateMetadata(
+		documentPath: string
+	): Promise<{ metadata: DocumentMetadata; validVersion: string } | null> {
+		// Extract metadata
+		let metadata: DocumentMetadata;
+		try {
+			metadata = await this.frontmatterProcessor.extract(documentPath);
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.logVersionChange({
+				level: "warning",
+				event: "error",
+				documentPath,
+				newVersion: "n/a",
+				author: "system",
+				previousVersion: undefined,
+				message: `YAML parse error, skipping version increment: ${errorMsg}`,
+			});
+			return null;
+		}
+
+		// Validate and normalize version
+		let validVersion = metadata.version;
+		if (!this.versionIncrementer.isValid(validVersion)) {
+			const normalizedVersion = this.versionIncrementer.normalize(validVersion);
+			this.logVersionChange({
+				level: "warning",
+				event: "normalization",
+				documentPath,
+				newVersion: normalizedVersion,
+				author: metadata.owner,
+				previousVersion: validVersion,
+				message: "malformed version normalized",
+			});
+			validVersion = normalizedVersion;
+		}
+
+		return { metadata, validVersion };
+	}
+
+	/**
+	 * Increment version and get Git user info with error recovery.
+	 * @returns New version and owner, or null if increment fails
+	 */
+	private incrementVersionAndGetOwner(
+		documentPath: string,
+		validVersion: string
+	): { newVersion: string; newOwner: string } | null {
+		// Increment version
+		let newVersion: string;
+		try {
+			newVersion = this.versionIncrementer.increment(validVersion);
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.logVersionChange({
+				level: "error",
+				event: "error",
+				documentPath,
+				newVersion: "n/a",
+				author: "system",
+				previousVersion: validVersion,
+				message: `Version increment failed: ${errorMsg}`,
+			});
+			return null;
+		}
+
+		// Get Git user info
+		let gitInfo: { name: string; email: string };
+		try {
+			gitInfo = this.gitUserInfoProvider.getUserInfo();
+			if (!this.gitUserInfoProvider.isGitConfigured()) {
+				this.logVersionChange({
+					level: "warning",
+					event: "increment",
+					documentPath,
+					newVersion,
+					author: this.gitUserInfoProvider.formatOwner(gitInfo),
+					previousVersion: validVersion,
+					message: "Git not configured - using system username",
+				});
+			}
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.logVersionChange({
+				level: "error",
+				event: "error",
+				documentPath,
+				newVersion: "n/a",
+				author: "system",
+				previousVersion: validVersion,
+				message: `Git user info failed: ${errorMsg}`,
+			});
+			return null;
+		}
+
+		return {
+			newVersion,
+			newOwner: this.gitUserInfoProvider.formatOwner(gitInfo),
+		};
+	}
+
+	/**
+	 * Persist version update (frontmatter, history, state) with error recovery.
+	 * @returns true if update succeeded, false otherwise
+	 */
+	private async persistVersionUpdate(
+		documentPath: string,
+		newVersion: string,
+		newOwner: string,
+		validVersion: string
+	): Promise<boolean> {
+		// Update frontmatter
+		try {
+			await this.frontmatterProcessor.update(documentPath, {
+				version: newVersion,
+				owner: newOwner,
+			});
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.logVersionChange({
+				level: "error",
+				event: "error",
+				documentPath,
+				newVersion,
+				author: newOwner,
+				previousVersion: validVersion,
+				message: `Frontmatter update failed: ${errorMsg}`,
+			});
+			return false;
+		}
+
+		// Create history entry (non-fatal)
+		const historyEntry: VersionHistoryEntry = {
+			documentPath,
+			previousVersion: validVersion,
+			newVersion,
+			timestamp: new Date().toISOString(),
+			author: newOwner,
+			changeType: "auto-increment",
+		};
+
+		try {
+			await this.versionHistoryManager.addEntry(documentPath, historyEntry);
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.logVersionChange({
+				level: "warning",
+				event: "error",
+				documentPath,
+				newVersion,
+				author: newOwner,
+				previousVersion: validVersion,
+				message: `History entry failed (version updated but not logged): ${errorMsg}`,
+			});
+		}
+
+		// Update workspace state (non-fatal)
+		try {
+			await this.versionHistoryManager.updateDocumentState(documentPath, {
+				currentVersion: newVersion,
+				owner: newOwner,
+			});
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.logVersionChange({
+				level: "warning",
+				event: "error",
+				documentPath,
+				newVersion,
+				author: newOwner,
+				previousVersion: validVersion,
+				message: `Workspace state update failed: ${errorMsg}`,
+			});
+		}
+
+		return true;
+	}
+
+	/**
+	 * Get current version for reset operation with error recovery.
+	 * @returns Previous version string
+	 */
+	private async getCurrentVersionForReset(
+		documentPath: string
+	): Promise<string> {
+		let previousVersion = "0.0";
+		try {
+			const currentMetadata =
+				await this.frontmatterProcessor.extract(documentPath);
+			previousVersion = currentMetadata.version || "0.0";
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.logVersionChange({
+				level: "warning",
+				event: "reset",
+				documentPath,
+				newVersion: "1.0",
+				author: "system",
+				previousVersion,
+				message: `Failed to read current version: ${errorMsg}`,
+			});
+		}
+		return previousVersion;
+	}
+
+	/**
+	 * Get Git user info for reset operation with error recovery.
+	 * @returns Formatted owner string
+	 * @throws Error if Git info cannot be obtained
+	 */
+	private getGitUserInfoForReset(
+		documentPath: string,
+		previousVersion: string
+	): string {
+		let userInfo: { name: string; email: string };
+		try {
+			userInfo = this.gitUserInfoProvider.getUserInfo();
+			if (!this.gitUserInfoProvider.isGitConfigured()) {
+				this.logVersionChange({
+					level: "warning",
+					event: "reset",
+					documentPath,
+					newVersion: "1.0",
+					author: this.gitUserInfoProvider.formatOwner(userInfo),
+					previousVersion,
+					message: "Git not configured - using system username",
+				});
+			}
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.logVersionChange({
+				level: "error",
+				event: "error",
+				documentPath,
+				newVersion: "1.0",
+				author: "system",
+				previousVersion,
+				message: `Failed to get Git user info: ${errorMsg}`,
+			});
+			throw error;
+		}
+		return this.gitUserInfoProvider.formatOwner(userInfo);
+	}
+
+	/**
+	 * Perform reset operations (frontmatter, history, state) with error recovery.
+	 * @throws Error if frontmatter update fails (fatal)
+	 */
+	private async performResetOperations(
+		documentPath: string,
+		owner: string,
+		previousVersion: string
+	): Promise<void> {
+		// Update frontmatter (fatal error)
+		try {
+			await this.frontmatterProcessor.update(documentPath, {
+				version: "1.0",
+				owner,
+			});
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.logVersionChange({
+				level: "error",
+				event: "error",
+				documentPath,
+				newVersion: "1.0",
+				author: owner,
+				previousVersion,
+				message: `Failed to update frontmatter during reset: ${errorMsg}`,
+			});
+			throw error;
+		}
+
+		// Create history entry (non-fatal)
+		const historyEntry: VersionHistoryEntry = {
+			documentPath,
+			previousVersion,
+			newVersion: "1.0",
+			timestamp: new Date().toISOString(),
+			author: owner,
+			changeType: "reset",
+		};
+
+		try {
+			await this.versionHistoryManager.addEntry(documentPath, historyEntry);
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.logVersionChange({
+				level: "warning",
+				event: "error",
+				documentPath,
+				newVersion: "1.0",
+				author: owner,
+				previousVersion,
+				message: `Failed to add history entry (reset succeeded): ${errorMsg}`,
+			});
+		}
+
+		// Update workspace state (non-fatal)
+		try {
+			await this.versionHistoryManager.updateDocumentState(documentPath, {
+				currentVersion: "1.0",
+				owner,
+				createdBy: owner,
+			});
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.logVersionChange({
+				level: "warning",
+				event: "error",
+				documentPath,
+				newVersion: "1.0",
+				author: owner,
+				previousVersion,
+				message: `Failed to update workspace state (reset succeeded): ${errorMsg}`,
+			});
+		}
+
+		// Update baseline (non-fatal)
+		try {
+			await this.fileChangeDetector.updateBaseline(documentPath);
+		} catch (error) {
+			console.warn(
+				`Failed to update baseline for ${documentPath}:`,
+				error instanceof Error ? error.message : String(error)
+			);
+		}
 	}
 }
 

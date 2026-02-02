@@ -1,6 +1,6 @@
 ---
 version: "1.0"
-owner: "Italo <182202+italoag@users.noreply.github.com>"
+owner: "Italo A. G."
 ---
 
 # Tasks: Automatic Document Version and Author Tracking
@@ -27,10 +27,10 @@ owner: "Italo <182202+italoag@users.noreply.github.com>"
 
 **Purpose**: Create directory structure and install dependencies
 
-- [x] T001 Create feature directory structure in src/features/documents/version-tracking/
-- [x] T002 Create test directory structure in tests/unit/features/documents/version-tracking/ and tests/integration/
-- [x] T003 [P] Install gray-matter dependency for YAML frontmatter parsing (verify in package.json)
-- [x] T004 [P] Create TypeScript type definitions from contracts/document-version-service.api.ts in src/features/documents/version-tracking/types.ts
+- [X] T001 Create feature directory structure in src/features/documents/version-tracking/
+- [X] T002 Create test directory structure in tests/unit/features/documents/version-tracking/ and tests/integration/
+- [X] T003 [P] Install gray-matter dependency for YAML frontmatter parsing (verify in package.json)
+- [X] T004 [P] Create TypeScript type definitions from contracts/document-version-service.api.ts in src/features/documents/version-tracking/types.ts
 
 ---
 
@@ -42,33 +42,33 @@ owner: "Italo <182202+italoag@users.noreply.github.com>"
 
 ### Pure Logic Components (No I/O)
 
-- [x] T005 [P] Implement VersionIncrementer class in src/features/documents/version-tracking/version-incrementer.ts (TDD: test increment 1.0→1.1, 1.9→2.0, normalize malformed versions)
-- [x] T006 [P] Create unit tests for VersionIncrementer in tests/unit/features/documents/version-tracking/version-incrementer.test.ts (cover all version increment scenarios, normalization edge cases)
+- [X] T005 [P] Implement VersionIncrementer class in src/features/documents/version-tracking/version-incrementer.ts (TDD: test increment 1.0→1.1, 1.9→2.0, normalize malformed versions)
+- [X] T006 [P] Create unit tests for VersionIncrementer in tests/unit/features/documents/version-tracking/version-incrementer.test.ts (cover all version increment scenarios, normalization edge cases)
 
 ### Git Integration Component
 
-- [x] T007 [P] Implement GitUserInfoProvider in src/utils/git-user-info.ts (TDD: test Git config read, fallback to system username, format owner string)
-- [x] T008 [P] Create unit tests for GitUserInfoProvider in tests/unit/utils/git-user-info.test.ts (mock child_process.execSync, test Git unavailable scenario)
+- [X] T007 [P] Implement GitUserInfoProvider in src/utils/git-user-info.ts (TDD: test Git config read, fallback to system username, format owner string)
+- [X] T008 [P] Create unit tests for GitUserInfoProvider in tests/unit/utils/git-user-info.test.ts (mock child_process.execSync, test Git unavailable scenario)
 
 ### Frontmatter Processing Component
 
-- [x] T009 Implement FrontmatterProcessor class in src/features/documents/version-tracking/frontmatter-processor.ts (TDD: test extract metadata, update frontmatter, handle missing/malformed YAML, extract body content)
-- [x] T010 Create unit tests for FrontmatterProcessor in tests/unit/features/documents/version-tracking/frontmatter-processor.test.ts (use test fixtures in tests/fixtures/)
+- [X] T009 Implement FrontmatterProcessor class in src/features/documents/version-tracking/frontmatter-processor.ts (TDD: test extract metadata, update frontmatter, handle missing/malformed YAML, extract body content)
+- [X] T010 Create unit tests for FrontmatterProcessor in tests/unit/features/documents/version-tracking/frontmatter-processor.test.ts (use test fixtures in tests/fixtures/)
 
 ### Workspace State Management
 
-- [x] T011 Implement VersionHistoryManager class in src/features/documents/version-tracking/version-history-manager.ts (TDD: test add entry, FIFO rotation at 50 entries, get/update document state, workspace state serialization)
-- [x] T012 Create unit tests for VersionHistoryManager in tests/unit/features/documents/version-tracking/version-history-manager.test.ts (mock ExtensionContext.workspaceState, verify FIFO rotation)
+- [X] T011 Implement VersionHistoryManager class in src/features/documents/version-tracking/version-history-manager.ts (TDD: test add entry, FIFO rotation at 50 entries, get/update document state, workspace state serialization)
+- [X] T012 Create unit tests for VersionHistoryManager in tests/unit/features/documents/version-tracking/version-history-manager.test.ts (mock ExtensionContext.workspaceState, verify FIFO rotation)
 
 ### Debounce Logic
 
-- [x] T013 [P] Implement DebounceTracker class in src/features/documents/version-tracking/debounce-tracker.ts (TDD: test 30-second debounce window, per-document tracking, timestamp persistence)
-- [x] T014 [P] Create unit tests for DebounceTracker in tests/unit/features/documents/version-tracking/debounce-tracker.test.ts (use Vitest fake timers, test blocked saves don't reset timer)
+- [X] T013 [P] Implement DebounceTracker class in src/features/documents/version-tracking/debounce-tracker.ts (TDD: test 30-second debounce window, per-document tracking, timestamp persistence)
+- [X] T014 [P] Create unit tests for DebounceTracker in tests/unit/features/documents/version-tracking/debounce-tracker.test.ts (use Vitest fake timers, test blocked saves don't reset timer)
 
 ### Change Detection
 
-- [x] T015 [P] Implement FileChangeDetector class in src/utils/file-change-detector.ts (TDD: test body content comparison, normalize whitespace, ignore frontmatter formatting changes)
-- [x] T016 [P] Create unit tests for FileChangeDetector in tests/unit/utils/file-change-detector.test.ts (test frontmatter-only changes don't trigger version increment)
+- [X] T015 [P] Implement FileChangeDetector class in src/utils/file-change-detector.ts (TDD: test body content comparison, normalize whitespace, ignore frontmatter formatting changes)
+- [X] T016 [P] Create unit tests for FileChangeDetector in tests/unit/utils/file-change-detector.test.ts (test frontmatter-only changes don't trigger version increment)
 
 **Checkpoint**: Foundation complete. All shared components implemented and tested. User story implementation can now begin.
 
@@ -82,10 +82,10 @@ owner: "Italo <182202+italoag@users.noreply.github.com>"
 
 ### Implementation
 
-- [x] T017 [US1] Implement DocumentVersionService.initializeVersionTracking() in src/features/documents/version-tracking/document-version-service.ts (TDD: test initialization for new document with no frontmatter, test Git user populated as owner)
-- [x] T018 [US1] Add initialization logic to DocumentVersionService constructor (detect documents without version/owner on extension activation)
-- [x] T019 [US1] Register workspace.onDidCreateFiles event in src/extension.ts to trigger initialization for new spec/plan/tasks documents
-- [x] T020 [US1] Create integration test for initialization flow in tests/integration/document-version-tracking.test.ts (test create new spec → has version 1.0 and owner)
+- [X] T017 [US1] Implement DocumentVersionService.initializeVersionTracking() in src/features/documents/version-tracking/document-version-service.ts (TDD: test initialization for new document with no frontmatter, test Git user populated as owner)
+- [X] T018 [US1] Add initialization logic to DocumentVersionService constructor (detect documents without version/owner on extension activation)
+- [X] T019 [US1] Register workspace.onDidCreateFiles event in src/extension.ts to trigger initialization for new spec/plan/tasks documents
+- [X] T020 [US1] Create integration test for initialization flow in tests/integration/document-version-tracking.test.ts (test create new spec → has version 1.0 and owner)
 
 **Checkpoint**: User Story 1 complete. New documents are automatically initialized with version 1.0 and Git user as owner.
 
@@ -119,10 +119,10 @@ owner: "Italo <182202+italoag@users.noreply.github.com>"
 
 ### Implementation
 
-- [x] T028 [US3] Create DocumentVersionService factory function in src/features/documents/version-tracking/document-version-service.ts (createDocumentVersionService with dependency injection)
-- [x] T029 [US3] Verify DocumentVersionService does NOT modify template files in .specify/templates/ (code review + integration test)
-- [x] T030 [US3] Register DocumentVersionService in extension.ts activate() function with proper lifecycle management (dispose on deactivate)
-- [x] T031 [US3] Create integration test for template updateability in tests/integration/document-version-tracking.test.ts (simulate template change, verify version tracking still works)
+- [X] T028 [US3] Create DocumentVersionService factory function in src/features/documents/version-tracking/document-version-service.ts (createDocumentVersionService with dependency injection)
+- [X] T029 [US3] Verify DocumentVersionService does NOT modify template files in .specify/templates/ (code review + integration test)
+- [X] T030 [US3] Register DocumentVersionService in extension.ts activate() function with proper lifecycle management (dispose on deactivate)
+- [X] T031 [US3] Create integration test for template updateability in tests/integration/document-version-tracking.test.ts (simulate template change, verify version tracking still works)
 
 **Checkpoint**: User Story 3 complete. Version tracking implemented via non-invasive post-processing, SpecKit templates remain unchanged.
 
@@ -165,16 +165,16 @@ owner: "Italo <182202+italoag@users.noreply.github.com>"
 
 ### Documentation
 
-- [x] T044 [P] Update package.json with command descriptions, configuration schema (if needed), changelog entry
-- [x] T045 [P] Update README.md with feature description, usage examples, troubleshooting
-- [x] T046 [P] Create test fixtures in tests/fixtures/ for various document scenarios (valid frontmatter, missing frontmatter, malformed versions)
+- [X] T044 [P] Update package.json with command descriptions, configuration schema (if needed), changelog entry
+- [X] T045 [P] Update README.md with feature description, usage examples, troubleshooting
+- [X] T046 [P] Create test fixtures in tests/fixtures/ for various document scenarios (valid frontmatter, missing frontmatter, malformed versions)
 
 ### Final Validation
 
-- [x] T047 Run all unit tests (`npm test`) and verify 100% pass rate
-- [x] T048 Run all integration tests and verify end-to-end workflows
-- [x] T049 Run quickstart.md manual validation (create spec, edit/save 10 times, verify 1.0→1.9→2.0, reset command)
-- [x] T050 Run linter and formatter (`npm run check`) and fix any violations (kebab-case filenames, no `any` types)
+- [X] T047 Run all unit tests (`npm test`) and verify 100% pass rate
+- [X] T048 Run all integration tests and verify end-to-end workflows
+- [X] T049 Run quickstart.md manual validation (create spec, edit/save 10 times, verify 1.0→1.9→2.0, reset command)
+- [X] T050 Run linter and formatter (`npm run check`) and fix any violations (kebab-case filenames, no `any` types)
 
 ---
 

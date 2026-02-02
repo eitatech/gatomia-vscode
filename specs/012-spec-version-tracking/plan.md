@@ -1,6 +1,6 @@
 ---
 version: "1.0"
-owner: "Italo <182202+italoag@users.noreply.github.com>"
+owner: "Italo A. G."
 ---
 
 # Implementation Plan: Automatic Document Version and Author Tracking
