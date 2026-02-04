@@ -1,3 +1,8 @@
+---
+version: "1.0"
+owner: "[AUTHOR]"
+---
+
 # [PROJECT NAME] Development Guidelines
 
 Auto-generated from all feature plans. Last updated: [DATE]

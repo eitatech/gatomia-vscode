@@ -54,6 +54,20 @@ You can follow our progress, open issues, or contribute directly through our off
 * **Manage Specs**: Browse generated specs in the **Specs** view.
 * **Execute Tasks**: Open `tasks.md` and use the "Start Task" CodeLens to send task context to GitHub Copilot Chat for implementation.
 
+### Document Version Tracking
+
+* **Automatic Versioning**: All SpecKit documents (spec.md, plan.md, tasks.md) automatically track versions and authors without any manual intervention.
+* **Smart Initialization**: New documents instantly get `version: "1.0"` and `owner` populated from your Git configuration.
+* **Auto-Increment on Save**: Documents automatically increment version when saved (1.0→1.1→...→1.9→2.0), but only when body content actually changes.
+* **Debounce Protection**: Built-in 30-second debounce prevents version inflation during rapid save cycles.
+* **Change Detection**: Intelligently ignores frontmatter-only changes (formatting, whitespace) to avoid unnecessary version bumps.
+* **Author Attribution**: The `owner` field automatically updates with Git username and email on each version change, maintaining clear ownership history.
+* **Version History**: Maintains up to 50 version change entries per document with automatic FIFO rotation for audit trails.
+* **Visual Display**: Version badges appear inline in Spec Explorer tree view (e.g., "Feature Name (v2.3)") for quick status checks.
+* **Reset Command**: Right-click any spec in Spec Explorer to reset its version back to 1.0 with full history preservation.
+* **Comprehensive Logging**: All version changes logged to extension output channel with ISO timestamps, change types, and authors.
+* **Error Recovery**: Graceful handling of Git unavailable, YAML parsing failures, and workspace state errors with automatic fallbacks.
+
 ### Prompt Management
 
 * **Custom Prompts**: Manage Markdown prompts under `.github/prompts` (configurable) alongside instructions and agents to keep all project guidance in one place.
@@ -164,7 +178,67 @@ Search for "GatomIA" in the VS Code Marketplace and install the extension.
 2. Click **Start All Tasks** above a checklist item.
 3. GitHub Copilot Chat will open with the task context. Interact with it to implement the code.
 
-### 3. Manage Instruction Rules
+### 3. Document Version Tracking
+
+GatomIA automatically tracks versions and authors for all SpecKit documents (spec.md, plan.md, tasks.md).
+
+**Automatic Features**:
+
+* **Auto-Initialization**: New documents automatically get `version: "1.0"` and `owner` from Git config
+* **Auto-Increment**: Version increments on save (1.0→1.1→...→1.9→2.0) when body content changes
+* **Smart Debounce**: 30-second debounce prevents version inflation during rapid saves
+* **Change Detection**: Ignores frontmatter-only changes (formatting, field order)
+* **Author Attribution**: `owner` field updates automatically with Git username and email
+* **Version History**: Up to 50 version changes preserved per document with FIFO rotation
+* **Visual Display**: Version badges appear in Spec Explorer tree view (e.g., "Feature Name (v2.3)")
+
+**Manual Operations**:
+
+1. **Reset Version**: Right-click a spec in Spec Explorer → "Reset Version to 1.0"
+2. **View Logs**: Open Output panel → Select "GatomIA" channel to see version change logs
+
+**Usage Examples**:
+
+```yaml
+# Example frontmatter after auto-initialization
+---
+version: "1.0"
+owner: "Italo <182202+italoag@users.noreply.github.com>"
+title: "Authentication System"
+status: "draft"
+---
+```
+
+**Version Increment Flow**:
+
+```
+Create spec.md → version: "1.0" (auto-initialized)
+Edit and save → version: "1.1" (auto-incremented)
+Edit and save → version: "1.2" (auto-incremented)
+...
+Edit and save → version: "1.9" (max minor version)
+Edit and save → version: "2.0" (major version bump)
+```
+
+**Troubleshooting**:
+
+* **Git Not Configured**: If you see warnings about Git, configure your Git user:
+  ```bash
+  git config --global user.name "Your Name"
+  git config --global user.email "your.email@example.com"
+  ```
+  Without Git, the extension falls back to system username with `@localhost` email.
+
+* **Version Not Incrementing**: Check the Output panel for reasons:
+  - Debounce active (wait 30 seconds since last increment)
+  - No body content changed (only frontmatter formatting changed)
+  - Extension processing previous save (wait for completion)
+
+* **YAML Parse Errors**: If frontmatter is malformed, version tracking is skipped for that save. Check the Output panel for error details.
+
+* **Version History Not Showing**: History is stored in workspace state. If missing, the document may have been initialized before version tracking was enabled.
+
+### 4. Manage Instruction Rules
 
 1. Open the **Steering** view in the Activity Bar.
 2. **Create Project Rule**:
@@ -181,7 +255,7 @@ Search for "GatomIA" in the VS Code Marketplace and install the extension.
    - Copilot Chat opens with `/speckit.constitution` prompt
    - The agent generates your `constitution.md`
 
-### 4. Use Copilot Agents
+### 5. Use Copilot Agents
 
 GatomIA auto-discovers agents defined in `resources/agents/` and registers them with GitHub Copilot Chat. You can interact with them directly in the chat interface.
 
@@ -239,7 +313,7 @@ Access agent settings in VS Code: Settings → GatomIA → Agents
 
 For more details, see [src/features/agents/README.md](src/features/agents/README.md).
 
-### 5. Automate with Hooks
+### 6. Automate with Hooks
 
 1. Open the **Hooks** view in the Activity Bar.
 2. Click **Create New Hook**.

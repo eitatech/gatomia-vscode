@@ -1,3 +1,8 @@
+---
+version: "1.0"
+owner: "[AUTHOR]"
+---
+
 # Implementation Plan: [FEATURE]
 
 **Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]

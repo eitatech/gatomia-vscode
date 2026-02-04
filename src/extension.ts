@@ -17,6 +17,7 @@ import {
 	window,
 	workspace,
 } from "vscode";
+import matter from "gray-matter";
 import { VSC_CONFIG_NAMESPACE } from "./constants";
 import { SpecManager } from "./features/spec/spec-manager";
 import { SteeringManager } from "./features/steering/steering-manager";
@@ -30,6 +31,7 @@ import { SteeringExplorerProvider } from "./providers/steering-explorer-provider
 import { WikiExplorerProvider } from "./providers/wiki-explorer-provider";
 import { PromptLoader } from "./services/prompt-loader";
 import { sendPromptToChat } from "./utils/chat-prompt-runner";
+import { registerDocumentVersioningCommands } from "./features/documents/document-versioning-commands";
 import { ConfigManager } from "./utils/config-manager";
 import { getMcpConfigPath } from "./utils/platform-utils";
 import { getSpecSystemAdapter } from "./utils/spec-kit-adapter";
@@ -68,6 +70,7 @@ import {
 	handleSendToArchived,
 	handleUnarchive,
 } from "./features/spec/review-flow/commands/send-to-archived-command";
+import { resetDocumentVersionCommand } from "./features/documents/version-tracking/reset-document-version-command";
 import { WelcomeScreenPanel } from "./panels/welcome-screen-panel";
 import { WelcomeScreenProvider } from "./providers/welcome-screen-provider";
 import {
@@ -90,6 +93,9 @@ let dependenciesViewProvider: DependenciesViewProvider;
 let documentPreviewPanel: DocumentPreviewPanel;
 let documentPreviewService: DocumentPreviewService;
 let refinementGateway: RefinementGateway;
+let documentVersionService: ReturnType<
+	typeof import("./features/documents/version-tracking/document-version-service").createDocumentVersionService
+>;
 let activePreviewUri: Uri | undefined;
 type HookCommandTarget = { hookId?: string } | string;
 
@@ -234,6 +240,70 @@ export async function activate(context: ExtensionContext) {
 
 	documentPreviewService = new DocumentPreviewService(outputChannel, context);
 	refinementGateway = new RefinementGateway(outputChannel);
+
+	// Initialize Document Version Tracking Service (Phase 3: User Story 1 - Automatic Version Initialization)
+	try {
+		const { createDocumentVersionService } = await import(
+			"./features/documents/version-tracking/document-version-service"
+		);
+		const { isSpecKitDocument } = await import(
+			"./features/documents/version-tracking/types"
+		);
+
+		documentVersionService = createDocumentVersionService(
+			context,
+			outputChannel
+		);
+		await documentVersionService.activate();
+		outputChannel.appendLine("DocumentVersionService initialized successfully");
+
+		// Register onDidCreateFiles event to auto-initialize new SpecKit documents
+		const createFilesDisposable = workspace.onDidCreateFiles(async (event) => {
+			for (const uri of event.files) {
+				if (isSpecKitDocument(uri.fsPath)) {
+					try {
+						await documentVersionService.initializeVersionTracking(uri.fsPath);
+						outputChannel.appendLine(
+							`[VersionTracking] Initialized version for new document: ${uri.fsPath}`
+						);
+					} catch (error) {
+						outputChannel.appendLine(
+							`[VersionTracking] Failed to initialize version: ${error}`
+						);
+					}
+				}
+			}
+		});
+
+		context.subscriptions.push(createFilesDisposable);
+		outputChannel.appendLine(
+			"[VersionTracking] onDidCreateFiles event registered"
+		);
+
+		// Register onDidSaveTextDocument event to auto-increment version on save (User Story 2 - Phase 4)
+		const saveDocumentDisposable = workspace.onDidSaveTextDocument(
+			async (document) => {
+				try {
+					await documentVersionService.processDocumentSave(document);
+				} catch (error) {
+					outputChannel.appendLine(
+						`[VersionTracking] Failed to process save event: ${error}`
+					);
+				}
+			}
+		);
+
+		context.subscriptions.push(saveDocumentDisposable);
+		outputChannel.appendLine(
+			"[VersionTracking] onDidSaveTextDocument event registered"
+		);
+	} catch (error) {
+		outputChannel.appendLine(
+			`Failed to initialize DocumentVersionService: ${error}`
+		);
+		// Don't fail extension activation if version tracking fails
+	}
+
 	documentPreviewPanel = new DocumentPreviewPanel(context, outputChannel, {
 		onReloadRequested: async () => {
 			if (activePreviewUri) {
@@ -406,7 +476,10 @@ export async function activate(context: ExtensionContext) {
 
 	// Register tree data providers
 	const quickAccessExplorer = new QuickAccessExplorerProvider();
-	const specExplorer = new SpecExplorerProvider(context);
+	const specExplorer = new SpecExplorerProvider(
+		context,
+		documentVersionService
+	);
 	const steeringExplorer = new SteeringExplorerProvider(context);
 	const actionsExplorer = new ActionsExplorerProvider(context);
 	const hooksExplorer = new HooksExplorerProvider(hookManager);
@@ -495,6 +568,10 @@ export async function activate(context: ExtensionContext) {
 			window.showInformationMessage("Table of Contents - Coming soon!");
 		})
 	);
+
+	// Register document versioning commands
+	registerDocumentVersioningCommands(context);
+	outputChannel.appendLine("Document versioning commands registered");
 
 	// Set up file watchers
 	setupFileWatchers(context, specExplorer, steeringExplorer, actionsExplorer);
@@ -660,10 +737,28 @@ async function syncSpecReviewFlowSummary(options: {
 		specId: options.specId,
 	});
 
+	// Try to read owner from spec.md frontmatter
+	let owner = "unknown";
+	try {
+		const specPath = join(
+			options.workspaceRoot,
+			"specs",
+			options.specId,
+			"spec.md"
+		);
+		const specUri = Uri.file(specPath);
+		const bytes = await workspace.fs.readFile(specUri);
+		const content = Buffer.from(bytes).toString("utf8");
+		const parsed = matter(content);
+		owner = (parsed.data?.owner as string | undefined) || "unknown";
+	} catch {
+		// If spec.md doesn't exist or can't be read, use "unknown"
+	}
+
 	upsertSpecState({
 		specId: options.specId,
 		title: options.specTitle,
-		owner: "unknown",
+		owner,
 		links,
 	});
 
@@ -855,6 +950,33 @@ function registerCommands({
 			REOPEN_SPEC_COMMAND_ID,
 			async (specArg: unknown) => {
 				await handleReopenSpec(specArg, () => specExplorer.refresh());
+			}
+		),
+		commands.registerCommand(
+			"gatomia.resetDocumentVersion",
+			async (documentPathOrUri?: string | Uri) => {
+				if (!documentVersionService) {
+					window.showErrorMessage(
+						"Document version service is not initialized."
+					);
+					return;
+				}
+				try {
+					await resetDocumentVersionCommand(
+						documentVersionService,
+						documentPathOrUri
+					);
+					specExplorer.refresh();
+				} catch (error) {
+					const message =
+						error instanceof Error ? error.message : String(error);
+					outputChannel.appendLine(
+						`[Version] Reset command failed: ${message}`
+					);
+					window.showErrorMessage(
+						`Failed to reset document version: ${message}`
+					);
+				}
 			}
 		),
 		commands.registerCommand("gatomia.hooks.export", async () => {
@@ -1663,6 +1785,33 @@ function setupFileWatchers(
 			watchers.push(watcher);
 		}
 	}
+
+	// Watch for newly created spec documents to automatically process version/owner
+	const newDocWatcher = workspace.createFileSystemWatcher(
+		"**/specs/**/{spec,plan,tasks}.md"
+	);
+
+	newDocWatcher.onDidCreate(async (uri) => {
+		try {
+			// Import the processor (lazy load to avoid circular dependencies)
+			const { DocumentTemplateProcessor } = await import(
+				"./services/document-template-processor"
+			);
+			const processor = DocumentTemplateProcessor.getInstance(context);
+
+			// Process the new document to inject version and owner
+			await processor.processNewDocument(uri);
+			outputChannel.appendLine(
+				`[Versioning] Auto-processed new document: ${uri.fsPath}`
+			);
+		} catch (error) {
+			outputChannel.appendLine(
+				`[Versioning] Failed to process new document ${uri.fsPath}: ${error}`
+			);
+		}
+	});
+
+	watchers.push(newDocWatcher);
 
 	context.subscriptions.push(...watchers);
 
