@@ -1,0 +1,41 @@
+{
+    "generation_info": {
+        "timestamp": "2026-02-03T16:01:46.608143",
+        "main_model": "deepseek-chat",
+        "generator_version": "1.0.1",
+        "repo_path": "/Users/italo/Projects/italo/gatomia-vscode",
+        "commit_id": null
+    },
+    "statistics": {
+        "total_components": 1627,
+        "leaf_nodes": 169,
+        "max_depth": 4
+    },
+    "files_generated": [
+        "overview.md",
+        "module_tree.json",
+        "first_module_tree.json",
+        "hooks_system.md",
+        "preview_bridge_apis.md",
+        "ui_components.md",
+        "system_overview.md",
+        "specification_management.md",
+        "spec_explorer.md",
+        "preview_system.md",
+        "preview_form_store.md",
+        "dependencies_management.md",
+        "dependencies_view_new.md",
+        "utilities.md",
+        "create_spec_view.md",
+        "ui_view_providers.md",
+        "dependencies_view.md",
+        "ui_infrastructure.md",
+        "welcome_setup.md",
+        "preview_system_new.md",
+        "preview_system_final.md",
+        "preview_quick_start.md",
+        "hooks_view.md",
+        "agents_management.md",
+        "steering_management.md"
+    ]
+}

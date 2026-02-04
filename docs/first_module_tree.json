@@ -1,0 +1,261 @@
+{
+    "hooks_system": {
+        "path": "src/features/hooks",
+        "components": [
+            "src.features.hooks.types.Hook",
+            "src.features.hooks.types.HookExecutionLog",
+            "src.features.hooks.types.AgentActionParams",
+            "src.features.hooks.types.GitActionParams",
+            "src.features.hooks.types.GitHubActionParams",
+            "src.features.hooks.types.MCPActionParams",
+            "src.features.hooks.types.CustomActionParams",
+            "src.features.hooks.types.MCPServer",
+            "src.features.hooks.agent-registry-types.GroupedAgents",
+            "src.features.hooks.agent-discovery-service.IAgentDiscoveryService",
+            "src.features.hooks.template-context-builder.TemplateContextBuilder",
+            "src.features.hooks.services.mcp-contracts.MCPDiscoveryError",
+            "src.features.hooks.actions.custom-action.CustomActionExecutor",
+            "specs.011-custom-agent-hooks.contracts.agent-registry-api.IAgentRegistry",
+            "specs.011-custom-agent-hooks.contracts.agent-registry-api.IAgentDiscoveryService",
+            "specs.011-custom-agent-hooks.contracts.agent-registry-api.IExtensionAgentDiscovery",
+            "specs.011-custom-agent-hooks.contracts.agent-registry-api.IFileAgentDiscovery",
+            "specs.011-custom-agent-hooks.contracts.agent-registry-api.IFileWatcherService",
+            "specs.011-custom-agent-hooks.contracts.agent-registry-api.IExtensionMonitorService",
+            "specs.011-custom-agent-hooks.contracts.agent-registry-api.AgentRegistryError",
+            "specs.011-custom-agent-hooks.contracts.template-variable-schema.ITemplateVariableParser",
+            "specs.011-custom-agent-hooks.contracts.template-variable-schema.ITemplateContextBuilder",
+            "specs.005-mcp-hooks-integration.contracts.mcp-service.IMCPClientService",
+            "specs.005-mcp-hooks-integration.contracts.mcp-service.IMCPExecutionPool",
+            "specs.005-mcp-hooks-integration.contracts.mcp-service.IMCPDiscoveryService",
+            "specs.005-mcp-hooks-integration.contracts.mcp-service.IMCPParameterResolver",
+            "specs.005-mcp-hooks-integration.contracts.mcp-service.MCPParameterValidationError",
+            "specs.005-mcp-hooks-integration.contracts.mcp-service.MCPToolNotFoundError",
+            "specs.005-mcp-hooks-integration.contracts.mcp-service.MCPServerNotFoundError",
+            "specs.005-mcp-hooks-integration.contracts.mcp-service.MCPServerUnavailableError",
+            "specs.005-mcp-hooks-integration.contracts.mcp-service.MCPDiscoveryError",
+            "specs.005-mcp-hooks-integration.contracts.mcp-service.MCPTimeoutError"
+        ],
+        "children": {}
+    },
+    "specification_management": {
+        "path": "src/features/spec",
+        "components": [
+            "src.features.spec.types.CreateSpecInitMessage",
+            "src.features.spec.types.CreateSpecReadyMessage",
+            "src.features.spec.types.CreateSpecSubmitMessage",
+            "src.features.spec.types.CreateSpecSubmitSuccessMessage",
+            "src.features.spec.types.CreateSpecSubmitErrorMessage",
+            "src.features.spec.types.CreateSpecCancelMessage",
+            "src.features.spec.types.CreateSpecCloseAttemptMessage",
+            "src.features.spec.types.CreateSpecConfirmCloseMessage",
+            "src.features.spec.types.CreateSpecAutosaveMessage",
+            "src.features.spec.types.CreateSpecFocusMessage",
+            "src.features.spec.types.CreateSpecExtensionMessage",
+            "src.features.spec.spec-submission-strategy.SpecSubmissionStrategyFactory",
+            "src.features.spec.review-flow.types.Specification",
+            "src.features.spec.review-flow.commands.spec-command-args.SpecCommandArg",
+            "src.features.spec.review-flow.telemetry.ReviewFlowEventType"
+        ],
+        "children": {}
+    },
+    "dependencies_management": {
+        "path": "src/services",
+        "components": [
+            "src.services.dependency-checker.CLIDetectionResult"
+        ],
+        "children": {}
+    },
+    "ui_view_providers": {
+        "path": "src/providers",
+        "components": [
+            "src.providers.hook-view-provider.HookReadyMessage",
+            "src.providers.hook-view-provider.HookListRequestMessage",
+            "src.providers.hook-view-provider.HookCreateMessage",
+            "src.providers.hook-view-provider.HookCreatedMessage",
+            "src.providers.hook-view-provider.HookUpdateMessage",
+            "src.providers.hook-view-provider.HookUpdatedMessage",
+            "src.providers.hook-view-provider.HookDeleteMessage",
+            "src.providers.hook-view-provider.HookDeletedMessage",
+            "src.providers.hook-view-provider.HookToggleMessage",
+            "src.providers.hook-view-provider.HookLogsRequestMessage",
+            "src.providers.hook-view-provider.ExecutionLogsMessage",
+            "src.providers.hook-view-provider.ExecutionStatusMessage",
+            "src.providers.hook-view-provider.ShowLogsPanelMessage",
+            "src.providers.hook-view-provider.AgentListRequestMessage",
+            "src.providers.hook-view-provider.MCPDiscoveryRequestMessage",
+            "src.providers.hook-view-provider.MCPServersMessage",
+            "src.providers.hook-view-provider.MCPErrorMessage",
+            "src.providers.hook-view-provider.HooksSyncMessage",
+            "src.providers.hook-view-provider.ShowFormMessage",
+            "src.providers.hook-view-provider.ErrorMessage",
+            "src.providers.dependencies-view-provider.DependenciesReadyMessage",
+            "src.providers.dependencies-view-provider.DependenciesCheckMessage",
+            "src.providers.dependencies-view-provider.DependenciesCheckOneMessage",
+            "src.providers.dependencies-view-provider.DependenciesStatusMessage",
+            "src.providers.dependencies-view-provider.DependenciesExecuteMessage",
+            "src.providers.dependencies-view-provider.DependenciesCopyMessage",
+            "src.providers.dependencies-view-provider.DependenciesPasteMessage",
+            "src.providers.dependencies-view-provider.DependenciesActionResultMessage",
+            "src.providers.dependencies-view-provider.DependenciesErrorMessage",
+            "src.providers.dependencies-view-provider.DependenciesCheckingMessage",
+            "src.providers.dependencies-view-provider.DependencyUpdatedMessage",
+            "src.providers.copilot-provider.CopilotAvailabilityResult",
+            "src.providers.interactive-view-provider.InteractiveViewProvider",
+            "src.providers.overview-provider.OverviewProvider",
+            "src.providers.simple-view-provider.SimpleViewProvider"
+        ],
+        "children": {}
+    },
+    "preview_system": {
+        "path": "src/features/preview",
+        "components": [
+            "src.types.preview.PreviewWebviewMessage",
+            "ui.src.features.preview.types.PreviewExtensionMessage",
+            "ui.src.features.preview.api.form-bridge.PendingRequest",
+            "ui.src.features.preview.api.refine-bridge.PendingRequest",
+            "ui.src.features.preview.stores.form-store.FormStore",
+            "ui.src.features.preview.stores.preview-store.PreviewStore"
+        ],
+        "children": {}
+    },
+    "welcome_setup": {
+        "path": "src/features/welcome",
+        "components": [
+            "src.types.welcome.WelcomeInitMessage",
+            "src.types.welcome.WelcomeReadyMessage",
+            "src.types.welcome.WelcomeStateMessage",
+            "src.types.welcome.WelcomeScreenState",
+            "src.types.welcome.WelcomeNavigateSectionMessage",
+            "src.types.welcome.WelcomeExecuteCommandMessage",
+            "src.types.welcome.WelcomeOpenExternalMessage",
+            "src.types.welcome.WelcomeInstallDependencyMessage",
+            "src.types.welcome.WelcomeRefreshDependenciesMessage",
+            "src.types.welcome.WelcomeDependencyStatusMessage",
+            "src.types.welcome.WelcomeSearchResourcesMessage",
+            "src.types.welcome.WelcomeUpdateConfigMessage",
+            "src.types.welcome.WelcomeConfigUpdatedMessage",
+            "src.types.welcome.WelcomeUpdatePreferenceMessage",
+            "src.types.welcome.WelcomeDiagnosticAddedMessage",
+            "src.types.welcome.WelcomeErrorMessage",
+            "ui.src.features.welcome.types.WelcomeStore",
+            "ui.src.features.welcome.types.WelcomeStateData",
+            "ui.src.features.welcome.types.WelcomeConfigUpdateData",
+            "ui.src.features.welcome.types.WelcomeDependencyStatusData",
+            "ui.src.features.welcome.types.SetupSectionProps",
+            "ui.src.features.welcome.types.StatusSectionProps",
+            "ui.src.features.welcome.types.FeaturesSectionProps",
+            "ui.src.features.welcome.types.LearningSectionProps",
+            "ui.src.features.welcome.types.ConfigSectionProps"
+        ],
+        "children": {}
+    },
+    "steering_management": {
+        "path": "src/features/steering",
+        "components": [
+            "src.features.steering.types.CreateSteeringWebviewMessage",
+            "src.features.steering.types.CreateSteeringReadyMessage",
+            "src.features.steering.types.CreateSteeringSubmitMessage",
+            "src.features.steering.types.CreateSteeringCancelMessage",
+            "src.features.steering.types.CreateSteeringCloseAttemptMessage",
+            "src.features.steering.types.CreateSteeringAutosaveMessage",
+            "src.features.steering.types.CreateSteeringFieldErrors",
+            "src.features.steering.types.CreateSteeringExtensionMessage",
+            "ui.src.features.create-steering-view.types.CreateSteeringWebviewMessage",
+            "ui.src.features.create-steering-view.types.CreateSteeringFieldErrors"
+        ],
+        "children": {}
+    },
+    "agents_management": {
+        "path": "src/features/agents",
+        "components": [
+            "src.features.agents.resource-cache.ResourceCache",
+            "src.features.agents.types.ValidationResult",
+            "specs.011-custom-agent-hooks.contracts.agent-dropdown-events.BaseMessage",
+            "specs.011-custom-agent-hooks.contracts.agent-dropdown-events.RequestMessage",
+            "specs.011-custom-agent-hooks.contracts.agent-dropdown-events.ResponseMessage",
+            "specs.011-custom-agent-hooks.contracts.agent-dropdown-events.EventMessage",
+            "specs.011-custom-agent-hooks.contracts.agent-dropdown-events.ExtensionEvent",
+            "specs.011-custom-agent-hooks.contracts.agent-dropdown-events.ExtensionResponse",
+            "specs.011-custom-agent-hooks.contracts.agent-dropdown-events.WebviewRequest",
+            "specs.011-custom-agent-hooks.contracts.agent-dropdown-events.GetAgentDetailsRequest",
+            "specs.011-custom-agent-hooks.contracts.agent-dropdown-events.GetAgentDetailsResponse",
+            "specs.011-custom-agent-hooks.contracts.agent-dropdown-events.CheckAgentAvailabilityResponse",
+            "specs.011-custom-agent-hooks.contracts.agent-dropdown-events.RefreshAgentsResponse",
+            "specs.011-custom-agent-hooks.contracts.agent-dropdown-events.RefreshStartedEvent",
+            "specs.011-custom-agent-hooks.contracts.agent-dropdown-events.RefreshCompletedEvent",
+            "specs.011-custom-agent-hooks.contracts.agent-dropdown-events.AgentAvailabilityChangedEvent"
+        ],
+        "children": {}
+    },
+    "ui_components": {
+        "path": "ui/src/components",
+        "components": [
+            "ui.src.components.cli-options.info-tooltip.InfoTooltipProps",
+            "ui.src.components.cli-options.multi-input.MultiInputProps",
+            "ui.src.components.refine.refine-dialog.RefineDialogValues",
+            "ui.src.components.spec-explorer.change-request-form.ChangeRequestFormValues",
+            "ui.src.components.spec-explorer.change-request-form.ExistingChangeRequest",
+            "ui.src.components.spec-explorer.changes-list.ChangesListItem",
+            "ui.src.components.ui.vscode-checkbox.VSCodeCheckboxProps",
+            "ui.src.components.ui.vscode-select.VSCodeSelectProps",
+            "ui.src.features.hooks-view.components.cli-options.copilot-cli-options-panel.CopilotCliOptionsPanelProps",
+            "ui.src.features.hooks-view.components.cli-options.mcp-server-options.McpServerOptionsProps",
+            "ui.src.features.hooks-view.components.cli-options.output-logging-options.OutputLoggingOptionsProps",
+            "ui.src.features.hooks-view.components.cli-options.permission-options.PermissionOptionsProps",
+            "ui.src.features.hooks-view.components.mcp-action-picker.MCPActionPickerProps",
+            "ui.src.features.hooks-view.components.mcp-tools-selector.MCPToolsSelectorProps"
+        ],
+        "children": {}
+    },
+    "hooks_view": {
+        "path": "ui/src/features/hooks-view",
+        "components": [
+            "ui.src.features.hooks-view.types.HooksWebviewMessage",
+            "ui.src.features.hooks-view.types.HooksExtensionMessage",
+            "ui.src.features.hooks-view.types.HookExecutionStatusEntry"
+        ],
+        "children": {}
+    },
+    "dependencies_view": {
+        "path": "ui/src/features/dependencies-view",
+        "components": [
+            "ui.src.features.dependencies-view.types.DependenciesWebviewMessage",
+            "ui.src.features.dependencies-view.types.DependenciesExtensionMessage"
+        ],
+        "children": {}
+    },
+    "create_spec_view": {
+        "path": "ui/src/features/create-spec-view",
+        "components": [
+            "ui.src.features.create-spec-view.types.CreateSpecFieldErrors"
+        ],
+        "children": {}
+    },
+    "spec_explorer": {
+        "path": "ui/src/features/spec-explorer",
+        "components": [
+            "ui.src.services.spec-explorer.SpecExplorerService",
+            "ui.src.stores.spec-explorer-store.SpecExplorerStore"
+        ],
+        "children": {}
+    },
+    "utilities": {
+        "path": "src/utils",
+        "components": [
+            "src.utils.copilot-mcp-utils.MCPConfig",
+            "src.utils.notification-utils.NotificationUtils",
+            "src.utils.telemetry.TelemetryStore",
+            "src.utils.telemetry.PreviewLoadTracker",
+            "src.utils.telemetry.DiagramRenderTracker"
+        ],
+        "children": {}
+    },
+    "ui_infrastructure": {
+        "path": "ui/src",
+        "components": [
+            "ui.src.bridge.vscode.Window",
+            "ui.src.page-registry.SupportedPage"
+        ],
+        "children": {}
+    }
+}
