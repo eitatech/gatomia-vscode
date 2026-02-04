@@ -192,20 +192,21 @@ tests/
 ### Prerequisites
 
 1. **Clone the repository**:
-   ```bash
-   git clone <repo-url>
-   cd copilot-spec-ui
-   ```
+
+```bash
+git clone <repo-url>
+cd copilot-spec-ui
+```
 
 2. **Install dependencies**:
-   ```bash
-   npm run install:all
-   ```
+```bash
+npm run install:all
+```
 
 3. **Checkout feature branch**:
-   ```bash
-   git checkout 001-hooks-module
-   ```
+```bash
+git checkout 001-hooks-module
+```
 
 ### Development Workflow
 
@@ -214,14 +215,14 @@ tests/
 1. **Open project in VS Code**
 
 2. **Build the extension**:
-   ```bash
-   npm run build:ext
-   ```
+```bash
+npm run build:ext
+```
 
 3. **Watch mode** (auto-rebuild on changes):
-   ```bash
-   npm run watch
-   ```
+```bash
+npm run watch
+```
 
 4. **Launch Extension Development Host**:
    - Press `F5` or select "Run > Start Debugging"
@@ -234,14 +235,14 @@ tests/
 #### Webview Development
 
 1. **Build webview**:
-   ```bash
-   npm run build:webview
-   ```
+```bash
+npm run build:webview
+```
 
 2. **Dev server** (hot reload):
-   ```bash
-   npm --prefix ui run dev
-   ```
+```bash
+npm --prefix ui run dev
+```
 
 3. **View in browser** (isolated development):
    - Open `http://localhost:5173`
@@ -290,40 +291,40 @@ npm run lint
 ### Add a New Hook Action Type
 
 1. **Create action class** in `src/features/hooks/actions/`:
-   ```typescript
-   // MyAction.ts
-   export class MyAction implements HookAction {
-       type = 'my-action' as const;
-       
-       constructor(private params: MyActionParams) {}
-       
-       async execute(context: ActionExecutionContext): Promise<void> {
-           // Implementation
-       }
-   }
-   ```
+```typescript
+// MyAction.ts
+export class MyAction implements HookAction {
+    type = 'my-action' as const;
+    
+    constructor(private params: MyActionParams) {}
+    
+    async execute(context: ActionExecutionContext): Promise<void> {
+        // Implementation
+    }
+}
+```
 
 2. **Update types** in `src/features/hooks/types.ts`:
-   ```typescript
-   type ActionType = 'agent' | 'git' | 'github' | 'custom' | 'my-action';
-   
-   interface MyActionParams {
-       // Parameters
-   }
-   ```
+```typescript
+type ActionType = 'agent' | 'git' | 'github' | 'custom' | 'my-action';
+
+interface MyActionParams {
+    // Parameters
+}
+```
 
 3. **Update executor** in `HookExecutor.ts`:
-   ```typescript
-   async executeHook(hook: Hook, context?: ExecutionContext): Promise<ExecutionResult> {
-       // ...
-       switch (hook.action.type) {
-           case 'my-action':
-               await this.executeMyAction(hook.action.parameters);
-               break;
-           // ...
-       }
-   }
-   ```
+```typescript
+async executeHook(hook: Hook, context?: ExecutionContext): Promise<ExecutionResult> {
+    // ...
+    switch (hook.action.type) {
+        case 'my-action':
+            await this.executeMyAction(hook.action.parameters);
+            break;
+        // ...
+    }
+}
+```
 
 4. **Update webview** form in `hook-form.tsx`:
    - Add action type option to dropdown
@@ -335,47 +336,47 @@ npm run lint
 1. **Identify trigger location** (e.g., new SpecKit command)
 
 2. **Fire trigger** after operation completes:
-   ```typescript
-   // In SpecManager or command handler
-   async handleMyOperation(): Promise<void> {
-       await performOperation();
-       this.triggerRegistry.fireTrigger('speckit', 'my-operation');
-   }
-   ```
+```typescript
+// In SpecManager or command handler
+async handleMyOperation(): Promise<void> {
+    await performOperation();
+    this.triggerRegistry.fireTrigger('speckit', 'my-operation');
+}
+```
 
 3. **Update types**:
-   ```typescript
-   type OperationType = 
-       | 'specify'
-       | 'clarify'
-       | 'plan'
-       | 'analyze'
-       | 'checklist'
-       | 'my-operation';  // NEW
-   ```
+```typescript
+type OperationType = 
+    | 'specify'
+    | 'clarify'
+    | 'plan'
+    | 'analyze'
+    | 'checklist'
+    | 'my-operation';  // NEW
+```
 
 4. **Update webview** form with new trigger option
 
 ### Debug a Hook Execution Issue
 
 1. **Enable debug logging**:
-   ```typescript
-   // In HookExecutor
-   this.outputChannel.appendLine(`Executing hook: ${hook.name}`);
-   this.outputChannel.appendLine(`Context: ${JSON.stringify(context)}`);
-   ```
+```typescript
+// In HookExecutor
+this.outputChannel.appendLine(`Executing hook: ${hook.name}`);
+this.outputChannel.appendLine(`Context: ${JSON.stringify(context)}`);
+```
 
 2. **Check execution logs**:
-   ```typescript
-   const logs = hookExecutor.getExecutionLogsForHook(hookId);
-   console.log('Execution history:', logs);
-   ```
+```typescript
+const logs = hookExecutor.getExecutionLogsForHook(hookId);
+console.log('Execution history:', logs);
+```
 
 3. **View trigger history**:
-   ```typescript
-   const triggers = triggerRegistry.getTriggerHistory();
-   console.log('Recent triggers:', triggers);
-   ```
+```typescript
+const triggers = triggerRegistry.getTriggerHistory();
+console.log('Recent triggers:', triggers);
+```
 
 4. **Check Output panel**:
    - Open "GatomIA - Debug" output channel

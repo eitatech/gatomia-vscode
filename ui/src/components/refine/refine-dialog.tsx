@@ -14,7 +14,7 @@ interface RefineDialogProps {
 	sections: Array<{ id: string; title: string }>;
 	onSubmit: (values: RefineDialogValues) => Promise<void>;
 	onSubmitted?: () => void;
-	triggerLabel?: string;
+	triggerLabel?: React.ReactNode;
 }
 
 const ISSUE_TYPE_OPTIONS: Array<{

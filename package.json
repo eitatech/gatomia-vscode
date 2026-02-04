@@ -2,7 +2,7 @@
   "name": "gatomia",
   "displayName": "GatomIA",
   "description": "Agentic Spec-Driven Development Toolkit",
-  "version": "0.32.0",
+  "version": "0.33.0",
   "license": "MIT",
   "author": "Italo A. G.",
   "publisher": "EITA",
@@ -75,6 +75,11 @@
           "type": "boolean",
           "default": true,
           "description": "Controls visibility of the Quick Access view in the activity bar."
+        },
+        "gatomia.views.wiki.visible": {
+          "type": "boolean",
+          "default": true,
+          "description": "Controls visibility of the Repo Wiki view in the activity bar."
         },
         "gatomia.copilot.specsPath": {
           "type": "string",
@@ -236,6 +241,12 @@
           "name": "Quick Access",
           "icon": "zap",
           "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.quickAccess.visible"
+        },
+        {
+          "id": "gatomia.views.wikiExplorer",
+          "name": "Repo Wiki",
+          "icon": "book",
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.wiki.visible"
         }
       ]
     },
@@ -255,6 +266,10 @@
       {
         "view": "gatomia.views.hooksExplorer",
         "contents": "Automate SpecKit/OpenSpec workflows with triggers and actions.\n\n[$(plus) Add Hook](command:gatomia.hooks.addHook)\n[$(eye) View Hook Logs](command:gatomia.hooks.viewLogs)\n[$(refresh) Refresh](command:gatomia.hooks.refresh)"
+      },
+      {
+        "view": "gatomia.views.wikiExplorer",
+        "contents": "Browse and manage documentation from the docs/ directory.\n\n[$(refresh) Refresh](command:gatomia.wiki.refresh)"
       }
     ],
     "commands": [
@@ -409,25 +424,25 @@
       },
       {
         "command": "gatomia.actions.create",
-        "title": "Create Action",
+        "title": "Create Prompt",
         "category": "GatomIA",
         "icon": "$(plus)"
       },
       {
         "command": "gatomia.actions.createAgentFile",
-        "title": "New Agent File",
+        "title": "Create Agent",
         "category": "GatomIA",
         "icon": "$(robot)"
       },
       {
-        "command": "gatomia.actions.createInstructions",
-        "title": "New Instructions File",
+        "command": "gatomia.actions.createSkill",
+        "title": "Create Skill",
         "category": "GatomIA",
-        "icon": "$(book)"
+        "icon": "$(tools)"
       },
       {
         "command": "gatomia.actions.createCopilotPrompt",
-        "title": "New Prompt File",
+        "title": "Create Prompt (Built-in)",
         "category": "GatomIA",
         "icon": "$(sparkle)"
       },
@@ -484,6 +499,36 @@
         "title": "Install Dependencies",
         "category": "GatomIA",
         "icon": "$(desktop-download)"
+      },
+      {
+        "command": "gatomia.wiki.refresh",
+        "title": "Refresh Repo Wiki",
+        "category": "GatomIA",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gatomia.wiki.open",
+        "title": "Open Document",
+        "category": "GatomIA",
+        "icon": "$(file-text)"
+      },
+      {
+        "command": "gatomia.wiki.update",
+        "title": "Update Document",
+        "category": "GatomIA",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "gatomia.wiki.updateAll",
+        "title": "Synchronize All Documents",
+        "category": "GatomIA",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "gatomia.wiki.showToc",
+        "title": "Show Table of Contents",
+        "category": "GatomIA",
+        "icon": "$(list-unordered)"
       },
       {
         "command": "gatomia.showWelcome",
@@ -623,7 +668,7 @@
           "group": "navigation@1"
         },
         {
-          "command": "gatomia.actions.createInstructions",
+          "command": "gatomia.actions.createSkill",
           "when": "view == gatomia.views.actionsExplorer",
           "group": "navigation@2"
         },
@@ -661,6 +706,16 @@
           "command": "gatomia.hooks.import",
           "when": "view == gatomia.views.hooksExplorer",
           "group": "navigation@5"
+        },
+        {
+          "command": "gatomia.wiki.refresh",
+          "when": "view == gatomia.views.wikiExplorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gatomia.wiki.updateAll",
+          "when": "view == gatomia.views.wikiExplorer",
+          "group": "navigation@2"
         },
         {
           "command": "gatomia.settings.openGlobalConfig",

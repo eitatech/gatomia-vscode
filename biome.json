@@ -20,7 +20,8 @@
       "!.codex/**/*",
       "!.vscode/**/*",
       "!.agent_work/**/*",
-      "!specs/**/*"
+      "!specs/**/*",
+      "!references/**/*"
     ],
     "ignoreUnknown": false
   },

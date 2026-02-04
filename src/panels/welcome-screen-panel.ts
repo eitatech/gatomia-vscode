@@ -22,7 +22,6 @@ export interface WelcomeScreenPanelCallbacks {
 	onReady?: () => Promise<void> | void;
 	onExecuteCommand?: (
 		commandId: string,
-		panel: WelcomeScreenPanel,
 		args?: unknown[]
 	) => Promise<void> | void;
 	onUpdateConfig?: (
@@ -242,7 +241,6 @@ export class WelcomeScreenPanel {
 			case "welcome/execute-command":
 				await this.callbacks.onExecuteCommand?.(
 					message.commandId,
-					this,
 					message.args
 				);
 				return;

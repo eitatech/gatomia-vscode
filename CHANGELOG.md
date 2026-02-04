@@ -2,6 +2,347 @@
 
 ---
 
+## v0.33.0 2026-02-04
+
+### Added
+
+- allow rich text labels in Mermaid diagrams by setting security level to antiscript and expanding DOMPurify allowed tags and attributes.
+- Update RefineDialog triggerLabel to accept ReactNode, replace text buttons with icons, and move document metadata to footer.
+- update preview UI with icon buttons and footer metadata, and allow React nodes for refine dialog trigger.
+- Introduce YAML frontmatter parsing, a Wiki Explorer provider, and Mermaid diagram rendering in the preview.
+- Introduce Gatomia AI skill with associated scripts, agents, and comprehensive documentation for the Hooks Automation Platform.
+
+### Changed
+
+- Potential fix for code scanning alert no. 2: DOM text reinterpreted as HTML
+
+### Release Info
+
+- **Source Branch**: `feature/repo-wiki`
+- **Release Type**: minor
+
+---
+
+
+## v0.32.2 2026-01-30
+
+### Fixed
+
+- update Copilot and VS Code guidelines, rename actions, and enhance feature actions
+
+### Release Info
+
+- **Source Branch**: `fix/minor-issues`
+- **Release Type**: patch
+
+---
+
+
+## v0.32.1 2026-01-29
+
+### Added
+
+- implement automatic MCP config path detection for multiple IDEs; add testing guide and comprehensive tests
+- implement automatic MCP config path detection for multiple IDEs; add testing guide and comprehensive tests
+- add model execution, output logging, permission, and session configuration options components
+- add model execution, output logging, permission, and session configuration options components
+- Add GitHub Copilot CLI options and refactor command argument construction
+- Add GitHub Copilot CLI options and refactor command argument construction
+- Enhance trigger timing and output capture functionality
+- Enhance trigger timing and output capture functionality
+- enhance custom agent hooks UI with template variables
+- enhance custom agent hooks UI with template variables
+- implement LOCAL and BACKGROUND agent execution
+- implement LOCAL and BACKGROUND agent execution
+- add Phase 6-9 test suites and extension monitor
+- add Phase 6-9 test suites and extension monitor
+- complete Phase 8 - agent availability & error handling
+- complete Phase 8 - agent availability & error handling
+- implement extension agent discovery (Phase 7, User Story 4)
+- implement extension agent discovery (Phase 7, User Story 4)
+- implement agent type selection (Phase 5, User Story 2)
+- implement agent type selection (Phase 5, User Story 2)
+- Add agents and skills paths to config tests and refactor steering explorer instruction group context values and labels.
+- Add agents and skills paths to config tests and refactor steering explorer instruction group context values and labels.
+- Implement Actions Explorer to manage various action types, replacing the Prompts Explorer, and introduce GatomIA project guidelines.
+- Implement Actions Explorer to manage various action types, replacing the Prompts Explorer, and introduce GatomIA project guidelines.
+- Implement auto-review transition and enhance spec management commands
+- Implement auto-review transition and enhance spec management commands
+- rename specs
+- rename specs
+- rename specs
+- rename specs
+- Implement Welcome Screen with Zustand state management and VS Code integration
+- Implement Welcome Screen with Zustand state management and VS Code integration
+- add continuous delivery workflow
+- add continuous delivery workflow
+- spec review flow
+- spec review flow
+- spec review flow
+- spec review flow
+- spec review flow
+- spec review flow
+- spec review
+- spec review
+- spec review flow
+- spec review flow
+- spec review flow
+- spec review flow
+- spec review flow
+- spec review flow
+- spec review flow
+- spec review flow
+- specification review flow
+- specification review flow
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- document preview
+- refactoring to use koog and embabel
+- refactoring to use koog and embabel
+- implement "New Agent File" command and menu integration
+- update SVG icon design for improved visual clarity
+- add rename functionality for prompts in the explorer view
+- add support for project instructions label in prompts explorer
+- enhance PromptsExplorerProvider to include project instructions group and update related tests
+- reorder sidebar views in Spec and Prompts Explorers
+- add support for custom instructions in prompts for GitHub Copilot integration
+
+### Fixed
+
+- resolve 13 pre-existing test failures in hooks tests
+- resolve 13 pre-existing test failures in hooks tests
+- update template expansion to use $variableName syntax
+- update template expansion to use $variableName syntax
+- send agent list directly to webview bypassing ready check
+- send agent list directly to webview bypassing ready check
+- use workspace.workspaceFolders for agent directory path
+- use workspace.workspaceFolders for agent directory path
+- remove AgentRegistry dependency from HookViewProvider
+- remove AgentRegistry dependency from HookViewProvider
+- remove AgentRegistry dependency from extension initialization
+- remove AgentRegistry dependency from extension initialization
+- load agents from .github/agents/*.agent.md files directly
+- load agents from .github/agents/*.agent.md files directly
+- correct agent list request command name
+- correct agent list request command name
+- resolve postMessage error in agent dropdown
+- resolve postMessage error in agent dropdown
+- audit issues in ui
+- audit issues in ui
+- audit issues
+- audit issues
+- polished about, experience and contact section
+- polished about, experience and contact section
+- skills and update
+- skills and update
+- skills and update
+- skills and update
+- constitution updated
+- constitution updated
+- constitution updated
+- constitution updated
+- constitution updated
+- constitution updated
+- spec review flow
+- spec review flow
+- spec review flow
+- spec review flow
+- spec review flow
+- spec review flow
+- remove vscode
+- remove vscode
+- Comment out header actions in Welcome Screen for future implementation
+- Comment out header actions in Welcome Screen for future implementation
+- change docs and structure
+- change docs and structure
+- version number
+- version number
+- readme info error about the extension
+- readme info error about the extension
+- readme info error about the extension
+- readme info error about the extension
+- update prompt and steering explorer descriptions for clarity
+
+### Changed
+
+- refactor: enhance hook validation and error handling; update tests for hook creation and agent discovery
+- refactor: enhance hook validation and error handling; update tests for hook creation and agent discovery
+- add agent names to example agents and update GitHub MCP references to GitHub Tools
+- add agent names to example agents and update GitHub MCP references to GitHub Tools
+- fix dependencies
+- fix dependencies
+- fix dependencies
+- fix dependencies
+- Implement feature X to enhance user experience and optimize performance
+- Implement feature X to enhance user experience and optimize performance
+- docs: add manual testing guide for custom agent hooks UI
+- docs: add manual testing guide for custom agent hooks UI
+- refactor: reduce buildTemplateContext complexity and fix template edge cases
+- refactor: reduce buildTemplateContext complexity and fix template edge cases
+- chore: update project documentation and code for Phase 8/9 integration
+- chore: update project documentation and code for Phase 8/9 integration
+- docs(hooks): complete final Phase 9 tasks (T089-T094) - ALL PHASES COMPLETE
+- docs(hooks): complete final Phase 9 tasks (T089-T094) - ALL PHASES COMPLETE
+- docs(hooks): complete Phase 9 polish tasks (T085-T089, T092-T093)
+- docs(hooks): complete Phase 9 polish tasks (T085-T089, T092-T093)
+- docs: mark Phase 5 (User Story 2) tasks as complete
+- docs: mark Phase 5 (User Story 2) tasks as complete
+- Update gray-matter resolved URL to npm registry
+- Update gray-matter resolved URL to npm registry
+- refactor: extract SteeringExplorerProvider child item generation into dedicated methods and remove prompts explorer test file.
+- refactor: extract SteeringExplorerProvider child item generation into dedicated methods and remove prompts explorer test file.
+- Add integration and unit tests for resource loading, settings change listener, and agent service
+- Add integration and unit tests for resource loading, settings change listener, and agent service
+- Simplifies unit tests by removing unnecessary async logic
+- Simplifies unit tests by removing unnecessary async logic
+- Implement real MCP server discovery and UI tool selection
+- Implement real MCP server discovery and UI tool selection
+- add new brand logo
+- add new brand logo
+- Adds robust instruction rule system and streamlines Steering UI
+- Adds robust instruction rule system and streamlines Steering UI
+- Adds project/user instruction rule creation and constitution support
+- Adds project/user instruction rule creation and constitution support
+- add some agentes to github copilot
+- add some agentes to github copilot
+- Establishes comprehensive development and agent guidelines
+- Establishes comprehensive development and agent guidelines
+- Update zustand package source URL
+- Update zustand package source URL
+- Removes redundant English version marker
+- Removes redundant English version marker
+- fix issues
+- fix issues
+- Change GITHUB_TOKEN to EITA_PAT_TOKEN in workflow
+- Change GITHUB_TOKEN to EITA_PAT_TOKEN in workflow
+- fix issues
+- fix issues
+- Update Open VSX token secret reference
+- Update Open VSX token secret reference
+- Update README.md
+- Update README.md
+- Update package.json
+- Update package.json
+- add .envrc to .gitignore
+- add .envrc to .gitignore
+- fix linter erros
+- fix linter erros
+- focuses on improving test reliability and stability by replacing random values with deterministic calculations in performance and unit tests. It addresses flaky test issues by ensuring consistent, predictable behavior across test runs
+- -S
+- enhances the markdown preview functionality in the webview UI by adding syntax highlighting for code blocks and making minor UI refinements. It integrates highlight.js for better code readability in rendered markdown documents.
+- -S
+- introduces comprehensive checklist support to the spec explorer, enabling users to view, track, and navigate checklist items within spec features. It adds parsing utilities, UI enhancements, and integration with the existing task status system
+- -S
+- is a minor code quality improvement in the webview UI, focusing on refactoring regex patterns used for HTML processing in the document preview feature. It extracts hardcoded regular expressions into named constants for better maintainability and readability
+- -S
+- focuses on enhancing the document preview functionality in the webview UI, specifically improving markdown rendering and styling for better readability and visual consistency. It introduces support for formatted text in document outlines and sections, with comprehensive CSS updates to handle inline code, code blocks, and text emphasis
+- -S
+- Change project title to Spec-Driven Development Tool
+- Change project title to Spec-Driven Development Tool
+- milestone in the gatomia-vscode repository, focusing on MCP hooks integration, repository modernization, and infrastructure updates. It introduces comprehensive automation capabilities while refactoring core documentation and workflow
+- -S
+- refactors SpecKit spec creation to use the agent-based workflow and removes outdated spec files
+- fxies
+- docs: Mark PR preparation complete - all checklists finalized
+- docs: Mark PR preparation complete - all checklists finalized
+- docs: Mark all remaining tasks complete - implementation fully done
+- docs: Mark all remaining tasks complete - implementation fully done
+- docs: Mark T030 complete - Error case testing successful
+- docs: Mark T030 complete - Error case testing successful
+- docs: Mark T029 complete - OpenSpec regression testing successful
+- docs: Mark T029 complete - OpenSpec regression testing successful
+- docs: Mark final verification complete - implementation ready for PR
+- docs: Mark final verification complete - implementation ready for PR
+- cleanup: Remove unused 002-mcp-support spec files
+- cleanup: Remove unused 002-mcp-support spec files
+- docs: Mark manual testing complete - SpecKit deletion works perfectly
+- docs: Mark manual testing complete - SpecKit deletion works perfectly
+- docs: Mark T027 complete - created test SpecKit spec for manual testing
+- docs: Mark T027 complete - created test SpecKit spec for manual testing
+- docs: Mark implementation checklist items complete (T026)
+- docs: Mark implementation checklist items complete (T026)
+- docs: Mark T026 complete - complexity verification passed
+- docs: Mark T026 complete - complexity verification passed
+- Fix: Implement system-aware delete for SpecKit and OpenSpec specs with confirmation dialog
+- Fix: Implement system-aware delete for SpecKit and OpenSpec specs with confirmation dialog
+- enhances the hooks system with custom agent invocation and improves task status visualization across the extension UI
+- fix
+- introduces comprehensive GitHub integration and dependency management capabilities to the hooks system and extension
+- -S
+- Performs a major rebranding and modernization of the extension from "ALMA" to "GatomIA", along with significant updates to project structure, dependencies and documentation
+- -S
+- commit adds new icon assets for the Gatomia extension, providing multiple icon variants in both PNG and SVG formats
+- -S
+- performs repository maintenance and modernization by updating guidelines, improving code quality tooling, and cleaning up assets
+- -S
+- simplifies the Husky pre-commit hook by removing unnecessary boilerplate and streamlining the code quality enforcement process:
+- -S
+- introduces two new Spec-Kit agents to enhance the spec-driven development workflow with advanced analysis and quality assurance capabilities
+- -S
+- makes a targeted clarification to the OpenSpec proposal workflow by adding a clear instruction to prevent premature code implementation
+- -S
+- Revise README for Spec Kit and OpenSpec naming
+- Revise README for Spec Kit and OpenSpec naming
+- Revise Spec-Kit installation steps in README
+- Revise Spec-Kit installation steps in README
+- Revise Spec-Kit and OpenSpec installation steps
+- Revise Spec-Kit and OpenSpec installation steps
+- Introduces comprehensive Spec-Kit support to the ALMA extension, implementing the core workflow components for Spec-Kit-based spec-driven development
+- -S
+- Implements Spec-Kit migration functionality along with configuration improvements and test coverage enhancements
+- -S
+- Major Rebranding and Spec-Kit Integration
+- -S
+- speckit minor bugs fixes
+- -S
+- speckit update installation steps
+- -S
+- speckit update installation steps
+- docs: add "New Agent File" button to Prompts view with command integration and ordering
+- docs: add "New Agent File" button to Prompts view with command integration
+- chore: update screenshot images
+- chore: update icon image
+- docs: add Project Agents group and rename functionality in Prompts explorer
+- docs: add Project Agents group and rename functionality in Prompts explorer
+- docs: add project instructions display in Prompts view with separate grouping
+- docs: add design, proposal, spec, and tasks for displaying project instructions in Prompts view
+- docs: add display order requirements for Spec and Prompts Explorers
+- docs: add proposal and requirements for reordering sidebar views in Spec and Prompts Explorers
+- test: add custom instructions structure to ConfigManager tests
+- docs: implement custom prompt instructions injection for GitHub Copilot integration
+- docs: add support for custom prompt instructions in GitHub Copilot integration
+
+### Release Info
+
+- **Source Branch**: `fix/minor-interface-bugs`
+- **Release Type**: patch
+
+---
+
+
 ## v0.33.0 2026-01-29
 
 ### Added
