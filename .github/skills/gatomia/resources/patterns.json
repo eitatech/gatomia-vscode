@@ -1,280 +1,146 @@
 {
-    "patterns": {
-        "architectural": {
-            "mvc": {
-                "name": "Model-View-Controller",
-                "indicators": [
-                    "Model",
-                    "View",
-                    "Controller",
-                    "Handler"
-                ],
-                "description": "Separates data, presentation, and control logic"
-            },
-            "layered": {
-                "name": "Layered Architecture",
-                "indicators": [
-                    "Repository",
-                    "Service",
-                    "Controller",
-                    "Entity"
-                ],
-                "description": "Organizes code into horizontal layers with clear responsibilities"
-            },
-            "microservices": {
-                "name": "Microservices",
-                "indicators": [
-                    "Service",
-                    "Gateway",
-                    "Client",
-                    "API"
-                ],
-                "description": "Distributes functionality across independent services"
-            },
-            "hexagonal": {
-                "name": "Hexagonal/Ports and Adapters",
-                "indicators": [
-                    "Port",
-                    "Adapter",
-                    "UseCase",
-                    "Domain"
-                ],
-                "description": "Isolates core domain from external concerns"
-            }
-        },
-        "design": {
-            "singleton": {
-                "name": "Singleton",
-                "indicators": [
-                    "getInstance",
-                    "_instance",
-                    "instance"
-                ],
-                "description": "Ensures a class has only one instance"
-            },
-            "factory": {
-                "name": "Factory",
-                "indicators": [
-                    "Factory",
-                    "create",
-                    "build",
-                    "make"
-                ],
-                "description": "Creates objects without specifying exact class"
-            },
-            "builder": {
-                "name": "Builder",
-                "indicators": [
-                    "Builder",
-                    "with",
-                    "build"
-                ],
-                "description": "Constructs complex objects step by step"
-            },
-            "observer": {
-                "name": "Observer",
-                "indicators": [
-                    "Observer",
-                    "Listener",
-                    "Event",
-                    "notify",
-                    "subscribe"
-                ],
-                "description": "Notifies dependents of state changes"
-            },
-            "strategy": {
-                "name": "Strategy",
-                "indicators": [
-                    "Strategy",
-                    "Policy",
-                    "Algorithm"
-                ],
-                "description": "Encapsulates interchangeable behaviors"
-            },
-            "decorator": {
-                "name": "Decorator",
-                "indicators": [
-                    "Decorator",
-                    "Wrapper",
-                    "wrap"
-                ],
-                "description": "Adds behavior to objects dynamically"
-            },
-            "adapter": {
-                "name": "Adapter",
-                "indicators": [
-                    "Adapter",
-                    "Wrapper",
-                    "Converter"
-                ],
-                "description": "Converts interface of a class to another"
-            },
-            "repository": {
-                "name": "Repository",
-                "indicators": [
-                    "Repository",
-                    "Dao",
-                    "Store",
-                    "Persistence"
-                ],
-                "description": "Abstracts data access logic"
-            }
-        }
+  "patterns": {
+    "architectural": {
+      "mvc": {
+        "name": "Model-View-Controller",
+        "indicators": ["Model", "View", "Controller", "Handler"],
+        "description": "Separates data, presentation, and control logic"
+      },
+      "layered": {
+        "name": "Layered Architecture",
+        "indicators": ["Repository", "Service", "Controller", "Entity"],
+        "description": "Organizes code into horizontal layers with clear responsibilities"
+      },
+      "microservices": {
+        "name": "Microservices",
+        "indicators": ["Service", "Gateway", "Client", "API"],
+        "description": "Distributes functionality across independent services"
+      },
+      "hexagonal": {
+        "name": "Hexagonal/Ports and Adapters",
+        "indicators": ["Port", "Adapter", "UseCase", "Domain"],
+        "description": "Isolates core domain from external concerns"
+      }
     },
-    "component_roles": {
-        "manager": {
-            "description": "Manages lifecycle and resources",
-            "typical_suffixes": [
-                "Manager",
-                "Handler",
-                "Controller"
-            ]
-        },
-        "service": {
-            "description": "Provides business logic and operations",
-            "typical_suffixes": [
-                "Service",
-                "Provider",
-                "Facade"
-            ]
-        },
-        "generator": {
-            "description": "Creates or constructs objects/data",
-            "typical_suffixes": [
-                "Generator",
-                "Builder",
-                "Factory",
-                "Creator"
-            ]
-        },
-        "analyzer": {
-            "description": "Analyzes or transforms data",
-            "typical_suffixes": [
-                "Analyzer",
-                "Parser",
-                "Processor",
-                "Transformer"
-            ]
-        },
-        "model": {
-            "description": "Represents data structure or entity",
-            "typical_suffixes": [
-                "Model",
-                "Entity",
-                "DTO",
-                "Schema",
-                "Type"
-            ]
-        },
-        "utility": {
-            "description": "Provides helper functions",
-            "typical_suffixes": [
-                "Utils",
-                "Helper",
-                "Tools",
-                "Common"
-            ]
-        },
-        "configuration": {
-            "description": "Manages configuration settings",
-            "typical_suffixes": [
-                "Config",
-                "Settings",
-                "Options",
-                "Preferences"
-            ]
-        },
-        "adapter": {
-            "description": "Adapts or wraps external interfaces",
-            "typical_suffixes": [
-                "Adapter",
-                "Wrapper",
-                "Bridge",
-                "Gateway"
-            ]
-        }
-    },
-    "language_conventions": {
-        "python": {
-            "file_extension": ".py",
-            "naming_style": "snake_case",
-            "class_style": "PascalCase",
-            "package_manifest": [
-                "setup.py",
-                "pyproject.toml",
-                "requirements.txt"
-            ]
-        },
-        "java": {
-            "file_extension": ".java",
-            "naming_style": "camelCase",
-            "class_style": "PascalCase",
-            "package_manifest": [
-                "pom.xml",
-                "build.gradle",
-                "build.gradle.kts"
-            ]
-        },
-        "javascript": {
-            "file_extension": [
-                ".js",
-                ".jsx",
-                ".mjs",
-                ".cjs"
-            ],
-            "naming_style": "camelCase",
-            "class_style": "PascalCase",
-            "package_manifest": [
-                "package.json"
-            ]
-        },
-        "typescript": {
-            "file_extension": [
-                ".ts",
-                ".tsx"
-            ],
-            "naming_style": "camelCase",
-            "class_style": "PascalCase",
-            "package_manifest": [
-                "package.json",
-                "tsconfig.json"
-            ]
-        },
-        "csharp": {
-            "file_extension": ".cs",
-            "naming_style": "PascalCase",
-            "class_style": "PascalCase",
-            "package_manifest": [
-                ".csproj",
-                ".sln"
-            ]
-        },
-        "cpp": {
-            "file_extension": [
-                ".cpp",
-                ".hpp",
-                ".cc",
-                ".cxx",
-                ".h"
-            ],
-            "naming_style": "snake_case",
-            "class_style": "PascalCase",
-            "package_manifest": [
-                "CMakeLists.txt",
-                "Makefile"
-            ]
-        },
-        "c": {
-            "file_extension": [
-                ".c",
-                ".h"
-            ],
-            "naming_style": "snake_case",
-            "class_style": "N/A",
-            "package_manifest": [
-                "CMakeLists.txt",
-                "Makefile"
-            ]
-        }
+    "design": {
+      "singleton": {
+        "name": "Singleton",
+        "indicators": ["getInstance", "_instance", "instance"],
+        "description": "Ensures a class has only one instance"
+      },
+      "factory": {
+        "name": "Factory",
+        "indicators": ["Factory", "create", "build", "make"],
+        "description": "Creates objects without specifying exact class"
+      },
+      "builder": {
+        "name": "Builder",
+        "indicators": ["Builder", "with", "build"],
+        "description": "Constructs complex objects step by step"
+      },
+      "observer": {
+        "name": "Observer",
+        "indicators": ["Observer", "Listener", "Event", "notify", "subscribe"],
+        "description": "Notifies dependents of state changes"
+      },
+      "strategy": {
+        "name": "Strategy",
+        "indicators": ["Strategy", "Policy", "Algorithm"],
+        "description": "Encapsulates interchangeable behaviors"
+      },
+      "decorator": {
+        "name": "Decorator",
+        "indicators": ["Decorator", "Wrapper", "wrap"],
+        "description": "Adds behavior to objects dynamically"
+      },
+      "adapter": {
+        "name": "Adapter",
+        "indicators": ["Adapter", "Wrapper", "Converter"],
+        "description": "Converts interface of a class to another"
+      },
+      "repository": {
+        "name": "Repository",
+        "indicators": ["Repository", "Dao", "Store", "Persistence"],
+        "description": "Abstracts data access logic"
+      }
     }
+  },
+  "component_roles": {
+    "manager": {
+      "description": "Manages lifecycle and resources",
+      "typical_suffixes": ["Manager", "Handler", "Controller"]
+    },
+    "service": {
+      "description": "Provides business logic and operations",
+      "typical_suffixes": ["Service", "Provider", "Facade"]
+    },
+    "generator": {
+      "description": "Creates or constructs objects/data",
+      "typical_suffixes": ["Generator", "Builder", "Factory", "Creator"]
+    },
+    "analyzer": {
+      "description": "Analyzes or transforms data",
+      "typical_suffixes": ["Analyzer", "Parser", "Processor", "Transformer"]
+    },
+    "model": {
+      "description": "Represents data structure or entity",
+      "typical_suffixes": ["Model", "Entity", "DTO", "Schema", "Type"]
+    },
+    "utility": {
+      "description": "Provides helper functions",
+      "typical_suffixes": ["Utils", "Helper", "Tools", "Common"]
+    },
+    "configuration": {
+      "description": "Manages configuration settings",
+      "typical_suffixes": ["Config", "Settings", "Options", "Preferences"]
+    },
+    "adapter": {
+      "description": "Adapts or wraps external interfaces",
+      "typical_suffixes": ["Adapter", "Wrapper", "Bridge", "Gateway"]
+    }
+  },
+  "language_conventions": {
+    "python": {
+      "file_extension": ".py",
+      "naming_style": "snake_case",
+      "class_style": "PascalCase",
+      "package_manifest": ["setup.py", "pyproject.toml", "requirements.txt"]
+    },
+    "java": {
+      "file_extension": ".java",
+      "naming_style": "camelCase",
+      "class_style": "PascalCase",
+      "package_manifest": ["pom.xml", "build.gradle", "build.gradle.kts"]
+    },
+    "javascript": {
+      "file_extension": [".js", ".jsx", ".mjs", ".cjs"],
+      "naming_style": "camelCase",
+      "class_style": "PascalCase",
+      "package_manifest": ["package.json"]
+    },
+    "typescript": {
+      "file_extension": [".ts", ".tsx"],
+      "naming_style": "camelCase",
+      "class_style": "PascalCase",
+      "package_manifest": ["package.json", "tsconfig.json"]
+    },
+    "csharp": {
+      "file_extension": ".cs",
+      "naming_style": "PascalCase",
+      "class_style": "PascalCase",
+      "package_manifest": [".csproj", ".sln"]
+    },
+    "cpp": {
+      "file_extension": [".cpp", ".hpp", ".cc", ".cxx", ".h"],
+      "naming_style": "snake_case",
+      "class_style": "PascalCase",
+      "package_manifest": ["CMakeLists.txt", "Makefile"]
+    },
+    "c": {
+      "file_extension": [".c", ".h"],
+      "naming_style": "snake_case",
+      "class_style": "N/A",
+      "package_manifest": ["CMakeLists.txt", "Makefile"]
+    }
+  }
 }

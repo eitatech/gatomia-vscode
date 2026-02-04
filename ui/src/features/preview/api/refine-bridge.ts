@@ -8,6 +8,8 @@ export interface SubmitRefinementInput {
 	sectionRef?: string;
 	issueType: PreviewRefinementIssueType;
 	description: string;
+	actionType?: string;
+	changedDependencies?: { documentId: string; documentType: string }[];
 }
 
 export interface SubmitRefinementResult {

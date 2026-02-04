@@ -1,10 +1,10 @@
-```yaml
 ---
 name: gatomia-vscode
 description: A VS Code extension for AI-assisted software development with automation hooks, specification management, and agent orchestration.
 author: Italo A. G.
 version: v0.32.1-2-g5a4ac1b
 ---
+
 # Gatomia Vscode
 
 ## Overview
