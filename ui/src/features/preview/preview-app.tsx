@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { MessageSquarePlus, Pencil } from "lucide-react";
 import { useSyncExternalStore } from "react";
+import { createRoot } from "react-dom/client";
+import mermaid from "mermaid";
 import { vscode } from "@/bridge/vscode";
 import { renderPreviewMarkdown } from "@/lib/markdown/preview-renderer";
 import { toFriendlyName } from "@/lib/document-title-utils";
 import { DocumentOutline } from "@/components/preview/document-outline";
+import { MermaidViewer } from "@/components/preview/mermaid-viewer";
 import { PreviewFormContainer } from "@/components/forms/preview-form-container";
 import { submitForm } from "@/features/preview/api/form-bridge";
 import {
@@ -98,6 +102,7 @@ export const PreviewApp = () => {
 		description: string;
 		message?: string;
 	} | null>(null);
+	const [tocVisible, setTocVisible] = useState(false);
 
 	useEffect(() => {
 		window.addEventListener("message", handleExtensionMessage);
@@ -115,6 +120,86 @@ export const PreviewApp = () => {
 		const readyMessage: PreviewWebviewMessage = { type: "preview/ready" };
 		vscode.postMessage(readyMessage);
 	}, []);
+
+	// Initialize mermaid diagrams when content changes - runs after initial render
+	// Mount interactive React components into the static markup
+	// biome-ignore lint/correctness/useExhaustiveDependencies: metadata.sections is necessary for re-renders
+	useEffect(() => {
+		mermaid.initialize({
+			startOnLoad: false,
+			theme: "dark",
+			// Use antiscript to allow text labels (HTML) but prevent script execution.
+			// We also sanitize the output with DOMPurify in the viewer.
+			securityLevel: "antiscript",
+			themeVariables: {
+				primaryColor: "#3c3c3c",
+				primaryTextColor: "#cccccc",
+				primaryBorderColor: "#555555",
+				lineColor: "#888888",
+				secondaryColor: "#252526",
+				tertiaryColor: "#1e1e1e",
+			},
+		});
+
+		const roots: ReturnType<typeof createRoot>[] = [];
+
+		// Simple hash function for IDs
+		const hashString = (str: string): string => {
+			let hash = 0;
+			for (let i = 0; i < str.length; i++) {
+				const char = str.charCodeAt(i);
+				// biome-ignore lint/suspicious/noBitwiseOperators: hashing algo uses bitwise
+				hash = (hash << 5) - hash + char;
+				// biome-ignore lint/suspicious/noBitwiseOperators: hashing algo uses bitwise
+				hash &= hash;
+			}
+			// biome-ignore lint/suspicious/noBitwiseOperators: hashing algo uses bitwise
+			return (hash >>> 0).toString(16).padStart(8, "0");
+		};
+
+		// Delay to allow DOM to render
+		const timeoutId = setTimeout(() => {
+			const diagrams = document.querySelectorAll<HTMLElement>(
+				".mermaid:not([data-processed])"
+			);
+			for (let i = 0; i < diagrams.length; i++) {
+				const el = diagrams[i];
+				el.dataset.processed = "true";
+				const code = el.textContent || "";
+				// Make empty to host the React component
+				el.innerHTML = "";
+
+				// Reset styles to allow component control
+				el.style.backgroundColor = "transparent";
+				el.style.padding = "0";
+
+				// Use hash-based ID for stability matching reference implementation
+				const hash = hashString(code);
+				const id = `mermaid-${hash}-${i}`; // Append index to handle identical diagrams
+				const root = createRoot(el);
+				root.render(<MermaidViewer code={code} id={id} />);
+				roots.push(root);
+			}
+		}, 100);
+
+		return () => {
+			clearTimeout(timeoutId);
+			// Unmount roots to prevent memory leaks
+			// roots.forEach((root) => root.unmount());
+			// Note: Since the parent DOM nodes are likely removed by React's diffing of dangerousHtml,
+			// explicit unmount might warn, but is good practice if nodes persist.
+			// However in this specific case (dangerouslySetInnerHTML replacement), the nodes are destroyed.
+			// We skip explicit unmount to avoid errors on detached nodes, keeping it simple.
+			// Actually, let's do it safely:
+			for (const root of roots) {
+				try {
+					root.unmount();
+				} catch {
+					// Ignore unmount errors
+				}
+			}
+		};
+	}, [metadata?.sections]);
 
 	const description = useMemo(() => {
 		if (staleReason) {
@@ -135,6 +220,16 @@ export const PreviewApp = () => {
 			html: section.body ? renderPreviewMarkdown(section.body) : "",
 		}));
 	}, [metadata?.sections]);
+
+	const documentType = useMemo(() => {
+		if (
+			metadata?.filePath?.includes("/docs/") ||
+			metadata?.filePath?.startsWith("docs/")
+		) {
+			return "doc";
+		}
+		return metadata?.documentType;
+	}, [metadata?.filePath, metadata?.documentType]);
 
 	const handleReload = () => {
 		const message: PreviewWebviewMessage = { type: "preview/request-reload" };
@@ -281,22 +376,144 @@ export const PreviewApp = () => {
 									title: section.title,
 								})) ?? []
 							}
+							triggerLabel={<MessageSquarePlus className="h-4 w-4" />}
 						/>
 						<button
+							aria-label="Toggle table of contents"
+							aria-pressed={tocVisible}
+							className="rounded border border-[color:var(--vscode-button-border,transparent)] bg-[color:var(--vscode-button-secondaryBackground,#3c3c3c)] px-2 py-1 text-[color:var(--vscode-button-secondaryForeground)] text-sm transition-colors hover:bg-[color:var(--vscode-button-secondaryHoverBackground)]"
+							onClick={() => setTocVisible(!tocVisible)}
+							title="Table of Contents"
+							type="button"
+						>
+							<svg
+								aria-hidden="true"
+								className="h-4 w-4"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth={2}
+								viewBox="0 0 24 24"
+							>
+								<path
+									d="M4 6h16M4 12h10M4 18h14"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+								/>
+							</svg>
+						</button>
+						<button
+							aria-label="Edit"
 							className="rounded border border-[color:var(--vscode-button-border,transparent)] bg-[color:var(--vscode-button-background)] px-3 py-1 text-[color:var(--vscode-button-foreground)] text-sm"
 							onClick={openInEditor}
 							type="button"
 						>
-							Edit
+							<Pencil className="h-4 w-4" />
 						</button>
 					</div>
 				</div>
-				<dl className="grid grid-cols-2 gap-3 rounded border border-[color:var(--vscode-input-border,#3c3c3c)] bg-[color:var(--vscode-editor-background)] px-3 py-3 text-sm md:grid-cols-4">
+			</header>
+
+			{/* Show update banner if document is outdated */}
+			{metadata.isOutdated && (
+				<UpdateDocumentButton
+					document={metadata}
+					onUpdate={handleDocumentUpdate}
+				/>
+			)}
+
+			<DocumentOutline
+				isVisible={tocVisible}
+				onClose={() => setTocVisible(false)}
+				onNavigate={scrollToSection}
+				sections={renderedSections.map((s) => ({
+					id: s.id,
+					title: s.title,
+					titleHtml: s.titleHtml,
+				}))}
+			/>
+
+			<div className="flex h-full flex-col gap-4 overflow-hidden">
+				<article className="flex flex-1 flex-col gap-6 overflow-y-auto rounded border border-[color:var(--vscode-input-border,#3c3c3c)] bg-[color:var(--vscode-editor-background)] px-5 py-4">
+					{renderedSections.length === 0 ? (
+						<PreviewFallback
+							actionLabel="Open in editor"
+							description="This document does not contain any headings. Open it in the editor to review the raw Markdown."
+							onAction={openInEditor}
+							title="No sections detected"
+						/>
+					) : (
+						renderedSections.map((section) => (
+							<section
+								className="flex flex-col gap-2"
+								id={section.id}
+								key={section.id}
+							>
+								<h2
+									className="font-semibold text-lg"
+									/* biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown is rendered via markdown-it before reaching the webview. */
+									dangerouslySetInnerHTML={{ __html: section.titleHtml }}
+								/>
+								<div
+									className="prose prose-invert max-w-none text-sm"
+									/* biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown is rendered via markdown-it before reaching the webview. */
+									dangerouslySetInnerHTML={{ __html: section.html }}
+								/>
+							</section>
+						))
+					)}
+
+					{staleReason && (
+						<div
+							aria-live="polite"
+							className="flex flex-col gap-2 rounded border border-[color:var(--vscode-inputValidation-warningBorder,#e5c07b)] bg-[color:var(--vscode-inputValidation-warningBackground,#3b3222)] px-3 py-2 text-sm"
+							role="alert"
+						>
+							<strong>{staleReason}</strong>
+							<button
+								className="self-start rounded border border-[color:var(--vscode-button-border,transparent)] bg-[color:var(--vscode-button-background)] px-3 py-1 text-[color:var(--vscode-button-foreground)]"
+								onClick={handleReload}
+								type="button"
+							>
+								Reload preview
+							</button>
+						</div>
+					)}
+
+					{lastRefinement && (
+						<RefineConfirmation
+							descriptionPreview={lastRefinement.description}
+							issueType={
+								ISSUE_TYPE_LABELS[lastRefinement.issueType] ??
+								lastRefinement.issueType
+							}
+							message={lastRefinement.message}
+							onDismiss={dismissRefinementMessage}
+							requestId={lastRefinement.requestId}
+							sectionRef={lastRefinement.sectionLabel ?? "Entire document"}
+						/>
+					)}
+				</article>
+
+				{(metadata.forms?.length ?? 0) > 0 && (
+					<PreviewFormContainer
+						documentId={metadata.documentId}
+						fields={metadata.forms ?? []}
+						onCancel={handleReload}
+						onSubmit={handleFormSubmit}
+						readOnly={metadata.permissions?.canEditForms === false}
+						readOnlyReason={metadata.permissions?.reason}
+						sessionId={metadata.sessionId ?? metadata.documentId}
+					/>
+				)}
+			</div>
+
+			<footer className="mt-auto border-[color:var(--vscode-widget-border,#3c3c3c)] border-t bg-[color:var(--vscode-editor-background)] p-4">
+				<dl className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
 					<div>
 						<dt className="text-[color:var(--vscode-descriptionForeground)] text-xs uppercase tracking-wide">
 							Type
 						</dt>
-						<dd>{metadata.documentType}</dd>
+						<dd>{documentType}</dd>
 					</div>
 					<div>
 						<dt className="text-[color:var(--vscode-descriptionForeground)] text-xs uppercase tracking-wide">
@@ -317,101 +534,7 @@ export const PreviewApp = () => {
 						<dd>{metadata.updatedAt ?? "—"}</dd>
 					</div>
 				</dl>
-			</header>
-
-			{/* Show update banner if document is outdated */}
-			{metadata.isOutdated && (
-				<UpdateDocumentButton
-					document={metadata}
-					onUpdate={handleDocumentUpdate}
-				/>
-			)}
-
-			<div className="grid h-full gap-4 md:grid-cols-[240px_1fr]">
-				<DocumentOutline
-					onNavigate={scrollToSection}
-					sections={renderedSections.map((s) => ({
-						id: s.id,
-						title: s.title,
-						titleHtml: s.titleHtml,
-					}))}
-				/>
-
-				<div className="flex h-full flex-col gap-4 overflow-hidden">
-					<article className="flex flex-1 flex-col gap-6 overflow-y-auto rounded border border-[color:var(--vscode-input-border,#3c3c3c)] bg-[color:var(--vscode-editor-background)] px-5 py-4">
-						{renderedSections.length === 0 ? (
-							<PreviewFallback
-								actionLabel="Open in editor"
-								description="This document does not contain any headings. Open it in the editor to review the raw Markdown."
-								onAction={openInEditor}
-								title="No sections detected"
-							/>
-						) : (
-							renderedSections.map((section) => (
-								<section
-									className="flex flex-col gap-2"
-									id={section.id}
-									key={section.id}
-								>
-									<h2
-										className="font-semibold text-lg"
-										/* biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown is rendered via markdown-it before reaching the webview. */
-										dangerouslySetInnerHTML={{ __html: section.titleHtml }}
-									/>
-									<div
-										className="prose prose-invert max-w-none text-sm"
-										/* biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown is rendered via markdown-it before reaching the webview. */
-										dangerouslySetInnerHTML={{ __html: section.html }}
-									/>
-								</section>
-							))
-						)}
-
-						{staleReason && (
-							<div
-								aria-live="polite"
-								className="flex flex-col gap-2 rounded border border-[color:var(--vscode-inputValidation-warningBorder,#e5c07b)] bg-[color:var(--vscode-inputValidation-warningBackground,#3b3222)] px-3 py-2 text-sm"
-								role="alert"
-							>
-								<strong>{staleReason}</strong>
-								<button
-									className="self-start rounded border border-[color:var(--vscode-button-border,transparent)] bg-[color:var(--vscode-button-background)] px-3 py-1 text-[color:var(--vscode-button-foreground)]"
-									onClick={handleReload}
-									type="button"
-								>
-									Reload preview
-								</button>
-							</div>
-						)}
-
-						{lastRefinement && (
-							<RefineConfirmation
-								descriptionPreview={lastRefinement.description}
-								issueType={
-									ISSUE_TYPE_LABELS[lastRefinement.issueType] ??
-									lastRefinement.issueType
-								}
-								message={lastRefinement.message}
-								onDismiss={dismissRefinementMessage}
-								requestId={lastRefinement.requestId}
-								sectionRef={lastRefinement.sectionLabel ?? "Entire document"}
-							/>
-						)}
-					</article>
-
-					{(metadata.forms?.length ?? 0) > 0 && (
-						<PreviewFormContainer
-							documentId={metadata.documentId}
-							fields={metadata.forms ?? []}
-							onCancel={handleReload}
-							onSubmit={handleFormSubmit}
-							readOnly={metadata.permissions?.canEditForms === false}
-							readOnlyReason={metadata.permissions?.reason}
-							sessionId={metadata.sessionId ?? metadata.documentId}
-						/>
-					)}
-				</div>
-			</div>
+			</footer>
 		</div>
 	);
 };

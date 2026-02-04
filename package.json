@@ -76,6 +76,11 @@
           "default": true,
           "description": "Controls visibility of the Quick Access view in the activity bar."
         },
+        "gatomia.views.wiki.visible": {
+          "type": "boolean",
+          "default": true,
+          "description": "Controls visibility of the Repo Wiki view in the activity bar."
+        },
         "gatomia.copilot.specsPath": {
           "type": "string",
           "default": "speckit",
@@ -236,6 +241,12 @@
           "name": "Quick Access",
           "icon": "zap",
           "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.quickAccess.visible"
+        },
+        {
+          "id": "gatomia.views.wikiExplorer",
+          "name": "Repo Wiki",
+          "icon": "book",
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.wiki.visible"
         }
       ]
     },
@@ -255,6 +266,10 @@
       {
         "view": "gatomia.views.hooksExplorer",
         "contents": "Automate SpecKit/OpenSpec workflows with triggers and actions.\n\n[$(plus) Add Hook](command:gatomia.hooks.addHook)\n[$(eye) View Hook Logs](command:gatomia.hooks.viewLogs)\n[$(refresh) Refresh](command:gatomia.hooks.refresh)"
+      },
+      {
+        "view": "gatomia.views.wikiExplorer",
+        "contents": "Browse and manage documentation from the docs/ directory.\n\n[$(refresh) Refresh](command:gatomia.wiki.refresh)"
       }
     ],
     "commands": [
@@ -480,6 +495,36 @@
         "icon": "$(desktop-download)"
       },
       {
+        "command": "gatomia.wiki.refresh",
+        "title": "Refresh Repo Wiki",
+        "category": "GatomIA",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gatomia.wiki.open",
+        "title": "Open Document",
+        "category": "GatomIA",
+        "icon": "$(file-text)"
+      },
+      {
+        "command": "gatomia.wiki.update",
+        "title": "Update Document",
+        "category": "GatomIA",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "gatomia.wiki.updateAll",
+        "title": "Synchronize All Documents",
+        "category": "GatomIA",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "gatomia.wiki.showToc",
+        "title": "Show Table of Contents",
+        "category": "GatomIA",
+        "icon": "$(list-unordered)"
+      },
+      {
         "command": "gatomia.showWelcome",
         "title": "Show Welcome Screen",
         "category": "GatomIA",
@@ -655,6 +700,16 @@
           "command": "gatomia.hooks.import",
           "when": "view == gatomia.views.hooksExplorer",
           "group": "navigation@5"
+        },
+        {
+          "command": "gatomia.wiki.refresh",
+          "when": "view == gatomia.views.wikiExplorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gatomia.wiki.updateAll",
+          "when": "view == gatomia.views.wikiExplorer",
+          "group": "navigation@2"
         },
         {
           "command": "gatomia.settings.openGlobalConfig",

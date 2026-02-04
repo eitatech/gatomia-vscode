@@ -27,6 +27,7 @@ import { ActionsExplorerProvider } from "./providers/actions-explorer-provider";
 import { SpecExplorerProvider } from "./providers/spec-explorer-provider";
 import { SpecTaskCodeLensProvider } from "./providers/spec-task-code-lens-provider";
 import { SteeringExplorerProvider } from "./providers/steering-explorer-provider";
+import { WikiExplorerProvider } from "./providers/wiki-explorer-provider";
 import { PromptLoader } from "./services/prompt-loader";
 import { sendPromptToChat } from "./utils/chat-prompt-runner";
 import { ConfigManager } from "./utils/config-manager";
@@ -411,6 +412,9 @@ export async function activate(context: ExtensionContext) {
 	const hooksExplorer = new HooksExplorerProvider(hookManager);
 	hooksExplorer.initialize();
 
+	// Initialize Wiki Explorer Provider
+	const wikiExplorer = new WikiExplorerProvider(context);
+
 	// Set managers
 	specExplorer.setSpecManager(specManager);
 	steeringExplorer.setSteeringManager(steeringManager);
@@ -432,7 +436,11 @@ export async function activate(context: ExtensionContext) {
 			"gatomia.views.actionsExplorer",
 			actionsExplorer
 		),
-		window.registerTreeDataProvider(HooksExplorerProvider.viewId, hooksExplorer)
+		window.registerTreeDataProvider(
+			HooksExplorerProvider.viewId,
+			hooksExplorer
+		),
+		window.registerTreeDataProvider(WikiExplorerProvider.viewId, wikiExplorer)
 	);
 	context.subscriptions.push(
 		{ dispose: () => hookManager.dispose() },
@@ -451,7 +459,42 @@ export async function activate(context: ExtensionContext) {
 		steeringExplorer,
 		actionsExplorer,
 		hooksExplorer,
+		wikiExplorer,
 	});
+
+	// Register wiki commands
+	context.subscriptions.push(
+		commands.registerCommand(WikiExplorerProvider.refreshCommandId, () => {
+			outputChannel.appendLine("[Wiki] Refreshing wiki explorer...");
+			wikiExplorer.refresh();
+		}),
+		commands.registerCommand(
+			WikiExplorerProvider.openCommandId,
+			async (documentPath: string) => {
+				if (documentPath) {
+					const uri = Uri.file(documentPath);
+					await renderPreviewForUri(uri);
+				}
+			}
+		),
+		commands.registerCommand(
+			WikiExplorerProvider.updateCommandId,
+			async (documentPath: string) => {
+				if (documentPath) {
+					await wikiExplorer.updateDocument(documentPath);
+				}
+			}
+		),
+		commands.registerCommand(
+			WikiExplorerProvider.updateAllCommandId,
+			async () => {
+				await wikiExplorer.updateAllDocuments();
+			}
+		),
+		commands.registerCommand(WikiExplorerProvider.showTocCommandId, () => {
+			window.showInformationMessage("Table of Contents - Coming soon!");
+		})
+	);
 
 	// Set up file watchers
 	setupFileWatchers(context, specExplorer, steeringExplorer, actionsExplorer);
@@ -638,6 +681,7 @@ interface RegisterCommandsOptions {
 	steeringExplorer: SteeringExplorerProvider;
 	actionsExplorer: ActionsExplorerProvider;
 	hooksExplorer: HooksExplorerProvider;
+	wikiExplorer: WikiExplorerProvider;
 }
 
 function registerCommands({
@@ -646,6 +690,7 @@ function registerCommands({
 	steeringExplorer,
 	actionsExplorer,
 	hooksExplorer,
+	wikiExplorer,
 }: RegisterCommandsOptions) {
 	const createSpecCommand = commands.registerCommand(
 		"gatomia.spec.create",
