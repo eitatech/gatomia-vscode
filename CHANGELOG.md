@@ -2,6 +2,20 @@
 
 ---
 
+## v0.32.2 2026-01-30
+
+### Fixed
+
+- update Copilot and VS Code guidelines, rename actions, and enhance feature actions
+
+### Release Info
+
+- **Source Branch**: `fix/minor-issues`
+- **Release Type**: patch
+
+---
+
+
 ## v0.32.1 2026-01-29
 
 ### Added
