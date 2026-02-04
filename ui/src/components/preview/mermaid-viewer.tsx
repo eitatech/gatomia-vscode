@@ -56,6 +56,9 @@ export const MermaidViewer = ({ code, id }: MermaidViewerProps) => {
 				// Sanitize the generated SVG before injecting it into the DOM to avoid XSS.
 				const sanitizedSvg = DOMPurify.sanitize(renderedSvg, {
 					USE_PROFILES: { svg: true, svgFilters: true },
+					// Allow foreignObject and HTML elements for rich text labels
+					ADD_TAGS: ["foreignObject", "div", "span", "p", "br", "style"],
+					ADD_ATTR: ["class", "id", "style", "xmlns"],
 				});
 				setSvg(sanitizedSvg);
 			} catch (err) {
