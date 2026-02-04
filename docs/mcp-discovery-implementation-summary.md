@@ -8,13 +8,13 @@
 
 A implementação original em `src/utils/copilot-mcp-utils.ts` tinha apenas placeholders (TODOs) que retornavam arrays vazios. Isso impedia a detecção de qualquer MCP server configurado no VS Code/VS Code Insiders.
 
-\`\`\`typescript
+```typescript
 // ANTES - Placeholder implementation
 export async function queryMCPServers(): Promise<MCPServer[]> {
     // TODO: Implement actual Copilot MCP server discovery
     return await Promise.resolve([]);
 }
-\`\`\`
+```
 
 ## Solução Implementada
 
@@ -22,7 +22,7 @@ export async function queryMCPServers(): Promise<MCPServer[]> {
 
 A solução correta é usar a API **`vscode.lm.tools`** que lista todas as ferramentas MCP registradas no VS Code, independentemente da versão (stable ou insiders).
 
-\`\`\`typescript
+```typescript
 // AGORA - Real implementation
 export function queryMCPServers(): MCPServer[] {
     if (!lm?.tools) {
@@ -32,7 +32,7 @@ export function queryMCPServers(): MCPServer[] {
     const allTools = lm.tools;
     // Agrupa ferramentas por servidor...
 }
-\`\`\`
+```
 
 ### 2. Agrupamento de Ferramentas por Servidor
 
@@ -50,7 +50,7 @@ Adicionada função `getVSCodeVersionInfo()` que detecta:
 - Versão exata do VS Code
 - Nome do produto
 
-\`\`\`typescript
+```typescript
 export function getVSCodeVersionInfo(): {
     version: string;
     isInsiders: boolean;
@@ -60,7 +60,7 @@ export function getVSCodeVersionInfo(): {
                        env.appName.includes("insider");
     return { version, isInsiders, productName: env.appName };
 }
-\`\`\`
+```
 
 ## Arquivos Modificados
 
@@ -110,9 +110,9 @@ export function getVSCodeVersionInfo(): {
 ## Testes
 
 Todos os 20 testes existentes em `mcp-discovery.test.ts` passaram após a implementação:
-\`\`\`
+```bash
 ✓ tests/unit/features/hooks/services/mcp-discovery.test.ts (20 tests) 13ms
-\`\`\`
+```
 
 ## Próximos Passos
 
