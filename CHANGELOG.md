@@ -2,6 +2,28 @@
 
 ---
 
+## v0.33.0 2026-02-04
+
+### Added
+
+- allow rich text labels in Mermaid diagrams by setting security level to antiscript and expanding DOMPurify allowed tags and attributes.
+- Update RefineDialog triggerLabel to accept ReactNode, replace text buttons with icons, and move document metadata to footer.
+- update preview UI with icon buttons and footer metadata, and allow React nodes for refine dialog trigger.
+- Introduce YAML frontmatter parsing, a Wiki Explorer provider, and Mermaid diagram rendering in the preview.
+- Introduce Gatomia AI skill with associated scripts, agents, and comprehensive documentation for the Hooks Automation Platform.
+
+### Changed
+
+- Potential fix for code scanning alert no. 2: DOM text reinterpreted as HTML
+
+### Release Info
+
+- **Source Branch**: `feature/repo-wiki`
+- **Release Type**: minor
+
+---
+
+
 ## v0.32.2 2026-01-30
 
 ### Fixed
