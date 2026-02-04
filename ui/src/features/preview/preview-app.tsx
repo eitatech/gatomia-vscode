@@ -128,6 +128,9 @@ export const PreviewApp = () => {
 		mermaid.initialize({
 			startOnLoad: false,
 			theme: "dark",
+			// Use strict security level so that mermaid sanitizes rendered output
+			// and disallows script execution or unsafe links in diagrams.
+			securityLevel: "strict",
 			themeVariables: {
 				primaryColor: "#3c3c3c",
 				primaryTextColor: "#cccccc",

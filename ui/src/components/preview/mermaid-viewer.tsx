@@ -1,6 +1,7 @@
 import { Minus, Move, Plus, RotateCcw } from "lucide-react";
 import mermaid from "mermaid";
 import { useEffect, useRef, useState } from "react";
+import DOMPurify from "dompurify";
 
 /**
  * Port of vscode-markdown-mermaid logic
@@ -52,7 +53,11 @@ export const MermaidViewer = ({ code, id }: MermaidViewerProps) => {
 					`mermaid-${id}`,
 					code
 				);
-				setSvg(renderedSvg);
+				// Sanitize the generated SVG before injecting it into the DOM to avoid XSS.
+				const sanitizedSvg = DOMPurify.sanitize(renderedSvg, {
+					USE_PROFILES: { svg: true, svgFilters: true },
+				});
+				setSvg(sanitizedSvg);
 			} catch (err) {
 				console.error("Mermaid render error:", err);
 				setError("Failed to render diagram.");
