@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { MessageSquarePlus, Pencil } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import mermaid from "mermaid";
@@ -217,6 +218,16 @@ export const PreviewApp = () => {
 		}));
 	}, [metadata?.sections]);
 
+	const documentType = useMemo(() => {
+		if (
+			metadata?.filePath?.includes("/docs/") ||
+			metadata?.filePath?.startsWith("docs/")
+		) {
+			return "doc";
+		}
+		return metadata?.documentType;
+	}, [metadata?.filePath, metadata?.documentType]);
+
 	const handleReload = () => {
 		const message: PreviewWebviewMessage = { type: "preview/request-reload" };
 		vscode.postMessage(message);
@@ -362,6 +373,7 @@ export const PreviewApp = () => {
 									title: section.title,
 								})) ?? []
 							}
+							triggerLabel={<MessageSquarePlus className="h-4 w-4" />}
 						/>
 						<button
 							aria-label="Toggle table of contents"
@@ -387,40 +399,15 @@ export const PreviewApp = () => {
 							</svg>
 						</button>
 						<button
+							aria-label="Edit"
 							className="rounded border border-[color:var(--vscode-button-border,transparent)] bg-[color:var(--vscode-button-background)] px-3 py-1 text-[color:var(--vscode-button-foreground)] text-sm"
 							onClick={openInEditor}
 							type="button"
 						>
-							Edit
+							<Pencil className="h-4 w-4" />
 						</button>
 					</div>
 				</div>
-				<dl className="grid grid-cols-2 gap-3 rounded border border-[color:var(--vscode-input-border,#3c3c3c)] bg-[color:var(--vscode-editor-background)] px-3 py-3 text-sm md:grid-cols-4">
-					<div>
-						<dt className="text-[color:var(--vscode-descriptionForeground)] text-xs uppercase tracking-wide">
-							Type
-						</dt>
-						<dd>{metadata.documentType}</dd>
-					</div>
-					<div>
-						<dt className="text-[color:var(--vscode-descriptionForeground)] text-xs uppercase tracking-wide">
-							Version
-						</dt>
-						<dd>{metadata.version ?? "—"}</dd>
-					</div>
-					<div>
-						<dt className="text-[color:var(--vscode-descriptionForeground)] text-xs uppercase tracking-wide">
-							Owner
-						</dt>
-						<dd>{metadata.owner ?? "—"}</dd>
-					</div>
-					<div>
-						<dt className="text-[color:var(--vscode-descriptionForeground)] text-xs uppercase tracking-wide">
-							Last Updated
-						</dt>
-						<dd>{metadata.updatedAt ?? "—"}</dd>
-					</div>
-				</dl>
 			</header>
 
 			{/* Show update banner if document is outdated */}
@@ -516,6 +503,35 @@ export const PreviewApp = () => {
 					/>
 				)}
 			</div>
+
+			<footer className="mt-auto border-[color:var(--vscode-widget-border,#3c3c3c)] border-t bg-[color:var(--vscode-editor-background)] p-4">
+				<dl className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+					<div>
+						<dt className="text-[color:var(--vscode-descriptionForeground)] text-xs uppercase tracking-wide">
+							Type
+						</dt>
+						<dd>{documentType}</dd>
+					</div>
+					<div>
+						<dt className="text-[color:var(--vscode-descriptionForeground)] text-xs uppercase tracking-wide">
+							Version
+						</dt>
+						<dd>{metadata.version ?? "—"}</dd>
+					</div>
+					<div>
+						<dt className="text-[color:var(--vscode-descriptionForeground)] text-xs uppercase tracking-wide">
+							Owner
+						</dt>
+						<dd>{metadata.owner ?? "—"}</dd>
+					</div>
+					<div>
+						<dt className="text-[color:var(--vscode-descriptionForeground)] text-xs uppercase tracking-wide">
+							Last Updated
+						</dt>
+						<dd>{metadata.updatedAt ?? "—"}</dd>
+					</div>
+				</dl>
+			</footer>
 		</div>
 	);
 };
