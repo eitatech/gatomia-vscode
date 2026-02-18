@@ -5,6 +5,7 @@ import {
 	EventEmitter,
 	type ExtensionContext,
 	FileType,
+	type OutputChannel,
 	ThemeIcon,
 	type TreeDataProvider,
 	TreeItem,
@@ -15,6 +16,7 @@ import {
 import type { SteeringManager } from "../features/steering/steering-manager";
 import { ConfigManager } from "../utils/config-manager";
 import { SPEC_SYSTEM_MODE } from "../constants";
+import { ensureGlobalResourceAccessConsent } from "../features/steering/global-resource-access-consent";
 
 import { homedir } from "node:os";
 
@@ -44,10 +46,12 @@ export class SteeringExplorerProvider
 	private steeringManager!: SteeringManager;
 	private readonly context: ExtensionContext;
 	private readonly configManager: ConfigManager;
+	private readonly outputChannel?: OutputChannel;
 
-	constructor(context: ExtensionContext) {
+	constructor(context: ExtensionContext, outputChannel?: OutputChannel) {
 		this.context = context;
 		this.configManager = ConfigManager.getInstance();
+		this.outputChannel = outputChannel;
 	}
 
 	setSteeringManager(steeringManager: SteeringManager) {
@@ -114,6 +118,22 @@ export class SteeringExplorerProvider
 	}
 
 	private async getGroupUserItems(): Promise<SteeringItem[]> {
+		const hasGlobalAccess = await ensureGlobalResourceAccessConsent(
+			this.context,
+			this.outputChannel
+		);
+		if (!hasGlobalAccess) {
+			return [
+				new SteeringItem({
+					label: "Global access disabled for this workspace",
+					collapsibleState: TreeItemCollapsibleState.None,
+					contextValue: "global-access-disabled",
+					resourcePath: "",
+					context: this.context,
+				}),
+			];
+		}
+
 		const items: SteeringItem[] = [];
 		const globalCopilotMd = join(homeDir, ".github", "copilot-instructions.md");
 		if (await this.exists(globalCopilotMd)) {
@@ -370,6 +390,8 @@ class SteeringItem extends TreeItem {
 			this.iconPath = new ThemeIcon("robot");
 		} else if (options.contextValue === "constitution-file") {
 			this.iconPath = new ThemeIcon("law");
+		} else if (options.contextValue === "global-access-disabled") {
+			this.iconPath = new ThemeIcon("shield");
 		}
 	}
 }

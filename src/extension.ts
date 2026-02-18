@@ -74,6 +74,10 @@ import {
 	shouldShowWelcomeAutomatically,
 	markWelcomeAsShown,
 } from "./utils/workspace-state";
+import {
+	isGlobalResourceAccessAllowed,
+	openGlobalResourceAccessSettings,
+} from "./features/steering/global-resource-access-consent";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -407,7 +411,7 @@ export async function activate(context: ExtensionContext) {
 	// Register tree data providers
 	const quickAccessExplorer = new QuickAccessExplorerProvider();
 	const specExplorer = new SpecExplorerProvider(context);
-	const steeringExplorer = new SteeringExplorerProvider(context);
+	const steeringExplorer = new SteeringExplorerProvider(context, outputChannel);
 	const actionsExplorer = new ActionsExplorerProvider(context);
 	const hooksExplorer = new HooksExplorerProvider(hookManager);
 	hooksExplorer.initialize();
@@ -1010,27 +1014,30 @@ function registerCommands({
 				steeringExplorer.refresh();
 			}
 		}),
-
 		commands.registerCommand("gatomia.steering.createProjectRule", async () => {
 			const created = await steeringManager.createProjectInstructionRule();
 			if (created) {
 				steeringExplorer.refresh();
 			}
 		}),
-
 		commands.registerCommand(
 			"gatomia.steering.createConstitution",
 			async () => {
 				await steeringManager.createConstitutionRequest();
 			}
 		),
-
 		commands.registerCommand("gatomia.steering.refresh", () => {
 			outputChannel.appendLine(
 				"[Manual Refresh] Refreshing steering explorer..."
 			);
 			steeringExplorer.refresh();
-		})
+		}),
+		commands.registerCommand(
+			"gatomia.steering.openGlobalResourceAccessSettings",
+			async () => {
+				await openGlobalResourceAccessSettings();
+			}
+		)
 	);
 
 	// Add file save confirmation for agent files
@@ -1667,20 +1674,36 @@ function setupFileWatchers(
 	context.subscriptions.push(...watchers);
 
 	// Watch for changes in copilot-instructions.md files
-	const globalHome = homedir() || process.env.USERPROFILE || "";
-	const globalCopilotMdWatcher = workspace.createFileSystemWatcher(
-		new RelativePattern(globalHome, ".github/copilot-instructions.md")
-	);
 	const projectCopilotMdWatcher = workspace.createFileSystemWatcher(
 		"**/copilot-instructions.md"
 	);
 
-	globalCopilotMdWatcher.onDidCreate(() => steeringExplorer.refresh());
-	globalCopilotMdWatcher.onDidDelete(() => steeringExplorer.refresh());
+	setupGlobalCopilotWatcher(context, steeringExplorer);
+
 	projectCopilotMdWatcher.onDidCreate(() => steeringExplorer.refresh());
 	projectCopilotMdWatcher.onDidDelete(() => steeringExplorer.refresh());
 
-	context.subscriptions.push(globalCopilotMdWatcher, projectCopilotMdWatcher);
+	context.subscriptions.push(projectCopilotMdWatcher);
+}
+
+function setupGlobalCopilotWatcher(
+	context: ExtensionContext,
+	steeringExplorer: SteeringExplorerProvider
+): void {
+	if (!isGlobalResourceAccessAllowed()) {
+		outputChannel.appendLine(
+			"[Steering Consent] Global watcher disabled (access not allowed)"
+		);
+		return;
+	}
+
+	const globalHome = homedir() || process.env.USERPROFILE || "";
+	const globalCopilotMdWatcher = workspace.createFileSystemWatcher(
+		new RelativePattern(globalHome, ".github/copilot-instructions.md")
+	);
+	globalCopilotMdWatcher.onDidCreate(() => steeringExplorer.refresh());
+	globalCopilotMdWatcher.onDidDelete(() => steeringExplorer.refresh());
+	context.subscriptions.push(globalCopilotMdWatcher);
 }
 
 function getDefaultWorkspaceFileUri(fileName: string): Uri | undefined {
