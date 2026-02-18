@@ -2,6 +2,24 @@
 
 ---
 
+## v0.34.0 2026-02-18
+
+### Added
+
+- implement global resource access consent management and related settings
+
+### Fixed
+
+- ensure .opencode/bun.lockb is ignored in .gitignore
+
+### Release Info
+
+- **Source Branch**: `feature/intrusive-permissions`
+- **Release Type**: minor
+
+---
+
+
 ## v0.33.1 2026-02-18
 
 ### Fixed
