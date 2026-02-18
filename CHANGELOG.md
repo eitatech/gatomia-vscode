@@ -2,6 +2,20 @@
 
 ---
 
+## v0.33.1 2026-02-18
+
+### Fixed
+
+- downgrade markdown-it to version 14.1.1 and update related dependencies
+- update markdown-it dependency to version 14.1.2
+
+### Changed
+
+- Remove old documentation files and implement unit tests for DocumentPreviewService
+
+---
+
+
 ## v0.33.0 2026-02-04
 
 ### Added
