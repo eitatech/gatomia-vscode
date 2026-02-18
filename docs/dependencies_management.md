@@ -8,6 +8,7 @@ version: v0.32.1-2-g5a4ac1b
 # Dependencies Management
 
 ## Overview
+
 The Dependencies Management module detects, validates, and manages all external dependencies required by the system. It ensures that required CLI tools, VS Code extensions, services, and libraries are available and meet version requirements before attempting to execute hooks or other functionality. This module provides proactive dependency checking and helpful installation guidance.
 
 **Business Value**: Prevents runtime failures by ensuring all dependencies are met, reduces support burden with clear installation instructions, and enables graceful degradation when optional dependencies are missing.
@@ -71,6 +72,7 @@ graph TB
 ```
 
 **Key Patterns**:
+
 - **Detector Pattern**: Specialized detectors for different dependency types
 - **Validator Pattern**: Chain of validation checks (existence, version, compatibility)
 - **Registry Pattern**: Centralized dependency state management
@@ -79,9 +81,11 @@ graph TB
 ## Core Components
 
 ### CLIDetectionResult
+
 **Purpose**: Represents the detection result for a CLI tool dependency.
 
 **Structure**:
+
 ```typescript
 interface CLIDetectionResult {
     toolName: string;           // Name of the CLI tool (e.g., 'git', 'node')
@@ -95,6 +99,7 @@ interface CLIDetectionResult {
 ```
 
 **Business Rules**:
+
 - Tools are detected by checking PATH and common installation locations
 - Version parsing handles different tool output formats
 - Version comparison uses semantic versioning (semver)
@@ -103,60 +108,72 @@ interface CLIDetectionResult {
 ### Dependency Detection Services
 
 #### CLI Tool Detector
+
 **Purpose**: Detects command-line tools in the system PATH.
 
 **Detection Methods**:
+
 1. **PATH scanning**: Check for executable in system PATH
 2. **Common locations**: Check standard installation directories
 3. **Version commands**: Execute `--version`, `-v`, or tool-specific commands
 4. **Fallback checks**: Alternative detection methods for tricky tools
 
 **Business Rules**:
+
 - Caches detection results with configurable TTL
 - Handles permission errors gracefully
 - Provides OS-specific installation guidance
 - Validates executable permissions
 
 #### Extension Detector
+
 **Purpose**: Detects installed VS Code extensions.
 
 **Detection Methods**:
+
 1. **Extension API**: Query VS Code extension marketplace API
 2. **Local scanning**: Check extension installation directories
 3. **Manifest parsing**: Read extension manifest for metadata
 4. **Activation checking**: Verify extension is properly activated
 
 **Business Rules**:
+
 - Handles both user and workspace extensions
 - Validates extension compatibility with current VS Code version
 - Checks extension activation status
 - Provides extension installation commands
 
 #### Service Detector
+
 **Purpose**: Detects external services (databases, APIs, etc.).
 
 **Detection Methods**:
+
 1. **Port scanning**: Check if service is listening on expected port
 2. **Health endpoints**: Call service health check endpoints
 3. **Connection testing**: Attempt to establish connection
 4. **Authentication testing**: Verify credentials work
 
 **Business Rules**:
+
 - Configurable timeouts for service detection
 - Exponential backoff for connection attempts
 - Credential validation without exposing secrets
 - Service-specific health check implementations
 
 ### Validation Engine
+
 **Purpose**: Validates dependencies meet all requirements.
 
 **Validation Stages**:
+
 1. **Existence Check**: Dependency is installed/available
 2. **Version Check**: Meets minimum/maximum version requirements
 3. **Compatibility Check**: Compatible with other dependencies
 4. **Health Check**: Dependency is functioning correctly
 
 **Business Rules**:
+
 - Validation failures provide specific error messages
 - Optional dependencies don't block system operation
 - Required dependencies prevent feature usage if missing
@@ -167,6 +184,7 @@ interface CLIDetectionResult {
 The dependencies management module is critical for ensuring [hooks_system](hooks_system.md) actions can execute successfully:
 
 ### Pre-execution Dependency Checking
+
 ```typescript
 class HookExecutorWithDependencyCheck {
     async executeHook(hook: Hook, context: TemplateContext) {
@@ -210,6 +228,7 @@ class HookExecutorWithDependencyCheck {
 ```
 
 ### Dependency-aware Hook Configuration
+
 ```typescript
 // Hook configuration with dependency requirements
 const hookWithDependencies: Hook = {
@@ -243,6 +262,7 @@ const hookWithDependencies: Hook = {
 ## Practical Examples
 
 ### Example 1: CLI Tool Detection
+
 ```typescript
 class CLIToolDetectorImpl {
     async detectTool(toolName: string): Promise<CLIDetectionResult> {
@@ -290,6 +310,7 @@ class CLIToolDetectorImpl {
 ```
 
 ### Example 2: Dependency Validation in UI
+
 ```typescript
 // UI component for dependency status
 class DependencyStatusComponent {
@@ -333,6 +354,7 @@ class DependencyStatusComponent {
 ```
 
 ### Example 3: Graceful Degradation
+
 ```typescript
 // Feature that works with or without optional dependency
 class FeatureWithOptionalDependency {
@@ -407,21 +429,25 @@ sequenceDiagram
 ## Dependency Types and Detection Strategies
 
 ### CLI Tools
+
 **Examples**: `git`, `node`, `python`, `docker`
 **Detection**: PATH scanning, version command execution
 **Installation**: Package managers (apt, brew, chocolatey, etc.)
 
 ### VS Code Extensions
+
 **Examples**: `github.copilot`, `github.copilot-chat`, custom extensions
 **Detection**: Extension marketplace API, local installation scanning
 **Installation**: VS Code extension installation commands
 
 ### External Services
+
 **Examples**: Databases, APIs, MCP servers, authentication services
 **Detection**: Network connectivity, health endpoints, authentication
 **Installation**: Service-specific setup procedures
 
 ### Libraries/Packages
+
 **Examples**: npm packages, Python packages, system libraries
 **Detection**: Package manager queries, import/require testing
 **Installation**: Package manager installation commands
@@ -429,11 +455,13 @@ sequenceDiagram
 ## Dependencies
 
 ### Internal Dependencies
+
 - **[hooks_system](hooks_system.md)**: For pre-execution dependency validation
 - **[ui_view_providers](ui_view_providers.md)**: For dependency status UI
 - **[agents_management](agents_management.md)**: For agent dependency checking
 
 ### External Dependencies
+
 - **VS Code Extension API**: For extension detection
 - **System APIs**: For process execution and PATH scanning
 - **Network APIs**: For service connectivity testing
@@ -442,6 +470,7 @@ sequenceDiagram
 ## Error Handling
 
 ### Dependency Error Types
+
 1. **Missing Dependency**: Required tool/extension not installed
 2. **Version Mismatch**: Installed version doesn't meet requirements
 3. **Service Unavailable**: External service not reachable
@@ -449,6 +478,7 @@ sequenceDiagram
 5. **Configuration Error**: Dependency misconfigured
 
 ### Recovery Strategies
+
 - **Installation Guidance**: Provide specific installation commands
 - **Version Upgrades**: Suggest upgrade commands for outdated dependencies
 - **Alternative Features**: Offer fallback functionality when possible

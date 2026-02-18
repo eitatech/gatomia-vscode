@@ -21,7 +21,16 @@
       "!.vscode/**/*",
       "!.agent_work/**/*",
       "!specs/**/*",
-      "!references/**/*"
+      "!references/**/*",
+      "!.mypy_cache/**/*",
+      "!.pytest_cache/**/*",
+      "!**/dist/**/*",
+      "!**/build/**/*",
+      "!**/out/**/*",
+      "!**/coverage/**/*",
+      "!**/coverage-*/**/*",
+      "!**/docs/**/*",
+      "!**/examples/**/*"
     ],
     "ignoreUnknown": false
   },

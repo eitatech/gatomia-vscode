@@ -1,2 +1,3 @@
 .vscode/tasks.json
 .agent_work/
+.mypy_cache/

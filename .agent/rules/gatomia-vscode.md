@@ -11,6 +11,7 @@ trigger: always_on
 This constitution establishes the foundational coding standards and practices for the GatomIA project. It aims to ensure code quality, maintainability, and consistency across the codebase while fostering a collaborative and efficient development environment.
 
 ### II. Scope
+
 notes
 This constitution applies to all source code, tests, documentation, and configuration files within the GatomIA project. It governs naming conventions, coding practices, testing strategies, and overall code quality standards.
 
