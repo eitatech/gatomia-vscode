@@ -324,6 +324,7 @@ All standard template variables available in hooks:
 - Verify bridge communication in extension logs
 
 ## Active Technologies
+- VS Code `workspaceState` API, key `gatomia.hooks.configurations` (existing, JSON array of `Hook[]`) (001-hooks-refactor)
 
 - TypeScript 5.3+ (strict) + VS Code Extension API, React 18, Spec Explorer stores, telemetry helpers in `src/features/spec/review-flow/telemetry.ts` (001-auto-review-transition)
 - JSON workspace state `.vscode/gatomia/spec-review-state.json` managed via `review-flow/state.ts` + `storage.ts` (001-auto-review-transition)

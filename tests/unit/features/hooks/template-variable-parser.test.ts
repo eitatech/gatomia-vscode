@@ -633,4 +633,87 @@ describe("TemplateVariableParser", () => {
 			expect(result).toBe("Content:\nLine 1\nLine 2\nLine 3\n---End---");
 		});
 	});
+
+	// ============================================================================
+	// T048: $acpAgentOutput template variable
+	// ============================================================================
+
+	describe("substitute() - $acpAgentOutput variable (T048)", () => {
+		it("substitutes $acpAgentOutput with ACP agent response text", () => {
+			const template = "ACP result: $acpAgentOutput";
+			const context: TemplateContext = {
+				timestamp: "2026-02-18T10:00:00Z",
+				triggerType: "specify",
+				acpAgentOutput: "The agent completed the task successfully.",
+			};
+
+			const result = parser.substitute(template, context);
+
+			expect(result).toBe(
+				"ACP result: The agent completed the task successfully."
+			);
+		});
+
+		it("replaces $acpAgentOutput with empty string when not provided", () => {
+			const template = "ACP result: $acpAgentOutput";
+			const context: TemplateContext = {
+				timestamp: "2026-02-18T10:00:00Z",
+				triggerType: "specify",
+				// acpAgentOutput not set
+			};
+
+			const result = parser.substitute(template, context);
+
+			expect(result).toBe("ACP result: ");
+		});
+
+		it("substitutes $acpAgentOutput when explicitly set to empty string", () => {
+			const template = "Output: [$acpAgentOutput]";
+			const context: TemplateContext = {
+				timestamp: "2026-02-18T10:00:00Z",
+				triggerType: "specify",
+				acpAgentOutput: "",
+			};
+
+			const result = parser.substitute(template, context);
+
+			expect(result).toBe("Output: []");
+		});
+
+		it("handles multiline $acpAgentOutput content", () => {
+			const template = "Agent said:\n$acpAgentOutput\n---";
+			const context: TemplateContext = {
+				timestamp: "2026-02-18T10:00:00Z",
+				triggerType: "specify",
+				acpAgentOutput: "Line one\nLine two\nLine three",
+			};
+
+			const result = parser.substitute(template, context);
+
+			expect(result).toBe("Agent said:\nLine one\nLine two\nLine three\n---");
+		});
+
+		it("extracts $acpAgentOutput as a variable name", () => {
+			const template = "Result: $acpAgentOutput end";
+			const variables = parser.extractVariables(template);
+
+			expect(variables).toContain("acpAgentOutput");
+		});
+
+		it("substitutes $acpAgentOutput alongside other variables", () => {
+			const template = "[$timestamp] ACP: $acpAgentOutput (branch: $branch)";
+			const context: TemplateContext = {
+				timestamp: "2026-02-18T10:00:00Z",
+				triggerType: "specify",
+				acpAgentOutput: "task done",
+				branch: "001-hooks-refactor",
+			};
+
+			const result = parser.substitute(template, context);
+
+			expect(result).toBe(
+				"[2026-02-18T10:00:00Z] ACP: task done (branch: 001-hooks-refactor)"
+			);
+		});
+	});
 });

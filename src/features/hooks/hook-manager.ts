@@ -568,6 +568,32 @@ export class HookManager {
 			}
 		}
 
+		if (action.type === "acp") {
+			const params = action.parameters as any;
+			if (
+				typeof params?.agentCommand !== "string" ||
+				!params.agentCommand.trim()
+			) {
+				return [
+					{
+						field: "action.parameters.agentCommand",
+						message: "Agent command is required",
+					},
+				];
+			}
+			if (
+				typeof params?.taskInstruction !== "string" ||
+				!params.taskInstruction.trim()
+			) {
+				return [
+					{
+						field: "action.parameters.taskInstruction",
+						message: "Task instruction is required",
+					},
+				];
+			}
+		}
+
 		return [
 			{
 				field: "action",

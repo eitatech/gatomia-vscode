@@ -160,6 +160,90 @@ describe("HookManager", () => {
 			expect(hooks).toHaveLength(1);
 			expect(hooks[0].trigger.timing).toBe("after");
 		});
+
+		it("should load hooks that have a stored CopilotModel string in cliOptions.modelId without error", async () => {
+			const { randomUUID } = await import("node:crypto");
+			// Simulates a hook stored when CopilotModel was an enum — value is now
+			// treated as a plain string via `type CopilotModel = string`.
+			const oldHookWithModelId = {
+				id: randomUUID(),
+				name: "Hook With Model",
+				enabled: true,
+				trigger: {
+					agent: "speckit",
+					operation: "specify",
+					timing: "after",
+				},
+				action: {
+					type: "custom",
+					parameters: {
+						agentName: "copilot",
+						prompt: "Review code",
+						cliOptions: {
+							modelId: "gpt-4o", // Old hardcoded enum value now stored as string
+						},
+					},
+				},
+				createdAt: Date.now(),
+				modifiedAt: Date.now(),
+				executionCount: 0,
+			};
+
+			await mockContext.workspaceState.update("gatomia.hooks.configurations", [
+				oldHookWithModelId,
+			]);
+
+			const newManager = new HookManager(mockContext, mockOutputChannel);
+			await newManager.initialize();
+
+			const hooks = await newManager.getAllHooks();
+			expect(hooks).toHaveLength(1);
+			const params = hooks[0].action.parameters as {
+				cliOptions?: { modelId?: string };
+			};
+			expect(params.cliOptions?.modelId).toBe("gpt-4o");
+		});
+
+		it("should load hooks that have an MCP action with old agentId field and migrate to modelId", async () => {
+			const { randomUUID } = await import("node:crypto");
+			const oldMcpHook = {
+				id: randomUUID(),
+				name: "Old MCP Hook",
+				enabled: true,
+				trigger: {
+					agent: "speckit",
+					operation: "specify",
+					timing: "after",
+				},
+				action: {
+					type: "mcp",
+					parameters: {
+						serverId: "github",
+						toolName: "some-tool",
+						agentId: "gpt-4o", // Old field — should be renamed to modelId
+					},
+				},
+				createdAt: Date.now(),
+				modifiedAt: Date.now(),
+				executionCount: 0,
+			};
+
+			await mockContext.workspaceState.update("gatomia.hooks.configurations", [
+				oldMcpHook,
+			]);
+
+			const newManager = new HookManager(mockContext, mockOutputChannel);
+			await newManager.initialize();
+
+			const hooks = await newManager.getAllHooks();
+			expect(hooks).toHaveLength(1);
+			const params = hooks[0].action.parameters as {
+				modelId?: string;
+				agentId?: string;
+			};
+			expect(params.modelId).toBe("gpt-4o");
+			expect(params.agentId).toBeUndefined();
+		});
 	});
 
 	describe("createHook", () => {

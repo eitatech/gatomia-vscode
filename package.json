@@ -12,7 +12,7 @@
     "url": "https://github.com/eitatech/gatomia-vscode"
   },
   "engines": {
-    "vscode": "^1.84.0"
+    "vscode": "^1.90.0"
   },
   "categories": [
     "AI",
@@ -929,6 +929,7 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "^0.14.1",
     "gray-matter": "^4.0.3",
     "handlebars": "^4.7.8",
     "markdown-it": "^14.1.1",

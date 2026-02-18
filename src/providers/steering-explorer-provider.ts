@@ -109,7 +109,7 @@ export class SteeringExplorerProvider
 			}),
 			new SteeringItem({
 				label: "User Instructions",
-				collapsibleState: TreeItemCollapsibleState.Expanded,
+				collapsibleState: TreeItemCollapsibleState.Collapsed,
 				contextValue: "group-user",
 				resourcePath: "",
 				context: this.context,

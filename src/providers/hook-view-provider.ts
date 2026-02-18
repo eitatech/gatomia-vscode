@@ -15,6 +15,8 @@ import type {
 	MCPServer,
 } from "../features/hooks/types";
 import type { IMCPDiscoveryService } from "../features/hooks/services/mcp-contracts";
+import type { IModelCacheService } from "../features/hooks/services/model-cache-service";
+import type { IAcpAgentDiscoveryService } from "../features/hooks/services/acp-agent-discovery-service";
 import { getWebviewContent } from "../utils/get-webview-content";
 
 /**
@@ -29,7 +31,9 @@ type WebviewMessage =
 	| HookReadyMessage
 	| HookLogsRequestMessage
 	| MCPDiscoveryRequestMessage
-	| AgentListRequestMessage;
+	| AgentListRequestMessage
+	| ModelRequestMessage
+	| ACPAgentsRequestMessage;
 
 interface HookCreateMessage {
 	command?: "hooks.create";
@@ -87,6 +91,18 @@ interface AgentListRequestMessage {
 	type?: "hooks/agents-list";
 	data?: { forceRefresh?: boolean };
 	payload?: { forceRefresh?: boolean };
+}
+
+interface ModelRequestMessage {
+	command?: "hooks.models-request";
+	type?: "hooks/models-request";
+	data?: { forceRefresh?: boolean };
+	payload?: { forceRefresh?: boolean };
+}
+
+interface ACPAgentsRequestMessage {
+	command?: "hooks.acp-agents-request";
+	type?: "hooks/acp-agents-request";
 }
 
 /**
@@ -180,6 +196,34 @@ interface AgentErrorMessage {
 	data: { message: string };
 }
 
+interface ModelsAvailableMessage {
+	command: "hooks.models-available";
+	type: "hooks/models-available";
+	models: Array<{
+		id: string;
+		name: string;
+		family: string;
+		maxInputTokens: number;
+	}>;
+	isStale: boolean;
+}
+
+interface ModelsErrorMessage {
+	command: "hooks.models-error";
+	type: "hooks/models-error";
+	message: string;
+}
+
+interface ACPAgentsAvailableMessage {
+	command: "hooks.acp-agents-available";
+	type: "hooks/acp-agents-available";
+	agents: Array<{
+		agentCommand: string;
+		agentDisplayName: string;
+		source: "workspace";
+	}>;
+}
+
 type ExtensionMessage =
 	| HooksSyncMessage
 	| HookCreatedMessage
@@ -192,6 +236,9 @@ type ExtensionMessage =
 	| MCPErrorMessage
 	| AgentListMessage
 	| AgentErrorMessage
+	| ModelsAvailableMessage
+	| ModelsErrorMessage
+	| ACPAgentsAvailableMessage
 	| ShowFormMessage
 	| ShowLogsPanelMessage;
 
@@ -224,6 +271,8 @@ export class HookViewProvider {
 	private readonly hookManager: HookManager;
 	private readonly hookExecutor: HookExecutor;
 	private readonly mcpDiscoveryService: IMCPDiscoveryService;
+	private readonly modelCacheService: IModelCacheService;
+	private readonly acpAgentDiscoveryService: IAcpAgentDiscoveryService;
 	private readonly outputChannel: OutputChannel;
 	private readonly disposables: Disposable[] = [];
 	private readonly executionStatusCache = new Map<
@@ -238,12 +287,16 @@ export class HookViewProvider {
 		hookManager: HookManager;
 		hookExecutor: HookExecutor;
 		mcpDiscoveryService: IMCPDiscoveryService;
+		modelCacheService: IModelCacheService;
+		acpAgentDiscoveryService: IAcpAgentDiscoveryService;
 		outputChannel: OutputChannel;
 	}) {
 		this.context = options.context;
 		this.hookManager = options.hookManager;
 		this.hookExecutor = options.hookExecutor;
 		this.mcpDiscoveryService = options.mcpDiscoveryService;
+		this.modelCacheService = options.modelCacheService;
+		this.acpAgentDiscoveryService = options.acpAgentDiscoveryService;
 		this.outputChannel = options.outputChannel;
 	}
 
@@ -340,6 +393,12 @@ export class HookViewProvider {
 					break;
 				case "hooks.agents-list":
 					await this.handleAgentListRequest(messageData?.forceRefresh ?? false);
+					break;
+				case "hooks.models-request":
+					await this.handleModelsRequest(messageData?.forceRefresh ?? false);
+					break;
+				case "hooks.acp-agents-request":
+					await this.handleACPAgentsRequest();
 					break;
 				default:
 					this.outputChannel.appendLine(
@@ -577,6 +636,64 @@ export class HookViewProvider {
 			} else {
 				this.pendingMessages.push(errorMessage);
 			}
+		}
+	}
+
+	private async handleModelsRequest(forceRefresh: boolean): Promise<void> {
+		try {
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Models request (forceRefresh: ${forceRefresh})`
+			);
+
+			const result =
+				await this.modelCacheService.getAvailableModels(forceRefresh);
+
+			await this.sendMessageToWebview({
+				command: "hooks.models-available",
+				type: "hooks/models-available",
+				models: result.models,
+				isStale: result.isStale,
+			} as ModelsAvailableMessage);
+
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Sent ${result.models.length} models to webview (isStale: ${result.isStale})`
+			);
+		} catch (error) {
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Models request error: ${(error as Error).message}`
+			);
+
+			await this.sendMessageToWebview({
+				command: "hooks.models-error",
+				type: "hooks/models-error",
+				message:
+					(error as Error).message || "Failed to retrieve available models",
+			} as ModelsErrorMessage);
+		}
+	}
+
+	private async handleACPAgentsRequest(): Promise<void> {
+		try {
+			this.outputChannel.appendLine("[HookViewProvider] ACP agents request");
+			const agents = await this.acpAgentDiscoveryService.discoverAgents();
+			await this.sendMessageToWebview({
+				command: "hooks.acp-agents-available",
+				type: "hooks/acp-agents-available",
+				agents,
+			} as ACPAgentsAvailableMessage);
+			this.outputChannel.appendLine(
+				`[HookViewProvider] Sent ${agents.length} ACP agents to webview`
+			);
+		} catch (error) {
+			this.outputChannel.appendLine(
+				`[HookViewProvider] ACP agents request error: ${(error as Error).message}`
+			);
+			// Send empty list on error — non-fatal
+			await this.sendMessageToWebview({
+				command: "hooks.acp-agents-available",
+				type: "hooks/acp-agents-available",
+				agents: [],
+			} as ACPAgentsAvailableMessage);
 		}
 	}
 

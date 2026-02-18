@@ -42,6 +42,8 @@ import { HookExecutor } from "./features/hooks/hook-executor";
 import { AgentRegistry } from "./features/hooks/agent-registry";
 import { CommandCompletionDetector } from "./features/hooks/services/command-completion-detector";
 import { MCPDiscoveryService } from "./features/hooks/services/mcp-discovery";
+import { ModelCacheService } from "./features/hooks/services/model-cache-service";
+import { AcpAgentDiscoveryService } from "./features/hooks/services/acp-agent-discovery-service";
 import { HookViewProvider } from "./providers/hook-view-provider";
 import { HooksExplorerProvider } from "./providers/hooks-explorer-provider";
 import { DependenciesViewProvider } from "./providers/dependencies-view-provider";
@@ -188,6 +190,16 @@ export async function activate(context: ExtensionContext) {
 	mcpDiscoveryService = new MCPDiscoveryService();
 	outputChannel.appendLine("MCPDiscoveryService initialized");
 
+	// Initialize ModelCacheService for dynamic model selection (T018 / US1)
+	const modelCacheService = new ModelCacheService();
+	outputChannel.appendLine("ModelCacheService initialized");
+
+	// Initialize AcpAgentDiscoveryService for ACP agent hooks (Phase 6)
+	const acpAgentDiscoveryService = new AcpAgentDiscoveryService(
+		workspaceFolders?.[0]?.uri.fsPath ?? ""
+	);
+	outputChannel.appendLine("AcpAgentDiscoveryService initialized");
+
 	// Initialize AgentRegistry for custom agent hooks (Phase 2 - T010, T018)
 	// Must be initialized before HookManager to enable agent validation
 	const agentWorkspaceRoot = workspaceFolders?.[0]?.uri.fsPath || "";
@@ -226,6 +238,8 @@ export async function activate(context: ExtensionContext) {
 		hookManager,
 		hookExecutor,
 		mcpDiscoveryService,
+		modelCacheService,
+		acpAgentDiscoveryService,
 		outputChannel,
 	});
 	hookViewProvider.initialize();
@@ -476,6 +490,7 @@ export async function activate(context: ExtensionContext) {
 		{ dispose: () => hookManager.dispose() },
 		{ dispose: () => hookExecutor.dispose() },
 		{ dispose: () => commandCompletionDetector.dispose() },
+		{ dispose: () => modelCacheService.dispose() },
 		{ dispose: () => hookViewProvider.dispose() },
 		{ dispose: () => hooksExplorer.dispose() },
 		{ dispose: () => quickAccessExplorer.dispose() },

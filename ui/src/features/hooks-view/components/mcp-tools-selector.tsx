@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react";
 import { VSCodeCheckbox } from "@/components/ui/vscode-checkbox";
-import type { SelectedMCPTool } from "../types";
+import type {
+	MCPProviderGroup,
+	MCPToolOption,
+	SelectedMCPTool,
+} from "../types";
+import { groupToolsByProvider } from "../hooks/use-mcp-servers";
 import type { MCPServer } from "../hooks/use-mcp-servers";
 
 export interface MCPToolsSelectorProps {
@@ -9,6 +14,46 @@ export interface MCPToolsSelectorProps {
 	onSelectionChange: (selectedTools: SelectedMCPTool[]) => void;
 	disabled?: boolean;
 }
+
+/**
+ * Filters a list of provider groups by a search query.
+ * Returns only groups that have at least one matching tool.
+ */
+const filterGroups = (
+	groups: MCPProviderGroup[],
+	query: string
+): MCPProviderGroup[] => {
+	if (!query.trim()) {
+		return groups;
+	}
+
+	const lowerQuery = query.toLowerCase();
+
+	return groups
+		.map((group) => ({
+			...group,
+			tools: group.tools.filter(
+				(tool) =>
+					tool.toolDisplayName.toLowerCase().includes(lowerQuery) ||
+					tool.toolName.toLowerCase().includes(lowerQuery) ||
+					tool.description.toLowerCase().includes(lowerQuery)
+			),
+		}))
+		.filter((group) => group.tools.length > 0);
+};
+
+/**
+ * Converts an MCPToolOption into a SelectedMCPTool given its parent group.
+ */
+const toSelectedTool = (
+	group: MCPProviderGroup,
+	tool: MCPToolOption
+): SelectedMCPTool => ({
+	serverId: group.serverId,
+	serverName: group.serverName,
+	toolName: tool.toolName,
+	toolDisplayName: tool.toolDisplayName,
+});
 
 export function MCPToolsSelector({
 	servers,
@@ -21,30 +66,15 @@ export function MCPToolsSelector({
 		new Set()
 	);
 
-	// Servers já vêm agrupados do backend, apenas ordenamos por nome
-	const sortedServers = useMemo(
-		() => [...servers].sort((a, b) => a.name.localeCompare(b.name)),
-		[servers]
+	const groups = useMemo(
+		() => groupToolsByProvider(servers, selectedTools),
+		[servers, selectedTools]
 	);
 
-	const filteredServers = useMemo(() => {
-		if (!searchQuery.trim()) {
-			return sortedServers;
-		}
-
-		const query = searchQuery.toLowerCase();
-		return sortedServers
-			.map((server) => ({
-				...server,
-				tools: server.tools.filter(
-					(tool) =>
-						tool.displayName.toLowerCase().includes(query) ||
-						tool.name.toLowerCase().includes(query) ||
-						tool.description?.toLowerCase().includes(query)
-				),
-			}))
-			.filter((server) => server.tools.length > 0);
-	}, [sortedServers, searchQuery]);
+	const filteredGroups = useMemo(
+		() => filterGroups(groups, searchQuery),
+		[groups, searchQuery]
+	);
 
 	const toggleServer = (serverId: string): void => {
 		const newExpanded = new Set(expandedServers);
@@ -56,85 +86,59 @@ export function MCPToolsSelector({
 		setExpandedServers(newExpanded);
 	};
 
-	const isToolSelected = (serverId: string, toolName: string): boolean =>
-		selectedTools.some(
-			(t) => t.serverId === serverId && t.toolName === toolName
-		);
-
-	const getServerSelectionState = (
-		serverId: string
+	const getGroupSelectionState = (
+		group: MCPProviderGroup
 	): "all" | "some" | "none" => {
-		const server = servers.find((s) => s.id === serverId);
-		if (!server || server.tools.length === 0) {
+		if (group.tools.length === 0) {
 			return "none";
 		}
 
-		const selectedCount = server.tools.filter((tool) =>
-			isToolSelected(serverId, tool.name)
-		).length;
+		const selectedCount = group.tools.filter((t) => t.isSelected).length;
 
 		if (selectedCount === 0) {
 			return "none";
 		}
-		if (selectedCount === server.tools.length) {
+		if (selectedCount === group.tools.length) {
 			return "all";
 		}
 		return "some";
 	};
 
 	const handleToolToggle = (
-		serverId: string,
-		serverName: string,
-		toolName: string,
-		toolDisplayName: string
+		group: MCPProviderGroup,
+		tool: MCPToolOption
 	): void => {
 		if (disabled) {
 			return;
 		}
 
-		const isSelected = isToolSelected(serverId, toolName);
 		let newSelection: SelectedMCPTool[];
 
-		if (isSelected) {
+		if (tool.isSelected) {
 			newSelection = selectedTools.filter(
-				(t) => !(t.serverId === serverId && t.toolName === toolName)
+				(t) => !(t.serverId === group.serverId && t.toolName === tool.toolName)
 			);
 		} else {
-			newSelection = [
-				...selectedTools,
-				{ serverId, serverName, toolName, toolDisplayName },
-			];
+			newSelection = [...selectedTools, toSelectedTool(group, tool)];
 		}
 
 		onSelectionChange(newSelection);
 	};
 
-	const handleServerToggle = (serverId: string, serverName: string): void => {
+	const handleGroupToggle = (group: MCPProviderGroup): void => {
 		if (disabled) {
 			return;
 		}
 
-		const server = servers.find((s) => s.id === serverId);
-		if (!server) {
-			return;
-		}
-
-		const state = getServerSelectionState(serverId);
+		const state = getGroupSelectionState(group);
 		let newSelection: SelectedMCPTool[];
 
 		if (state === "all") {
-			// Deselecionar todas as tools deste servidor
-			newSelection = selectedTools.filter((t) => t.serverId !== serverId);
+			newSelection = selectedTools.filter((t) => t.serverId !== group.serverId);
 		} else {
-			// Selecionar todas as tools deste servidor
-			const toolsToAdd = server.tools
-				.filter((tool) => !isToolSelected(serverId, tool.name))
-				.map((tool) => ({
-					serverId,
-					serverName,
-					toolName: tool.name,
-					toolDisplayName: tool.displayName,
-				}));
+			const toolsToAdd = group.tools
+				.filter((tool) => !tool.isSelected)
+				.map((tool) => toSelectedTool(group, tool));
 
 			newSelection = [...selectedTools, ...toolsToAdd];
 		}
@@ -186,7 +190,7 @@ export function MCPToolsSelector({
 					borderColor: "var(--vscode-panel-border)",
 				}}
 			>
-				{filteredServers.length === 0 ? (
+				{filteredGroups.length === 0 ? (
 					<div
 						className="p-4 text-center text-sm"
 						style={{ color: "var(--vscode-descriptionForeground)" }}
@@ -200,15 +204,15 @@ export function MCPToolsSelector({
 						className="divide-y"
 						style={{ borderColor: "var(--vscode-panel-border)" }}
 					>
-						{filteredServers.map((server) => {
-							const selectionState = getServerSelectionState(server.id);
-							const isExpanded = expandedServers.has(server.id);
-							const selectedCount = server.tools.filter((tool) =>
-								isToolSelected(server.id, tool.name)
+						{filteredGroups.map((group) => {
+							const selectionState = getGroupSelectionState(group);
+							const isExpanded = expandedServers.has(group.serverId);
+							const selectedCount = group.tools.filter(
+								(t) => t.isSelected
 							).length;
 
 							return (
-								<div key={server.id}>
+								<div key={group.serverId}>
 									<div
 										className="flex items-center gap-2 px-3 py-2 transition-colors hover:bg-opacity-50"
 										style={{
@@ -221,27 +225,27 @@ export function MCPToolsSelector({
 											checked={selectionState === "all"}
 											disabled={disabled}
 											indeterminate={selectionState === "some"}
-											onChange={() =>
-												handleServerToggle(server.id, server.name)
-											}
+											onChange={() => handleGroupToggle(group)}
 										/>
 
 										<button
 											className="flex flex-1 items-center gap-2 text-left font-medium text-sm"
 											disabled={disabled}
-											onClick={() => toggleServer(server.id)}
+											onClick={() => toggleServer(group.serverId)}
 											style={{
 												color: "var(--vscode-foreground)",
 											}}
 											type="button"
 										>
 											<span className="text-xs">{isExpanded ? "▼" : "▶"}</span>
-											<span>{server.name}</span>
+											<span>{group.serverName}</span>
 											<span
 												className="text-xs"
-												style={{ color: "var(--vscode-descriptionForeground)" }}
+												style={{
+													color: "var(--vscode-descriptionForeground)",
+												}}
 											>
-												({selectedCount}/{server.tools.length})
+												({selectedCount}/{group.tools.length})
 											</span>
 										</button>
 									</div>
@@ -251,34 +255,26 @@ export function MCPToolsSelector({
 											className="divide-y"
 											style={{ borderColor: "var(--vscode-panel-border)" }}
 										>
-											{server.tools.map((tool) => {
-												const isSelected = isToolSelected(server.id, tool.name);
-												const toolId = `tool-${server.id}-${tool.name}`;
+											{group.tools.map((tool) => {
+												const toolId = `tool-${group.serverId}-${tool.toolName}`;
 
 												return (
 													<label
 														className="flex cursor-pointer items-start gap-2 px-3 py-2 pl-10 transition-colors hover:bg-opacity-50"
 														htmlFor={toolId}
-														key={tool.name}
+														key={tool.toolName}
 														style={{
-															backgroundColor: isSelected
+															backgroundColor: tool.isSelected
 																? "var(--vscode-list-hoverBackground)"
 																: "transparent",
 														}}
 													>
 														<VSCodeCheckbox
-															checked={isSelected}
+															checked={tool.isSelected}
 															className="mt-0.5"
 															disabled={disabled}
 															id={toolId}
-															onChange={() =>
-																handleToolToggle(
-																	server.id,
-																	server.name,
-																	tool.name,
-																	tool.displayName
-																)
-															}
+															onChange={() => handleToolToggle(group, tool)}
 														/>
 
 														<span className="min-w-0 flex-1">
@@ -286,7 +282,7 @@ export function MCPToolsSelector({
 																className="block font-medium text-sm"
 																style={{ color: "var(--vscode-foreground)" }}
 															>
-																{tool.displayName}
+																{tool.toolDisplayName}
 															</span>
 															{tool.description && (
 																<span
