@@ -17,7 +17,7 @@
     "clsx": "^2.1.1",
     "highlight.js": "^11.11.1",
     "lucide-react": "^0.544.0",
-    "markdown-it": "^14.1.0",
+    "markdown-it": "^14.1.1",
     "markdown-it-mermaid": "^0.2.0",
     "markdown-it-plantuml": "^1.4.1",
     "mermaid": "^10.9.5",
