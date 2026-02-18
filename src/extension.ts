@@ -424,8 +424,8 @@ export async function activate(context: ExtensionContext) {
 	steeringExplorer.setSteeringManager(steeringManager);
 	initializeAutoReviewTransitions();
 	outputChannel.appendLine("[ReviewFlow] Auto review transitions initialized");
-	await syncAllSpecReviewFlowSummaries(specManager);
 
+	// Register tree providers immediately so VS Code can render initial state
 	context.subscriptions.push(
 		window.registerTreeDataProvider(
 			QuickAccessExplorerProvider.viewId,
@@ -446,6 +446,32 @@ export async function activate(context: ExtensionContext) {
 		),
 		window.registerTreeDataProvider(WikiExplorerProvider.viewId, wikiExplorer)
 	);
+
+	// Deferred refresh: gives VS Code one tick to complete internal tree setup
+	// before the first data push (guards against settled-state empty render)
+	setImmediate(() => {
+		specExplorer.refresh();
+		steeringExplorer.refresh();
+		hooksExplorer.refresh();
+		actionsExplorer.refresh();
+		outputChannel.appendLine(
+			"[TreeView] Post-registration deferred refresh fired"
+		);
+	});
+
+	// Run heavyweight sync non-blocking; refresh spec explorer when pending counts are ready
+	syncAllSpecReviewFlowSummaries(specManager)
+		.then(() => {
+			specExplorer.refresh();
+			outputChannel.appendLine(
+				"[ReviewFlow] Initial sync complete, spec explorer refreshed"
+			);
+		})
+		.catch((err: unknown) => {
+			outputChannel.appendLine(
+				`[ReviewFlow] Failed to sync initial pending summaries: ${err}`
+			);
+		});
 	context.subscriptions.push(
 		{ dispose: () => hookManager.dispose() },
 		{ dispose: () => hookExecutor.dispose() },
