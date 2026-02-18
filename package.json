@@ -66,6 +66,28 @@
           "default": true,
           "description": "Controls visibility of the Steering view in the activity bar."
         },
+        "gatomia.steering.globalResourceAccessDefault": {
+          "type": "string",
+          "default": "ask",
+          "enum": [
+            "ask",
+            "allow",
+            "deny"
+          ],
+          "description": "Default policy for reading global Copilot resources in your home directory (for example ~/.github/copilot-instructions.md, ~/.github/instructions/*.instructions.md, and global Prompts/Skills/Agents paths when available).",
+          "order": 1
+        },
+        "gatomia.steering.workspaceGlobalResourceAccess": {
+          "type": "string",
+          "default": "inherit",
+          "enum": [
+            "inherit",
+            "allow",
+            "deny"
+          ],
+          "description": "Workspace override for global Copilot resource access. Use 'inherit' to follow the global default.",
+          "order": 2
+        },
         "gatomia.views.hooks.visible": {
           "type": "boolean",
           "default": true,
@@ -237,16 +259,16 @@
           "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.hooks.visible"
         },
         {
-          "id": "gatomia.views.overview",
-          "name": "Quick Access",
-          "icon": "zap",
-          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.quickAccess.visible"
-        },
-        {
           "id": "gatomia.views.wikiExplorer",
           "name": "Repo Wiki",
           "icon": "book",
           "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.wiki.visible"
+        },
+        {
+          "id": "gatomia.views.overview",
+          "name": "Quick Access",
+          "icon": "zap",
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.quickAccess.visible"
         }
       ]
     },
@@ -415,6 +437,12 @@
         "title": "Create Constitution",
         "category": "GatomIA",
         "icon": "$(book)"
+      },
+      {
+        "command": "gatomia.steering.openGlobalResourceAccessSettings",
+        "title": "Global Access Settings",
+        "category": "GatomIA",
+        "icon": "$(shield)"
       },
       {
         "command": "gatomia.actions.create",
@@ -655,6 +683,11 @@
           "command": "gatomia.steering.createConstitution",
           "when": "view == gatomia.views.steeringExplorer",
           "group": "navigation@3"
+        },
+        {
+          "command": "gatomia.steering.openGlobalResourceAccessSettings",
+          "when": "view == gatomia.views.steeringExplorer",
+          "group": "navigation@5"
         },
         {
           "command": "gatomia.actions.createAgentFile",
