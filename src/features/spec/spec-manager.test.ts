@@ -22,9 +22,10 @@ const { openMock, createSpecInputControllerMock } = vi.hoisted(() => {
 	const open = vi.fn();
 	return {
 		openMock: open,
-		createSpecInputControllerMock: vi.fn(() => ({
-			open,
-		})),
+		// biome-ignore lint/complexity/useArrowFunction: vi.fn() as constructor requires function keyword for vitest 4.x
+		createSpecInputControllerMock: vi.fn(function () {
+			return { open };
+		}),
 	};
 });
 vi.mock("./create-spec-input-controller", () => ({

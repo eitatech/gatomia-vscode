@@ -134,16 +134,18 @@ vi.mock("../../../../src/utils/chat-prompt-runner", () => ({
 
 // Mock GitActionExecutor
 vi.mock("../../../../src/features/hooks/actions/git-action", () => ({
-	GitActionExecutor: vi.fn().mockImplementation(() => ({
-		execute: vi.fn(() => Promise.resolve({ success: true })),
-	})),
+	// biome-ignore lint/complexity/useArrowFunction: vi.fn() as constructor requires function keyword for vitest 4.x
+	GitActionExecutor: vi.fn(function () {
+		return { execute: vi.fn(() => Promise.resolve({ success: true })) };
+	}),
 }));
 
 // Mock GitHubActionExecutor
 vi.mock("../../../../src/features/hooks/actions/github-action", () => ({
-	GitHubActionExecutor: vi.fn().mockImplementation(() => ({
-		execute: vi.fn(() => Promise.resolve({ success: true })),
-	})),
+	// biome-ignore lint/complexity/useArrowFunction: vi.fn() as constructor requires function keyword for vitest 4.x
+	GitHubActionExecutor: vi.fn(function () {
+		return { execute: vi.fn(() => Promise.resolve({ success: true })) };
+	}),
 }));
 
 // Mock vscode extensions for Git
@@ -199,6 +201,7 @@ vi.mock("vscode", async () => {
 vi.mock("node:child_process", async (importOriginal) => {
 	const actual = await importOriginal();
 	return {
+		default: actual,
 		...actual,
 		spawn: vi.fn(() => {
 			// Mock child process that simulates successful execution
