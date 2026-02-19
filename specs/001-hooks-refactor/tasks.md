@@ -197,6 +197,37 @@
 
 ---
 
+## Phase 8: Simplified Known Agent Selection (Priority: P1)
+
+**Goal**: Replace the open-ended agent command textarea with a two-path UX:
+1. Known agents checklist — 7 pre-configured agents, checkbox enables, detected badge shown
+2. Custom agent — JSON config blob for unlisted ACP-compatible agents
+
+### Tasks
+
+- [X] T073 Write failing tests for `KnownAgentCatalog` (`known-agent-catalog.test.ts`)
+- [X] T074 Implement `KnownAgentCatalog` (`known-agent-catalog.ts`) — 7 catalog entries
+- [X] T075 Write failing tests for `KnownAgentDetector` (`known-agent-detector.test.ts`)
+- [X] T076 Implement `KnownAgentDetector` (`known-agent-detector.ts`) — npm-global + path strategies
+- [X] T077 Write failing tests for `KnownAgentPreferencesService` (`known-agent-preferences-service.test.ts`)
+- [X] T078 Implement `KnownAgentPreferencesService` (`known-agent-preferences-service.ts`) — globalState storage
+- [X] T079 Expand `ACPAgentDescriptor.source` type union to `"workspace" | "known" | "custom"` in both `acp-agent-discovery-service.ts` and `contracts/acp-messages.ts`
+- [X] T080 Add new bridge messages to `contracts/acp-messages.ts`: `ACPKnownAgentsStatusMessage`, `ACPKnownAgentsRequestMessage`, `ACPKnownAgentsToggleMessage`
+- [X] T081 Write failing tests for merged `AcpAgentDiscoveryService` discovery (`acp-agent-discovery-merged.test.ts`)
+- [X] T082 Update `AcpAgentDiscoveryService` with optional `detector` + `prefs` constructor args
+- [X] T083 Write failing tests for `HookViewProvider` known-agent handlers (`hook-view-provider-known-agents.test.ts`) — fix all 13 tests green
+- [X] T084 Wire `KnownAgentPreferencesService` + `KnownAgentDetector` into `extension.ts`
+- [X] T085 Write failing tests for `AcpKnownAgentsPanel` (`acp-known-agents-panel.test.tsx`)
+- [X] T086 Implement `AcpKnownAgentsPanel` component + expand `KnownAgentStatus` type in `ui/src/features/hooks-view/types.ts`
+- [X] T087 Add detection-result telemetry in `buildKnownAgentsStatus()` (`hook-view-provider.ts`)
+- [X] T088 Run `npm run check` — must exit 0 (zero warnings/errors)
+- [X] T089 Update `tasks.md` and `research.md` with Phase 8 decisions
+- [X] T090 Implement `useKnownAcpAgents` hook (`ui/src/features/hooks-view/hooks/use-known-acp-agents.ts`) — sends/listens for known-agent messages
+- [X] T091 Wire `AcpKnownAgentsPanel` + `useKnownAcpAgents` into `TriggerActionSelector` `case "acp"` block (`trigger-action-selector.tsx`)
+- [X] T092 Verify `npm run check` exits 0 and `npm test` passes (1825 tests passing)
+
+---
+
 ## Dependencies and Execution Order
 
 ### Phase Dependencies

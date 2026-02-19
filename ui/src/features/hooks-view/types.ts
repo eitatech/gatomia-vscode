@@ -203,7 +203,8 @@ export type ACPExecutionMode = "local";
 
 /**
  * ACPAgentDescriptor - Describes a discoverable local ACP agent.
- * Populated from .github/agents/*.agent.md files with `acp: true` frontmatter.
+ * Populated from .github/agents/*.agent.md files with `acp: true` frontmatter,
+ * or from the known-agent catalog, or from a custom JSON config blob.
  */
 export interface ACPAgentDescriptor {
 	/** Shell command used to spawn the agent. */
@@ -211,7 +212,28 @@ export interface ACPAgentDescriptor {
 	/** Human-readable label shown in the dropdown. */
 	agentDisplayName: string;
 	/** Origin of this descriptor. */
-	source: "workspace";
+	source: "workspace" | "known" | "custom";
+	/** For known agents: the catalog ID (e.g. "gemini", "opencode"). */
+	knownAgentId?: string;
+}
+
+/**
+ * KnownAgentStatus - Per-agent status payload sent from the extension
+ * in response to `hooks/acp-known-agents-request`.
+ */
+export interface KnownAgentStatus {
+	/** Catalog ID (e.g. "gemini", "opencode"). */
+	id: string;
+	/** Human-readable name. */
+	displayName: string;
+	/** Shell command to spawn this agent. */
+	agentCommand: string;
+	/** Whether the user has enabled this agent in their preferences. */
+	enabled: boolean;
+	/** Whether the agent binary/package was detected on the system. */
+	isDetected: boolean;
+	/** Non-null only when enabled AND detected. */
+	descriptor: ACPAgentDescriptor | null;
 }
 
 /**
@@ -391,6 +413,11 @@ export type HooksExtensionMessage =
 			type: "hooks/acp-agents-available";
 			command?: "hooks.acp-agents-available";
 			agents: ACPAgentDescriptor[];
+	  }
+	| {
+			type: "hooks/acp-known-agents-status";
+			command?: "hooks.acp-known-agents-status";
+			agents: KnownAgentStatus[];
 	  };
 
 // Webview -> Extension messages
@@ -426,4 +453,14 @@ export type HooksWebviewMessage =
 	| {
 			type: "hooks/acp-agents-request";
 			command?: "hooks.acp-agents-request";
+	  }
+	| {
+			type: "hooks/acp-known-agents-request";
+			command?: "hooks.acp-known-agents-request";
+	  }
+	| {
+			type: "hooks/acp-known-agents-toggle";
+			command?: "hooks.acp-known-agents-toggle";
+			agentId: string;
+			enabled: boolean;
 	  };

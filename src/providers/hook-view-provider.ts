@@ -17,6 +17,9 @@ import type {
 import type { IMCPDiscoveryService } from "../features/hooks/services/mcp-contracts";
 import type { IModelCacheService } from "../features/hooks/services/model-cache-service";
 import type { IAcpAgentDiscoveryService } from "../features/hooks/services/acp-agent-discovery-service";
+import type { IKnownAgentPreferencesService } from "../features/hooks/services/known-agent-preferences-service";
+import type { KnownAgentDetector } from "../features/hooks/services/known-agent-detector";
+import { KNOWN_AGENTS } from "../features/hooks/services/known-agent-catalog";
 import { getWebviewContent } from "../utils/get-webview-content";
 
 /**
@@ -33,7 +36,9 @@ type WebviewMessage =
 	| MCPDiscoveryRequestMessage
 	| AgentListRequestMessage
 	| ModelRequestMessage
-	| ACPAgentsRequestMessage;
+	| ACPAgentsRequestMessage
+	| ACPKnownAgentsRequestMessage
+	| ACPKnownAgentsToggleMessage;
 
 interface HookCreateMessage {
 	command?: "hooks.create";
@@ -103,6 +108,18 @@ interface ModelRequestMessage {
 interface ACPAgentsRequestMessage {
 	command?: "hooks.acp-agents-request";
 	type?: "hooks/acp-agents-request";
+}
+
+interface ACPKnownAgentsRequestMessage {
+	command?: "hooks.acp-known-agents-request";
+	type?: "hooks/acp-known-agents-request";
+}
+
+interface ACPKnownAgentsToggleMessage {
+	command?: "hooks.acp-known-agents-toggle";
+	type?: "hooks/acp-known-agents-toggle";
+	agentId?: string;
+	enabled?: boolean;
 }
 
 /**
@@ -220,7 +237,25 @@ interface ACPAgentsAvailableMessage {
 	agents: Array<{
 		agentCommand: string;
 		agentDisplayName: string;
-		source: "workspace";
+		source: "workspace" | "known" | "custom";
+		knownAgentId?: string;
+	}>;
+}
+
+interface ACPKnownAgentsStatusMessage {
+	command: "hooks.acp-known-agents-status";
+	type: "hooks/acp-known-agents-status";
+	agents: Array<{
+		id: string;
+		displayName: string;
+		enabled: boolean;
+		isDetected: boolean;
+		descriptor: {
+			agentCommand: string;
+			agentDisplayName: string;
+			source: "known";
+			knownAgentId: string;
+		} | null;
 	}>;
 }
 
@@ -239,6 +274,7 @@ type ExtensionMessage =
 	| ModelsAvailableMessage
 	| ModelsErrorMessage
 	| ACPAgentsAvailableMessage
+	| ACPKnownAgentsStatusMessage
 	| ShowFormMessage
 	| ShowLogsPanelMessage;
 
@@ -273,6 +309,10 @@ export class HookViewProvider {
 	private readonly mcpDiscoveryService: IMCPDiscoveryService;
 	private readonly modelCacheService: IModelCacheService;
 	private readonly acpAgentDiscoveryService: IAcpAgentDiscoveryService;
+	private readonly knownAgentPreferencesService:
+		| IKnownAgentPreferencesService
+		| undefined;
+	private readonly knownAgentDetector: KnownAgentDetector | undefined;
 	private readonly outputChannel: OutputChannel;
 	private readonly disposables: Disposable[] = [];
 	private readonly executionStatusCache = new Map<
@@ -290,6 +330,8 @@ export class HookViewProvider {
 		modelCacheService: IModelCacheService;
 		acpAgentDiscoveryService: IAcpAgentDiscoveryService;
 		outputChannel: OutputChannel;
+		knownAgentPreferencesService?: IKnownAgentPreferencesService;
+		knownAgentDetector?: KnownAgentDetector;
 	}) {
 		this.context = options.context;
 		this.hookManager = options.hookManager;
@@ -298,6 +340,8 @@ export class HookViewProvider {
 		this.modelCacheService = options.modelCacheService;
 		this.acpAgentDiscoveryService = options.acpAgentDiscoveryService;
 		this.outputChannel = options.outputChannel;
+		this.knownAgentPreferencesService = options.knownAgentPreferencesService;
+		this.knownAgentDetector = options.knownAgentDetector;
 	}
 
 	initialize(): void {
@@ -400,6 +444,19 @@ export class HookViewProvider {
 				case "hooks.acp-agents-request":
 					await this.handleACPAgentsRequest();
 					break;
+				case "hooks.acp-known-agents-request":
+					await this.handleACPKnownAgentsRequest();
+					break;
+				case "hooks.acp-known-agents-toggle": {
+					const toggleMsg = message as ACPKnownAgentsToggleMessage;
+					if (typeof toggleMsg.agentId === "string") {
+						await this.handleACPKnownAgentsToggle(
+							toggleMsg.agentId,
+							toggleMsg.enabled ?? false
+						);
+					}
+					break;
+				}
 				default:
 					this.outputChannel.appendLine(
 						`[HookViewProvider] Unknown command: ${(message as any).command ?? (message as any).type}`
@@ -670,6 +727,103 @@ export class HookViewProvider {
 					(error as Error).message || "Failed to retrieve available models",
 			} as ModelsErrorMessage);
 		}
+	}
+
+	/**
+	 * Builds and sends the known-agents status to the webview.
+	 * Always sends all 7 catalog entries with their enabled/detected state.
+	 */
+	private async handleACPKnownAgentsRequest(): Promise<void> {
+		this.outputChannel.appendLine(
+			"[HookViewProvider] ACP known agents request"
+		);
+		const statusMessage = await this.buildKnownAgentsStatus();
+		await this.sendMessageToWebview(statusMessage);
+		this.outputChannel.appendLine(
+			`[HookViewProvider] Sent known agents status (${statusMessage.agents.length} agents)`
+		);
+	}
+
+	/**
+	 * Toggles a known agent pref and immediately re-sends the full status.
+	 * Also refreshes the ACP agents dropdown so the Agent Command selector
+	 * reflects the updated set of enabled+detected agents.
+	 */
+	private async handleACPKnownAgentsToggle(
+		agentId: string,
+		enabled: boolean
+	): Promise<void> {
+		this.outputChannel.appendLine(
+			`[HookViewProvider] ACP known agent toggle: ${agentId} → ${enabled}`
+		);
+
+		if (this.knownAgentPreferencesService) {
+			await this.knownAgentPreferencesService.toggleAgent(
+				agentId as Parameters<
+					typeof this.knownAgentPreferencesService.toggleAgent
+				>[0],
+				enabled
+			);
+		}
+
+		const statusMessage = await this.buildKnownAgentsStatus();
+		await this.sendMessageToWebview(statusMessage);
+		// Refresh the Agent Command dropdown to reflect the new enabled set
+		await this.handleACPAgentsRequest();
+	}
+
+	/**
+	 * Builds an ACPKnownAgentsStatusMessage by iterating every catalog entry.
+	 *
+	 * Detection (`isInstalledAny`) is run for every agent regardless of whether
+	 * it is enabled, so that the "Detected / Not installed" label always reflects
+	 * the true system state. Results are cached in `detectionCache` after the
+	 * first run to avoid re-spawning shell subprocesses on every toggle.
+	 */
+	private async buildKnownAgentsStatus(): Promise<ACPKnownAgentsStatusMessage> {
+		const prefs = this.knownAgentPreferencesService;
+		const detector = this.knownAgentDetector;
+
+		const agentStatuses = await Promise.all(
+			KNOWN_AGENTS.map(async (entry) => {
+				const isEnabled = prefs ? prefs.isAgentEnabled(entry.id) : false;
+
+				// Delegate entirely to the detector — it maintains its own internal cache
+				// warmed at extension activation via preloadAll(). This call returns
+				// immediately from cache on all subsequent invocations after preload.
+				const isDetected = detector
+					? await detector.isInstalledAny(entry.installChecks)
+					: false;
+
+				this.outputChannel.appendLine(
+					`[HookViewProvider] Known agent "${entry.id}": enabled=${isEnabled} detected=${isDetected}`
+				);
+
+				const descriptor =
+					isEnabled && isDetected
+						? {
+								agentCommand: entry.agentCommand,
+								agentDisplayName: entry.displayName,
+								source: "known" as const,
+								knownAgentId: entry.id,
+							}
+						: null;
+
+				return {
+					id: entry.id,
+					displayName: entry.displayName,
+					enabled: isEnabled,
+					isDetected,
+					descriptor,
+				};
+			})
+		);
+
+		return {
+			command: "hooks.acp-known-agents-status",
+			type: "hooks/acp-known-agents-status",
+			agents: agentStatuses,
+		};
 	}
 
 	private async handleACPAgentsRequest(): Promise<void> {

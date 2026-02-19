@@ -152,3 +152,46 @@ The `CopilotModel`-to-`string` change for stored hooks requires no migration bec
 
 ### No NEEDS CLARIFICATION Remaining
 All unknowns identified during Technical Context analysis have been resolved by this research.
+
+---
+
+## Phase 8: Simplified Known Agent Selection — Architecture Decisions
+
+### Problem
+The previous `acp-agent-form.tsx` required users to know and type the exact ACP agent command manually. This created friction for the 7 most common ACP agents already in the public registry.
+
+### Solution: Two-Path UX
+1. **Known agents checklist** — 7 pre-configured catalog entries with checkbox enable + detection badge
+2. **Custom agents** — retained for any agent not in the catalog
+
+### The 7 Catalog Entries (`KnownAgentCatalog`)
+
+| ID | Display Name | Command | Install Check Strategy |
+|----|---|---|---|
+| `claude-acp` | Claude Code | `npx @zed-industries/claude-agent-acp` | npm-global |
+| `kimi` | Kimi Code CLI | `kimi acp` | path |
+| `gemini` | Gemini CLI | `npx @google/gemini-cli --experimental-acp` | npm-global |
+| `github-copilot` | GitHub Copilot | `npx @github/copilot-language-server --acp` | npm-global |
+| `codex-acp` | OpenAI Codex | `npx @zed-industries/codex-acp` | npm-global |
+| `mistral-vibe` | Mistral Vibe | `vibe-acp` | path |
+| `opencode` | OpenCode | `opencode acp` | path |
+
+### New Services
+- **`KnownAgentDetector`** — stateless, two strategies: `npm-global` (`npm list -g <pkg>`) and `path` (`which`/`where`)
+- **`KnownAgentPreferencesService`** — persists enabled IDs in `globalState` under key `gatomia.acp.knownAgents.enabled`
+
+### New Bridge Messages
+- `hooks/acp-known-agents-request` (webview → extension) — request current status
+- `hooks/acp-known-agents-status` (extension → webview) — full per-agent status array
+- `hooks/acp-known-agents-toggle` (webview → extension) — toggle one agent on/off
+
+### Key Design Decision: Only Show Enabled+Detected
+`descriptor` in `KnownAgentStatus` is non-null **only** when both `enabled=true` AND `isDetected=true`. This prevents users from selecting an agent that isn't installed, avoiding silent spawn failures.
+
+### New UI Component: `AcpKnownAgentsPanel`
+Checklist component rendering `KnownAgentStatus[]`. Each row: checkbox + display name + detected/not-installed badge.
+
+### Backward Compatibility
+- `ACPAgentDescriptor.source` expanded from `"workspace"` to `"workspace" | "known" | "custom"` — no breaking change since webview only read the value
+- `AcpAgentDiscoveryService` constructor gains optional `detector?` and `prefs?` params — existing call sites without these args continue to work
+- All existing `AcpAgentForm` tests (20 tests) continue to pass unchanged

@@ -81,22 +81,29 @@ export interface RequestModelsMessage {
 
 /**
  * Describes a discoverable local ACP agent (FR-024).
- * Populated by AcpAgentDiscoveryService from .github/agents/*.agent.md files
- * that have `acp: true` in their YAML frontmatter.
+ * Sources:
+ *   - "workspace": from .github/agents/*.agent.md with `acp: true` frontmatter
+ *   - "known": one of the 7 pre-configured agents the user has enabled
+ *   - "custom": manually provided by the user via JSON config
  */
 export interface ACPAgentDescriptor {
-	/** Shell command used to spawn the agent (from frontmatter agentCommand field). */
+	/** Shell command used to spawn the agent. */
 	agentCommand: string;
-	/** Human-readable label shown in the dropdown (from frontmatter agentDisplayName or filename). */
+	/** Human-readable label shown in the dropdown. */
 	agentDisplayName: string;
 	/** Where this descriptor originated. */
-	source: "workspace";
+	source: "workspace" | "known" | "custom";
+	/**
+	 * For `source: "known"` agents — the catalog id (e.g. "gemini", "opencode").
+	 * Undefined for workspace and custom agents.
+	 */
+	knownAgentId?: string;
 }
 
 /**
  * Extension → Webview: list of discovered ACP agents.
  * Sent in response to hooks/acp-agents-request.
- * An empty array is valid (no agents found in workspace).
+ * An empty array is valid (no agents found).
  */
 export interface ACPAgentsAvailableMessage {
 	type: "hooks/acp-agents-available";
@@ -112,6 +119,56 @@ export interface ACPAgentsRequestMessage {
 }
 
 // ---------------------------------------------------------------------------
+// Phase 8: known-agent preferences bridge messages
+// ---------------------------------------------------------------------------
+
+/**
+ * Describes a known agent's current status on this system.
+ * Sent by extension in response to hooks/acp-known-agents-request.
+ */
+export interface KnownAgentStatus {
+	/** Stable catalog id. */
+	id: string;
+	/** Human-readable label. */
+	displayName: string;
+	/** User has this agent checked (enabled in preferences). */
+	enabled: boolean;
+	/** Agent binary/package was found on the system during detection. */
+	isDetected: boolean;
+	/**
+	 * Ready-to-use descriptor if the agent is both enabled AND detected.
+	 * Null otherwise.
+	 */
+	descriptor: ACPAgentDescriptor | null;
+}
+
+/**
+ * Extension → Webview: current status of all 7 known agents.
+ * Sent in response to hooks/acp-known-agents-request.
+ */
+export interface ACPKnownAgentsStatusMessage {
+	type: "hooks/acp-known-agents-status";
+	agents: KnownAgentStatus[];
+}
+
+/**
+ * Webview → Extension: request the known-agents status (prefs + detection).
+ * Sent when the ACP agent form mounts.
+ */
+export interface ACPKnownAgentsRequestMessage {
+	type: "hooks/acp-known-agents-request";
+}
+
+/**
+ * Webview → Extension: user toggled a known agent checkbox.
+ */
+export interface ACPKnownAgentsToggleMessage {
+	type: "hooks/acp-known-agents-toggle";
+	agentId: string;
+	enabled: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Complete new message union additions
 // ---------------------------------------------------------------------------
 
@@ -119,10 +176,15 @@ export interface ACPAgentsRequestMessage {
 export type NewExtensionMessage =
 	| ModelsAvailableMessage
 	| ModelsErrorMessage
-	| ACPAgentsAvailableMessage;
+	| ACPAgentsAvailableMessage
+	| ACPKnownAgentsStatusMessage;
 
 /** Union of NEW webview → extension messages added by this feature. */
-export type NewWebviewMessage = RequestModelsMessage | ACPAgentsRequestMessage;
+export type NewWebviewMessage =
+	| RequestModelsMessage
+	| ACPAgentsRequestMessage
+	| ACPKnownAgentsRequestMessage
+	| ACPKnownAgentsToggleMessage;
 
 // ---------------------------------------------------------------------------
 // ModelCacheService interface contract

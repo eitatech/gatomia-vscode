@@ -3,10 +3,12 @@ import { VSCodeSelect } from "@/components/ui/vscode-select";
 import { AgentDropdown } from "@/components/hooks/agent-dropdown";
 import { AgentTypeSelector } from "./agent-type-selector";
 import { AcpAgentForm } from "./acp-agent-form";
+import { AcpKnownAgentsPanel } from "./acp-known-agents-panel";
 import { GitActionForm } from "./git-action-form";
 import { GitHubActionForm } from "./github-action-form";
 import type {
 	ACPActionParams,
+	ACPAgentDescriptor,
 	ActionConfig,
 	ActionType,
 	AgentActionParams,
@@ -14,6 +16,7 @@ import type {
 	CustomActionParams,
 	GitActionParams,
 	GitHubActionParams,
+	KnownAgentStatus,
 	MCPActionParams,
 	OperationType,
 	SelectedMCPTool,
@@ -22,6 +25,7 @@ import type {
 import type { ChangeEvent } from "react";
 import { useMCPServers } from "../hooks/use-mcp-servers";
 import { useAcpAgents } from "../hooks/use-acp-agents";
+import { useKnownAcpAgents } from "../hooks/use-known-acp-agents";
 import { MCPToolsSelector } from "./mcp-tools-selector";
 import { ArgumentTemplateEditor } from "./argument-template-editor";
 import { CopilotCliOptionsPanel } from "./cli-options/copilot-cli-options-panel";
@@ -111,6 +115,51 @@ const AGENT_COMMAND_SUGGESTIONS = [
 	"/speckit.integration-test",
 ];
 
+interface AcpActionContentProps {
+	action: ActionConfig;
+	actionError?: string;
+	disabled?: boolean;
+	discoveredAgents: ACPAgentDescriptor[];
+	knownAgents: KnownAgentStatus[];
+	onActionChange: (action: ActionConfig) => void;
+	onClearActionError?: () => void;
+	onToggleKnownAgent: (agentId: string, enabled: boolean) => void;
+}
+
+const AcpActionContent = ({
+	action,
+	actionError,
+	disabled,
+	discoveredAgents,
+	knownAgents,
+	onActionChange,
+	onClearActionError,
+	onToggleKnownAgent,
+}: AcpActionContentProps) => (
+	<>
+		{knownAgents.length > 0 && (
+			<div className="flex flex-col gap-2">
+				<span className="font-medium text-[color:var(--vscode-foreground)] text-sm">
+					Known Agents
+				</span>
+				<AcpKnownAgentsPanel
+					agents={knownAgents}
+					disabled={disabled}
+					onToggle={onToggleKnownAgent}
+				/>
+			</div>
+		)}
+		<AcpAgentForm
+			action={action}
+			actionError={actionError}
+			disabled={disabled}
+			discoveredAgents={discoveredAgents}
+			onActionChange={onActionChange}
+			onClearActionError={onClearActionError}
+		/>
+	</>
+);
+
 export const TriggerActionSelector = ({
 	trigger,
 	action,
@@ -122,8 +171,10 @@ export const TriggerActionSelector = ({
 }: TriggerActionSelectorProps) => {
 	// MCP servers state
 	const { servers, loading: mcpLoading, error: mcpError } = useMCPServers();
-	// ACP agents state
+	// ACP workspace-discovered agents
 	const discoveredAgents = useAcpAgents();
+	// ACP known-agent checklist state
+	const { agents: knownAgents, toggle: toggleKnownAgent } = useKnownAcpAgents();
 
 	const handleTriggerAgentChange = (event: ChangeEvent<HTMLSelectElement>) => {
 		onTriggerChange({
@@ -498,13 +549,15 @@ export const TriggerActionSelector = ({
 			}
 			case "acp": {
 				return (
-					<AcpAgentForm
+					<AcpActionContent
 						action={action}
 						actionError={actionError}
 						disabled={disabled}
 						discoveredAgents={discoveredAgents}
+						knownAgents={knownAgents}
 						onActionChange={onActionChange}
 						onClearActionError={onClearActionError}
+						onToggleKnownAgent={toggleKnownAgent}
 					/>
 				);
 			}

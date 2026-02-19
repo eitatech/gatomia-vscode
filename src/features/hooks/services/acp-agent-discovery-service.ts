@@ -1,19 +1,23 @@
 /**
  * AcpAgentDiscoveryService
  *
- * Scans `.github/agents/*.agent.md` in the workspace, parses YAML frontmatter
- * via gray-matter, and returns ACPAgentDescriptor[] for every file that has
- * `acp: true` in its frontmatter.
+ * Discovers ACP-compatible agents from two sources (merged):
+ *   1. Workspace files: `.github/agents/*.agent.md` with `acp: true` frontmatter
+ *   2. Known agents: 7 pre-configured agents that the user has enabled
+ *      and that are detected as installed on the system.
  *
- * Never throws — returns an empty array on any error (e.g. directory absent).
+ * Never throws — returns an empty array on any error.
  *
- * @feature 001-hooks-refactor Phase 6
+ * @feature 001-hooks-refactor Phase 6 (workspace) + Phase 8 (known agents)
  * @see specs/001-hooks-refactor/contracts/acp-messages.ts ACPAgentDescriptor
  */
 
 import { join } from "node:path";
 import { readdir, readFile } from "node:fs/promises";
 import matter from "gray-matter";
+import { KNOWN_AGENTS } from "./known-agent-catalog";
+import type { KnownAgentDetector } from "./known-agent-detector";
+import type { IKnownAgentPreferencesService } from "./known-agent-preferences-service";
 
 const LOG_PREFIX = "[AcpAgentDiscoveryService]";
 
@@ -29,15 +33,19 @@ export interface ACPAgentDescriptor {
 	agentCommand: string;
 	/** Human-readable label shown in the dropdown. */
 	agentDisplayName: string;
-	/** Origin of this descriptor. */
-	source: "workspace";
+	/** Where this descriptor originated. */
+	source: "workspace" | "known" | "custom";
+	/**
+	 * For `source: "known"` agents — the catalog id (e.g. "gemini", "opencode").
+	 * Undefined for workspace and custom agents.
+	 */
+	knownAgentId?: string;
 }
 
 export interface IAcpAgentDiscoveryService {
 	/**
-	 * Discovers ACP-compatible agents in the workspace.
-	 * Returns an empty array when the agents directory is absent or no agents
-	 * have `acp: true` in their frontmatter. Never throws.
+	 * Discovers ACP-compatible agents from all available sources.
+	 * Returns an empty array when no agents are found. Never throws.
 	 */
 	discoverAgents(): Promise<ACPAgentDescriptor[]>;
 }
@@ -47,23 +55,62 @@ export interface IAcpAgentDiscoveryService {
 // ============================================================================
 
 /**
- * AcpAgentDiscoveryService — discovers local ACP agents from workspace files.
+ * AcpAgentDiscoveryService — discovers local ACP agents from workspace files
+ * and from the known-agent catalog (user preferences + system detection).
  */
 export class AcpAgentDiscoveryService implements IAcpAgentDiscoveryService {
 	private readonly workspaceRoot: string;
+	private readonly detector: KnownAgentDetector | undefined;
+	private readonly prefs: IKnownAgentPreferencesService | undefined;
 
-	constructor(workspaceRoot: string) {
+	constructor(
+		workspaceRoot: string,
+		detector?: KnownAgentDetector,
+		prefs?: IKnownAgentPreferencesService
+	) {
 		this.workspaceRoot = workspaceRoot;
+		this.detector = detector;
+		this.prefs = prefs;
 	}
 
 	async discoverAgents(): Promise<ACPAgentDescriptor[]> {
+		const [workspaceAgents, knownAgents] = await Promise.allSettled([
+			this.discoverWorkspaceAgents(),
+			this.discoverKnownAgents(),
+		]);
+
+		const result: ACPAgentDescriptor[] = [];
+
+		if (workspaceAgents.status === "fulfilled") {
+			result.push(...workspaceAgents.value);
+		} else {
+			console.log(
+				`${LOG_PREFIX} Workspace discovery failed: ${workspaceAgents.reason}`
+			);
+		}
+
+		if (knownAgents.status === "fulfilled") {
+			result.push(...knownAgents.value);
+		} else {
+			console.log(
+				`${LOG_PREFIX} Known agent discovery failed: ${knownAgents.reason}`
+			);
+		}
+
+		return result;
+	}
+
+	// -------------------------------------------------------------------------
+	// Workspace discovery
+	// -------------------------------------------------------------------------
+
+	private async discoverWorkspaceAgents(): Promise<ACPAgentDescriptor[]> {
 		const agentsDir = join(this.workspaceRoot, AGENTS_DIR);
 
 		let entries: string[];
 		try {
 			entries = await readdir(agentsDir);
 		} catch (err) {
-			// Directory absent or unreadable — not an error condition
 			console.log(
 				`${LOG_PREFIX} Agents directory not found or unreadable: ${agentsDir}`
 			);
@@ -87,10 +134,6 @@ export class AcpAgentDiscoveryService implements IAcpAgentDiscoveryService {
 
 		return agents;
 	}
-
-	// -------------------------------------------------------------------------
-	// Private helpers
-	// -------------------------------------------------------------------------
 
 	private async parseAgentFile(
 		filePath: string,
@@ -121,6 +164,58 @@ export class AcpAgentDiscoveryService implements IAcpAgentDiscoveryService {
 			agentCommand,
 			agentDisplayName,
 			source: "workspace",
+		};
+	}
+
+	// -------------------------------------------------------------------------
+	// Known agent discovery
+	// -------------------------------------------------------------------------
+
+	private async discoverKnownAgents(): Promise<ACPAgentDescriptor[]> {
+		if (!(this.prefs && this.detector)) {
+			return [];
+		}
+
+		const enabledIds = this.prefs.getEnabledAgents();
+		if (enabledIds.length === 0) {
+			return [];
+		}
+
+		const results = await Promise.allSettled(
+			enabledIds.map((id) => this.resolveKnownAgent(id))
+		);
+
+		const agents: ACPAgentDescriptor[] = [];
+		for (const result of results) {
+			if (result.status === "fulfilled" && result.value !== null) {
+				agents.push(result.value);
+			} else if (result.status === "rejected") {
+				console.log(`${LOG_PREFIX} Known agent check failed: ${result.reason}`);
+			}
+		}
+
+		return agents;
+	}
+
+	private async resolveKnownAgent(
+		id: string
+	): Promise<ACPAgentDescriptor | null> {
+		const entry = KNOWN_AGENTS.find((a) => a.id === id);
+		if (!(entry && this.detector)) {
+			return null;
+		}
+
+		const detected = await this.detector.isInstalledAny(entry.installChecks);
+		if (!detected) {
+			console.log(`${LOG_PREFIX} Known agent '${id}' not detected on system`);
+			return null;
+		}
+
+		return {
+			agentCommand: entry.agentCommand,
+			agentDisplayName: entry.displayName,
+			source: "known",
+			knownAgentId: entry.id,
 		};
 	}
 }
