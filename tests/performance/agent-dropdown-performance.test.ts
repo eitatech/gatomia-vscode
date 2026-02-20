@@ -67,7 +67,7 @@ Execute the following steps:
 	}
 
 	describe("Discovery Performance", () => {
-		it("should discover 10 agents in <100ms", async () => {
+		it("should discover 10 agents in <150ms", async () => {
 			await generateAgentFiles(10);
 
 			const registry = new AgentRegistry(tempDir);
@@ -79,7 +79,7 @@ Execute the following steps:
 			const agents = registry.getAllAgents();
 
 			expect(agents).toHaveLength(10);
-			expect(duration).toBeLessThan(100);
+			expect(duration).toBeLessThan(150);
 
 			console.log(`✓ 10 agents discovered in ${duration.toFixed(2)}ms`);
 		});

@@ -12,7 +12,7 @@ const DESCRIPTION_LABEL_RE = /description/i;
 const DESCRIBE_RE = /describe/i;
 const IMPORT_FROM_FILE_RE = /import from file/i;
 const REPLACE_WARNING_RE =
-	/replace|overwrite|existing content will be replaced/i;
+	/this will replace the existing content\. continue\?/i;
 const REPLACE_BTN_RE = /replace/i;
 
 const makeRef = <T,>(current: T | null = null): MutableRefObject<T | null> => ({
