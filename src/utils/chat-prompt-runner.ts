@@ -1,13 +1,30 @@
-import { commands } from "vscode";
+import { commands, type Uri, version as vscodeVersion } from "vscode";
 import { ConfigManager } from "./config-manager";
 
 export interface ChatContext {
 	instructionType?: "createSpec" | "startAllTask" | "runPrompt";
 }
 
+const MINIMUM_FILES_SUPPORT_VERSION = "1.95.0";
+
+const supportsFilesParam = (): boolean => {
+	const parts = vscodeVersion.split(".").map(Number);
+	const minParts = MINIMUM_FILES_SUPPORT_VERSION.split(".").map(Number);
+	for (let i = 0; i < minParts.length; i++) {
+		if ((parts[i] ?? 0) > (minParts[i] ?? 0)) {
+			return true;
+		}
+		if ((parts[i] ?? 0) < (minParts[i] ?? 0)) {
+			return false;
+		}
+	}
+	return true;
+};
+
 export const sendPromptToChat = async (
 	prompt: string,
-	context?: ChatContext
+	context?: ChatContext,
+	files?: Uri[]
 ): Promise<void> => {
 	const configManager = ConfigManager.getInstance();
 	const settings = configManager.getSettings();
@@ -34,7 +51,15 @@ export const sendPromptToChat = async (
 		finalPrompt += `\n\n(Please respond in ${language}.)`;
 	}
 
-	await commands.executeCommand("workbench.action.chat.open", {
-		query: finalPrompt,
-	});
+	const hasFiles = files && files.length > 0;
+	if (hasFiles && supportsFilesParam()) {
+		await commands.executeCommand("workbench.action.chat.open", {
+			query: finalPrompt,
+			files,
+		});
+	} else {
+		await commands.executeCommand("workbench.action.chat.open", {
+			query: finalPrompt,
+		});
+	}
 };

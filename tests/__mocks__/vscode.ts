@@ -42,6 +42,7 @@ export const window = {
 	showErrorMessage: vi.fn().mockResolvedValue(undefined),
 	showWarningMessage: vi.fn().mockResolvedValue(undefined),
 	showInformationMessage: vi.fn().mockResolvedValue(undefined),
+	showOpenDialog: vi.fn(),
 	showInputBox: vi.fn(),
 	showQuickPick: vi.fn(),
 	createTerminal: vi.fn(),
@@ -86,6 +87,8 @@ export const Uri = {
 		fsPath: str.replace("file://", ""),
 	})),
 };
+
+export const version = "1.95.0";
 
 export const ViewColumn = {
 	Active: 1,
