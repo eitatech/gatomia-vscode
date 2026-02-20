@@ -27,24 +27,58 @@ export interface TriggerCondition {
 	waitForCompletion?: boolean; // Only for "before" timing: block operation until hook completes
 }
 
-export type ActionType = "agent" | "git" | "github" | "custom" | "mcp";
+export type ActionType = "agent" | "git" | "github" | "custom" | "mcp" | "acp";
 
 export interface AgentActionParams {
 	command: string;
 }
 
 export interface GitActionParams {
-	operation: "commit" | "push";
+	operation:
+		| "commit"
+		| "push"
+		| "create-branch"
+		| "checkout-branch"
+		| "pull"
+		| "merge"
+		| "tag"
+		| "stash";
 	messageTemplate: string;
 	pushToRemote?: boolean;
+	branchName?: string; // For create-branch, checkout-branch, merge
+	tagName?: string; // For tag operation
+	tagMessage?: string; // For tag operation (optional annotation)
+	stashMessage?: string; // For stash operation (optional label)
 }
 
 export interface GitHubActionParams {
-	operation: "open-issue" | "close-issue" | "create-pr" | "add-comment";
+	operation:
+		| "open-issue"
+		| "close-issue"
+		| "create-pr"
+		| "add-comment"
+		| "merge-pr"
+		| "close-pr"
+		| "add-label"
+		| "remove-label"
+		| "request-review"
+		| "assign-issue"
+		| "create-release";
 	repository?: string;
 	titleTemplate?: string;
 	bodyTemplate?: string;
 	issueNumber?: number;
+	prNumber?: number; // For merge-pr, close-pr, request-review
+	mergeMethod?: "merge" | "squash" | "rebase"; // For merge-pr
+	labels?: string[]; // For add-label (comma-separated list in UI)
+	labelName?: string; // For remove-label
+	reviewers?: string[]; // For request-review (comma-separated list in UI)
+	assignees?: string[]; // For assign-issue (comma-separated list in UI)
+	tagName?: string; // For create-release
+	releaseName?: string; // For create-release
+	releaseBody?: string; // For create-release
+	draft?: boolean; // For create-release
+	prerelease?: boolean; // For create-release
 }
 
 export interface CustomActionParams {
@@ -90,7 +124,7 @@ export interface CopilotCliOptions {
 
 	// Execution Options
 	agent?: string;
-	model?: CopilotModel;
+	modelId?: CopilotModel;
 	noAskUser?: boolean;
 	disableParallelToolsExecution?: boolean;
 	noCustomInstructions?: boolean;
@@ -119,20 +153,11 @@ export interface CopilotCliOptions {
 	allowAll?: boolean;
 }
 
-export type CopilotModel =
-	| "claude-sonnet-4.5"
-	| "claude-haiku-4.5"
-	| "claude-opus-4.5"
-	| "claude-sonnet-4"
-	| "gpt-5.2-codex"
-	| "gpt-5.1-codex-max"
-	| "gpt-5.1-codex"
-	| "gpt-5.2"
-	| "gpt-5.1"
-	| "gpt-5"
-	| "gpt-5.1-codex-mini"
-	| "gpt-5-mini"
-	| "gpt-4.1";
+/**
+ * @deprecated Use string (dynamic model ID from ModelCacheService) instead.
+ *   This type is kept as a string alias to avoid breaking external consumers.
+ */
+export type CopilotModel = string;
 
 export type CopilotLogLevel =
 	| "none"
@@ -171,12 +196,69 @@ export interface SelectedMCPTool {
 	toolDisplayName: string; // Human-readable tool name
 }
 
+/**
+ * ACPExecutionMode - Only "local" (stdio/JSON-RPC subprocess) is supported in v1.
+ */
+export type ACPExecutionMode = "local";
+
+/**
+ * ACPAgentDescriptor - Describes a discoverable local ACP agent.
+ * Populated from .github/agents/*.agent.md files with `acp: true` frontmatter,
+ * or from the known-agent catalog, or from a custom JSON config blob.
+ */
+export interface ACPAgentDescriptor {
+	/** Shell command used to spawn the agent. */
+	agentCommand: string;
+	/** Human-readable label shown in the dropdown. */
+	agentDisplayName: string;
+	/** Origin of this descriptor. */
+	source: "workspace" | "known" | "custom";
+	/** For known agents: the catalog ID (e.g. "gemini", "opencode"). */
+	knownAgentId?: string;
+}
+
+/**
+ * KnownAgentStatus - Per-agent status payload sent from the extension
+ * in response to `hooks/acp-known-agents-request`.
+ */
+export interface KnownAgentStatus {
+	/** Catalog ID (e.g. "gemini", "opencode"). */
+	id: string;
+	/** Human-readable name. */
+	displayName: string;
+	/** Shell command to spawn this agent. */
+	agentCommand: string;
+	/** Whether the user has enabled this agent in their preferences. */
+	enabled: boolean;
+	/** Whether the agent binary/package was detected on the system. */
+	isDetected: boolean;
+	/** Non-null only when enabled AND detected. */
+	descriptor: ACPAgentDescriptor | null;
+}
+
+/**
+ * ACPActionParams - Parameters for ACP Agent hook actions.
+ * Executes a local ACP-compatible agent as a subprocess via stdio/JSON-RPC.
+ */
+export interface ACPActionParams {
+	mode: ACPExecutionMode;
+	/** The subprocess command that starts the ACP agent. */
+	agentCommand: string;
+	/** Human-readable label shown in hook list and logs. */
+	agentDisplayName?: string;
+	/** Task instruction sent to the agent. Supports $variable template substitution. */
+	taskInstruction: string;
+	/** Working directory for the subprocess. Defaults to workspace root. */
+	cwd?: string;
+}
+
 export type ActionParameters =
 	| AgentActionParams
 	| GitActionParams
 	| GitHubActionParams
 	| CustomActionParams
-	| MCPActionParams;
+	| MCPActionParams
+	| ACPActionParams;
 
 export interface ActionConfig {
 	type: ActionType;
@@ -223,6 +305,47 @@ export interface HookExecutionLog {
 		message: string;
 	};
 	contextSnapshot: Record<string, unknown>;
+}
+
+/**
+ * UI-only: A single MCP tool option within a provider group, enriched with
+ * selection state for rendering in MCPToolsSelector.
+ */
+export interface MCPToolOption {
+	/** Tool identifier (matches MCPTool.name) */
+	toolName: string;
+	/** Human-readable tool name */
+	toolDisplayName: string;
+	/** Tool description */
+	description: string;
+	/** Whether this tool is currently selected */
+	isSelected: boolean;
+}
+
+/**
+ * UI-only: A group of MCP tools belonging to the same provider/server.
+ * Produced by groupToolsByProvider() for consumption by MCPToolsSelector.
+ */
+export interface MCPProviderGroup {
+	/** Server identifier */
+	serverId: string;
+	/** Server display name (used as group label) */
+	serverName: string;
+	/** Tools in this group, sorted alphabetically by toolDisplayName */
+	tools: MCPToolOption[];
+	/** True when this group collects orphaned selected tools from unknown servers */
+	isOther?: boolean;
+}
+
+/**
+ * Serialisable info about a single language model returned by ModelCacheService.
+ * Mirrors the backend LanguageModelInfoPayload shape.
+ */
+export interface LanguageModelInfoPayload {
+	id: string;
+	name: string;
+	family: string;
+	maxInputTokens: number;
 }
 
 // Extension -> Webview messages
@@ -274,6 +397,27 @@ export type HooksExtensionMessage =
 			type: "hooks/show-logs";
 			command?: "hooks.show-logs";
 			payload: { visible: boolean; hookId?: string };
+	  }
+	| {
+			type: "hooks/models-available";
+			command?: "hooks.models-available";
+			models: LanguageModelInfoPayload[];
+			isStale: boolean;
+	  }
+	| {
+			type: "hooks/models-error";
+			command?: "hooks.models-error";
+			message: string;
+	  }
+	| {
+			type: "hooks/acp-agents-available";
+			command?: "hooks.acp-agents-available";
+			agents: ACPAgentDescriptor[];
+	  }
+	| {
+			type: "hooks/acp-known-agents-status";
+			command?: "hooks.acp-known-agents-status";
+			agents: KnownAgentStatus[];
 	  };
 
 // Webview -> Extension messages
@@ -300,4 +444,23 @@ export type HooksWebviewMessage =
 			type: "hooks/logs";
 			command?: "hooks.logs";
 			payload?: { hookId?: string };
+	  }
+	| {
+			type: "hooks/models-request";
+			command?: "hooks.models-request";
+			payload?: { forceRefresh?: boolean };
+	  }
+	| {
+			type: "hooks/acp-agents-request";
+			command?: "hooks.acp-agents-request";
+	  }
+	| {
+			type: "hooks/acp-known-agents-request";
+			command?: "hooks.acp-known-agents-request";
+	  }
+	| {
+			type: "hooks/acp-known-agents-toggle";
+			command?: "hooks.acp-known-agents-toggle";
+			agentId: string;
+			enabled: boolean;
 	  };

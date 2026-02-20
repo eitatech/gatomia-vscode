@@ -34,4 +34,4 @@ test-results3.txt
 .gitignore
 test-results4.txt
 .grok/settings.json
-.opencode/bun.lockb
+.opencode/bun.lockb**/CLAUDE.md

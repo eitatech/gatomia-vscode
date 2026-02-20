@@ -42,6 +42,11 @@ import { HookExecutor } from "./features/hooks/hook-executor";
 import { AgentRegistry } from "./features/hooks/agent-registry";
 import { CommandCompletionDetector } from "./features/hooks/services/command-completion-detector";
 import { MCPDiscoveryService } from "./features/hooks/services/mcp-discovery";
+import { ModelCacheService } from "./features/hooks/services/model-cache-service";
+import { AcpAgentDiscoveryService } from "./features/hooks/services/acp-agent-discovery-service";
+import { KnownAgentDetector } from "./features/hooks/services/known-agent-detector";
+import { KnownAgentPreferencesService } from "./features/hooks/services/known-agent-preferences-service";
+import { KNOWN_AGENTS } from "./features/hooks/services/known-agent-catalog";
 import { HookViewProvider } from "./providers/hook-view-provider";
 import { HooksExplorerProvider } from "./providers/hooks-explorer-provider";
 import { DependenciesViewProvider } from "./providers/dependencies-view-provider";
@@ -188,6 +193,34 @@ export async function activate(context: ExtensionContext) {
 	mcpDiscoveryService = new MCPDiscoveryService();
 	outputChannel.appendLine("MCPDiscoveryService initialized");
 
+	// Initialize ModelCacheService for dynamic model selection (T018 / US1)
+	const modelCacheService = new ModelCacheService();
+	outputChannel.appendLine("ModelCacheService initialized");
+
+	// Initialize AcpAgentDiscoveryService for ACP agent hooks (Phase 6)
+	const knownAgentDetector = new KnownAgentDetector();
+	const knownAgentPreferencesService = new KnownAgentPreferencesService(
+		context
+	);
+	const acpAgentDiscoveryService = new AcpAgentDiscoveryService(
+		workspaceFolders?.[0]?.uri.fsPath ?? "",
+		knownAgentDetector,
+		knownAgentPreferencesService
+	);
+	outputChannel.appendLine("AcpAgentDiscoveryService initialized");
+	// Warm the agent detection cache eagerly in the background — results will be
+	// ready by the time the user opens the Hooks panel. Fire-and-forget (non-blocking).
+	knownAgentDetector
+		.preloadAll(KNOWN_AGENTS)
+		.then(() => {
+			outputChannel.appendLine("KnownAgentDetector: preload complete");
+		})
+		.catch((err: unknown) => {
+			outputChannel.appendLine(
+				`KnownAgentDetector: preload error: ${(err as Error).message}`
+			);
+		});
+
 	// Initialize AgentRegistry for custom agent hooks (Phase 2 - T010, T018)
 	// Must be initialized before HookManager to enable agent validation
 	const agentWorkspaceRoot = workspaceFolders?.[0]?.uri.fsPath || "";
@@ -226,7 +259,11 @@ export async function activate(context: ExtensionContext) {
 		hookManager,
 		hookExecutor,
 		mcpDiscoveryService,
+		modelCacheService,
+		acpAgentDiscoveryService,
 		outputChannel,
+		knownAgentPreferencesService,
+		knownAgentDetector,
 	});
 	hookViewProvider.initialize();
 
@@ -424,8 +461,8 @@ export async function activate(context: ExtensionContext) {
 	steeringExplorer.setSteeringManager(steeringManager);
 	initializeAutoReviewTransitions();
 	outputChannel.appendLine("[ReviewFlow] Auto review transitions initialized");
-	await syncAllSpecReviewFlowSummaries(specManager);
 
+	// Register tree providers immediately so VS Code can render initial state
 	context.subscriptions.push(
 		window.registerTreeDataProvider(
 			QuickAccessExplorerProvider.viewId,
@@ -446,10 +483,37 @@ export async function activate(context: ExtensionContext) {
 		),
 		window.registerTreeDataProvider(WikiExplorerProvider.viewId, wikiExplorer)
 	);
+
+	// Deferred refresh: gives VS Code one tick to complete internal tree setup
+	// before the first data push (guards against settled-state empty render)
+	setImmediate(() => {
+		specExplorer.refresh();
+		steeringExplorer.refresh();
+		hooksExplorer.refresh();
+		actionsExplorer.refresh();
+		outputChannel.appendLine(
+			"[TreeView] Post-registration deferred refresh fired"
+		);
+	});
+
+	// Run heavyweight sync non-blocking; refresh spec explorer when pending counts are ready
+	syncAllSpecReviewFlowSummaries(specManager)
+		.then(() => {
+			specExplorer.refresh();
+			outputChannel.appendLine(
+				"[ReviewFlow] Initial sync complete, spec explorer refreshed"
+			);
+		})
+		.catch((err: unknown) => {
+			outputChannel.appendLine(
+				`[ReviewFlow] Failed to sync initial pending summaries: ${err}`
+			);
+		});
 	context.subscriptions.push(
 		{ dispose: () => hookManager.dispose() },
 		{ dispose: () => hookExecutor.dispose() },
 		{ dispose: () => commandCompletionDetector.dispose() },
+		{ dispose: () => modelCacheService.dispose() },
 		{ dispose: () => hookViewProvider.dispose() },
 		{ dispose: () => hooksExplorer.dispose() },
 		{ dispose: () => quickAccessExplorer.dispose() },

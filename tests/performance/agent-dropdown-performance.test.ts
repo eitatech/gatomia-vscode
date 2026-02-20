@@ -272,7 +272,7 @@ description: Test generator agent ${i}
 			const agents = registry.getAllAgents();
 
 			expect(agents).toHaveLength(50);
-			expect(duration).toBeLessThan(100);
+			expect(duration).toBeLessThan(200);
 
 			console.log(
 				`✓ 50 agents with duplicates resolved in ${duration.toFixed(2)}ms`

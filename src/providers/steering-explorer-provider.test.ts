@@ -11,6 +11,13 @@ vi.mock("os", () => ({
 	homedir: vi.fn(() => "/home/test"),
 }));
 
+vi.mock("node:os", () => ({
+	default: {
+		homedir: vi.fn(() => "/home/test"),
+	},
+	homedir: vi.fn(() => "/home/test"),
+}));
+
 vi.mock("fs", () => ({
 	default: {
 		existsSync: vi.fn(() => false),

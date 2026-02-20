@@ -90,11 +90,24 @@ describe("HookViewProvider (panel)", () => {
 			isCacheFresh: vi.fn().mockReturnValue(true),
 		};
 
+		const mockModelCacheService = {
+			getAvailableModels: vi
+				.fn()
+				.mockResolvedValue({ models: [], isStale: false }),
+			dispose: vi.fn(),
+		};
+
+		const mockAcpAgentDiscoveryService = {
+			discoverAgents: vi.fn().mockResolvedValue([]),
+		};
+
 		provider = new HookViewProvider({
 			context: mockContext,
 			hookManager: mockHookManager,
 			hookExecutor: mockHookExecutor,
 			mcpDiscoveryService: mockMCPDiscovery,
+			modelCacheService: mockModelCacheService,
+			acpAgentDiscoveryService: mockAcpAgentDiscoveryService,
 			outputChannel: mockOutputChannel,
 		});
 		provider.initialize();
@@ -154,11 +167,22 @@ describe("HookViewProvider (panel)", () => {
 			isCacheFresh: vi.fn().mockReturnValue(true),
 		};
 
+		const mockModelCacheService = {
+			getAvailableModels: vi
+				.fn()
+				.mockResolvedValue({ models: [], isStale: false }),
+			dispose: vi.fn(),
+		};
+
 		const localProvider = new HookViewProvider({
 			context: mockContext,
 			hookManager: mockHookManager,
 			hookExecutor: mockHookExecutor,
 			mcpDiscoveryService: mockMCPDiscovery,
+			modelCacheService: mockModelCacheService,
+			acpAgentDiscoveryService: {
+				discoverAgents: vi.fn().mockResolvedValue([]),
+			},
 			outputChannel: mockOutputChannel,
 		});
 		await localProvider.showLogsPanel("hook-1");

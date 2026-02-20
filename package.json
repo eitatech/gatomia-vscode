@@ -12,7 +12,7 @@
     "url": "https://github.com/eitatech/gatomia-vscode"
   },
   "engines": {
-    "vscode": "^1.84.0"
+    "vscode": "^1.90.0"
   },
   "categories": [
     "AI",
@@ -904,31 +904,29 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.6",
-    "@jest/globals": "^29.7.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^15.0.7",
     "@testing-library/user-event": "^14.6.1",
     "@types/glob": "^8.1.0",
     "@types/node": "^20.x",
     "@types/vscode": "^1.84.0",
-    "@vitest/coverage-v8": "3.2.4",
-    "@vitest/ui": "^3.2.4",
+    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/ui": "^4.0.18",
     "@vscode/codicons": "^0.0.43",
     "concurrently": "^9.2.0",
     "copy-webpack-plugin": "^13.0.0",
     "esbuild": "^0.27.2",
     "husky": "^9.1.7",
-    "jest": "^29.7.0",
     "jsdom": "^27.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "ts-jest": "^29.4.0",
     "ts-loader": "^9.5.2",
     "typescript": "^5.3.0",
     "ultracite": "^6.3.4",
-    "vitest": "^3.2.4"
+    "vitest": "^4.0.18"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "^0.14.1",
     "gray-matter": "^4.0.3",
     "handlebars": "^4.7.8",
     "markdown-it": "^14.1.1",

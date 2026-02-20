@@ -1,9 +1,14 @@
-import { TextareaPanel } from "@/components/textarea-panel";
 import { VSCodeCheckbox } from "@/components/ui/vscode-checkbox";
 import { VSCodeSelect } from "@/components/ui/vscode-select";
 import { AgentDropdown } from "@/components/hooks/agent-dropdown";
 import { AgentTypeSelector } from "./agent-type-selector";
+import { AcpAgentForm } from "./acp-agent-form";
+import { AcpKnownAgentsPanel } from "./acp-known-agents-panel";
+import { GitActionForm } from "./git-action-form";
+import { GitHubActionForm } from "./github-action-form";
 import type {
+	ACPActionParams,
+	ACPAgentDescriptor,
 	ActionConfig,
 	ActionType,
 	AgentActionParams,
@@ -11,6 +16,7 @@ import type {
 	CustomActionParams,
 	GitActionParams,
 	GitHubActionParams,
+	KnownAgentStatus,
 	MCPActionParams,
 	OperationType,
 	SelectedMCPTool,
@@ -18,6 +24,8 @@ import type {
 } from "../types";
 import type { ChangeEvent } from "react";
 import { useMCPServers } from "../hooks/use-mcp-servers";
+import { useAcpAgents } from "../hooks/use-acp-agents";
+import { useKnownAcpAgents } from "../hooks/use-known-acp-agents";
 import { MCPToolsSelector } from "./mcp-tools-selector";
 import { ArgumentTemplateEditor } from "./argument-template-editor";
 import { CopilotCliOptionsPanel } from "./cli-options/copilot-cli-options-panel";
@@ -60,6 +68,12 @@ const getDefaultParameters = (type: ActionType): ActionConfig["parameters"] => {
 				toolName: "",
 				toolDisplayName: "",
 			} as MCPActionParams;
+		case "acp":
+			return {
+				mode: "local",
+				agentCommand: "",
+				taskInstruction: "",
+			} as ACPActionParams;
 		default:
 			return {
 				command: "",
@@ -101,6 +115,51 @@ const AGENT_COMMAND_SUGGESTIONS = [
 	"/speckit.integration-test",
 ];
 
+interface AcpActionContentProps {
+	action: ActionConfig;
+	actionError?: string;
+	disabled?: boolean;
+	discoveredAgents: ACPAgentDescriptor[];
+	knownAgents: KnownAgentStatus[];
+	onActionChange: (action: ActionConfig) => void;
+	onClearActionError?: () => void;
+	onToggleKnownAgent: (agentId: string, enabled: boolean) => void;
+}
+
+const AcpActionContent = ({
+	action,
+	actionError,
+	disabled,
+	discoveredAgents,
+	knownAgents,
+	onActionChange,
+	onClearActionError,
+	onToggleKnownAgent,
+}: AcpActionContentProps) => (
+	<>
+		{knownAgents.length > 0 && (
+			<div className="flex flex-col gap-2">
+				<span className="font-medium text-[color:var(--vscode-foreground)] text-sm">
+					Known Agents
+				</span>
+				<AcpKnownAgentsPanel
+					agents={knownAgents}
+					disabled={disabled}
+					onToggle={onToggleKnownAgent}
+				/>
+			</div>
+		)}
+		<AcpAgentForm
+			action={action}
+			actionError={actionError}
+			disabled={disabled}
+			discoveredAgents={discoveredAgents}
+			onActionChange={onActionChange}
+			onClearActionError={onClearActionError}
+		/>
+	</>
+);
+
 export const TriggerActionSelector = ({
 	trigger,
 	action,
@@ -112,6 +171,10 @@ export const TriggerActionSelector = ({
 }: TriggerActionSelectorProps) => {
 	// MCP servers state
 	const { servers, loading: mcpLoading, error: mcpError } = useMCPServers();
+	// ACP workspace-discovered agents
+	const discoveredAgents = useAcpAgents();
+	// ACP known-agent checklist state
+	const { agents: knownAgents, toggle: toggleKnownAgent } = useKnownAcpAgents();
 
 	const handleTriggerAgentChange = (event: ChangeEvent<HTMLSelectElement>) => {
 		onTriggerChange({
@@ -182,26 +245,6 @@ export const TriggerActionSelector = ({
 			onClearActionError?.();
 		};
 
-	const handleGitOperationChange = (
-		event: ChangeEvent<HTMLSelectElement>
-	): void => {
-		const params = action.parameters as GitActionParams;
-		const nextOperation = event.target.value as GitActionParams["operation"];
-
-		onActionChange({
-			...action,
-			type: "git",
-			parameters: {
-				...params,
-				operation: nextOperation,
-				...(nextOperation === "push"
-					? { pushToRemote: false }
-					: { pushToRemote: params.pushToRemote ?? false }),
-			},
-		});
-		onClearActionError?.();
-	};
-
 	const handleMCPToolsSelection = (selectedTools: SelectedMCPTool[]): void => {
 		const params = action.parameters as MCPActionParams;
 		onActionChange({
@@ -230,7 +273,6 @@ export const TriggerActionSelector = ({
 		onClearActionError?.();
 	};
 
-	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: UI renders different action editors
 	const renderActionParameters = () => {
 		switch (action.type) {
 			case "agent": {
@@ -272,179 +314,25 @@ export const TriggerActionSelector = ({
 				);
 			}
 			case "git": {
-				const params = action.parameters as GitActionParams;
-				const isCommitOperation = params.operation === "commit";
 				return (
-					<>
-						<VSCodeSelect
-							disabled={disabled}
-							id="git-operation"
-							label="Operation"
-							onChange={handleGitOperationChange}
-							value={params.operation}
-						>
-							<option value="commit">Commit</option>
-							<option value="push">Push</option>
-						</VSCodeSelect>
-						{isCommitOperation ? (
-							<>
-								<div className="flex flex-col gap-2">
-									<div className="flex items-center gap-1">
-										<label
-											className="font-medium text-[color:var(--vscode-foreground)] text-sm"
-											htmlFor="git-message-template"
-										>
-											Message Template
-										</label>
-										<span
-											aria-hidden="true"
-											className="text-[color:var(--vscode-errorForeground)]"
-										>
-											*
-										</span>
-									</div>
-									<TextareaPanel
-										disabled={disabled}
-										onChange={handleActionParamChange("messageTemplate")}
-										placeholder="feat($feature): automated update at $timestamp"
-										rows={2}
-										textareaClassName="min-h-[4rem] text-sm"
-										textareaProps={{ id: "git-message-template" }}
-										value={params.messageTemplate || ""}
-									/>
-									<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.6))] text-xs">
-										Available variables: $feature, $branch, $timestamp, $user
-									</p>
-								</div>
-								<VSCodeCheckbox
-									checked={params.pushToRemote ?? false}
-									disabled={disabled}
-									id="git-push-to-remote"
-									label="Push to remote after commit"
-									onChange={handleActionParamChange("pushToRemote")}
-								/>
-							</>
-						) : (
-							<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.6))] text-xs">
-								The push action immediately pushes the active branch to its
-								upstream remote. No commit message is needed.
-							</p>
-						)}
-					</>
+					<GitActionForm
+						action={action}
+						actionError={actionError}
+						disabled={disabled}
+						onActionChange={onActionChange}
+						onClearActionError={onClearActionError}
+					/>
 				);
 			}
 			case "github": {
-				const params = action.parameters as GitHubActionParams;
 				return (
-					<>
-						<VSCodeSelect
-							disabled={disabled}
-							id="github-operation"
-							label="Operation"
-							onChange={handleActionParamChange("operation")}
-							value={params.operation}
-						>
-							<option value="open-issue">Open Issue</option>
-							<option value="close-issue">Close Issue</option>
-							<option value="create-pr">Create Pull Request</option>
-							<option value="add-comment">Add Comment</option>
-						</VSCodeSelect>
-						<div className="flex flex-col gap-2">
-							<label
-								className="font-medium text-[color:var(--vscode-foreground)] text-sm"
-								htmlFor="github-repository"
-							>
-								Repository
-							</label>
-							<input
-								className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-input-background)] px-3 py-2 text-[color:var(--vscode-input-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
-								disabled={disabled}
-								id="github-repository"
-								onChange={handleActionParamChange("repository")}
-								placeholder="owner/repo (optional, defaults to current)"
-								type="text"
-								value={params.repository || ""}
-							/>
-						</div>
-						{(params.operation === "open-issue" ||
-							params.operation === "create-pr") && (
-							<>
-								<div className="flex flex-col gap-2">
-									<div className="flex items-center gap-1">
-										<label
-											className="font-medium text-[color:var(--vscode-foreground)] text-sm"
-											htmlFor="github-title-template"
-										>
-											Title
-										</label>
-										<span
-											aria-hidden="true"
-											className="text-[color:var(--vscode-errorForeground)]"
-										>
-											*
-										</span>
-									</div>
-									<input
-										className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-input-background)] px-3 py-2 text-[color:var(--vscode-input-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
-										disabled={disabled}
-										id="github-title-template"
-										onChange={handleActionParamChange("titleTemplate")}
-										placeholder="Spec created for $feature"
-										type="text"
-										value={params.titleTemplate || ""}
-									/>
-								</div>
-								<div className="flex flex-col gap-2">
-									<label
-										className="font-medium text-[color:var(--vscode-foreground)] text-sm"
-										htmlFor="github-body-template"
-									>
-										Body
-									</label>
-									<TextareaPanel
-										disabled={disabled}
-										onChange={handleActionParamChange("bodyTemplate")}
-										placeholder="Specification created at $timestamp by $user"
-										rows={3}
-										textareaClassName="min-h-[6rem] text-sm"
-										textareaProps={{ id: "github-body-template" }}
-										value={params.bodyTemplate || ""}
-									/>
-									<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.6))] text-xs">
-										Available variables: $feature, $branch, $timestamp, $user
-									</p>
-								</div>
-							</>
-						)}
-						{(params.operation === "close-issue" ||
-							params.operation === "add-comment") && (
-							<div className="flex flex-col gap-2">
-								<div className="flex items-center gap-1">
-									<label
-										className="font-medium text-[color:var(--vscode-foreground)] text-sm"
-										htmlFor="github-issue-number"
-									>
-										Issue Number
-									</label>
-									<span
-										aria-hidden="true"
-										className="text-[color:var(--vscode-errorForeground)]"
-									>
-										*
-									</span>
-								</div>
-								<input
-									className="rounded border border-[color:var(--vscode-input-border)] bg-[color:var(--vscode-input-background)] px-3 py-2 text-[color:var(--vscode-input-foreground)] text-sm focus:border-[color:var(--vscode-focusBorder)] focus:outline-none"
-									disabled={disabled}
-									id="github-issue-number"
-									onChange={handleActionParamChange("issueNumber")}
-									placeholder="123"
-									type="number"
-									value={params.issueNumber ?? ""}
-								/>
-							</div>
-						)}
-					</>
+					<GitHubActionForm
+						action={action}
+						actionError={actionError}
+						disabled={disabled}
+						onActionChange={onActionChange}
+						onClearActionError={onClearActionError}
+					/>
 				);
 			}
 			case "custom": {
@@ -615,17 +503,18 @@ export const TriggerActionSelector = ({
 							value={params.modelId || ""}
 						>
 							<option value="">Default Model (Copilot)</option>
-							<option value="gpt-4o">GPT-4o</option>
-							<option value="gpt-4o-mini">GPT-4o Mini</option>
-							<option value="o1-preview">o1-preview</option>
-							<option value="o1-mini">o1-mini</option>
-							<option value="claude-3-5-sonnet-20241022">
-								Claude 3.5 Sonnet
+							<option value="gpt-4.1">GPT-4.1</option>
+							<option value="gpt-5-mini">GPT-5 Mini</option>
+							<option value="gpt-5.3-codex">GPT-5.3 Codex</option>
+							<option value="claude-4-6-sonnet">Claude 4.6 Sonnet</option>
+							<option value="claude-4-6-opus">Claude 4.6 Opus</option>
+							<option value="claude-4-5-haiku">Claude 4.5 Haiku</option>
+							<option value="gemini-3.0-flash-preview">
+								Gemini 3.0 Flash (Preview)
 							</option>
-							<option value="claude-3-5-haiku-20241022">
-								Claude 3.5 Haiku
+							<option value="gemini-3.0-pro-preview">
+								Gemini 3.0 Pro (Preview)
 							</option>
-							<option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option>
 						</VSCodeSelect>
 						{/* MCP Tools Selector - Multi-select with checkboxes */}
 						<div className="flex flex-col gap-2">
@@ -656,6 +545,20 @@ export const TriggerActionSelector = ({
 							)}
 						</div>
 					</div>
+				);
+			}
+			case "acp": {
+				return (
+					<AcpActionContent
+						action={action}
+						actionError={actionError}
+						disabled={disabled}
+						discoveredAgents={discoveredAgents}
+						knownAgents={knownAgents}
+						onActionChange={onActionChange}
+						onClearActionError={onClearActionError}
+						onToggleKnownAgent={toggleKnownAgent}
+					/>
 				);
 			}
 			default:
@@ -745,13 +648,17 @@ export const TriggerActionSelector = ({
 					<option value="github">GitHub Operation</option>
 					<option value="custom">Custom Agent</option>
 					<option value="mcp">Custom Tools</option>
+					<option value="acp">ACP Agent</option>
 				</VSCodeSelect>
 				{renderActionParameters()}
-				{actionError && (
-					<span className="text-[color:var(--vscode-errorForeground)] text-xs">
-						{actionError}
-					</span>
-				)}
+				{actionError &&
+					action.type !== "git" &&
+					action.type !== "github" &&
+					action.type !== "acp" && (
+						<span className="text-[color:var(--vscode-errorForeground)] text-xs">
+							{actionError}
+						</span>
+					)}
 			</fieldset>
 		</div>
 	);
