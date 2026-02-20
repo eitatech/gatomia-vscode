@@ -6,8 +6,7 @@ import type { CreateSpecDraftState } from "./types";
 import { SPEC_SYSTEM_MODE } from "../../constants";
 import { sendPromptToChat } from "../../utils/chat-prompt-runner";
 
-const CREATE_SPEC_PROMPT_REGEX =
-	/Prompt Template[\s\S]*Key Scenarios \/ Acceptance Criteria:[\s\S]*Feature idea/;
+const CREATE_SPEC_PROMPT_REGEX = /Prompt Template[\s\S]*Feature idea/;
 
 vi.mock("../../utils/chat-prompt-runner", () => ({
 	sendPromptToChat: vi.fn(),
@@ -188,13 +187,7 @@ describe("CreateSpecInputController", () => {
 
 	it("restores saved draft state when available", async () => {
 		const draft: CreateSpecDraftState = {
-			formData: {
-				productContext: "Saved product context",
-				keyScenarios: "Saved key scenarios",
-				technicalConstraints: "",
-				relatedFiles: "",
-				openQuestions: "",
-			},
+			formData: { description: "Saved spec description" },
 			lastUpdated: 123,
 		};
 
@@ -219,17 +212,15 @@ describe("CreateSpecInputController", () => {
 		await emitMessage({
 			type: "create-spec/submit",
 			payload: {
-				productContext: "Context",
-				keyScenarios: " Feature idea ",
-				technicalConstraints: "",
-				relatedFiles: "",
-				openQuestions: "",
+				description: "Feature idea",
+				imageUris: [],
 			},
 		});
 
 		expect(sendPromptToChat).toHaveBeenCalledWith(
 			expect.stringMatching(CREATE_SPEC_PROMPT_REGEX),
-			{ instructionType: "createSpec" }
+			{ instructionType: "createSpec" },
+			undefined
 		);
 		expect(workspaceStateUpdateMock).toHaveBeenCalledWith(
 			"createSpecDraftState",
@@ -246,25 +237,13 @@ describe("CreateSpecInputController", () => {
 
 		await emitMessage({
 			type: "create-spec/autosave",
-			payload: {
-				productContext: "",
-				keyScenarios: "Draft summary",
-				technicalConstraints: "Constraints",
-				relatedFiles: "",
-				openQuestions: "",
-			},
+			payload: { description: "Draft summary" },
 		});
 
 		expect(workspaceStateUpdateMock).toHaveBeenCalledWith(
 			"createSpecDraftState",
 			{
-				formData: {
-					productContext: "",
-					keyScenarios: "Draft summary",
-					technicalConstraints: "Constraints",
-					relatedFiles: "",
-					openQuestions: "",
-				},
+				formData: { description: "Draft summary" },
 				lastUpdated: 1_700_000_000_000,
 			}
 		);

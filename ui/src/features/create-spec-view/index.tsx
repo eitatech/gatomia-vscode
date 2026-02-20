@@ -1,14 +1,5 @@
 import { vscode } from "@/bridge/vscode";
-import { Button } from "@/components/ui/button";
-import { CreateSpecForm } from "./components/create-spec-form";
-import { StatusBanner } from "./components/status-banner";
-import type {
-	CreateSpecDraftState,
-	CreateSpecExtensionMessage,
-	CreateSpecFieldErrors,
-	CreateSpecFormData,
-	CreateSpecInitPayload,
-} from "./types";
+import { Send, X } from "lucide-react";
 import {
 	useCallback,
 	useEffect,
@@ -18,40 +9,21 @@ import {
 	type ChangeEvent,
 	type FormEvent,
 } from "react";
-
-const EMPTY_FORM: CreateSpecFormData = {
-	productContext: "",
-	keyScenarios: "",
-	technicalConstraints: "",
-	relatedFiles: "",
-	openQuestions: "",
-};
+import { CreateSpecForm } from "./components/create-spec-form";
+import { StatusBanner } from "./components/status-banner";
+import type {
+	CreateSpecDraftState,
+	CreateSpecExtensionMessage,
+	CreateSpecFormData,
+	CreateSpecInitPayload,
+	ImageAttachmentMeta,
+} from "./types";
 
 const AUTOSAVE_DEBOUNCE_MS = 600;
-const normalizeFormData = (
-	data: Partial<CreateSpecFormData> | undefined
-): CreateSpecFormData => ({
-	productContext:
-		typeof data?.productContext === "string" ? data.productContext : "",
-	keyScenarios: typeof data?.keyScenarios === "string" ? data.keyScenarios : "",
-	technicalConstraints:
-		typeof data?.technicalConstraints === "string"
-			? data.technicalConstraints
-			: "",
-	relatedFiles: typeof data?.relatedFiles === "string" ? data.relatedFiles : "",
-	openQuestions:
-		typeof data?.openQuestions === "string" ? data.openQuestions : "",
-});
 
-const areFormsEqual = (
-	left: CreateSpecFormData,
-	right: CreateSpecFormData
-): boolean =>
-	left.productContext === right.productContext &&
-	left.keyScenarios === right.keyScenarios &&
-	left.technicalConstraints === right.technicalConstraints &&
-	left.relatedFiles === right.relatedFiles &&
-	left.openQuestions === right.openQuestions;
+const normalizeDescription = (
+	data: Partial<CreateSpecFormData> | undefined
+): string => (typeof data?.description === "string" ? data.description : "");
 
 const formatTimestamp = (timestamp: number | undefined): string | undefined => {
 	if (!timestamp) {
@@ -70,104 +42,57 @@ const formatTimestamp = (timestamp: number | undefined): string | undefined => {
 
 const readPersistedDraft = (): CreateSpecDraftState | undefined => {
 	const raw = vscode.getState() as CreateSpecDraftState | undefined;
-	if (!raw) {
-		return;
-	}
-
-	if (!raw.formData || typeof raw.lastUpdated !== "number") {
+	if (!raw?.formData || typeof raw.lastUpdated !== "number") {
 		return;
 	}
 
 	return {
-		formData: normalizeFormData(raw.formData),
+		formData: { description: normalizeDescription(raw.formData) },
 		lastUpdated: raw.lastUpdated,
 	};
 };
 
 export const CreateSpecView = () => {
-	const [formData, setFormData] = useState<CreateSpecFormData>(EMPTY_FORM);
+	const [description, setDescription] = useState("");
+	const [attachments, setAttachments] = useState<ImageAttachmentMeta[]>([]);
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [fieldErrors, setFieldErrors] = useState<CreateSpecFieldErrors>({});
+	const [fieldError, setFieldError] = useState<string | undefined>();
 	const [submissionError, setSubmissionError] = useState<string | undefined>();
 	const [draftSavedAt, setDraftSavedAt] = useState<number | undefined>();
 	const [closeWarningVisible, setCloseWarningVisible] = useState(false);
+	const [pendingImportConfirm, setPendingImportConfirm] = useState(false);
+	const [isImporting, setIsImporting] = useState(false);
 
-	const lastPersistedRef = useRef<CreateSpecFormData>(EMPTY_FORM);
-	// const autosaveTimeoutRef = useRef<number | undefined>();
+	const descriptionRef = useRef<HTMLTextAreaElement>(null);
+	const lastPersistedRef = useRef<string>("");
 
-	const productContextRef = useRef<HTMLTextAreaElement>(null);
-	const keyScenariosRef = useRef<HTMLTextAreaElement>(null);
-	const technicalConstraintsRef = useRef<HTMLTextAreaElement>(null);
-	const relatedFilesRef = useRef<HTMLTextAreaElement>(null);
-	const openQuestionsRef = useRef<HTMLTextAreaElement>(null);
+	const isDirty = description !== lastPersistedRef.current;
 
-	const isDirty = useMemo(
-		() => !areFormsEqual(formData, lastPersistedRef.current),
-		[formData]
-	);
-
-	// const clearAutosaveTimer = useCallback(() => {
-	// 	if (autosaveTimeoutRef.current) {
-	// 		window.clearTimeout(autosaveTimeoutRef.current);
-	// 		autosaveTimeoutRef.current = undefined;
-	// 	}
-	// }, []);
-
-	const persistDraft = useCallback((data: CreateSpecFormData) => {
-		const normalized = normalizeFormData(data);
-		if (areFormsEqual(normalized, lastPersistedRef.current)) {
+	const persistDraft = useCallback((desc: string) => {
+		if (desc === lastPersistedRef.current) {
 			return;
 		}
 
 		const nextState: CreateSpecDraftState = {
-			formData: normalized,
+			formData: { description: desc },
 			lastUpdated: Date.now(),
 		};
 
-		lastPersistedRef.current = normalized;
+		lastPersistedRef.current = desc;
 		setDraftSavedAt(nextState.lastUpdated);
 		vscode.setState(nextState);
-		vscode.postMessage({ type: "create-spec/autosave", payload: normalized });
+		vscode.postMessage({
+			type: "create-spec/autosave",
+			payload: { description: desc },
+		});
 	}, []);
 
-	// const scheduleAutosave = useCallback(
-	// 	(data: CreateSpecFormData) => {
-	// 		clearAutosaveTimer();
-	// 		autosaveTimeoutRef.current = window.setTimeout(() => {
-	// 			persistDraft(data);
-	// 		}, AUTOSAVE_DEBOUNCE_MS);
-	// 	},
-	// 	[clearAutosaveTimer, persistDraft]
-	// );
-
-	const handleFieldChange = useCallback(
-		(field: keyof CreateSpecFormData) =>
-			(event: ChangeEvent<HTMLTextAreaElement>) => {
-				const value = event.target.value;
-				setFormData((previous) => {
-					const next = {
-						...previous,
-						[field]: value,
-					};
-					// scheduleAutosave(next);
-					return next;
-				});
-			},
-		// [scheduleAutosave]
+	const handleDescriptionChange = useCallback(
+		(event: ChangeEvent<HTMLTextAreaElement>) => {
+			setDescription(event.target.value);
+		},
 		[]
 	);
-
-	const validateForm = useCallback((current: CreateSpecFormData): boolean => {
-		const trimmedContext = current.productContext.trim();
-		if (!trimmedContext) {
-			setFieldErrors({ productContext: "Product Context is required." });
-			productContextRef.current?.focus();
-			return false;
-		}
-
-		setFieldErrors({});
-		return true;
-	}, []);
 
 	const handleSubmit = useCallback(
 		(event: FormEvent<HTMLFormElement>) => {
@@ -176,29 +101,29 @@ export const CreateSpecView = () => {
 				return;
 			}
 
-			const normalized = normalizeFormData({
-				...formData,
-				productContext: formData.productContext.trim(),
-			});
-
-			if (!validateForm(normalized)) {
+			const trimmed = description.trim();
+			if (!trimmed) {
+				setFieldError("Description is required.");
+				descriptionRef.current?.focus();
 				return;
 			}
 
-			// clearAutosaveTimer();
+			setFieldError(undefined);
 			setIsSubmitting(true);
 			setSubmissionError(undefined);
 
 			vscode.postMessage({
 				type: "create-spec/submit",
-				payload: normalized,
+				payload: {
+					description: trimmed,
+					imageUris: attachments.map((a) => a.uri),
+				},
 			});
 		},
-		[formData, isSubmitting, validateForm]
+		[description, attachments, isSubmitting]
 	);
 
 	const handleCancel = useCallback(() => {
-		// clearAutosaveTimer();
 		vscode.postMessage({
 			type: "create-spec/close-attempt",
 			payload: { hasDirtyChanges: isDirty },
@@ -207,20 +132,53 @@ export const CreateSpecView = () => {
 
 	const focusPrimaryField = useCallback(() => {
 		window.setTimeout(() => {
-			productContextRef.current?.focus();
+			descriptionRef.current?.focus();
 		}, 0);
+	}, []);
+
+	const handleImportClick = useCallback(() => {
+		if (description.trim()) {
+			setPendingImportConfirm(true);
+		} else {
+			setIsImporting(true);
+			vscode.postMessage({ type: "create-spec/import-markdown:request" });
+		}
+	}, [description]);
+
+	const handleConfirmImport = useCallback(() => {
+		setPendingImportConfirm(false);
+		setIsImporting(true);
+		vscode.postMessage({ type: "create-spec/import-markdown:request" });
+	}, []);
+
+	const handleCancelImport = useCallback(() => {
+		setPendingImportConfirm(false);
+	}, []);
+
+	const handleAttach = useCallback(() => {
+		vscode.postMessage({
+			type: "create-spec/attach-images:request",
+			payload: { currentCount: attachments.length },
+		});
+	}, [attachments.length]);
+
+	const handleRemoveAttachment = useCallback((id: string) => {
+		setAttachments((previous) => previous.filter((a) => a.id !== id));
 	}, []);
 
 	const handleInitMessage = useCallback(
 		(initPayload?: CreateSpecInitPayload) => {
-			const draftData = normalizeFormData(initPayload?.draft?.formData);
-			lastPersistedRef.current = draftData;
-			setFormData(draftData);
+			const desc = normalizeDescription(initPayload?.draft?.formData);
+			lastPersistedRef.current = desc;
+			setDescription(desc);
+			setAttachments([]);
 			setDraftSavedAt(initPayload?.draft?.lastUpdated);
 			setSubmissionError(undefined);
 			setIsSubmitting(false);
-			setFieldErrors({});
+			setFieldError(undefined);
 			setCloseWarningVisible(false);
+			setPendingImportConfirm(false);
+			setIsImporting(false);
 			vscode.setState(initPayload?.draft);
 
 			if (initPayload?.shouldFocusPrimaryField) {
@@ -233,28 +191,52 @@ export const CreateSpecView = () => {
 	useEffect(() => {
 		const persistedDraft = readPersistedDraft();
 		if (persistedDraft) {
-			lastPersistedRef.current = persistedDraft.formData;
-			setFormData(persistedDraft.formData);
+			lastPersistedRef.current = persistedDraft.formData.description;
+			setDescription(persistedDraft.formData.description);
 			setDraftSavedAt(persistedDraft.lastUpdated);
 		}
 
 		vscode.postMessage({ type: "create-spec/ready" });
-
-		return () => {
-			// clearAutosaveTimer();
-		};
 	}, []);
+
+	const handleImportMarkdownResult = useCallback(
+		(payload: { content: string; warning?: string } | { error: string }) => {
+			setIsImporting(false);
+			if ("error" in payload) {
+				setSubmissionError(payload.error);
+			} else {
+				setDescription(payload.content);
+				lastPersistedRef.current = "";
+			}
+		},
+		[]
+	);
+
+	const handleAttachImagesResult = useCallback(
+		(
+			payload:
+				| { images: ImageAttachmentMeta[]; capped?: boolean }
+				| { error: string }
+		) => {
+			if ("error" in payload) {
+				setSubmissionError(payload.error);
+			} else {
+				setAttachments((previous) => [...previous, ...payload.images]);
+			}
+		},
+		[]
+	);
 
 	useEffect(() => {
 		const handleMessage = (event: MessageEvent<CreateSpecExtensionMessage>) => {
-			const payload = event.data;
-			if (!payload || typeof payload !== "object") {
+			const msg = event.data;
+			if (!msg || typeof msg !== "object") {
 				return;
 			}
 
-			switch (payload.type) {
+			switch (msg.type) {
 				case "create-spec/init": {
-					handleInitMessage(payload.payload);
+					handleInitMessage(msg.payload);
 					break;
 				}
 				case "create-spec/submit:success": {
@@ -264,15 +246,23 @@ export const CreateSpecView = () => {
 				}
 				case "create-spec/submit:error": {
 					setIsSubmitting(false);
-					setSubmissionError(payload.payload?.message ?? "Failed to submit.");
+					setSubmissionError(msg.payload?.message ?? "Failed to submit.");
 					break;
 				}
 				case "create-spec/confirm-close": {
-					setCloseWarningVisible(!payload.payload?.shouldClose);
+					setCloseWarningVisible(!msg.payload?.shouldClose);
 					break;
 				}
 				case "create-spec/focus": {
 					focusPrimaryField();
+					break;
+				}
+				case "create-spec/import-markdown:result": {
+					handleImportMarkdownResult(msg.payload);
+					break;
+				}
+				case "create-spec/attach-images:result": {
+					handleAttachImagesResult(msg.payload);
 					break;
 				}
 				default:
@@ -284,7 +274,12 @@ export const CreateSpecView = () => {
 		return () => {
 			window.removeEventListener("message", handleMessage);
 		};
-	}, [focusPrimaryField, handleInitMessage]);
+	}, [
+		focusPrimaryField,
+		handleInitMessage,
+		handleImportMarkdownResult,
+		handleAttachImagesResult,
+	]);
 
 	useEffect(() => {
 		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -305,6 +300,16 @@ export const CreateSpecView = () => {
 			window.removeEventListener("beforeunload", handleBeforeUnload);
 		};
 	}, [isDirty]);
+
+	useEffect(() => {
+		const timer = window.setTimeout(() => {
+			persistDraft(description);
+		}, AUTOSAVE_DEBOUNCE_MS);
+
+		return () => {
+			window.clearTimeout(timer);
+		};
+	}, [description, persistDraft]);
 
 	const statusBanner = useMemo(() => {
 		if (submissionError) {
@@ -355,45 +360,53 @@ export const CreateSpecView = () => {
 						Create New Spec
 					</h1>
 					<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.65))] text-sm">
-						Provide context for the new specification. Product Context is
-						required; other sections are optional but recommended.
+						Describe the specification you want to create. Optionally, import
+						from a Markdown file or attach reference images.
 					</p>
 				</div>
-				<div className="flex shrink-0 gap-2">
-					<Button
+				<div className="flex shrink-0 items-center gap-2">
+					<button
+						aria-label="Cancel"
+						className="rounded border border-[color:var(--vscode-button-border,transparent)] bg-[color:var(--vscode-button-secondaryBackground,#3c3c3c)] px-2 py-1 text-[color:var(--vscode-button-secondaryForeground)] text-sm transition-colors hover:bg-[color:var(--vscode-button-secondaryHoverBackground)] disabled:opacity-50"
 						disabled={isSubmitting}
 						onClick={handleCancel}
+						title="Cancel"
 						type="button"
-						variant="ghost"
 					>
-						Cancel
-					</Button>
-					<Button
+						<X aria-hidden="true" className="h-4 w-4" />
+					</button>
+					<button
+						aria-label={isSubmitting ? "Creating…" : "Create Spec"}
+						className="rounded border border-[color:var(--vscode-button-border,transparent)] bg-[color:var(--vscode-button-background)] px-2 py-1 text-[color:var(--vscode-button-foreground)] text-sm transition-colors hover:bg-[color:var(--vscode-button-hoverBackground)] disabled:opacity-50"
 						disabled={isSubmitting}
 						form="create-spec-form"
+						title={isSubmitting ? "Creating…" : "Create Spec"}
 						type="submit"
-						variant="default"
 					>
-						{isSubmitting ? "Creating…" : "Create Spec"}
-					</Button>
+						<Send aria-hidden="true" className="h-4 w-4" />
+					</button>
 				</div>
 			</header>
 
 			{statusBanner}
 
 			<CreateSpecForm
+				attachments={attachments}
 				autosaveStatus={autosaveStatus}
-				fieldErrors={fieldErrors}
-				formData={formData}
+				description={description}
+				descriptionRef={descriptionRef}
+				fieldError={fieldError}
 				formId="create-spec-form"
+				isImporting={isImporting}
 				isSubmitting={isSubmitting}
-				keyScenariosRef={keyScenariosRef}
-				onFieldChange={handleFieldChange}
+				onAttach={handleAttach}
+				onCancelImport={handleCancelImport}
+				onConfirmImport={handleConfirmImport}
+				onDescriptionChange={handleDescriptionChange}
+				onImport={handleImportClick}
+				onRemoveAttachment={handleRemoveAttachment}
 				onSubmit={handleSubmit}
-				openQuestionsRef={openQuestionsRef}
-				productContextRef={productContextRef}
-				relatedFilesRef={relatedFilesRef}
-				technicalConstraintsRef={technicalConstraintsRef}
+				pendingImportConfirm={pendingImportConfirm}
 			/>
 		</div>
 	);
