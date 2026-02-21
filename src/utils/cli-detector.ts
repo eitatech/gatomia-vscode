@@ -9,6 +9,8 @@ import { homedir } from "node:os";
 import { promisify } from "node:util";
 
 const execAsync = promisify(exec);
+const COMMAND_SPLIT_REGEX = /\s+/u;
+const NEWLINE_SPLIT_REGEX = /\r?\n/u;
 
 /**
  * Get extended PATH including common CLI tool installation directories
@@ -72,6 +74,12 @@ export const checkCLI = async (
 	command: string,
 	timeoutMs = 5000
 ): Promise<CLICheckResult> => {
+	const binaryName = command.trim().split(COMMAND_SPLIT_REGEX)[0];
+	const extractOutputVersion = (output: string): string | null => {
+		const version = extractVersion(output);
+		return version || null;
+	};
+
 	try {
 		const { stdout, stderr } = await execAsync(command, {
 			timeout: timeoutMs,
@@ -103,21 +111,21 @@ export const checkCLI = async (
 
 		return {
 			installed: true,
-			version: version || output || "unknown",
+			version: version || output || null,
 			output,
 		};
-	} catch (error: any) {
-		// Command not found (not in PATH)
-		if (error.code === "ENOENT") {
-			return {
-				installed: false,
-				version: null,
-				error: "Command not found",
-			};
-		}
+	} catch (error: unknown) {
+		const typedError = error as {
+			code?: string | number;
+			killed?: boolean;
+			signal?: string;
+			message?: string;
+			stdout?: string;
+			stderr?: string;
+		};
 
 		// Timeout
-		if (error.killed || error.signal === "SIGTERM") {
+		if (typedError.killed || typedError.signal === "SIGTERM") {
 			return {
 				installed: false,
 				version: null,
@@ -125,11 +133,56 @@ export const checkCLI = async (
 			};
 		}
 
+		const executablePath = await locateCLIExecutable(binaryName, timeoutMs);
+		if (executablePath) {
+			const output =
+				`${typedError.stdout || ""}${typedError.stderr || ""}`.trim();
+			return {
+				installed: true,
+				version: extractOutputVersion(output),
+				output: output || executablePath,
+				error: typedError.message || String(error),
+			};
+		}
+
 		// Other errors
 		return {
 			installed: false,
 			version: null,
-			error: error.message || String(error),
+			error: typedError.message || String(error),
 		};
+	}
+};
+
+export const locateCLIExecutable = async (
+	binaryName: string,
+	timeoutMs = 5000
+): Promise<string | null> => {
+	if (!binaryName) {
+		return null;
+	}
+
+	const lookupCommand =
+		process.platform === "win32"
+			? `where ${binaryName}`
+			: `which ${binaryName}`;
+
+	try {
+		const { stdout } = await execAsync(lookupCommand, {
+			timeout: timeoutMs,
+			encoding: "utf8",
+			env: {
+				...process.env,
+				PATH: getExtendedPath(),
+			},
+		});
+
+		const executablePath = stdout
+			.trim()
+			.split(NEWLINE_SPLIT_REGEX)
+			.find((line) => line.length > 0);
+		return executablePath || null;
+	} catch {
+		return null;
 	}
 };

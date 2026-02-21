@@ -23,6 +23,8 @@ const initialState: WelcomeScreenState = {
 		copilotChat: { installed: false, active: false, version: null },
 		speckit: { installed: false, version: null },
 		openspec: { installed: false, version: null },
+		copilotCli: { installed: false, version: null },
+		gatomiaCli: { installed: false, version: null },
 		lastChecked: Date.now(),
 	},
 	configuration: {

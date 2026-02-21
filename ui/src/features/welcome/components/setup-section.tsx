@@ -5,11 +5,19 @@
 
 import type { DependencyStatus } from "../types";
 
+const GATOMIA_COPILOT_CONFIG_COMMAND =
+	"gatomia config set --llm-provider copilot --main-model gpt-4";
+
+type InstallableDependency =
+	| "copilot-chat"
+	| "speckit"
+	| "openspec"
+	| "copilot-cli"
+	| "gatomia-cli";
+
 interface SetupSectionProps {
 	dependencies: DependencyStatus;
-	onInstallDependency: (
-		dependency: "copilot-chat" | "speckit" | "openspec"
-	) => void;
+	onInstallDependency: (dependency: InstallableDependency) => void;
 	onRefreshDependencies: () => void;
 	onNavigateNext: () => void;
 	isRefreshing?: boolean;
@@ -26,12 +34,16 @@ export const SetupSection = ({
 	const copilotReady = dependencies.copilotChat.installed;
 	const speckitReady = dependencies.speckit.installed;
 	const openspecReady = dependencies.openspec.installed;
+	const copilotCliReady = dependencies.copilotCli.installed;
+	const gatomiaCliReady = dependencies.gatomiaCli.installed;
 
 	// At least one spec system must be installed
 	const specSystemReady = speckitReady || openspecReady;
 
 	// All requirements met
-	const allRequirementsMet = copilotReady && specSystemReady;
+	const gatomiaPrerequisitesMet =
+		copilotReady && copilotCliReady && specSystemReady;
+	const allRequirementsMet = gatomiaPrerequisitesMet && gatomiaCliReady;
 
 	return (
 		<div className="welcome-section">
@@ -49,21 +61,19 @@ export const SetupSection = ({
 			</div>
 
 			<p className="welcome-section-description">
-				GatomIA requires GitHub Copilot Chat and at least one specification
-				system (SpecKit or OpenSpec) to work properly. Let's verify your setup.
+				GatomIA requires GitHub Copilot Chat, Copilot CLI, and at least one
+				specification system (SpecKit or OpenSpec). Install GatomIA CLI after
+				those prerequisites are ready.
 			</p>
 
 			{/* Dependency Cards Grid */}
 			<DependenciesGrid
 				dependencies={dependencies}
+				gatomiaPrerequisitesMet={gatomiaPrerequisitesMet}
 				onInstallDependency={onInstallDependency}
 			/>
-
 			{/* Setup Guidance */}
-			<div
-				className="welcome-section"
-				style={{ borderTop: "1px solid var(--vscode-panel-border)" }}
-			>
+			<div className="welcome-subsection welcome-subsection-divider">
 				<h3 className="welcome-section-title">What You Need</h3>
 				<ul
 					style={{
@@ -80,9 +90,19 @@ export const SetupSection = ({
 						title="GitHub Copilot Chat"
 					/>
 					<RequirementItem
+						description="Required for Copilot provider integration"
+						met={copilotCliReady}
+						title="GitHub Copilot CLI"
+					/>
+					<RequirementItem
 						description="At least one spec system"
 						met={specSystemReady}
 						title="SpecKit or OpenSpec"
+					/>
+					<RequirementItem
+						description="Install after prerequisites are ready"
+						met={gatomiaCliReady}
+						title="GatomIA CLI"
 					/>
 					<RequirementItem
 						description="Configure paths in next section"
@@ -101,12 +121,10 @@ export const SetupSection = ({
 
 			{/* Get Started Button */}
 			<div
+				className="welcome-subsection-divider"
 				style={{
 					display: "flex",
 					justifyContent: "center",
-					marginTop: "32px",
-					paddingTop: "24px",
-					borderTop: "1px solid var(--vscode-panel-border)",
 				}}
 			>
 				{allRequirementsMet ? (
@@ -145,17 +163,57 @@ export const SetupSection = ({
  */
 const DependenciesGrid = ({
 	dependencies,
+	gatomiaPrerequisitesMet,
 	onInstallDependency,
 }: {
 	dependencies: DependencyStatus;
-	onInstallDependency: (dep: "copilot-chat" | "speckit" | "openspec") => void;
+	gatomiaPrerequisitesMet: boolean;
+	onInstallDependency: (dep: InstallableDependency) => void;
 }) => {
 	const copilotReady = dependencies.copilotChat.installed;
 	const speckitReady = dependencies.speckit.installed;
 	const openspecReady = dependencies.openspec.installed;
+	const copilotCliReady = dependencies.copilotCli.installed;
+	const gatomiaCliReady = dependencies.gatomiaCli.installed;
 
 	return (
 		<div className="welcome-card-grid">
+			<div className="welcome-card">
+				<div className="welcome-card-header">
+					<i
+						aria-hidden="true"
+						className="codicon codicon-terminal-bash welcome-card-icon"
+					/>
+					<h3 className="welcome-card-title">GitHub Copilot CLI</h3>
+					<StatusBadge
+						installed={copilotCliReady}
+						version={dependencies.copilotCli.version}
+					/>
+				</div>
+				<p className="welcome-card-description">
+					Required to configure GatomIA CLI with Copilot as the default
+					provider.
+				</p>
+				{!copilotCliReady && (
+					<button
+						className="welcome-button welcome-button-primary"
+						onClick={() => onInstallDependency("copilot-cli")}
+						style={{ marginTop: "12px" }}
+						type="button"
+					>
+						Copy Install Command
+					</button>
+				)}
+				{copilotCliReady && dependencies.copilotCli.version && (
+					<div
+						className="welcome-card-description"
+						style={{ marginTop: "8px", fontSize: "11px" }}
+					>
+						Version: {dependencies.copilotCli.version}
+					</div>
+				)}
+			</div>
+
 			<div className="welcome-card">
 				<div className="welcome-card-header">
 					<i
@@ -269,6 +327,65 @@ const DependenciesGrid = ({
 					</div>
 				)}
 			</div>
+
+			<div className="welcome-card">
+				<div className="welcome-card-header">
+					<i
+						aria-hidden="true"
+						className="codicon codicon-package welcome-card-icon"
+					/>
+					<h3 className="welcome-card-title">GatomIA CLI</h3>
+					<StatusBadge
+						installed={gatomiaCliReady}
+						version={dependencies.gatomiaCli.version}
+					/>
+				</div>
+				<p className="welcome-card-description">
+					Install with uv after all prerequisites are ready.
+				</p>
+				{!gatomiaCliReady && (
+					<button
+						className="welcome-button welcome-button-primary"
+						disabled={!gatomiaPrerequisitesMet}
+						onClick={() => onInstallDependency("gatomia-cli")}
+						style={{ marginTop: "12px" }}
+						type="button"
+					>
+						{gatomiaPrerequisitesMet
+							? "Copy Install Command"
+							: "Complete Prerequisites First"}
+					</button>
+				)}
+				{!(gatomiaCliReady || gatomiaPrerequisitesMet) && (
+					<div
+						className="welcome-card-description"
+						style={{ marginTop: "8px", fontSize: "11px" }}
+					>
+						Requires Copilot Chat, Copilot CLI, and SpecKit or OpenSpec.
+					</div>
+				)}
+				{gatomiaCliReady && (
+					<div style={{ marginTop: "8px" }}>
+						<div
+							className="welcome-card-description"
+							style={{ fontSize: "11px", marginBottom: "6px" }}
+						>
+							Configure Copilot provider:
+						</div>
+						<code
+							style={{
+								display: "block",
+								fontSize: "11px",
+								padding: "8px",
+								borderRadius: "4px",
+								backgroundColor: "var(--vscode-textCodeBlock-background)",
+							}}
+						>
+							{GATOMIA_COPILOT_CONFIG_COMMAND}
+						</code>
+					</div>
+				)}
+			</div>
 		</div>
 	);
 };
@@ -307,11 +424,12 @@ const SpecSystemGuidance = ({
 
 	return (
 		<div
-			className="welcome-section"
+			className="welcome-subsection welcome-subsection-divider"
 			style={{
-				borderTop: "1px solid var(--vscode-panel-border)",
 				backgroundColor:
 					"color-mix(in srgb, var(--vscode-editor-inactiveSelectionBackground) 30%, transparent)",
+				padding: "20px",
+				borderRadius: "6px",
 			}}
 		>
 			<h3 className="welcome-section-title">

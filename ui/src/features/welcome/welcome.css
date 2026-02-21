@@ -32,6 +32,15 @@
 	margin: 0;
 }
 
+:root {
+	--welcome-space-1: 8px;
+	--welcome-space-2: 12px;
+	--welcome-space-3: 16px;
+	--welcome-space-4: 20px;
+	--welcome-space-5: 24px;
+	--welcome-space-6: 32px;
+}
+
 /* ============================================================================
  * Header
  * ============================================================================ */
@@ -134,7 +143,10 @@ a:focus-visible {
 }
 
 .welcome-section {
-	padding: 32px 32px;
+	padding: var(--welcome-space-6) var(--welcome-space-6);
+	display: flex;
+	flex-direction: column;
+	gap: var(--welcome-space-4);
 }
 
 .welcome-section:last-child {
@@ -145,7 +157,8 @@ a:focus-visible {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	margin-bottom: 20px;
+	gap: var(--welcome-space-3);
+	margin-bottom: 0;
 }
 
 .welcome-section-title {
@@ -159,8 +172,20 @@ a:focus-visible {
 
 .welcome-section-description {
 	color: var(--vscode-descriptionForeground);
-	margin-bottom: 20px;
+	margin: 0;
 	line-height: 1.6;
+}
+
+.welcome-subsection-divider {
+	border-top: 1px solid var(--vscode-panel-border);
+	padding-top: var(--welcome-space-5);
+	margin-top: var(--welcome-space-1);
+}
+
+.welcome-subsection {
+	display: flex;
+	flex-direction: column;
+	gap: var(--welcome-space-3);
 }
 
 /* ============================================================================
@@ -180,6 +205,9 @@ a:focus-visible {
 	background-color: var(--vscode-editor-background);
 	transition: all 0.2s ease;
 	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	gap: var(--welcome-space-2);
 }
 
 .welcome-card:hover {
@@ -193,7 +221,7 @@ a:focus-visible {
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	margin-bottom: 12px;
+	margin-bottom: 0;
 }
 
 .welcome-card-icon {
@@ -213,6 +241,7 @@ a:focus-visible {
 	color: var(--vscode-descriptionForeground);
 	font-size: 13px;
 	line-height: 1.5;
+	margin: 0;
 }
 
 /* ============================================================================
@@ -227,6 +256,7 @@ a:focus-visible {
 	border-radius: 12px;
 	font-size: 12px;
 	font-weight: 500;
+	white-space: nowrap;
 }
 
 .status-badge.success {
@@ -295,7 +325,10 @@ a:focus-visible {
  * ============================================================================ */
 
 .config-group {
-	margin-bottom: 24px;
+	display: flex;
+	flex-direction: column;
+	gap: var(--welcome-space-3);
+	margin-bottom: 0;
 }
 
 .config-group-title {
@@ -305,13 +338,13 @@ a:focus-visible {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	margin-bottom: 8px;
+	margin: 0;
 }
 
 .config-group-description {
 	font-size: 13px;
 	color: var(--vscode-descriptionForeground);
-	margin-bottom: 16px;
+	margin: 0;
 	line-height: 1.5;
 }
 
@@ -322,7 +355,7 @@ a:focus-visible {
 	padding: 16px;
 	border: 1px solid var(--vscode-panel-border);
 	border-radius: 4px;
-	margin-bottom: 12px;
+	margin-bottom: 0;
 	background-color: var(--vscode-editor-background);
 }
 
@@ -583,7 +616,7 @@ a:focus-visible {
 .learning-filters {
 	display: flex;
 	gap: 8px;
-	margin-bottom: 20px;
+	margin-bottom: 0;
 	flex-wrap: wrap;
 }
 
@@ -609,7 +642,7 @@ a:focus-visible {
 }
 
 .learning-search {
-	margin-bottom: 20px;
+	margin-bottom: 0;
 }
 
 .learning-search-input {
@@ -631,7 +664,7 @@ a:focus-visible {
 .resource-card {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: var(--welcome-space-2);
 	padding: 16px;
 	border: 1px solid var(--vscode-panel-border);
 	border-radius: 6px;
@@ -762,7 +795,8 @@ a:focus-visible {
 
 @media (max-width: 768px) {
 	.welcome-section {
-		padding: 24px 16px;
+		padding: var(--welcome-space-5) var(--welcome-space-3);
+		gap: var(--welcome-space-3);
 	}
 
 	.welcome-header {

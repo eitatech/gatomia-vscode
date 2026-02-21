@@ -15,6 +15,7 @@ import {
 import { getWebviewContent } from "../utils/get-webview-content";
 import type {
 	ExtensionToWebviewMessage,
+	InstallableDependency,
 	WebviewToExtensionMessage,
 } from "../types/welcome";
 
@@ -29,7 +30,7 @@ export interface WelcomeScreenPanelCallbacks {
 		value: string | boolean
 	) => Promise<void> | void;
 	onInstallDependency?: (
-		dependency: "copilot-chat" | "speckit" | "openspec"
+		dependency: InstallableDependency
 	) => Promise<void> | void;
 	onRefreshDependencies?: () => Promise<void> | void;
 	onUpdatePreference?: (

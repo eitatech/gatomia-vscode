@@ -18,6 +18,7 @@ import { ConfigSection } from "./components/config-section";
 import { LearningSection } from "./components/learning-section";
 import { StatusSection } from "./components/status-section";
 import { vscode } from "../../bridge/vscode";
+import type { InstallableDependency } from "./types";
 import "./welcome.css";
 
 // T125: Error Boundary for graceful error handling
@@ -155,9 +156,7 @@ export const WelcomeScreen = () => {
 	}, [initialize, setState]);
 
 	// Message handlers for SetupSection
-	const handleInstallDependency = (
-		dependency: "copilot-chat" | "speckit" | "openspec"
-	) => {
+	const handleInstallDependency = (dependency: InstallableDependency) => {
 		if (vscode) {
 			vscode.postMessage({
 				type: "welcome/install-dependency",

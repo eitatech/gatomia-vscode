@@ -28,8 +28,23 @@ export interface DependencyStatus {
 		installed: boolean;
 		version: string | null;
 	};
+	copilotCli: {
+		installed: boolean;
+		version: string | null;
+	};
+	gatomiaCli: {
+		installed: boolean;
+		version: string | null;
+	};
 	lastChecked: number;
 }
+
+export type InstallableDependency =
+	| "copilot-chat"
+	| "speckit"
+	| "openspec"
+	| "copilot-cli"
+	| "gatomia-cli";
 
 export interface ConfigurationItem {
 	key: string;
@@ -120,6 +135,8 @@ export interface WelcomeDependencyStatusData {
 	copilotChat: DependencyStatus["copilotChat"];
 	speckit: DependencyStatus["speckit"];
 	openspec: DependencyStatus["openspec"];
+	copilotCli: DependencyStatus["copilotCli"];
+	gatomiaCli: DependencyStatus["gatomiaCli"];
 	lastChecked: number;
 }
 
@@ -135,9 +152,7 @@ export interface WelcomeErrorData {
 
 export interface SetupSectionProps {
 	dependencies: DependencyStatus;
-	onInstallDependency: (
-		dependency: "copilot-chat" | "speckit" | "openspec"
-	) => void;
+	onInstallDependency: (dependency: InstallableDependency) => void;
 	onRefreshDependencies: () => void;
 	onNavigateNext: () => void;
 }
@@ -158,9 +173,7 @@ export interface StatusSectionProps {
 	vscodeVersion: string;
 	dependencies: DependencyStatus;
 	diagnostics: SystemDiagnostic[];
-	onInstallDependency: (
-		dependency: "copilot-chat" | "speckit" | "openspec"
-	) => void;
+	onInstallDependency: (dependency: InstallableDependency) => void;
 }
 
 export interface LearningSectionProps {

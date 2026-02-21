@@ -1,5 +1,3 @@
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
 import {
 	type Disposable,
 	type ExtensionContext,
@@ -12,14 +10,12 @@ import {
 	window,
 } from "vscode";
 import { getWebviewContent } from "../utils/get-webview-content";
-import { getExtendedPath, extractVersion } from "../utils/cli-detector";
-
-const execAsync = promisify(exec);
+import { checkCLI } from "../utils/cli-detector";
 
 /**
  * Dependency check result
  */
-interface DependencyStatus {
+export interface DependencyStatus {
 	name: string;
 	installed: boolean;
 	version?: string;
@@ -30,13 +26,23 @@ interface DependencyStatus {
 /**
  * Installation step
  */
-interface InstallationStep {
+export interface InstallationStep {
 	id: string;
 	title: string;
 	description: string;
 	command: string;
 	platform?: "darwin" | "linux" | "win32" | "all";
 }
+
+const GATOMIA_CLI_STEP_ID = "gatomia-cli";
+const GATOMIA_CLI_PREREQUISITE_NAMES = [
+	"Node.js",
+	"Python",
+	"UV",
+	"SpecKit",
+	"OpenSpec",
+	"Copilot CLI",
+] as const;
 
 /**
  * Message types from webview to extension
@@ -124,6 +130,18 @@ const DEPENDENCIES_TO_CHECK = [
 	{ name: "UV", command: "uv --version", minVersion: undefined },
 	{ name: "SpecKit", command: "specify version", minVersion: undefined },
 	{ name: "OpenSpec", command: "openspec --version", minVersion: undefined },
+	{
+		name: "Copilot CLI",
+		command: "copilot --version",
+		fallbackCommand: "github-copilot --version",
+		minVersion: undefined,
+	},
+	{
+		name: "GatomIA CLI",
+		command: "gatomia --version",
+		fallbackCommand: "mia --version",
+		minVersion: undefined,
+	},
 ] as const;
 
 /**
@@ -170,6 +188,14 @@ const INSTALLATION_STEPS: InstallationStep[] = [
 		platform: "all",
 	},
 	{
+		id: "copilot-cli",
+		title: "Install GitHub Copilot CLI",
+		description:
+			"Required to use GitHub Copilot as the default provider for GatomIA CLI.",
+		command: "npm install -g @github/copilot",
+		platform: "all",
+	},
+	{
 		id: "speckit",
 		title: "Install SpecKit (Specify CLI)",
 		description:
@@ -186,7 +212,40 @@ const INSTALLATION_STEPS: InstallationStep[] = [
 		command: "npm install -g @fission-ai/openspec@latest",
 		platform: "all",
 	},
+	{
+		id: GATOMIA_CLI_STEP_ID,
+		title: "Install GatomIA CLI",
+		description:
+			"Installs the GatomIA CLI plugin. Available after all other prerequisites are installed.",
+		command:
+			"uv tool install gatomia --from git+https://github.com/eitatech/gatomia-cli.git",
+		platform: "all",
+	},
 ];
+
+export const areGatomiaCliPrerequisitesMet = (
+	dependencies: DependencyStatus[]
+): boolean =>
+	GATOMIA_CLI_PREREQUISITE_NAMES.every((name) =>
+		dependencies.some(
+			(dependency) => dependency.name === name && dependency.installed
+		)
+	);
+
+export const getInstallationStepsForPlatform = (
+	platform: "darwin" | "linux" | "win32",
+	dependencies: DependencyStatus[]
+): InstallationStep[] => {
+	const platformSteps = INSTALLATION_STEPS.filter(
+		(step) => step.platform === "all" || step.platform === platform
+	);
+
+	if (areGatomiaCliPrerequisitesMet(dependencies)) {
+		return platformSteps;
+	}
+
+	return platformSteps.filter((step) => step.id !== GATOMIA_CLI_STEP_ID);
+};
 
 /**
  * DependenciesViewProvider - Manages the Dependencies checker webview panel
@@ -323,14 +382,16 @@ export class DependenciesViewProvider {
 		const dependencies: DependencyStatus[] = [];
 
 		for (const dep of DEPENDENCIES_TO_CHECK) {
-			const status = await this.checkDependency(dep.name, dep.command);
+			const status = await this.checkDependency(
+				dep.name,
+				dep.command,
+				dep.fallbackCommand
+			);
 			dependencies.push(status);
 		}
 
 		const platform = process.platform as "darwin" | "linux" | "win32";
-		const steps = INSTALLATION_STEPS.filter(
-			(step) => step.platform === "all" || step.platform === platform
-		);
+		const steps = getInstallationStepsForPlatform(platform, dependencies);
 
 		await this.sendMessageToWebview({
 			type: "dependencies/status",
@@ -349,7 +410,11 @@ export class DependenciesViewProvider {
 			payload: { name },
 		});
 
-		const status = await this.checkDependency(dep.name, dep.command);
+		const status = await this.checkDependency(
+			dep.name,
+			dep.command,
+			dep.fallbackCommand
+		);
 
 		await this.sendMessageToWebview({
 			type: "dependencies/updated",
@@ -359,45 +424,63 @@ export class DependenciesViewProvider {
 
 	private async checkDependency(
 		name: string,
-		command: string
+		command: string,
+		fallbackCommand?: string
 	): Promise<DependencyStatus> {
-		try {
-			const { stdout, stderr } = await execAsync(command, {
-				timeout: 10_000,
-				encoding: "utf8",
-				env: {
-					...process.env,
-					PATH: getExtendedPath(),
-				},
-			});
+		const primaryAttempt = await this.checkDependencyCommand(command);
 
-			const output = stdout.trim() || stderr.trim();
-			const version = extractVersion(output);
-
+		if (primaryAttempt.installed) {
 			this.outputChannel.appendLine(
-				`[DependenciesViewProvider] ${name}: ${version || output}`
+				`[DependenciesViewProvider] ${name}: ${primaryAttempt.version || "unknown"}`
 			);
-
 			return {
 				name,
 				installed: true,
-				version: version || output,
-				command,
-			};
-		} catch (error) {
-			const errorMessage =
-				error instanceof Error ? error.message : String(error);
-			this.outputChannel.appendLine(
-				`[DependenciesViewProvider] ${name}: not found - ${errorMessage}`
-			);
-
-			return {
-				name,
-				installed: false,
-				error: "Not installed",
+				version: primaryAttempt.version,
 				command,
 			};
 		}
+
+		if (fallbackCommand) {
+			const fallbackAttempt =
+				await this.checkDependencyCommand(fallbackCommand);
+			if (fallbackAttempt.installed) {
+				this.outputChannel.appendLine(
+					`[DependenciesViewProvider] ${name}: ${fallbackAttempt.version || "unknown"} (fallback command)`
+				);
+				return {
+					name,
+					installed: true,
+					version: fallbackAttempt.version,
+					command,
+				};
+			}
+		}
+
+		const errorMessage = primaryAttempt.error || "Not installed";
+		this.outputChannel.appendLine(
+			`[DependenciesViewProvider] ${name}: not found - ${errorMessage}`
+		);
+
+		return {
+			name,
+			installed: false,
+			error: "Not installed",
+			command,
+		};
+	}
+
+	private async checkDependencyCommand(command: string): Promise<{
+		installed: boolean;
+		version?: string;
+		error?: string;
+	}> {
+		const result = await checkCLI(command, 10_000);
+		return {
+			installed: result.installed,
+			version: result.version || undefined,
+			error: result.error,
+		};
 	}
 
 	private async copyCommand(command: string): Promise<void> {

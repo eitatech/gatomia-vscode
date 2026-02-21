@@ -119,12 +119,16 @@ describe("Welcome Screen - First-Time Display (Integration)", () => {
 				copilotChat: { installed: false, active: false, version: null },
 				speckit: { installed: false, version: null },
 				openspec: { installed: false, version: null },
+				copilotCli: { installed: false, version: null },
+				gatomiaCli: { installed: false, version: null },
 				lastChecked: Date.now(),
 			};
 
 			expect(dependencies).toHaveProperty("copilotChat");
 			expect(dependencies).toHaveProperty("speckit");
 			expect(dependencies).toHaveProperty("openspec");
+			expect(dependencies).toHaveProperty("copilotCli");
+			expect(dependencies).toHaveProperty("gatomiaCli");
 			expect(dependencies).toHaveProperty("lastChecked");
 		});
 

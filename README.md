@@ -107,6 +107,11 @@ You can follow our progress, open issues, or contribute directly through our off
 
 * Visual Studio Code 1.84.0 or newer.
 * **[GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat)** extension must be installed.
+* GitHub Copilot CLI:
+
+  ```shell
+  npm install -g @github/copilot
+  ```
 
 ### [SpecKit](https://github.com/github/spec-kit)
 
@@ -138,6 +143,22 @@ If you prefer OpenSpec:
    ```shell
    openspec init
    ```
+
+### [GatomIA CLI](https://github.com/eitatech/gatomia-cli)
+
+After all prerequisites are installed, install GatomIA CLI:
+
+```shell
+uv tool install gatomia --from git+https://github.com/eitatech/gatomia-cli.git
+```
+
+Configure GitHub Copilot as the default provider:
+
+```shell
+gatomia config set --llm-provider copilot --main-model gpt-4
+```
+
+If your environment uses the `mia` alias, use `mia config set ...` with the same options.
 
 ### Marketplace
 
