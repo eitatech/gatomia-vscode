@@ -138,7 +138,7 @@ export const checkCLI = async (
 			const output =
 				`${typedError.stdout || ""}${typedError.stderr || ""}`.trim();
 			return {
-				installed: true,
+				installed: false,
 				version: extractOutputVersion(output),
 				output: output || executablePath,
 				error: typedError.message || String(error),

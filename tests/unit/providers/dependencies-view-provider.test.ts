@@ -21,7 +21,7 @@ describe("DependenciesViewProvider helpers", () => {
 			makeDependency("Python", true),
 			makeDependency("UV", true),
 			makeDependency("SpecKit", true),
-			makeDependency("OpenSpec", true),
+			makeDependency("OpenSpec", false),
 			makeDependency("Copilot CLI", false),
 		];
 
@@ -31,12 +31,29 @@ describe("DependenciesViewProvider helpers", () => {
 		expect(steps.some((step) => step.id === "gatomia-cli")).toBe(false);
 	});
 
-	it("includes gatomia-cli and copilot-cli steps when prerequisites are met", () => {
+	it("includes steps when SpecKit satisfies spec system requirement", () => {
 		const dependencies: DependencyStatus[] = [
 			makeDependency("Node.js", true),
 			makeDependency("Python", true),
 			makeDependency("UV", true),
 			makeDependency("SpecKit", true),
+			makeDependency("OpenSpec", false),
+			makeDependency("Copilot CLI", true),
+		];
+
+		expect(areGatomiaCliPrerequisitesMet(dependencies)).toBe(true);
+
+		const steps = getInstallationStepsForPlatform("darwin", dependencies);
+		expect(steps.some((step) => step.id === "copilot-cli")).toBe(true);
+		expect(steps.some((step) => step.id === "gatomia-cli")).toBe(true);
+	});
+
+	it("includes steps when OpenSpec satisfies spec system requirement", () => {
+		const dependencies: DependencyStatus[] = [
+			makeDependency("Node.js", true),
+			makeDependency("Python", true),
+			makeDependency("UV", true),
+			makeDependency("SpecKit", false),
 			makeDependency("OpenSpec", true),
 			makeDependency("Copilot CLI", true),
 		];
