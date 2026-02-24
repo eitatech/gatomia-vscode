@@ -1,7 +1,7 @@
 # Feature Specification: GatomIA for JetBrains IDEs
 
 **Feature Branch**: `claude/jetbrains-extension-plan-jB2yS`
-**Created**: 2026-02-23
+**Created**: 2026-02
 **Status**: Draft
 **Type**: New Product — JetBrains Plugin
 
