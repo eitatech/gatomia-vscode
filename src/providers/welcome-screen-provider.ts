@@ -42,6 +42,7 @@ import type {
 	FeatureAction,
 	LearningResource,
 	WelcomeErrorCodeType,
+	InstallableDependency,
 } from "../types/welcome";
 import { WelcomeErrorCode } from "../types/welcome";
 import { DependencyChecker } from "../services/dependency-checker";
@@ -239,7 +240,7 @@ export class WelcomeScreenProvider {
 	 * Handle dependency install action
 	 */
 	async installDependency(
-		dependency: "copilot-chat" | "speckit" | "openspec",
+		dependency: InstallableDependency,
 		panel: WelcomeScreenPanel
 	): Promise<void> {
 		switch (dependency) {
@@ -284,6 +285,50 @@ export class WelcomeScreenProvider {
 						}
 					});
 				break;
+
+			case "copilot-cli":
+				await env.clipboard.writeText("npm install -g @github/copilot");
+				window
+					.showInformationMessage(
+						"GitHub Copilot CLI install command copied to clipboard. Paste and run in your terminal.",
+						"Open Terminal"
+					)
+					.then((selection) => {
+						if (selection === "Open Terminal") {
+							commands.executeCommand("workbench.action.terminal.new");
+						}
+					});
+				break;
+
+			case "gatomia-cli": {
+				const dependencies = await this.dependencyChecker.checkAll();
+				const prerequisitesMet =
+					dependencies.copilotChat.installed &&
+					dependencies.copilotCli.installed &&
+					(dependencies.speckit.installed || dependencies.openspec.installed);
+
+				if (!prerequisitesMet) {
+					window.showWarningMessage(
+						"Install GitHub Copilot Chat, Copilot CLI, and at least one spec system (SpecKit or OpenSpec) before installing GatomIA CLI."
+					);
+					return;
+				}
+
+				await env.clipboard.writeText(
+					"uv tool install gatomia --from git+https://github.com/eitatech/gatomia-cli.git"
+				);
+				window
+					.showInformationMessage(
+						"GatomIA CLI install command copied to clipboard. Paste and run in your terminal.",
+						"Open Terminal"
+					)
+					.then((selection) => {
+						if (selection === "Open Terminal") {
+							commands.executeCommand("workbench.action.terminal.new");
+						}
+					});
+				break;
+			}
 			default:
 				// Should never reach here due to TypeScript type checking
 				this.outputChannel.appendLine(
@@ -612,9 +657,7 @@ export class WelcomeScreenProvider {
 				await this.updateConfiguration(key, value, getPanel());
 			},
 			// T030: Handle welcome/install-dependency message
-			onInstallDependency: async (
-				dependency: "copilot-chat" | "speckit" | "openspec"
-			) => {
+			onInstallDependency: async (dependency: InstallableDependency) => {
 				this.outputChannel.appendLine(
 					`[WelcomeScreenProvider] Install dependency: ${dependency}`
 				);

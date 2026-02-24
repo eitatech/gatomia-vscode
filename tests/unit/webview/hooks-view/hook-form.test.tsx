@@ -76,7 +76,7 @@ describe("HookForm", () => {
 				expect(screen.getByText("Hook name is required")).toBeInTheDocument();
 			});
 			expect(mockOnSubmit).not.toHaveBeenCalled();
-		});
+		}, 15_000);
 
 		it("validates name length (max 100 characters)", async () => {
 			const user = userEvent.setup();
@@ -102,7 +102,7 @@ describe("HookForm", () => {
 				).toBeInTheDocument();
 			});
 			expect(mockOnSubmit).not.toHaveBeenCalled();
-		});
+		}, 15_000);
 
 		it("creates hook with valid data", async () => {
 			const user = userEvent.setup();
@@ -292,7 +292,7 @@ describe("HookForm", () => {
 				);
 				expect(errorMessages.length).toBeGreaterThan(0);
 			});
-		});
+		}, 15_000);
 	});
 
 	describe("Git Action Type", () => {

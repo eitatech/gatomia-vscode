@@ -107,7 +107,7 @@
 
 - [X] T025 [P] Run `npm test` — verify all tests across extension and webview pass (zero failures)
 - [X] T026 [P] Run `npm run check` — verify Biome linter and formatter clean (zero errors); confirm: (a) all regex **literals** are defined as top-level constants (Biome `useTopLevelRegex` rule — e.g. `IMAGE_EXTENSIONS_PATTERN`), and (b) all numeric size limits are top-level constants (e.g. `MARKDOWN_SIZE_LIMIT_BYTES`, `IMAGE_MAX_SIZE_BYTES`)
-- [ ] T027 Manual smoke test: follow `specs/013-create-spec-ui-redesign/quickstart.md` — verify US1 (submit description), US2 (import markdown with overwrite confirm), and US3 (attach images + submit) all work end-to-end in the Extension Development Host
+- [X] T027 Manual smoke test: follow `specs/013-create-spec-ui-redesign/quickstart.md` — verify US1 (submit description), US2 (import markdown with overwrite confirm), and US3 (attach images + submit) all work end-to-end in the Extension Development Host
 
 ---
 

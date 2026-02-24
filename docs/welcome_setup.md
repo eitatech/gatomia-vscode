@@ -277,6 +277,16 @@ class WelcomeScreenProvider {
 - **speckit**: Copies UV install command to clipboard
 - **openspec**: Copies npm install command to clipboard
 
+The dedicated **Install Dependencies** panel also validates and installs:
+- **Copilot CLI** (`npm install -g @github/copilot`)
+- **GatomIA CLI** (`uv tool install gatomia --from git+https://github.com/eitatech/gatomia-cli.git`)
+
+GatomIA CLI installation is only shown after all other prerequisites are installed, and the panel includes configuration guidance for GitHub Copilot as default provider via:
+
+```shell
+gatomia config set --llm-provider copilot --main-model gpt-4
+```
+
 ### WelcomeScreenPanel
 
 Manages the webview panel lifecycle and message passing with singleton pattern to prevent multiple instances.

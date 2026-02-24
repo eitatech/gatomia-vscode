@@ -46,8 +46,23 @@ export interface WelcomeDependencyStatusMessage {
 		installed: boolean;
 		version: string | null;
 	};
+	copilotCli: {
+		installed: boolean;
+		version: string | null;
+	};
+	gatomiaCli: {
+		installed: boolean;
+		version: string | null;
+	};
 	lastChecked: number;
 }
+
+export type InstallableDependency =
+	| "copilot-chat"
+	| "speckit"
+	| "openspec"
+	| "copilot-cli"
+	| "gatomia-cli";
 
 export interface WelcomeDiagnosticAddedMessage {
 	type: "welcome/diagnostic-added";
@@ -91,7 +106,7 @@ export interface WelcomeUpdateConfigMessage {
 
 export interface WelcomeInstallDependencyMessage {
 	type: "welcome/install-dependency";
-	dependency: "copilot-chat" | "speckit" | "openspec";
+	dependency: InstallableDependency;
 }
 
 export interface WelcomeRefreshDependenciesMessage {
@@ -145,6 +160,14 @@ export interface DependencyStatus {
 		version: string | null;
 	};
 	openspec: {
+		installed: boolean;
+		version: string | null;
+	};
+	copilotCli: {
+		installed: boolean;
+		version: string | null;
+	};
+	gatomiaCli: {
 		installed: boolean;
 		version: string | null;
 	};

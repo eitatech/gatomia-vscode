@@ -78,12 +78,14 @@ describe("WelcomeScreenProvider", () => {
 			expect(state.hasShownBefore).toBe(true);
 		});
 
-		it("should include dependency status for all three dependencies", async () => {
+		it("should include dependency status for all welcome setup dependencies", async () => {
 			const state = await provider.getWelcomeState();
 
 			expect(state.dependencies).toHaveProperty("copilotChat");
 			expect(state.dependencies).toHaveProperty("speckit");
 			expect(state.dependencies).toHaveProperty("openspec");
+			expect(state.dependencies).toHaveProperty("copilotCli");
+			expect(state.dependencies).toHaveProperty("gatomiaCli");
 			expect(state.dependencies).toHaveProperty("lastChecked");
 		});
 
@@ -246,6 +248,42 @@ describe("WelcomeScreenProvider", () => {
 
 			// Should copy command to clipboard
 		});
+
+		it("should copy Copilot CLI install command to clipboard", async () => {
+			const mockPanel = {
+				postMessage: vi.fn(),
+			} as any;
+
+			await provider.installDependency("copilot-cli", mockPanel);
+
+			expect(vscode.env.clipboard.writeText).toHaveBeenCalledWith(
+				"npm install -g @github/copilot"
+			);
+		});
+
+		it("should copy GatomIA CLI install command to clipboard", async () => {
+			const mockPanel = {
+				postMessage: vi.fn(),
+			} as any;
+
+			vi.spyOn(
+				(provider as any).dependencyChecker,
+				"checkAll"
+			).mockResolvedValue({
+				copilotChat: { installed: true, active: true, version: "0.1.0" },
+				speckit: { installed: true, version: "1.0.0" },
+				openspec: { installed: false, version: null },
+				copilotCli: { installed: true, version: "1.0.0" },
+				gatomiaCli: { installed: false, version: null },
+				lastChecked: Date.now(),
+			});
+
+			await provider.installDependency("gatomia-cli", mockPanel);
+
+			expect(vscode.env.clipboard.writeText).toHaveBeenCalledWith(
+				"uv tool install gatomia --from git+https://github.com/eitatech/gatomia-cli.git"
+			);
+		});
 	});
 
 	describe("refreshDependencies()", () => {
@@ -280,6 +318,8 @@ describe("WelcomeScreenProvider", () => {
 					copilotChat: expect.any(Object),
 					speckit: expect.any(Object),
 					openspec: expect.any(Object),
+					copilotCli: expect.any(Object),
+					gatomiaCli: expect.any(Object),
 				})
 			);
 		});
