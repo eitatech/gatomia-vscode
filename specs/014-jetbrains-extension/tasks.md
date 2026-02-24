@@ -5,263 +5,263 @@
 
 ---
 
-## Fase 1 — Fundação e Estrutura
+## Phase 1 — Foundation and Structure
 
-- [ ] **TASK-01** Criar repositório `gatomia-jetbrains` com template do IntelliJ Platform Plugin
-  - Usar [intellij-platform-plugin-template](https://github.com/JetBrains/intellij-platform-plugin-template) como base
-  - Configurar `build.gradle.kts` com IntelliJ Platform Gradle Plugin v2.3.0+
-  - Configurar `gradle.properties` com versões (SDK: 2024.1, since-build: 241)
-  - Configurar `.github/workflows/build.yml` para CI
+- [ ] **TASK-01** Create `gatomia-jetbrains` repository with IntelliJ Platform Plugin template
+  - Use [intellij-platform-plugin-template](https://github.com/JetBrains/intellij-platform-plugin-template) as a base
+  - Configure `build.gradle.kts` with IntelliJ Platform Gradle Plugin v2.3.0+
+  - Configure `gradle.properties` with versions (SDK: 2024.1, since-build: 241)
+  - Configure `.github/workflows/build.yml` for CI
 
-- [ ] **TASK-02** Criar `plugin.xml` completo com todas as extensões declaradas
+- [ ] **TASK-02** Create complete `plugin.xml` with all declared extensions
   - Tool Windows: Specs, Hooks, Steering, Actions
   - Application Services: GatomiaSettings
   - Project Services: SpecManagerService, HookManagerService, SteeringManagerService, PromptLoaderService
   - Listeners: ProjectOpenListener, FileChangeListener
   - Configurable: GatomiaSettingsConfigurable
-  - Action groups e actions declaradas
+  - Action groups and declared actions
 
-- [ ] **TASK-03** Implementar `GatomiaSettings` (PersistentStateComponent)
-  - Campos: specSystem, specsPath, promptsPath, chatLanguage, agentsResourcesPath, enableHotReload
-  - Campos de visibilidade de views
-  - Serialização XML automática via @State
+- [ ] **TASK-03** Implement `GatomiaSettings` (PersistentStateComponent)
+  - Fields: specSystem, specsPath, promptsPath, chatLanguage, agentsResourcesPath, enableHotReload
+  - View visibility fields
+  - Automatic XML serialization via @State
 
-- [ ] **TASK-04** Implementar `SpecManagerService` (Project Service)
-  - Leitura de specs do diretório configurado (SpecKit ou OpenSpec)
-  - Detecção automática do sistema ativo
-  - Retorno de lista de specs com metadata (nome, status, datas)
-  - Suporte a refresh manual
+- [ ] **TASK-04** Implement `SpecManagerService` (Project Service)
+  - Read specs from configured directory (SpecKit or OpenSpec)
+  - Automatic detection of active system
+  - Return list of specs with metadata (name, status, dates)
+  - Support for manual refresh
 
-- [ ] **TASK-05** Implementar `SpecToolWindow` com tree view básico
-  - Nós raiz: Current, Review, Archived
-  - Subnós: spec folders com seus arquivos (spec.md, plan.md, tasks.md)
-  - Renderer customizado com ícones
+- [ ] **TASK-05** Implement `SpecToolWindow` with basic tree view
+  - Root nodes: Current, Review, Archived
+  - Sub-nodes: spec folders with their files (spec.md, plan.md, tasks.md)
+  - Custom renderer with icons
   - Toolbar: Create, Refresh, Settings
-  - Double-click: abre arquivo no editor
+  - Double-click: opens file in editor
 
-- [ ] **TASK-06** Implementar `SteeringManagerService` e `SteeringToolWindow`
-  - Lê Constitution, AGENTS.md, instruction rules (project + user)
-  - Tree view com grupos: Constitution, Project Rules, User Rules
+- [ ] **TASK-06** Implement `SteeringManagerService` and `SteeringToolWindow`
+  - Reads Constitution, AGENTS.md, instruction rules (project + user)
+  - Tree view with groups: Constitution, Project Rules, User Rules
   - Toolbar: Create Constitution, Create Project Rule, Create User Rule, Refresh
 
-- [ ] **TASK-07** Implementar `FileChangeListener` (BulkFileListener)
-  - Monitora mudanças em arquivos de spec (*.md nas pastas de specs)
-  - Notifica services via MessageBus para refresh das tree views
-  - Configurável via `enableHotReload` setting
+- [ ] **TASK-07** Implement `FileChangeListener` (BulkFileListener)
+  - Monitors changes in spec files (*.md in spec folders)
+  - Notifies services via MessageBus to refresh tree views
+  - Configurable via `enableHotReload` setting
 
-- [ ] **TASK-08** Implementar `ProjectOpenListener`
-  - Inicializa services ao abrir projeto
-  - Verifica dependências (SpecKit/OpenSpec CLIs)
-  - Exibe Welcome Screen se primeira ativação
+- [ ] **TASK-08** Implement `ProjectOpenListener`
+  - Initializes services when project opens
+  - Verifies dependencies (SpecKit/OpenSpec CLIs)
+  - Displays Welcome Screen on first activation
 
-- [ ] **TASK-09** Testes unitários para SpecManagerService e SteeringManagerService
-  - Cobertura: leitura de specs, detecção de sistema, parsing de frontmatter
-
----
-
-## Fase 2 — Actions e CLI Integration
-
-- [ ] **TASK-10** Implementar `CliRunner` utilitário
-  - Execução de processos externos com streaming de output
-  - Suporte a coroutines (Dispatchers.IO)
-  - Detecção de CLI instalado (isInstalled check)
-  - Timeout configurável
-
-- [ ] **TASK-11** Implementar `DiagnosticsService`
-  - Verifica: SpecKit CLI, OpenSpec CLI, Git, JetBrains AI Assistant
-  - Retorna status de cada dependência
-  - Usado pela Welcome Screen
-
-- [ ] **TASK-12** Implementar `CreateSpecAction`
-  - Diálogo nativo de input (campos: description, spec system)
-  - Executa `specify specify` ou `openspec create` via CliRunner
-  - Fallback: monta prompt e copia para clipboard + abre AI Chat
-  - Notificação de sucesso/erro
-
-- [ ] **TASK-13** Implementar `ImplTaskAction` e `RunTaskAction`
-  - Lê tasks.md do spec selecionado
-  - Parser de checklist markdown para extrair tasks pendentes
-  - Apresenta lista de tasks em diálogo
-  - Executa task via CLI ou abre AI com contexto
-
-- [ ] **TASK-14** Implementar `DeleteSpecAction` com confirmação
-  - Diálogo de confirmação antes de deletar
-  - Move para Archived ou remove definitivamente
-
-- [ ] **TASK-15** Implementar `ActionsToolWindow` (prompts/agents explorer)
-  - Lê arquivos de `.github/prompts/`, `.github/instructions/`, `.github/agents/`
-  - Tree view com grupos: Prompts, Instructions, Agents, Skills
-  - Ações: Run Prompt, Create Prompt, Rename, Delete
-
-- [ ] **TASK-16** Implementar `CreatePromptAction` e `RunPromptAction`
-  - Create: cria arquivo `.md` em `.github/prompts/` com template
-  - Run: lê conteúdo do arquivo de prompt, copia/envia para AI
-
-- [ ] **TASK-17** Implementar `CreateConstitutionAction`, `CreateUserRuleAction`, `CreateProjectRuleAction`
-  - Diálogo de nome/descrição
-  - Cria arquivo no local correto com template
-  - Abre arquivo no editor
-
-- [ ] **TASK-18** Implementar `GatomiaSettingsConfigurable` (Settings UI)
-  - Painel de configurações com campos de UI nativa (Kotlin UI DSL)
-  - Grupos: General, Spec Management, Views, Agents
-  - Apply/Reset/Cancel funcionando corretamente
-
-- [ ] **TASK-19** Implementar `NotificationUtils`
-  - Wrappers para diferentes tipos de notificação
-  - Suporte a ações clicáveis nas notificações
-  - Group ID consistente
-
-- [ ] **TASK-20** Testes unitários para CliRunner, CreateSpecAction, parsers
+- [ ] **TASK-09** Unit tests for SpecManagerService and SteeringManagerService
+  - Coverage: spec reading, system detection, frontmatter parsing
 
 ---
 
-## Fase 3 — JCEF UI
+## Phase 2 — Actions and CLI Integration
 
-- [ ] **TASK-21** Criar bridge JCEF no lado TypeScript (`ui/src/bridge/jcef-bridge.ts`)
-  - Implementa mesma interface da VSCode bridge
-  - Usa `window.cefQuery` para enviar mensagens ao Kotlin
-  - Usa `CustomEvent` para receber mensagens do Kotlin
-  - Feature detection: detecta se está rodando em JCEF ou VSCode
+- [ ] **TASK-10** Implement `CliRunner` utility
+  - External process execution with output streaming
+  - Coroutines support (Dispatchers.IO)
+  - CLI installation detection (isInstalled check)
+  - Configurable timeout
 
-- [ ] **TASK-22** Adaptar build da UI para target `jcef`
-  - Novo script `npm run build:jcef` em `ui/package.json`
-  - Output vai para `../gatomia-jetbrains/src/main/resources/webview/`
-  - Substituição de bridge em build time
+- [ ] **TASK-11** Implement `DiagnosticsService`
+  - Verifies: SpecKit CLI, OpenSpec CLI, Git, JetBrains AI Assistant
+  - Returns status of each dependency
+  - Used by Welcome Screen
 
-- [ ] **TASK-23** Implementar `GatomiaJcefPanel` base (Kotlin)
-  - Wrapper sobre `JBCefBrowser`
-  - Setup do message router (CefQueryHandler)
-  - Método `sendToUI(type, payload)` via executeJavaScript
-  - Método abstrato `handleMessage(type, payload)`
-  - Verificação de disponibilidade de JCEF
+- [ ] **TASK-12** Implement `CreateSpecAction`
+  - Native input dialog (fields: description, spec system)
+  - Runs `specify specify` or `openspec create` via CliRunner
+  - Fallback: assembles prompt and copies to clipboard + opens AI Chat
+  - Success/error notification
 
-- [ ] **TASK-24** Implementar `CreateSpecPanel` (JCEF)
-  - Abre a UI React de criação de spec dentro do JetBrains
-  - Handlers para: form submit, cancel, attach image
-  - Fecha painel após criação bem-sucedida
+- [ ] **TASK-13** Implement `ImplTaskAction` and `RunTaskAction`
+  - Reads tasks.md from selected spec
+  - Markdown checklist parser to extract pending tasks
+  - Presents task list in dialog
+  - Runs task via CLI or opens AI with task context
 
-- [ ] **TASK-25** Implementar `DocumentPreviewPanel` (JCEF)
-  - Carrega a UI React de preview de documentos
-  - Sincronização com arquivo em disco via VirtualFileListener
-  - Ações de refinamento (Refine, Edit)
+- [ ] **TASK-14** Implement `DeleteSpecAction` with confirmation
+  - Confirmation dialog before deleting
+  - Move to Archived or permanently remove
 
-- [ ] **TASK-26** Implementar `WelcomePanel` (JCEF)
-  - Reutiliza Welcome Screen React
-  - Handlers para: install dependency, open settings, run command
-  - Diagnósticos via DiagnosticsService
+- [ ] **TASK-15** Implement `ActionsToolWindow` (prompts/agents explorer)
+  - Reads files from `.github/prompts/`, `.github/instructions/`, `.github/agents/`
+  - Tree view with groups: Prompts, Instructions, Agents, Skills
+  - Actions: Run Prompt, Create Prompt, Rename, Delete
 
-- [ ] **TASK-27** Fallback nativo para quando JCEF não disponível
-  - `CreateSpecDialog` nativo (Kotlin UI DSL) com campos básicos
-  - Notificação quando features avançadas não disponíveis
+- [ ] **TASK-16** Implement `CreatePromptAction` and `RunPromptAction`
+  - Create: creates `.md` file in `.github/prompts/` from template
+  - Run: reads prompt file content, copies/sends to AI
 
-- [ ] **TASK-28** Testes de integração JCEF cross-platform
+- [ ] **TASK-17** Implement `CreateConstitutionAction`, `CreateUserRuleAction`, `CreateProjectRuleAction`
+  - Name/description dialog
+  - Creates file in correct location from template
+  - Opens file in editor
+
+- [ ] **TASK-18** Implement `GatomiaSettingsConfigurable` (Settings UI)
+  - Settings panel with native UI fields (Kotlin UI DSL)
+  - Groups: General, Spec Management, Views, Agents
+  - Apply/Reset/Cancel working correctly
+
+- [ ] **TASK-19** Implement `NotificationUtils`
+  - Wrappers for different notification types
+  - Support for clickable actions in notifications
+  - Consistent Group ID
+
+- [ ] **TASK-20** Unit tests for CliRunner, CreateSpecAction, parsers
+
+---
+
+## Phase 3 — JCEF UI
+
+- [ ] **TASK-21** Create JCEF bridge on the TypeScript side (`ui/src/bridge/jcef-bridge.ts`)
+  - Implements same interface as the VSCode bridge
+  - Uses `window.cefQuery` to send messages to Kotlin
+  - Uses `CustomEvent` to receive messages from Kotlin
+  - Feature detection: detects if running in JCEF or VSCode
+
+- [ ] **TASK-22** Adapt UI build for `jcef` target
+  - New script `npm run build:jcef` in `ui/package.json`
+  - Output goes to `../gatomia-jetbrains/src/main/resources/webview/`
+  - Bridge replacement at build time
+
+- [ ] **TASK-23** Implement `GatomiaJcefPanel` base (Kotlin)
+  - Wrapper over `JBCefBrowser`
+  - Message router setup (CefQueryHandler)
+  - `sendToUI(type, payload)` method via executeJavaScript
+  - Abstract method `handleMessage(type, payload)`
+  - JCEF availability check
+
+- [ ] **TASK-24** Implement `CreateSpecPanel` (JCEF)
+  - Opens the React spec creation UI inside JetBrains
+  - Handlers for: form submit, cancel, attach image
+  - Closes panel after successful creation
+
+- [ ] **TASK-25** Implement `DocumentPreviewPanel` (JCEF)
+  - Loads the React document preview UI
+  - Synchronization with file on disk via VirtualFileListener
+  - Refinement actions (Refine, Edit)
+
+- [ ] **TASK-26** Implement `WelcomePanel` (JCEF)
+  - Reuses React Welcome Screen
+  - Handlers for: install dependency, open settings, run command
+  - Diagnostics via DiagnosticsService
+
+- [ ] **TASK-27** Native fallback when JCEF is unavailable
+  - Native `CreateSpecDialog` (Kotlin UI DSL) with basic fields
+  - Notification when advanced features are unavailable
+
+- [ ] **TASK-28** JCEF cross-platform integration tests
   - Linux (X11), Linux (Wayland), macOS, Windows
-  - Verificar carregamento da UI React
-  - Verificar comunicação bidirecional
+  - Verify React UI loading
+  - Verify bidirectional communication
 
 ---
 
-## Fase 4 — Hooks e MCP
+## Phase 4 — Hooks and MCP
 
-- [ ] **TASK-29** Implementar `McpClient` (JSON-RPC sobre stdio)
-  - Inicialização de processo MCP server via ProcessBuilder
-  - Handshake `initialize` / `initialized`
-  - `tools/list` para descobrir ferramentas disponíveis
-  - `tools/call` para executar ferramentas
-  - Gestão de lifecycle (start, keepalive, stop)
-  - Timeout e retry logic
+- [ ] **TASK-29** Implement `McpClient` (JSON-RPC over stdio)
+  - MCP server process initialization via ProcessBuilder
+  - `initialize` / `initialized` handshake
+  - `tools/list` to discover available tools
+  - `tools/call` to execute tools
+  - Lifecycle management (start, keepalive, stop)
+  - Timeout and retry logic
 
-- [ ] **TASK-30** Implementar `HookManagerService`
-  - Persistência de hooks (PersistentStateComponent ou arquivo JSON)
+- [ ] **TASK-30** Implement `HookManagerService`
+  - Hook persistence (PersistentStateComponent or JSON file)
   - CRUD: add, edit, enable, disable, delete
-  - Import/export de hooks (JSON)
-  - Lista de hooks por trigger
+  - Hook import/export (JSON)
+  - List of hooks by trigger
 
-- [ ] **TASK-31** Implementar `HookExecutor`
-  - Leitura de template variables (`$agentOutput`, `$clipboardContent`, etc.)
-  - Substituição de variáveis em parâmetros de action
-  - Execução de ação MCP via McpClient
-  - Logging com timestamps
-  - Error handling com retry
+- [ ] **TASK-31** Implement `HookExecutor`
+  - Template variable reading (`$agentOutput`, `$clipboardContent`, etc.)
+  - Variable substitution in action parameters
+  - MCP action execution via McpClient
+  - Logging with timestamps
+  - Error handling with retry
 
-- [ ] **TASK-32** Implementar `TriggerRegistry`
-  - Registro de triggers disponíveis (after-spec-create, after-task-run, etc.)
-  - Dispatch de hooks quando trigger ocorre
-  - Suporte a timing: before/after
+- [ ] **TASK-32** Implement `TriggerRegistry`
+  - Registry of available triggers (after-spec-create, after-task-run, etc.)
+  - Hook dispatch when trigger occurs
+  - Timing support: before/after
 
-- [ ] **TASK-33** Implementar `HooksToolWindow`
-  - Tree view: lista de hooks com status (enabled/disabled)
-  - Log panel: execuções recentes com timestamps
+- [ ] **TASK-33** Implement `HooksToolWindow`
+  - Tree view: list of hooks with status (enabled/disabled)
+  - Log panel: recent executions with timestamps
   - Toolbar: Add Hook, Import, Export, View Logs, Refresh
 
-- [ ] **TASK-34** Implementar `HooksConfigPanel` (JCEF) ou nativo
-  - Formulário de configuração de hook
-  - Seletor de MCP server e tool (via McpClient.listTools())
-  - Mapeamento de parâmetros
+- [ ] **TASK-34** Implement `HooksConfigPanel` (JCEF) or native
+  - Hook configuration form
+  - MCP server and tool selector (via McpClient.listTools())
+  - Parameter mapping
 
-- [ ] **TASK-35** Implementar ações de hooks: AddHook, EditHook, EnableHook, DeleteHook
+- [ ] **TASK-35** Implement hook actions: AddHook, EditHook, EnableHook, DeleteHook
 
-- [ ] **TASK-36** Implementar leitura de MCP config
-  - Detectar arquivo mcp.json (GitHub Copilot config path)
-  - Parsear lista de servers configurados
-  - Fallback para config própria do GatomIA
+- [ ] **TASK-36** Implement MCP config reading
+  - Detect mcp.json file (GitHub Copilot config path)
+  - Parse list of configured servers
+  - Fallback to GatomIA's own config
 
-- [ ] **TASK-37** Testes de integração para McpClient e HookExecutor
+- [ ] **TASK-37** Integration tests for McpClient and HookExecutor
 
 ---
 
-## Fase 5 — AI Integration e Polimento
+## Phase 5 — AI Integration and Polish
 
-- [ ] **TASK-38** Implementar `AiAssistantService`
-  - Detecção de disponibilidade do JetBrains AI Assistant plugin
-  - Envio de prompt para AI Chat quando disponível
-  - Fallback para clipboard quando não disponível
+- [ ] **TASK-38** Implement `AiAssistantService`
+  - Detection of JetBrains AI Assistant plugin availability
+  - Send prompt to AI Chat when available
+  - Fallback to clipboard when unavailable
 
-- [ ] **TASK-39** Implementar `RefinementGatewayService`
-  - Porta do `refinement-gateway.ts` para Kotlin
-  - Mapeamento de document type → agent command
-  - Formatação de prompt de refinamento
+- [ ] **TASK-39** Implement `RefinementGatewayService`
+  - Port of `refinement-gateway.ts` to Kotlin
+  - Mapping of document type → agent command
+  - Refinement prompt formatting
 
-- [ ] **TASK-40** Implementar `AgentService` e descoberta de agents
-  - Lê agents de `resources/agents/*.agent.md`
-  - Parseia frontmatter YAML dos agent files
-  - Registra agents disponíveis no ActionsToolWindow
+- [ ] **TASK-40** Implement `AgentService` and agent discovery
+  - Reads agents from `resources/agents/*.agent.md`
+  - Parses YAML frontmatter of agent files
+  - Registers available agents in ActionsToolWindow
 
-- [ ] **TASK-41** Implementar `TaskLineMarkerProvider` (equivalente ao CodeLens)
-  - Detecta linhas `- [ ] description` em arquivos `tasks.md`
-  - Exibe marcador lateral "▶ Run Task"
-  - Clique abre ação de execução da task
+- [ ] **TASK-41** Implement `TaskLineMarkerProvider` (equivalent to CodeLens)
+  - Detects `- [ ] description` lines in `tasks.md` files
+  - Displays lateral marker "▶ Run Task"
+  - Click opens task execution action
 
-- [ ] **TASK-42** Adicionar ícones customizados do plugin
-  - Ícone principal (gatomia.svg) para sidebar do JetBrains
-  - Ícones para cada tipo de item nos tree views
-  - Versão dark/light dos ícones
+- [ ] **TASK-42** Add custom plugin icons
+  - Main icon (gatomia.svg) for JetBrains sidebar
+  - Icons for each item type in tree views
+  - Dark/light versions of icons
 
-- [ ] **TASK-43** Polimento de UX
-  - Tooltips em todos os botões de toolbar
-  - Atalhos de teclado para ações principais
-  - Context menus (right-click) nos tree nodes
-  - Mensagens de erro amigáveis
+- [ ] **TASK-43** UX polish
+  - Tooltips on all toolbar buttons
+  - Keyboard shortcuts for main actions
+  - Context menus (right-click) on tree nodes
+  - User-friendly error messages
 
-- [ ] **TASK-44** Documentação do plugin
-  - README.md atualizado para JetBrains
+- [ ] **TASK-44** Plugin documentation
+  - Updated README.md for JetBrains
   - CHANGELOG.md
-  - Guia de contribuição
-  - Screenshots e GIFs para o Marketplace
+  - Contribution guide
+  - Screenshots and GIFs for the Marketplace
 
-- [ ] **TASK-45** Configuração de publicação no JetBrains Marketplace
-  - Conta de publisher criada
-  - Token de publicação configurado como GitHub Secret
-  - `./gradlew publishPlugin` testado
-  - Plugin description page preparada
+- [ ] **TASK-45** JetBrains Marketplace publishing setup
+  - Publisher account created
+  - Publishing token configured as GitHub Secret
+  - `./gradlew publishPlugin` tested
+  - Plugin description page prepared
 
-- [ ] **TASK-46** Testes E2E no IDE sandbox
-  - Fluxo completo: instalar plugin → criar spec → ver no explorer
-  - Fluxo de hooks: configurar hook → executar spec → hook executa
-  - Fluxo de steering: criar instruction rule → ver no explorer
+- [ ] **TASK-46** E2E tests in IDE sandbox
+  - Full flow: install plugin → create spec → see in explorer
+  - Hooks flow: configure hook → run spec → hook executes
+  - Steering flow: create instruction rule → see in explorer
 
-- [ ] **TASK-47** Teste em múltiplos IDEs
+- [ ] **TASK-47** Test on multiple IDEs
   - IntelliJ IDEA Community 2024.1
   - IntelliJ IDEA Community 2024.3
   - PyCharm Community 2024.1

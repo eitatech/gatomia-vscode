@@ -5,59 +5,59 @@
 
 ---
 
-## 1. Análise da Extensão VSCode Existente
+## 1. Analysis of the Existing VSCode Extension
 
-### 1.1 Estrutura de Código
+### 1.1 Code Structure
 
 ```
 src/
-├── extension.ts              # Entry point — registra todos os providers, commands, watchers
-├── constants.ts              # Namespace de configuração VSC_CONFIG_NAMESPACE
+├── extension.ts              # Entry point — registers all providers, commands, watchers
+├── constants.ts              # Configuration namespace VSC_CONFIG_NAMESPACE
 ├── features/
 │   ├── spec/
-│   │   ├── spec-manager.ts         # Gerencia specs (SpecKit/OpenSpec)
-│   │   ├── spec-kit-manager.ts     # Operações específicas SpecKit
+│   │   ├── spec-manager.ts         # Manages specs (SpecKit/OpenSpec)
+│   │   ├── spec-kit-manager.ts     # SpecKit-specific operations
 │   │   ├── spec-submission-strategy.ts
 │   │   └── create-spec-input-controller.ts
 │   ├── hooks/
-│   │   ├── hook-manager.ts         # CRUD de hooks (persistência em globalState)
-│   │   ├── hook-executor.ts        # Execução de hooks com template variables
-│   │   ├── trigger-registry.ts     # Registro de triggers disponíveis
-│   │   ├── agent-registry.ts       # Descoberta de agents
+│   │   ├── hook-manager.ts         # Hook CRUD (persistence in globalState)
+│   │   ├── hook-executor.ts        # Hook execution with template variables
+│   │   ├── trigger-registry.ts     # Registry of available triggers
+│   │   ├── agent-registry.ts       # Agent discovery
 │   │   └── services/
 │   │       ├── agent-discovery-service.ts
 │   │       ├── extension-monitor-service.ts
 │   │       └── file-watcher-service.ts
 │   ├── agents/
-│   │   ├── agent-loader.ts         # Carrega agents de resources/agents/
-│   │   ├── chat-participant-registry.ts  # Registra como chat participants
-│   │   └── tools/                  # Tool handlers para agentes
+│   │   ├── agent-loader.ts         # Loads agents from resources/agents/
+│   │   ├── chat-participant-registry.ts  # Registers as chat participants
+│   │   └── tools/                  # Tool handlers for agents
 │   └── steering/
-│       ├── steering-manager.ts     # Gerencia Constitution/AGENTS.md
+│       ├── steering-manager.ts     # Manages Constitution/AGENTS.md
 │       ├── constitution-manager.ts
 │       └── instruction-rules.ts
 ├── providers/
-│   ├── spec-explorer-provider.ts    # TreeDataProvider para specs
-│   ├── hooks-explorer-provider.ts   # TreeDataProvider para hooks
+│   ├── spec-explorer-provider.ts    # TreeDataProvider for specs
+│   ├── hooks-explorer-provider.ts   # TreeDataProvider for hooks
 │   ├── steering-explorer-provider.ts
 │   ├── actions-explorer-provider.ts
-│   ├── copilot-provider.ts          # Integração com GitHub Copilot
+│   ├── copilot-provider.ts          # GitHub Copilot integration
 │   └── interactive-view-provider.ts
 ├── services/
 │   ├── agent-service.ts
 │   ├── configuration-service.ts
-│   ├── refinement-gateway.ts       # Envia prompts para Copilot Chat
+│   ├── refinement-gateway.ts       # Sends prompts to Copilot Chat
 │   └── prompt-loader.ts
 └── utils/
     ├── chat-prompt-runner.ts        # sendPromptToChat() via vscode.commands
-    ├── config-manager.ts            # Singleton de configurações
+    ├── config-manager.ts            # Configuration singleton
     ├── copilot-mcp-utils.ts         # MCP via vscode.lm
-    └── platform-utils.ts            # paths cross-platform
+    └── platform-utils.ts            # Cross-platform paths
 ```
 
-### 1.2 Integração com GitHub Copilot Chat
+### 1.2 Integration with GitHub Copilot Chat
 
-O ponto central da extensão VSCode é `sendPromptToChat()`:
+The central point of the VSCode extension is `sendPromptToChat()`:
 
 ```typescript
 // utils/chat-prompt-runner.ts
@@ -66,8 +66,8 @@ export const sendPromptToChat = async (
     context?: ChatContext,
     files?: Uri[]
 ): Promise<void> => {
-    // Aplica language e custom instructions ao prompt
-    // Depois executa:
+    // Applies language and custom instructions to the prompt
+    // Then executes:
     await commands.executeCommand("workbench.action.chat.open", {
         query: finalPrompt,
         isPartialQuery: false,
@@ -76,50 +76,50 @@ export const sendPromptToChat = async (
 };
 ```
 
-Toda a "IA" da extensão é terceirizada para o GitHub Copilot Chat. O plugin apenas:
-1. Monta o prompt correto
-2. Abre o chat com o prompt pré-preenchido
-3. O usuário interage com o Copilot Chat
-4. Copilot gera os arquivos
-5. File watchers detectam os novos arquivos
+All the "AI" of the extension is outsourced to GitHub Copilot Chat. The plugin only:
+1. Assembles the correct prompt
+2. Opens the chat with the pre-filled prompt
+3. The user interacts with Copilot Chat
+4. Copilot generates the files
+5. File watchers detect the new files
 
-### 1.3 Persistência de Dados
+### 1.3 Data Persistence
 
 - **Settings**: `vscode.workspace.getConfiguration()` → JetBrains: `PersistentStateComponent`
-- **Hooks**: `context.globalState` → JetBrains: `PersistentStateComponent` ou arquivo JSON no `~/.gatomia/`
-- **Spec data**: Arquivos em disco (sem banco de dados)
+- **Hooks**: `context.globalState` → JetBrains: `PersistentStateComponent` or JSON file in `~/.gatomia/`
+- **Spec data**: Files on disk (no database)
 
-### 1.4 UI React (WebView)
+### 1.4 React UI (WebView)
 
 ```
 ui/src/
 ├── features/
-│   ├── create-spec-view/      # Formulário de criação de spec
-│   ├── hooks-view/            # Gerenciador de hooks
-│   ├── preview/               # Preview de documentos markdown
-│   ├── steering-view/         # (views do steering)
-│   └── welcome/               # Tela de boas-vindas
-└── bridge/                    # Comunicação WebView ↔ Extension
-    └── (abstração de postMessage)
+│   ├── create-spec-view/      # Spec creation form
+│   ├── hooks-view/            # Hooks manager
+│   ├── preview/               # Markdown document preview
+│   ├── steering-view/         # (steering views)
+│   └── welcome/               # Welcome screen
+└── bridge/                    # WebView ↔ Extension communication
+    └── (postMessage abstraction)
 ```
 
-A bridge usa `acquireVsCodeApi().postMessage()` e `window.addEventListener('message')`.
+The bridge uses `acquireVsCodeApi().postMessage()` and `window.addEventListener('message')`.
 
 ---
 
-## 2. JetBrains Platform SDK — APIs Relevantes
+## 2. JetBrains Platform SDK — Relevant APIs
 
 ### 2.1 Tool Windows
 
 ```kotlin
-// Declaração em plugin.xml
+// Declaration in plugin.xml
 <toolWindow id="GatomIA Specs"
     anchor="left"
     secondary="false"
     icon="AllIcons.General.Modified"
     factoryClass="com.eitatech.gatomia.toolwindow.SpecToolWindowFactory"/>
 
-// Implementação
+// Implementation
 class SpecToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val panel = SpecToolWindowPanel(project)
@@ -139,7 +139,7 @@ class SpecTreeModel(private val project: Project) : DefaultTreeModel(DefaultMuta
         val specs = specService.getSpecs()
         val root = root as DefaultMutableTreeNode
         root.removeAllChildren()
-        // Adiciona nós
+        // Add nodes
         reload()
     }
 }
@@ -148,13 +148,13 @@ class SpecTreeModel(private val project: Project) : DefaultTreeModel(DefaultMuta
 ### 2.3 File System Watchers
 
 ```kotlin
-// Registrado em plugin.xml como listener
+// Registered in plugin.xml as listener
 class FileChangeListener : BulkFileListener {
     override fun after(events: List<VFileEvent>) {
         val specFiles = events.filter { it.file?.name?.endsWith("spec.md") == true }
         if (specFiles.isNotEmpty()) {
             ApplicationManager.getApplication().invokeLater {
-                // Notifica SpecToolWindow para atualizar
+                // Notifies SpecToolWindow to update
                 project.messageBus.syncPublisher(SPEC_CHANGED_TOPIC).onSpecChanged()
             }
         }
@@ -165,26 +165,26 @@ class FileChangeListener : BulkFileListener {
 ### 2.4 JCEF (JetBrains Chromium Embedded Framework)
 
 ```kotlin
-// Disponível desde IntelliJ 2020.1
-// Verificar disponibilidade:
+// Available since IntelliJ 2020.1
+// Check availability:
 if (!JBCefApp.isSupported()) {
-    // Fallback para UI nativa
+    // Fallback to native UI
 }
 
 val browser = JBCefBrowser()
 browser.loadURL("file:///path/to/index.html")
 
-// Enviar dados para JS:
+// Send data to JS:
 browser.executeJavaScript("window.receiveData(${json})", "", 0)
 
-// Receber dados do JS:
+// Receive data from JS:
 val handler = object : CefQueryHandler {
     override fun onQuery(
         browser: CefBrowser, frame: CefFrame,
         queryId: Long, request: String,
         persistent: Boolean, callback: CefQueryCallback
     ): Boolean {
-        // `request` contém a mensagem do JS
+        // `request` contains the JS message
         handleMessage(request)
         callback.success("")
         return true
@@ -195,7 +195,7 @@ val handler = object : CefQueryHandler {
 ### 2.5 Actions (Commands)
 
 ```kotlin
-// Registrado em plugin.xml
+// Registered in plugin.xml
 <action id="gatomia.spec.create"
     class="com.eitatech.gatomia.actions.spec.CreateSpecAction"
     text="Create New Spec"
@@ -203,12 +203,12 @@ val handler = object : CefQueryHandler {
     <add-to-group group-id="GatomiaSpecGroup" anchor="first"/>
 </action>
 
-// Implementação
+// Implementation
 class CreateSpecAction : AnAction("Create New Spec") {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val specService = project.getService(SpecManagerService::class.java)
-        // Abre diálogo ou JCEF panel
+        // Opens dialog or JCEF panel
     }
 }
 ```
@@ -216,7 +216,7 @@ class CreateSpecAction : AnAction("Create New Spec") {
 ### 2.6 Settings (Configurable)
 
 ```kotlin
-// Registrado em plugin.xml
+// Registered in plugin.xml
 <applicationConfigurable
     groupId="tools"
     instance="com.eitatech.gatomia.settings.GatomiaSettingsConfigurable"
@@ -236,17 +236,17 @@ class GatomiaSettings : PersistentStateComponent<GatomiaSettings.State> {
 ### 2.7 Notifications
 
 ```kotlin
-// Simples
+// Simple
 Notifications.Bus.notify(
-    Notification("GatomIA", "Spec criada!", "spec.md foi gerado com sucesso.",
+    Notification("GatomIA", "Spec created!", "spec.md was successfully generated.",
         NotificationType.INFORMATION)
 )
 
-// Com ação
-Notification("GatomIA", "Erro", "SpecKit CLI não encontrado.",
+// With action
+Notification("GatomIA", "Error", "SpecKit CLI not found.",
     NotificationType.ERROR
 ).apply {
-    addAction(NotificationAction.create("Instalar SpecKit") { _, notification ->
+    addAction(NotificationAction.create("Install SpecKit") { _, notification ->
         BrowserUtil.browse("https://github.com/github/spec-kit")
         notification.expire()
     })
@@ -256,7 +256,7 @@ Notification("GatomIA", "Erro", "SpecKit CLI não encontrado.",
 ### 2.8 Process Execution
 
 ```kotlin
-// Executar CLI de forma assíncrona
+// Execute CLI asynchronously
 suspend fun executeSpecKitCommand(project: Project, args: List<String>): String {
     return withContext(Dispatchers.IO) {
         val commandLine = GeneralCommandLine()
@@ -283,90 +283,90 @@ suspend fun executeSpecKitCommand(project: Project, args: List<String>): String 
 
 ## 3. JetBrains AI Assistant API
 
-### 3.1 Status da API (2025)
+### 3.1 API Status (2025)
 
-A JetBrains disponibilizou API pública para o AI Assistant a partir da versão 2024.2 do plugin `com.intellij.ml.llm`.
+JetBrains made the public API available for AI Assistant starting from version 2024.2 of the `com.intellij.ml.llm` plugin.
 
-**Funcionalidades disponíveis**:
-- Enviar prompts para o chat do AI Assistant
-- Criar ações personalizadas que aparecem no contexto do AI
+**Available features**:
+- Send prompts to the AI Assistant chat
+- Create custom actions that appear in the AI context
 
-**Documentação**:
+**Documentation**:
 - [AI Assistant Extension Development](https://plugins.jetbrains.com/docs/intellij/ai-assistant-api.html)
 
-### 3.2 Uso básico (quando disponível)
+### 3.2 Basic Usage (when available)
 
 ```kotlin
-// Verificar se AI Assistant está disponível
+// Check if AI Assistant is available
 val isAiAvailable = PluginManagerCore.getPlugin(
     PluginId.getId("com.intellij.ml.llm")
 )?.isEnabled == true
 
-// Usar via reflection para evitar hard dependency
+// Use via reflection to avoid hard dependency
 if (isAiAvailable) {
-    // Chamar API do AI Assistant
+    // Call AI Assistant API
 } else {
-    // Fallback: copiar para clipboard
+    // Fallback: copy to clipboard
     copyToClipboard(prompt)
-    showNotification("Prompt copiado! Cole no seu AI Chat preferido.")
+    showNotification("Prompt copied! Paste it in your preferred AI Chat.")
 }
 ```
 
 ---
 
-## 4. MCP no JetBrains
+## 4. MCP in JetBrains
 
-### 4.1 Suporte Nativo JetBrains
+### 4.1 Native JetBrains Support
 
-A partir de 2025.1, o JetBrains AI Assistant tem suporte nativo a MCP servers.
+Starting from 2025.1, the JetBrains AI Assistant has native support for MCP servers.
 
-Para o plugin GatomIA, o `McpClient` deve:
-1. Ler a configuração de MCP servers (de `mcp.json` padrão ou arquivo customizado)
-2. Iniciar processos de MCP servers via `ProcessBuilder`
-3. Comunicar via JSON-RPC sobre stdin/stdout
-4. Gerenciar lifecycle dos processos (start, health check, stop)
+For the GatomIA plugin, the `McpClient` should:
+1. Read the MCP servers configuration (from the standard `mcp.json` or a custom file)
+2. Start MCP server processes via `ProcessBuilder`
+3. Communicate via JSON-RPC over stdin/stdout
+4. Manage process lifecycle (start, health check, stop)
 
-### 4.2 Localização do mcp.json no JetBrains
+### 4.2 Location of mcp.json in JetBrains
 
-O JetBrains não tem o mesmo arquivo `mcp.json` que o VS Code. Opções:
-- Usar o mesmo arquivo `~/.config/github-copilot/mcp.json` (se o usuário usa Copilot)
-- Ter configuração própria do GatomIA para MCP servers
-- Ler da configuração do JetBrains AI Assistant (quando API disponível)
+JetBrains does not have the same `mcp.json` file as VS Code. Options:
+- Use the same `~/.config/github-copilot/mcp.json` file (if the user uses Copilot)
+- Have a GatomIA-specific configuration for MCP servers
+- Read from the JetBrains AI Assistant configuration (when API available)
 
 ---
 
-## 5. Riscos Técnicos Detalhados
+## 5. Detailed Technical Risks
 
-### 5.1 JCEF em Linux
+### 5.1 JCEF on Linux
 
-O JCEF no Linux pode ter problemas de:
-- Renderização com Wayland (usar `GDK_BACKEND=x11` como workaround)
-- Performance em VMs/containers
-- Fontes e DPI
+JCEF on Linux may have issues with:
+- Rendering with Wayland (use `GDK_BACKEND=x11` as a workaround)
+- Performance in VMs/containers
+- Fonts and DPI
 
-**Mitigação**: Testar cedo em Ubuntu 22.04 (Wayland) e 20.04 (X11). Ter UI nativa de fallback para formulários críticos.
+**Mitigation**: Test early on Ubuntu 22.04 (Wayland) and 20.04 (X11). Have a native UI fallback for critical forms.
 
 ### 5.2 Cross-Platform Path Handling
 
-VSCode usa `Uri` que abstrai paths. No JetBrains:
-- Usar `VirtualFile` para arquivos dentro do projeto
-- Usar `Path.of()` para arquivos do sistema (nunca `String` concatenation)
-- `FileUtil.toSystemIndependentName()` para normalização
+VSCode uses `Uri` which abstracts paths. In JetBrains:
+- Use `VirtualFile` for files within the project
+- Use `Path.of()` for system files (never `String` concatenation)
+- `FileUtil.toSystemIndependentName()` for normalization
 
-### 5.3 Threading no IDE
+### 5.3 IDE Threading
 
-O JetBrains IDE tem regras estritas:
-- **EDT** (Event Dispatch Thread): Apenas operações de UI
-- **Read Action**: Leitura do PSI (índice de código)
-- **Write Action**: Modificação de arquivos
-- **IO Dispatch**: Operações de I/O
+The JetBrains IDE has strict rules:
+- **EDT** (Event Dispatch Thread): UI operations only
+- **Read Action**: PSI (code index) reading
+- **Write Action**: File modification
+- **IO Dispatch**: I/O operations
 
 ```kotlin
-// Correto: operação de arquivo fora da EDT
+// Correct: file operation outside EDT
 ApplicationManager.getApplication().executeOnPooledThread {
     val content = VfsUtil.loadText(virtualFile)
     ApplicationManager.getApplication().invokeLater {
-        // Atualizar UI na EDT
+        // Update UI on EDT
         treeModel.reload()
     }
 }
@@ -374,14 +374,14 @@ ApplicationManager.getApplication().executeOnPooledThread {
 
 ### 5.4 Plugin.xml Validation
 
-O JetBrains Marketplace faz validação estrita do `plugin.xml`. Pontos críticos:
-- Todos os `id` de actions devem ser únicos globalmente (usar `com.eitatech.gatomia.*`)
-- Tool Window IDs devem ser únicos
-- Versões `since-build` e `until-build` precisam ser corretas
+The JetBrains Marketplace performs strict validation of `plugin.xml`. Critical points:
+- All action `id` values must be globally unique (use `com.eitatech.gatomia.*`)
+- Tool Window IDs must be unique
+- `since-build` and `until-build` versions must be correct
 
 ---
 
-## 6. Tooling e Build
+## 6. Tooling and Build
 
 ### 6.1 IntelliJ Platform Gradle Plugin
 
@@ -391,11 +391,11 @@ plugins {
 }
 ```
 
-Tarefas Gradle úteis:
-- `./gradlew buildPlugin` — Gera arquivo `.zip` do plugin
-- `./gradlew runIde` — Lança IDE sandbox com plugin instalado
-- `./gradlew verifyPlugin` — Valida compatibilidade
-- `./gradlew publishPlugin` — Publica no Marketplace (requer token)
+Useful Gradle tasks:
+- `./gradlew buildPlugin` — Generates plugin `.zip` file
+- `./gradlew runIde` — Launches IDE sandbox with plugin installed
+- `./gradlew verifyPlugin` — Validates compatibility
+- `./gradlew publishPlugin` — Publishes to Marketplace (requires token)
 
 ### 6.2 CI/CD (GitHub Actions)
 
@@ -424,21 +424,21 @@ jobs:
 
 ---
 
-## 7. Referências e Recursos
+## 7. References and Resources
 
-### Documentação Oficial
+### Official Documentation
 - [IntelliJ Platform SDK Docs](https://plugins.jetbrains.com/docs/intellij/welcome.html)
 - [IntelliJ Platform Plugin Template](https://github.com/JetBrains/intellij-platform-plugin-template)
 - [JCEF Guide](https://plugins.jetbrains.com/docs/intellij/jcef.html)
 - [Tool Windows Guide](https://plugins.jetbrains.com/docs/intellij/tool-windows.html)
 - [Gradle IntelliJ Platform Plugin](https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html)
 
-### Plugins Open Source de Referência
-- [GitToolBox](https://github.com/zielu/GitToolBox) — Exemplo de plugin complexo com Kotlin
-- [Rainbow Brackets](https://github.com/izhangzhihao/intellij-rainbow-brackets) — Exemplo com JCEF
-- [CodeWithMe](https://plugins.jetbrains.com/plugin/14896-code-with-me) — Exemplo de tool windows complexos
+### Open Source Reference Plugins
+- [GitToolBox](https://github.com/zielu/GitToolBox) — Example of a complex plugin with Kotlin
+- [Rainbow Brackets](https://github.com/izhangzhihao/intellij-rainbow-brackets) — Example with JCEF
+- [CodeWithMe](https://plugins.jetbrains.com/plugin/14896-code-with-me) — Example of complex tool windows
 
-### Projetos Relacionados
-- [SpecKit](https://github.com/github/spec-kit) — CLI base usado pela GatomIA
-- [OpenSpec](https://github.com/Fission-AI/OpenSpec) — Alternativa ao SpecKit
-- [MCP Specification](https://modelcontextprotocol.io/) — Protocolo MCP para hooks
+### Related Projects
+- [SpecKit](https://github.com/github/spec-kit) — Base CLI used by GatomIA
+- [OpenSpec](https://github.com/Fission-AI/OpenSpec) — Alternative to SpecKit
+- [MCP Specification](https://modelcontextprotocol.io/) — MCP protocol for hooks
