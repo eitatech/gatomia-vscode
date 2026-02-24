@@ -2,7 +2,7 @@
 
 **Feature Branch**: `claude/jetbrains-extension-plan-jB2yS`
 **Created**: 2026-02-23
-**Status**: Planning
+**Status**: Draft
 **Type**: New Product — JetBrains Plugin
 
 ---
