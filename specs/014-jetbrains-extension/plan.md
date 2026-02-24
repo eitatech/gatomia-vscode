@@ -9,34 +9,34 @@
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        gatomia-jetbrains                             │
-│                                                                      │
+┌────────────────────────────────────────────────────────────────────┐
+│                        gatomia-jetbrains                           │
+│                                                                    │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  │
-│  │  Tool Windows    │  │    Services       │  │     Actions      │  │
-│  │  ─────────────   │  │  ─────────────    │  │  ─────────────   │  │
-│  │  SpecExplorer    │  │  SpecManager      │  │  CreateSpec      │  │
-│  │  HooksExplorer   │◀─│  HookManager      │  │  RunTask         │  │
-│  │  SteeringExp.    │  │  SteeringManager  │  │  AddHook         │  │
-│  │  ActionsExp.     │  │  PromptLoader     │  │  CreateRule      │  │
+│  │  Tool Windows    │  │    Services      │  │     Actions      │  │
+│  │  ─────────────   │  │  ─────────────   │  │  ─────────────   │  │
+│  │  SpecExplorer    │  │  SpecManager     │  │  CreateSpec      │  │
+│  │  HooksExplorer   │◀─│  HookManager     │  │  RunTask         │  │
+│  │  SteeringExp.    │  │  SteeringManager │  │  AddHook         │  │
+│  │  ActionsExp.     │  │  PromptLoader    │  │  CreateRule      │  │
 │  └──────────────────┘  └──────────────────┘  └──────────────────┘  │
-│           │                    │                       │             │
-│           ▼                    ▼                       ▼             │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │                       Core Layer                              │   │
-│  │  CliRunner │ McpClient │ FileWatcher │ NotificationUtils      │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-│           │                    │                                     │
-│           ▼                    ▼                                     │
+│           │                    │                       │           │
+│           ▼                    ▼                       ▼           │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │                       Core Layer                             │  │
+│  │  CliRunner │ McpClient │ FileWatcher │ NotificationUtils     │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│           │                    │                                   │
+│           ▼                    ▼                                   │
 │  ┌──────────────┐   ┌─────────────────────────────────────────┐    │
-│  │  JCEF Panels │   │           Settings                       │    │
-│  │  ─────────── │   │  GatomiaSettings (PersistentState)       │    │
-│  │  CreateSpec  │   │  GatomiaSettingsConfigurable (UI page)   │    │
+│  │  JCEF Panels │   │           Settings                      │    │
+│  │  ─────────── │   │  GatomiaSettings (PersistentState)      │    │
+│  │  CreateSpec  │   │  GatomiaSettingsConfigurable (UI page)  │    │
 │  │  DocPreview  │   └─────────────────────────────────────────┘    │
-│  │  HooksConfig │                                                   │
-│  │  Welcome     │                                                   │
-│  └──────────────┘                                                   │
-└─────────────────────────────────────────────────────────────────────┘
+│  │  HooksConfig │                                                  │
+│  │  Welcome     │                                                  │
+│  └──────────────┘                                                  │
+└────────────────────────────────────────────────────────────────────┘
          │                 │
          ▼                 ▼
   ┌────────────┐    ┌─────────────┐
@@ -52,6 +52,7 @@
 ### 1.1 Project Setup
 
 **File**: `build.gradle.kts`
+
 ```kotlin
 plugins {
     id("org.jetbrains.kotlin.jvm") version "1.9.25"
@@ -79,6 +80,7 @@ dependencies {
 ```
 
 **File**: `gradle.properties`
+
 ```properties
 pluginName=GatomIA
 pluginVersion=1.0.0-alpha
@@ -93,6 +95,7 @@ platformVersion=2024.1
 **File**: `src/main/resources/META-INF/plugin.xml`
 
 Full structure with:
+
 - ID: `com.eitatech.gatomia`
 - Declared Tool Windows (Specs, Hooks, Steering, Actions)
 - Registered Application/Project services
@@ -132,6 +135,7 @@ class GatomiaSettings : PersistentStateComponent<GatomiaSettings.State> {
 **File**: `src/main/kotlin/.../services/SpecManagerService.kt`
 
 Direct port of the `SpecManager` (TypeScript) logic to Kotlin:
+
 - Reads specs from the configured directory
 - Detects the active system (SpecKit vs OpenSpec)
 - Returns list of specs with metadata
@@ -141,7 +145,7 @@ Direct port of the `SpecManager` (TypeScript) logic to Kotlin:
 
 **File**: `src/main/kotlin/.../toolwindow/spec/SpecToolWindow.kt`
 
-```
+```bash
 GatomIA Specs
 ├── 📁 Current
 │   ├── 001-feature-a/
@@ -154,6 +158,7 @@ GatomIA Specs
 ```
 
 Toolbar buttons:
+
 - `+` Create New Spec
 - `↺` Refresh
 - `⚙` Settings
@@ -195,6 +200,7 @@ object CliRunner {
 ### 2.2 CreateSpecAction
 
 Flow:
+
 1. User triggers "Create New Spec"
 2. If JCEF available → opens `CreateSpecPanel` (JCEF)
 3. Otherwise → native Kotlin dialog with basic fields
@@ -207,6 +213,7 @@ Flow:
 ### 2.3 RunTaskAction
 
 Flow:
+
 1. User clicks "Run Task" in SpecToolWindow (tasks.md item)
 2. Plugin reads the tasks.md file
 3. Extracts pending tasks (markdown checklist parser)
@@ -227,6 +234,7 @@ GatomIA Steering
 ```
 
 Toolbar:
+
 - `+ Rule` Create Project Rule
 - `+ User Rule` Create User Rule
 - `+ Constitution` Create Constitution
@@ -241,6 +249,7 @@ Toolbar:
 The existing React UI (`ui/`) will be compiled for two targets:
 
 **New build target** in `ui/vite.config.ts`:
+
 ```typescript
 // vite.config.ts
 export default defineConfig(({ mode }) => ({
@@ -253,6 +262,7 @@ export default defineConfig(({ mode }) => ({
 ```
 
 **New JCEF bridge** in `ui/src/bridge/jcef-bridge.ts`:
+
 ```typescript
 // Replaces the VSCode postMessage with the JCEF API
 export const bridge = {
@@ -313,6 +323,7 @@ abstract class GatomiaJcefPanel(project: Project, pageName: String) : Disposable
 ### 3.3 DocumentPreviewPanel
 
 Reuses the document preview feature (spec.md, plan.md, tasks.md) with:
+
 - Rendered markdown with mermaid/plantuml
 - Action buttons (Edit, Refine, etc.)
 - Synchronization with file on disk via `VirtualFileListener`
@@ -323,7 +334,7 @@ Reuses the document preview feature (spec.md, plan.md, tasks.md) with:
 
 ### 4.1 HooksToolWindow
 
-```
+```bash
 GatomIA Hooks
 ├── 🟢 after-spec-create → MCP: create-github-issue
 ├── 🟢 after-task-run → MCP: slack-notify
@@ -371,6 +382,7 @@ class McpClient(private val serverConfig: McpServerConfig) {
 ### 4.3 HookExecutor
 
 Port of `HookExecutor.ts` to Kotlin:
+
 - Template variable substitution (`$agentOutput`, `$clipboardContent`, etc.)
 - Sequential/parallel hook execution
 - Logging with timestamps
@@ -442,6 +454,7 @@ class TaskLineMarkerProvider : LineMarkerProvider {
 **Reason**: Code reuse and UX fidelity. The existing React UI already has quality and advanced features (markdown preview, mermaid, etc.) that would be costly to replicate in Swing.
 
 **JCEF usage criteria**:
+
 - Multi-step forms with complex validation → JCEF
 - Simple tree views → Native Kotlin
 - Document previews → JCEF
