@@ -35,14 +35,13 @@ export interface InstallationStep {
 }
 
 const GATOMIA_CLI_STEP_ID = "gatomia-cli";
-const GATOMIA_CLI_PREREQUISITE_NAMES = [
+const GATOMIA_CLI_COMMON_PREREQUISITES = [
 	"Node.js",
 	"Python",
 	"UV",
-	"SpecKit",
-	"OpenSpec",
 	"Copilot CLI",
 ] as const;
+const GATOMIA_CLI_SPEC_SYSTEM_NAMES = ["SpecKit", "OpenSpec"] as const;
 
 /**
  * Message types from webview to extension
@@ -225,12 +224,20 @@ const INSTALLATION_STEPS: InstallationStep[] = [
 
 export const areGatomiaCliPrerequisitesMet = (
 	dependencies: DependencyStatus[]
-): boolean =>
-	GATOMIA_CLI_PREREQUISITE_NAMES.every((name) =>
+): boolean => {
+	const commonPrerequisitesMet = GATOMIA_CLI_COMMON_PREREQUISITES.every(
+		(name) =>
+			dependencies.some(
+				(dependency) => dependency.name === name && dependency.installed
+			)
+	);
+	const specSystemInstalled = GATOMIA_CLI_SPEC_SYSTEM_NAMES.some((name) =>
 		dependencies.some(
 			(dependency) => dependency.name === name && dependency.installed
 		)
 	);
+	return commonPrerequisitesMet && specSystemInstalled;
+};
 
 export const getInstallationStepsForPlatform = (
 	platform: "darwin" | "linux" | "win32",
@@ -465,7 +472,7 @@ export class DependenciesViewProvider {
 		return {
 			name,
 			installed: false,
-			error: "Not installed",
+			error: errorMessage,
 			command,
 		};
 	}

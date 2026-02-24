@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DependenciesView } from "../../../ui/src/features/dependencies-view";
 
@@ -48,12 +48,21 @@ describe("DependenciesView", () => {
 		).toBeInTheDocument();
 	});
 
-	it("hides gatomia copilot configuration instructions when gatomia is missing", () => {
+	it("hides gatomia copilot configuration instructions when gatomia is missing", async () => {
 		render(<DependenciesView />);
-		dispatchDependenciesStatus(false);
 
+		// First verify the section appears when gatomia is installed
+		dispatchDependenciesStatus(true);
 		expect(
-			screen.queryByText("Configure GatomIA CLI with GitHub Copilot")
-		).not.toBeInTheDocument();
+			await screen.findByText("Configure GatomIA CLI with GitHub Copilot")
+		).toBeInTheDocument();
+
+		// Then verify it is removed when gatomia transitions to missing
+		dispatchDependenciesStatus(false);
+		await waitFor(() => {
+			expect(
+				screen.queryByText("Configure GatomIA CLI with GitHub Copilot")
+			).not.toBeInTheDocument();
+		});
 	});
 });

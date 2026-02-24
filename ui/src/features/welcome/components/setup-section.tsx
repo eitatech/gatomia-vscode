@@ -3,17 +3,10 @@
  * First-time setup guidance and dependency installation
  */
 
-import type { DependencyStatus } from "../types";
+import type { DependencyStatus, InstallableDependency } from "../types";
 
 const GATOMIA_COPILOT_CONFIG_COMMAND =
 	"gatomia config set --llm-provider copilot --main-model gpt-4";
-
-type InstallableDependency =
-	| "copilot-chat"
-	| "speckit"
-	| "openspec"
-	| "copilot-cli"
-	| "gatomia-cli";
 
 interface SetupSectionProps {
 	dependencies: DependencyStatus;
