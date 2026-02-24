@@ -1,8 +1,3 @@
----
-version: "1.0"
-owner: "[AUTHOR]"
----
-
 # [CHECKLIST TYPE] Checklist: [FEATURE NAME]
 
 **Purpose**: [Brief description of what this checklist covers]

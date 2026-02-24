@@ -1,7 +1,6 @@
 ---
+
 description: "Task list template for feature implementation"
-version: "1.0"
-owner: "[AUTHOR]"
 ---
 
 # Tasks: [FEATURE NAME]
