@@ -6,7 +6,7 @@
 
 ---
 
-## Visão Geral da Arquitetura
+## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -47,11 +47,11 @@
 
 ---
 
-## Fase 1: Fundação — Projeto Gradle + Tool Windows Base
+## Phase 1: Foundation — Gradle Project + Base Tool Windows
 
-### 1.1 Setup do Projeto
+### 1.1 Project Setup
 
-**Arquivo**: `build.gradle.kts`
+**File**: `build.gradle.kts`
 ```kotlin
 plugins {
     id("org.jetbrains.kotlin.jvm") version "1.9.25"
@@ -78,7 +78,7 @@ dependencies {
 }
 ```
 
-**Arquivo**: `gradle.properties`
+**File**: `gradle.properties`
 ```properties
 pluginName=GatomIA
 pluginVersion=1.0.0-alpha
@@ -90,19 +90,19 @@ platformVersion=2024.1
 
 ### 1.2 Plugin Descriptor
 
-**Arquivo**: `src/main/resources/META-INF/plugin.xml`
+**File**: `src/main/resources/META-INF/plugin.xml`
 
-Estrutura completa com:
+Full structure with:
 - ID: `com.eitatech.gatomia`
-- Tool Windows declarados (Specs, Hooks, Steering, Actions)
-- Application/Project services registrados
-- Actions registradas com grupos de menu
-- Listeners registrados
-- Configurável de Settings
+- Declared Tool Windows (Specs, Hooks, Steering, Actions)
+- Registered Application/Project services
+- Registered Actions with menu groups
+- Registered Listeners
+- Settings Configurable
 
 ### 1.3 Settings (PersistentStateComponent)
 
-**Arquivo**: `src/main/kotlin/.../settings/GatomiaSettings.kt`
+**File**: `src/main/kotlin/.../settings/GatomiaSettings.kt`
 
 ```kotlin
 @State(name = "GatomiaSettings", storages = [Storage("gatomia.xml")])
@@ -129,17 +129,17 @@ class GatomiaSettings : PersistentStateComponent<GatomiaSettings.State> {
 
 ### 1.4 SpecManagerService
 
-**Arquivo**: `src/main/kotlin/.../services/SpecManagerService.kt`
+**File**: `src/main/kotlin/.../services/SpecManagerService.kt`
 
-Porta direta da lógica de `SpecManager` (TypeScript) para Kotlin:
-- Lê specs do diretório configurado
-- Detecta sistema ativo (SpecKit vs OpenSpec)
-- Retorna lista de specs com metadata
-- Suporte a watch de mudanças via `BulkFileListener`
+Direct port of the `SpecManager` (TypeScript) logic to Kotlin:
+- Reads specs from the configured directory
+- Detects the active system (SpecKit vs OpenSpec)
+- Returns list of specs with metadata
+- Support for change watching via `BulkFileListener`
 
 ### 1.5 SpecToolWindow (Tree View)
 
-**Arquivo**: `src/main/kotlin/.../toolwindow/spec/SpecToolWindow.kt`
+**File**: `src/main/kotlin/.../toolwindow/spec/SpecToolWindow.kt`
 
 ```
 GatomIA Specs
@@ -153,18 +153,18 @@ GatomIA Specs
 └── 📁 Archived
 ```
 
-Toolbar com botões:
+Toolbar buttons:
 - `+` Create New Spec
 - `↺` Refresh
 - `⚙` Settings
 
 ---
 
-## Fase 2: Actions e CLI Integration
+## Phase 2: Actions and CLI Integration
 
 ### 2.1 CliRunner
 
-**Arquivo**: `src/main/kotlin/.../utils/CliRunner.kt`
+**File**: `src/main/kotlin/.../utils/CliRunner.kt`
 
 ```kotlin
 object CliRunner {
@@ -194,25 +194,25 @@ object CliRunner {
 
 ### 2.2 CreateSpecAction
 
-Fluxo:
-1. Usuário aciona "Create New Spec"
-2. Se JCEF disponível → abre `CreateSpecPanel` (JCEF)
-3. Senão → diálogo nativo Kotlin com campos básicos
-4. Usuário preenche campos e clica "Create"
-5. Plugin chama `CliRunner.execute(["specify", "specify", "--description", desc])`
-6. OU: monta prompt e envia para JetBrains AI Assistant
-7. FileChangeListener detecta arquivos criados
-8. SpecToolWindow atualiza automaticamente
+Flow:
+1. User triggers "Create New Spec"
+2. If JCEF available → opens `CreateSpecPanel` (JCEF)
+3. Otherwise → native Kotlin dialog with basic fields
+4. User fills in fields and clicks "Create"
+5. Plugin calls `CliRunner.execute(["specify", "specify", "--description", desc])`
+6. OR: assembles prompt and sends to JetBrains AI Assistant
+7. FileChangeListener detects created files
+8. SpecToolWindow updates automatically
 
 ### 2.3 RunTaskAction
 
-Fluxo:
-1. Usuário clica "Run Task" no SpecToolWindow (item tasks.md)
-2. Plugin lê o arquivo tasks.md
-3. Extrai tasks pendentes (parser de checklist markdown)
-4. Apresenta diálogo com tasks disponíveis
-5. Abre tasks.md no editor + AI Assistant com contexto da task
-6. OU: executa `specify implement` via CLI
+Flow:
+1. User clicks "Run Task" in SpecToolWindow (tasks.md item)
+2. Plugin reads the tasks.md file
+3. Extracts pending tasks (markdown checklist parser)
+4. Presents dialog with available tasks
+5. Opens tasks.md in editor + AI Assistant with task context
+6. OR: runs `specify implement` via CLI
 
 ### 2.4 SteeringToolWindow + Actions
 
@@ -234,13 +234,13 @@ Toolbar:
 
 ---
 
-## Fase 3: JCEF UI
+## Phase 3: JCEF UI
 
-### 3.1 Estratégia de Reutilização da UI React
+### 3.1 React UI Reuse Strategy
 
-A UI React existente (`ui/`) será compilada para dois alvos:
+The existing React UI (`ui/`) will be compiled for two targets:
 
-**Novo build target** em `ui/vite.config.ts`:
+**New build target** in `ui/vite.config.ts`:
 ```typescript
 // vite.config.ts
 export default defineConfig(({ mode }) => ({
@@ -252,9 +252,9 @@ export default defineConfig(({ mode }) => ({
 }))
 ```
 
-**Nova bridge JCEF** em `ui/src/bridge/jcef-bridge.ts`:
+**New JCEF bridge** in `ui/src/bridge/jcef-bridge.ts`:
 ```typescript
-// Substitui a postMessage do VSCode pela API JCEF
+// Replaces the VSCode postMessage with the JCEF API
 export const bridge = {
     postMessage: (type: string, payload: unknown) => {
         if (window.gatomiaJcef) {
@@ -281,7 +281,7 @@ abstract class GatomiaJcefPanel(project: Project, pageName: String) : Disposable
         val url = this::class.java.getResource("/webview/index.html")!!.toURI()
         browser.loadURL("$url?page=$pageName")
 
-        // Handler para mensagens da UI → Kotlin
+        // Handler for UI → Kotlin messages
         browser.jbCefClient.addMessageRouterHandler(
             object : CefMessageRouterHandlerAdapter() {
                 override fun onQuery(
@@ -312,14 +312,14 @@ abstract class GatomiaJcefPanel(project: Project, pageName: String) : Disposable
 
 ### 3.3 DocumentPreviewPanel
 
-Reutiliza a feature de preview de documentos (spec.md, plan.md, tasks.md) com:
-- Markdown renderizado com mermaid/plantuml
-- Botões de ação (Edit, Refine, etc.)
-- Sincronização com arquivo em disco via `VirtualFileListener`
+Reuses the document preview feature (spec.md, plan.md, tasks.md) with:
+- Rendered markdown with mermaid/plantuml
+- Action buttons (Edit, Refine, etc.)
+- Synchronization with file on disk via `VirtualFileListener`
 
 ---
 
-## Fase 4: Hooks e MCP
+## Phase 4: Hooks and MCP
 
 ### 4.1 HooksToolWindow
 
@@ -327,7 +327,7 @@ Reutiliza a feature de preview de documentos (spec.md, plan.md, tasks.md) com:
 GatomIA Hooks
 ├── 🟢 after-spec-create → MCP: create-github-issue
 ├── 🟢 after-task-run → MCP: slack-notify
-└── 🔴 before-review → (desabilitado)
+└── 🔴 before-review → (disabled)
 
 Logs:
   [12:34] Executed: create-github-issue ✓ (234ms)
@@ -370,53 +370,53 @@ class McpClient(private val serverConfig: McpServerConfig) {
 
 ### 4.3 HookExecutor
 
-Porta do `HookExecutor.ts` para Kotlin:
-- Substituição de template variables (`$agentOutput`, `$clipboardContent`, etc.)
-- Execução sequencial/paralela de hooks
-- Logging com timestamps
-- Tratamento de erros com retry
+Port of `HookExecutor.ts` to Kotlin:
+- Template variable substitution (`$agentOutput`, `$clipboardContent`, etc.)
+- Sequential/parallel hook execution
+- Logging with timestamps
+- Error handling with retry
 
 ---
 
-## Fase 5: AI Integration e Polimento
+## Phase 5: AI Integration and Polish
 
 ### 5.1 JetBrains AI Assistant Integration
 
 ```kotlin
-// Integração via AI Assistant plugin API
-// Plugin dependency: com.intellij.ml.llm (opcional)
+// Integration via AI Assistant plugin API
+// Plugin dependency: com.intellij.ml.llm (optional)
 class AiAssistantService(private val project: Project) {
 
     fun sendPrompt(prompt: String, onChunk: (String) -> Unit) {
-        // Verifica se AI Assistant está disponível
+        // Check if AI Assistant is available
         val aiPlugin = PluginManagerCore.getPlugin(PluginId.getId("com.intellij.ml.llm"))
         if (aiPlugin == null || !aiPlugin.isEnabled) {
-            // Fallback: copiar para clipboard
+            // Fallback: copy to clipboard
             CopyPasteManager.getInstance().setContents(StringSelection(prompt))
             Notifications.Bus.notify(
-                Notification("GatomIA", "Prompt copiado",
-                    "O prompt foi copiado para o clipboard. Cole no seu AI Chat preferido.",
+                Notification("GatomIA", "Prompt copied",
+                    "The prompt was copied to the clipboard. Paste it in your preferred AI Chat.",
                     NotificationType.INFORMATION)
             )
             return
         }
 
-        // Usar reflection ou serviços públicos disponíveis
-        // para comunicar com o AI Assistant
+        // Use reflection or available public services
+        // to communicate with the AI Assistant
     }
 }
 ```
 
-### 5.2 CodeMarker para tasks.md
+### 5.2 CodeMarker for tasks.md
 
-Substituição do CodeLens do VSCode:
+VSCode CodeLens replacement:
 
 ```kotlin
 class TaskLineMarkerProvider : LineMarkerProvider {
     override fun getLineMarkerInfo(element: PsiElement): LineMarkerInfo<*>? {
-        // Detecta linhas "- [ ] Task description" em tasks.md
+        // Detects lines "- [ ] Task description" in tasks.md
         if (element is PsiFile && element.name == "tasks.md") {
-            // Retorna marcador com botão "▶ Run Task"
+            // Returns marker with "▶ Run Task" button
         }
         return null
     }
@@ -425,43 +425,43 @@ class TaskLineMarkerProvider : LineMarkerProvider {
 
 ---
 
-## Decisões de Design
+## Design Decisions
 
-### D1: Repositório Separado vs Monorepo
+### D1: Separate Repository vs Monorepo
 
-**Decisão**: Repositório separado `gatomia-jetbrains`.
+**Decision**: Separate repository `gatomia-jetbrains`.
 
-**Razão**: O JetBrains plugin usa Kotlin/Gradle, completamente diferente do Node.js/TypeScript do VSCode. Um monorepo adicionaria complexidade sem benefício significativo.
+**Reason**: The JetBrains plugin uses Kotlin/Gradle, completely different from the VSCode Node.js/TypeScript. A monorepo would add complexity without significant benefit.
 
-**Exceção**: A pasta `ui/` pode ser um **git submodule** compartilhado entre os dois repositórios, permitindo que a UI React seja mantida em um único lugar.
+**Exception**: The `ui/` folder can be a **git submodule** shared between the two repositories, allowing the React UI to be maintained in a single place.
 
-### D2: JCEF vs UI Nativa
+### D2: JCEF vs Native UI
 
-**Decisão**: JCEF para UIs complexas, Kotlin nativo para explorers simples.
+**Decision**: JCEF for complex UIs, native Kotlin for simple explorers.
 
-**Razão**: Reutilização de código e fidelidade de UX. A UI React existente já tem qualidade e funcionalidades avançadas (markdown preview, mermaid, etc.) que seriam custosas de replicar em Swing.
+**Reason**: Code reuse and UX fidelity. The existing React UI already has quality and advanced features (markdown preview, mermaid, etc.) that would be costly to replicate in Swing.
 
-**Critério de uso de JCEF**:
-- Formulários multi-step com validação complexa → JCEF
-- Tree views simples → Kotlin nativo
-- Preview de documentos → JCEF
-- Diálogos simples de input → Kotlin nativo
+**JCEF usage criteria**:
+- Multi-step forms with complex validation → JCEF
+- Simple tree views → Native Kotlin
+- Document previews → JCEF
+- Simple input dialogs → Native Kotlin
 
-### D3: AI Integration no MVP
+### D3: AI Integration in MVP
 
-**Decisão**: Fallback via clipboard para o MVP; integração com JetBrains AI API como feature adicional.
+**Decision**: Fallback via clipboard for the MVP; integration with JetBrains AI API as an additional feature.
 
-**Razão**: Reduz risco de dependência de API instável. O usuário pode usar qualquer AI Chat (JetBrains AI, ChatGPT, Claude, etc.) copiando o prompt gerado pelo plugin.
+**Reason**: Reduces risk of dependency on an unstable API. The user can use any AI Chat (JetBrains AI, ChatGPT, Claude, etc.) by pasting the prompt generated by the plugin.
 
-### D4: Kotlin Coroutines para operações async
+### D4: Kotlin Coroutines for Async Operations
 
-**Decisão**: Usar `kotlinx.coroutines` com `CoroutineScope(Dispatchers.IO)` para todas as operações de I/O (CLI, MCP, filesystem).
+**Decision**: Use `kotlinx.coroutines` with `CoroutineScope(Dispatchers.IO)` for all I/O operations (CLI, MCP, filesystem).
 
-**Razão**: Evitar bloqueio da EDT (Event Dispatch Thread) do Swing, que travaria a UI do IDE.
+**Reason**: Avoid blocking the EDT (Event Dispatch Thread) of Swing, which would freeze the IDE UI.
 
 ---
 
-## Dependências e Versões
+## Dependencies and Versions
 
 ```kotlin
 // build.gradle.kts - dependencies
@@ -476,10 +476,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
-    // Markdown parsing (para tasks.md e specs)
+    // Markdown parsing (for tasks.md and specs)
     implementation("org.commonmark:commonmark:0.22.0")
 
-    // YAML (para frontmatter de specs)
+    // YAML (for spec frontmatter)
     implementation("com.charleskorn.kaml:kaml:0.57.0")
 
     // Tests
@@ -491,43 +491,43 @@ dependencies {
 
 ---
 
-## Estimativas de Complexidade por Componente
+## Complexity Estimates by Component
 
-| Componente | Complexidade | Notas |
+| Component | Complexity | Notes |
 |---|---|---|
-| Projeto Gradle + plugin.xml | Baixa | Template disponível |
-| GatomiaSettings | Baixa | API estável e simples |
-| SpecManagerService | Média | Porta lógica do TypeScript |
-| SpecToolWindow | Média | Tree view com renderização customizada |
-| CliRunner | Baixa | ProcessBuilder + coroutines |
-| CreateSpecAction | Média | Diálogo nativo simples |
-| SteeringToolWindow | Média | Semelhante ao SpecToolWindow |
-| ActionsToolWindow | Média | Semelhante ao SpecToolWindow |
-| JCEF Bridge (Kotlin) | Alta | API JCEF tem curva de aprendizado |
-| JCEF Bridge (TypeScript) | Média | Adaptar bridge existente |
-| CreateSpecPanel (JCEF) | Alta | Integração JCEF + React |
-| DocumentPreviewPanel | Alta | JCEF + sync com disco |
-| McpClient | Alta | Protocol JSON-RPC, process management |
-| HookManager | Alta | Porta de lógica complexa |
-| HooksToolWindow | Alta | JCEF + tree view + logs |
-| AI Assistant Integration | Alta | API instável, requer investigação |
-| TaskLineMarkerProvider | Média | API LineMarker disponível |
-| DiagnosticsService | Baixa | Verificação de processos |
-| CI/CD (GitHub Actions) | Baixa | Plugin template tem exemplo |
+| Gradle project + plugin.xml | Low | Template available |
+| GatomiaSettings | Low | Stable and simple API |
+| SpecManagerService | Medium | Port logic from TypeScript |
+| SpecToolWindow | Medium | Tree view with custom rendering |
+| CliRunner | Low | ProcessBuilder + coroutines |
+| CreateSpecAction | Medium | Simple native dialog |
+| SteeringToolWindow | Medium | Similar to SpecToolWindow |
+| ActionsToolWindow | Medium | Similar to SpecToolWindow |
+| JCEF Bridge (Kotlin) | High | JCEF API has a learning curve |
+| JCEF Bridge (TypeScript) | Medium | Adapt existing bridge |
+| CreateSpecPanel (JCEF) | High | JCEF + React integration |
+| DocumentPreviewPanel | High | JCEF + disk sync |
+| McpClient | High | JSON-RPC protocol, process management |
+| HookManager | High | Port of complex logic |
+| HooksToolWindow | High | JCEF + tree view + logs |
+| AI Assistant Integration | High | Unstable API, requires investigation |
+| TaskLineMarkerProvider | Medium | LineMarker API available |
+| DiagnosticsService | Low | Process verification |
+| CI/CD (GitHub Actions) | Low | Plugin template has example |
 
 ---
 
-## Cronograma Sugerido
+## Suggested Schedule
 
 ```
-Fase 1 (Fundação)          ██████░░░░░░░░░░░░░░  Sprint 1-2
-Fase 2 (Actions + CLI)     ░░░░░░██████░░░░░░░░  Sprint 3-4
-Fase 3 (JCEF UI)           ░░░░░░░░░░░░██████░░  Sprint 5-6
-Fase 4 (Hooks + MCP)       ░░░░░░░░░░░░░░░░████  Sprint 7-8
-Fase 5 (AI + Polimento)    ░░░░░░░░░░░░░░░░░░██  Sprint 9-10
+Phase 1 (Foundation)          ██████░░░░░░░░░░░░░░  Sprint 1-2
+Phase 2 (Actions + CLI)       ░░░░░░██████░░░░░░░░  Sprint 3-4
+Phase 3 (JCEF UI)             ░░░░░░░░░░░░██████░░  Sprint 5-6
+Phase 4 (Hooks + MCP)         ░░░░░░░░░░░░░░░░████  Sprint 7-8
+Phase 5 (AI + Polish)         ░░░░░░░░░░░░░░░░░░██  Sprint 9-10
 ```
 
-MVP funcional (Fases 1-2): após Sprint 4
-Beta com UI completa (Fases 1-3): após Sprint 6
-Release candidate (Fases 1-4): após Sprint 8
-Launch (Fase 5): após Sprint 10
+Functional MVP (Phases 1-2): after Sprint 4
+Beta with full UI (Phases 1-3): after Sprint 6
+Release candidate (Phases 1-4): after Sprint 8
+Launch (Phase 5): after Sprint 10
