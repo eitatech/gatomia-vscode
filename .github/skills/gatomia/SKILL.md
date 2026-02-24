@@ -1,5 +1,5 @@
 ---
-name: GatomIA Documentation Generator
+name: gatomia
 description: Generate comprehensive code documentation using hierarchical analysis and AI-powered synthesis
 ---
 
