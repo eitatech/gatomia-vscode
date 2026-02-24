@@ -2,6 +2,35 @@
 
 ---
 
+## v0.34.2 2026-02-24
+
+### Added
+
+- add JetBrains extension plan (spec, plan, research, tasks)
+- fix user interface issues in welcome screen and implement dependency process
+
+### Fixed
+
+- update skill name to lowercase for consistency
+- address review comments on prerequisite logic, error propagation, CLI detection, and tests
+
+### Changed
+
+- Translate spec planning files from Portuguese to English
+- Initial plan
+- Update specs/014-jetbrains-extension/spec.md
+- Update specs/014-jetbrains-extension/spec.md
+- Initial plan
+- chore: ignore .beads dir
+
+### Release Info
+
+- **Source Branch**: `claude/jetbrains-extension-plan-jB2yS`
+- **Release Type**: patch
+
+---
+
+
 ## v0.34.1 2026-02-20
 
 ### Added
