@@ -185,19 +185,20 @@ interface RawV1CreateSessionResponse {
 	session_id: string;
 	url?: string;
 	status: string;
-	created_at: number;
-	updated_at: number;
-	pull_request?: { pr_url: string; pr_state?: string };
+	created_at: string | number;
+	updated_at: string | number;
+	pull_request?: { url: string; state?: string } | null;
 }
 
 interface RawV1GetSessionResponse {
 	session_id: string;
 	status: string;
-	created_at: number;
-	updated_at: number;
+	status_enum?: string;
+	created_at: string | number;
+	updated_at: string | number;
 	title?: string;
 	tags?: string[];
-	pull_request?: { pr_url: string; pr_state?: string };
+	pull_request?: { url: string; state?: string } | null;
 	snapshot_id?: string;
 	structured_output?: object;
 }
@@ -210,11 +211,19 @@ interface RawV1ListSessionsResponse {
 // Response mappers (snake_case -> camelCase)
 // ============================================================================
 
+function parseTimestamp(value: string | number): number {
+	if (typeof value === "number") {
+		return value;
+	}
+	const parsed = new Date(value).getTime();
+	return Number.isNaN(parsed) ? 0 : parsed;
+}
+
 function mapV1CreateSessionResponse(
 	raw: RawV1CreateSessionResponse
 ): CreateSessionResponse {
 	const pullRequests = raw.pull_request
-		? [{ prUrl: raw.pull_request.pr_url, prState: raw.pull_request.pr_state }]
+		? [{ prUrl: raw.pull_request.url, prState: raw.pull_request.state }]
 		: [];
 
 	return {
@@ -222,8 +231,8 @@ function mapV1CreateSessionResponse(
 		url: raw.url ?? "",
 		status: raw.status as CreateSessionResponse["status"],
 		acusConsumed: 0,
-		createdAt: raw.created_at,
-		updatedAt: raw.updated_at,
+		createdAt: parseTimestamp(raw.created_at),
+		updatedAt: parseTimestamp(raw.updated_at),
 		pullRequests,
 	};
 }
@@ -232,17 +241,17 @@ function mapV1GetSessionResponse(
 	raw: RawV1GetSessionResponse
 ): GetSessionResponse {
 	const pullRequests = raw.pull_request
-		? [{ prUrl: raw.pull_request.pr_url, prState: raw.pull_request.pr_state }]
+		? [{ prUrl: raw.pull_request.url, prState: raw.pull_request.state }]
 		: [];
 
 	return {
 		sessionId: raw.session_id,
 		url: "",
 		status: raw.status as GetSessionResponse["status"],
-		statusDetail: undefined,
+		statusDetail: raw.status_enum,
 		tags: raw.tags ?? [],
-		createdAt: raw.created_at,
-		updatedAt: raw.updated_at,
+		createdAt: parseTimestamp(raw.created_at),
+		updatedAt: parseTimestamp(raw.updated_at),
 		acusConsumed: 0,
 		pullRequests,
 		title: raw.title,

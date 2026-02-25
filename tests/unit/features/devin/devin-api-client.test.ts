@@ -213,8 +213,8 @@ describe("DevinApiClientV1", () => {
 				jsonResponse({
 					session_id: "sess-v1-123",
 					status: "new",
-					created_at: 1_700_000_000,
-					updated_at: 1_700_000_000,
+					created_at: "2026-02-25T15:12:44.372811Z",
+					updated_at: "2026-02-25T15:12:44.372811Z",
 				})
 			);
 
@@ -226,6 +226,7 @@ describe("DevinApiClientV1", () => {
 			expect(url).toBe("https://api.test.devin.ai/v1/sessions");
 			expect(options.method).toBe("POST");
 			expect(result.sessionId).toBe("sess-v1-123");
+			expect(result.createdAt).toBeGreaterThan(0);
 		});
 	});
 
@@ -235,8 +236,8 @@ describe("DevinApiClientV1", () => {
 				jsonResponse({
 					session_id: "sess-v1-123",
 					status: "running",
-					created_at: 1_700_000_000,
-					updated_at: 1_700_000_001,
+					created_at: "2026-02-25T15:12:44.372811Z",
+					updated_at: "2026-02-25T15:12:45.000000Z",
 				})
 			);
 
@@ -246,6 +247,47 @@ describe("DevinApiClientV1", () => {
 			expect(url).toBe("https://api.test.devin.ai/v1/sessions/sess-v1-123");
 			expect(result.sessionId).toBe("sess-v1-123");
 			expect(result.status).toBe("running");
+		});
+
+		it("maps pull_request.url to pullRequests array", async () => {
+			mockFetch.mockResolvedValueOnce(
+				jsonResponse({
+					session_id: "sess-v1-pr",
+					status: "suspended",
+					status_enum: "finished",
+					created_at: "2026-02-25T15:05:13.693954Z",
+					updated_at: "2026-02-25T15:51:22.532750Z",
+					title: "Task T056: Add feature",
+					tags: ["gatomia", "task-T056"],
+					pull_request: {
+						url: "https://github.com/org/repo/pull/172",
+					},
+				})
+			);
+
+			const result = await client.getSession("sess-v1-pr");
+
+			expect(result.pullRequests).toHaveLength(1);
+			expect(result.pullRequests[0].prUrl).toBe(
+				"https://github.com/org/repo/pull/172"
+			);
+			expect(result.statusDetail).toBe("finished");
+		});
+
+		it("returns empty pullRequests when pull_request is null", async () => {
+			mockFetch.mockResolvedValueOnce(
+				jsonResponse({
+					session_id: "sess-v1-no-pr",
+					status: "exit",
+					created_at: "2026-02-25T15:12:44.372811Z",
+					updated_at: "2026-02-25T19:15:51.956945Z",
+					pull_request: null,
+				})
+			);
+
+			const result = await client.getSession("sess-v1-no-pr");
+
+			expect(result.pullRequests).toHaveLength(0);
 		});
 	});
 });
