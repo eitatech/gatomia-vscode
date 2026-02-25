@@ -891,6 +891,11 @@
           "group": "7_modification@2"
         },
         {
+          "command": "gatomia.devin.cancelSession",
+          "when": "view == gatomia.views.devinProgress && (viewItem == devinSession.queued || viewItem == devinSession.initializing || viewItem == devinSession.running)",
+          "group": "inline@1"
+        },
+        {
           "command": "gatomia.hooks.disable",
           "when": "view == gatomia.views.hooksExplorer && viewItem == hook-enabled",
           "group": "inline@1"

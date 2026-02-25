@@ -26,7 +26,9 @@ import { SessionStatus, TaskStatus } from "../features/devin/types";
 
 type DevinTreeItem = SessionTreeItem | TaskTreeItem | InfoTreeItem;
 
-class SessionTreeItem extends TreeItem {
+const PR_NUMBER_PATTERN = /\/(?:pull|merge_requests|pull-requests)\/([0-9]+)/i;
+
+export class SessionTreeItem extends TreeItem {
 	readonly session: DevinSession;
 
 	constructor(session: DevinSession) {
@@ -165,13 +167,21 @@ export class DevinProgressProvider implements TreeDataProvider<DevinTreeItem> {
 
 		if (session.pullRequests.length > 0) {
 			for (const pr of session.pullRequests) {
-				const prItem = new InfoTreeItem("Pull Request", pr.prUrl);
+				const prNumber = extractPrNumber(pr.prUrl);
+				const label = prNumber ? `Pull Request #${prNumber}` : "Pull Request";
+				const description = pr.prUrl || "No URL available";
+				const prItem = new InfoTreeItem(label, description);
 				prItem.iconPath = new ThemeIcon("git-pull-request");
-				prItem.command = {
-					command: "vscode.open",
-					title: "Open Pull Request",
-					arguments: [Uri.parse(pr.prUrl)],
-				};
+				if (pr.prUrl) {
+					prItem.command = {
+						command: "vscode.open",
+						title: "Open Pull Request",
+						arguments: [Uri.parse(pr.prUrl)],
+					};
+					prItem.tooltip = pr.prUrl;
+				} else {
+					prItem.tooltip = "Pull request URL not available yet";
+				}
 				items.push(prItem);
 			}
 		}
@@ -201,6 +211,18 @@ function getSessionIcon(status: SessionStatus): ThemeIcon {
 		default:
 			return new ThemeIcon("question");
 	}
+}
+
+/**
+ * Extract pull request number from a PR URL.
+ * Supports GitHub, GitLab, Bitbucket, and Azure DevOps patterns.
+ */
+function extractPrNumber(prUrl: string): string | undefined {
+	if (!prUrl) {
+		return;
+	}
+	const match = prUrl.match(PR_NUMBER_PATTERN);
+	return match?.[1];
 }
 
 function getTaskIcon(status: TaskStatus): ThemeIcon {

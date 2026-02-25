@@ -89,6 +89,7 @@ export interface RunWithDevinTreeItem {
 export interface DevinCommandCallbacks {
 	readonly onCredentialsConfigured?: () => void;
 	readonly onSessionCreated?: () => void;
+	readonly onSessionCancelled?: () => void;
 }
 
 export function registerDevinCommands(
@@ -125,8 +126,13 @@ export function registerDevinCommands(
 	disposables.push(
 		commands.registerCommand(
 			DEVIN_COMMANDS.CANCEL_SESSION,
-			async (localId?: string) => {
-				await handleCancelSession(localId, sessionManager);
+			async (arg?: string | { session?: { localId?: string } }) => {
+				const localId = typeof arg === "string" ? arg : arg?.session?.localId;
+				await handleCancelSession(
+					localId,
+					sessionManager,
+					callbacks?.onSessionCancelled
+				);
 			}
 		)
 	);
@@ -271,7 +277,8 @@ async function handleConfigureCredentials(
 
 async function handleCancelSession(
 	localId: string | undefined,
-	sessionManager: DevinSessionManager
+	sessionManager: DevinSessionManager,
+	onSessionCancelled?: () => void
 ): Promise<void> {
 	if (!localId) {
 		await window.showErrorMessage("No session ID provided.");
@@ -280,6 +287,7 @@ async function handleCancelSession(
 
 	try {
 		await sessionManager.cancelSession(localId);
+		onSessionCancelled?.();
 		await window.showInformationMessage("Devin session cancelled.");
 	} catch (error: unknown) {
 		await showDevinErrorNotification(error);

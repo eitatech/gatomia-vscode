@@ -649,6 +649,9 @@ export async function activate(context: ExtensionContext) {
 					devinProgressProvider.refresh();
 					devinPollingService.start();
 				},
+				onSessionCancelled: () => {
+					devinProgressProvider.refresh();
+				},
 			}
 		);
 		context.subscriptions.push(...devinDisposables);
