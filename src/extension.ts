@@ -83,6 +83,12 @@ import {
 	isGlobalResourceAccessAllowed,
 	openGlobalResourceAccessSettings,
 } from "./features/steering/global-resource-access-consent";
+import { registerDevinCommands } from "./commands/devin-commands";
+import { DevinCredentialsManager } from "./features/devin/devin-credentials-manager";
+import { DevinSessionManager } from "./features/devin/devin-session-manager";
+import { DevinSessionStorage } from "./features/devin/devin-session-storage";
+import { DevinPollingService } from "./features/devin/devin-polling-service";
+import { DevinProgressProvider } from "./providers/devin-progress-provider";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -563,6 +569,93 @@ export async function activate(context: ExtensionContext) {
 			window.showInformationMessage("Table of Contents - Coming soon!");
 		})
 	);
+
+	// Register Devin integration commands and progress view
+	try {
+		const devinCredentialsManager = new DevinCredentialsManager(
+			context.secrets
+		);
+		const devinSessionStorage = new DevinSessionStorage(context.workspaceState);
+		const devinSessionManager = new DevinSessionManager(
+			devinSessionStorage,
+			devinCredentialsManager
+		);
+
+		const devinProgressProvider = new DevinProgressProvider(
+			devinSessionStorage
+		);
+		const devinTreeView = window.createTreeView(DevinProgressProvider.viewId, {
+			treeDataProvider: devinProgressProvider,
+		});
+		context.subscriptions.push(devinTreeView);
+
+		// Set up polling service for session status updates
+		const devinPollingService = new DevinPollingService(
+			devinSessionStorage,
+			devinCredentialsManager,
+			undefined,
+			(msg) => outputChannel.appendLine(msg)
+		);
+		devinPollingService.onStatusChange(async (event) => {
+			if (event.status === "completed") {
+				const session = devinSessionStorage.getBySessionId(event.sessionId);
+				if (session && session.pullRequests.length > 0) {
+					const { handlePrNotification } = await import(
+						"./features/devin/pr-notification-handler"
+					);
+					await handlePrNotification(session);
+				}
+			}
+		});
+		devinPollingService.onPollCycleComplete(() => {
+			devinProgressProvider.refresh();
+		});
+		context.subscriptions.push({ dispose: () => devinPollingService.stop() });
+
+		// Start polling if there are already active sessions
+		if (devinSessionStorage.getActive().length > 0) {
+			devinPollingService.start();
+		}
+
+		// Set initial context key for welcome view visibility
+		devinCredentialsManager.hasCredentials().then(
+			(has) => {
+				commands.executeCommand(
+					"setContext",
+					"gatomia.devin.hasCredentials",
+					has
+				);
+			},
+			() => {
+				// Ignore credential check failure during activation
+			}
+		);
+
+		const devinDisposables = registerDevinCommands(
+			devinSessionManager,
+			devinCredentialsManager,
+			undefined,
+			{
+				onCredentialsConfigured: () => {
+					commands.executeCommand(
+						"setContext",
+						"gatomia.devin.hasCredentials",
+						true
+					);
+					devinProgressProvider.refresh();
+					devinPollingService.start();
+				},
+				onSessionCreated: () => {
+					devinProgressProvider.refresh();
+					devinPollingService.start();
+				},
+			}
+		);
+		context.subscriptions.push(...devinDisposables);
+		outputChannel.appendLine("[Devin] Commands and progress view registered");
+	} catch (error) {
+		outputChannel.appendLine(`[Devin] Failed to register commands: ${error}`);
+	}
 
 	// Set up file watchers
 	setupFileWatchers(context, specExplorer, steeringExplorer, actionsExplorer);
