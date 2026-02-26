@@ -189,7 +189,7 @@ export class SteeringExplorerProvider
 			);
 		}
 
-		// Constitution
+		// Constitution (.github)
 		const constitutionMd = join(workspaceRoot, ".github", "constitution.md");
 		if (await this.exists(constitutionMd)) {
 			items.push(
@@ -205,6 +205,31 @@ export class SteeringExplorerProvider
 						arguments: [Uri.file(constitutionMd)],
 					},
 					filename: "constitution.md",
+				})
+			);
+		}
+
+		// SpecKit Constitution (.specify/memory)
+		const specKitConstitutionMd = join(
+			workspaceRoot,
+			".specify",
+			"memory",
+			"constitution.md"
+		);
+		if (await this.exists(specKitConstitutionMd)) {
+			items.push(
+				new SteeringItem({
+					label: "SpecKit Constitution",
+					collapsibleState: TreeItemCollapsibleState.None,
+					contextValue: "constitution-file",
+					resourcePath: specKitConstitutionMd,
+					context: this.context,
+					command: {
+						command: "vscode.open",
+						title: "Open",
+						arguments: [Uri.file(specKitConstitutionMd)],
+					},
+					filename: ".specify/memory/constitution.md",
 				})
 			);
 		}
