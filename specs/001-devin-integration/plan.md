@@ -8,6 +8,7 @@
 Implement VS Code extension integration with Devin (Cognition) AI to enable remote task delegation. The extension allows users to select tasks from specs, send them to Devin for implementation, monitor progress in real-time, and review resulting pull requests - all without leaving VS Code.
 
 **Technical Approach**:
+
 - Support Devin API v1, v2, and v3 with automatic version detection based on API key prefix (`cog_` for v3, `apk_*` for legacy)
 - Use VS Code SecretStorage for secure credential management
 - Implement polling-based progress monitoring (5-10s intervals)
@@ -100,6 +101,7 @@ tests/
 ## Complexity Tracking
 
 No complexity violations identified. Implementation follows existing architectural patterns:
+
 - Service layer for API communication
 - Provider pattern for VS Code tree views
 - Webview panel for rich UI
@@ -110,15 +112,18 @@ No complexity violations identified. Implementation follows existing architectur
 Completed research on Devin API:
 
 **API Versions**:
+
 - v3 (current): Service users with `cog_` prefix, RBAC, audit trails
 - v1/v2 (legacy): Personal/service API keys with `apk_*` prefix
 
 **Key Endpoints**:
+
 - `POST /v3/organizations/{org_id}/sessions` - Create session
 - `GET /v3/organizations/{org_id}/sessions/{id}` - Get session details
 - `GET /v3/organizations/{org_id}/sessions` - List sessions
 
 **Authentication**:
+
 - Header: `Authorization: Bearer {token}`
 - Auto-detect version from token prefix
 
@@ -127,15 +132,18 @@ See [research.md](./research.md) for complete details.
 ## Phase 1: Design Summary
 
 **Data Model**: See [data-model.md](./data-model.md)
+
 - Core entities: DevinSession, DevinTask, DevinCredentials, DevinProgressEvent
 - Session persistence across VS Code restarts
 - 7-day retention policy
 
 **Contracts**: See [contracts/](./contracts/)
+
 - `devin-api.ts`: Devin API v1/v2/v3 interfaces
 - `extension-api.ts`: Extension internal message contracts
 
 **Quickstart**: See [quickstart.md](./quickstart.md)
+
 - Setup instructions for v3 and legacy APIs
 - Usage guide for single/batch task delegation
 - Troubleshooting common issues
