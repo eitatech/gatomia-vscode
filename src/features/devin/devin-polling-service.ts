@@ -12,11 +12,13 @@ import { DEFAULT_POLLING_INTERVAL_SECONDS } from "./config";
 import type { DevinApiClientInterface } from "./devin-api-client";
 import type { DevinCredentialsManager } from "./devin-credentials-manager";
 import type { DevinSessionStorage } from "./devin-session-storage";
+import type { DevinTask } from "./entities";
+import { resolveSessionStatus, isTerminalStatus } from "./status-mapper";
 import {
-	mapDevinApiStatusToSessionStatus,
-	isTerminalStatus,
-} from "./status-mapper";
-import type { SessionStatus } from "./types";
+	type SessionStatus,
+	SessionStatus as SessionStatusEnum,
+	TaskStatus,
+} from "./types";
 
 // ============================================================================
 // Types
@@ -33,6 +35,15 @@ export interface StatusChangeEvent {
 }
 
 /**
+ * Event emitted when a session becomes blocked and requires user action.
+ */
+export interface BlockedSessionEvent {
+	readonly localId: string;
+	readonly sessionId: string;
+	readonly title: string;
+}
+
+/**
  * Options for configuring the polling service.
  */
 export interface PollingServiceOptions {
@@ -40,6 +51,7 @@ export interface PollingServiceOptions {
 }
 
 type StatusChangeListener = (event: StatusChangeEvent) => void;
+type BlockedSessionListener = (event: BlockedSessionEvent) => void;
 type PollCycleListener = () => void;
 type LogFn = (message: string) => void;
 
@@ -60,6 +72,7 @@ export class DevinPollingService {
 	private readonly storage: DevinSessionStorage;
 	private readonly intervalMs: number;
 	private readonly listeners: Set<StatusChangeListener> = new Set();
+	private readonly blockedListeners: Set<BlockedSessionListener> = new Set();
 	private readonly cycleListeners: Set<PollCycleListener> = new Set();
 	private readonly log: LogFn;
 	private timerId: ReturnType<typeof setInterval> | undefined;
@@ -151,6 +164,21 @@ export class DevinPollingService {
 	}
 
 	/**
+	 * Register a listener for blocked session events.
+	 *
+	 * Called when a session transitions to BLOCKED status, indicating
+	 * Devin needs user input to continue.
+	 *
+	 * @returns A dispose function to unregister the listener
+	 */
+	onBlocked(listener: BlockedSessionListener): () => void {
+		this.blockedListeners.add(listener);
+		return () => {
+			this.blockedListeners.delete(listener);
+		};
+	}
+
+	/**
 	 * Register a listener called after every poll cycle completes.
 	 *
 	 * @returns A dispose function to unregister the listener
@@ -208,7 +236,10 @@ export class DevinPollingService {
 	): Promise<void> {
 		try {
 			const response = await client.getSession(sessionId);
-			const newStatus = mapDevinApiStatusToSessionStatus(response.status);
+			const newStatus = resolveSessionStatus(
+				response.status,
+				response.statusDetail
+			);
 
 			const updates: Record<string, unknown> = {
 				status: newStatus,
@@ -227,6 +258,17 @@ export class DevinPollingService {
 				}));
 			}
 
+			const session = this.storage.getBySessionId(sessionId);
+			if (session) {
+				updates.tasks = syncTaskStatuses(session.tasks, newStatus);
+
+				if (!session.devinUrl) {
+					const url =
+						response.url || `https://app.devin.ai/sessions/${sessionId}`;
+					updates.devinUrl = url;
+				}
+			}
+
 			await this.storage.update(localId, updates);
 
 			if (newStatus !== currentStatus) {
@@ -236,6 +278,17 @@ export class DevinPollingService {
 					status: newStatus,
 					previousStatus: currentStatus,
 				});
+			}
+
+			if (
+				newStatus === SessionStatusEnum.BLOCKED &&
+				currentStatus !== SessionStatusEnum.BLOCKED
+			) {
+				const title = response.title ?? sessionId;
+				this.log(
+					`[Polling] Session ${sessionId} is BLOCKED and requires user action`
+				);
+				this.emitBlocked({ localId, sessionId, title });
 			}
 		} catch (error: unknown) {
 			const msg = error instanceof Error ? error.message : String(error);
@@ -248,4 +301,51 @@ export class DevinPollingService {
 			listener(event);
 		}
 	}
+
+	private emitBlocked(event: BlockedSessionEvent): void {
+		for (const listener of this.blockedListeners) {
+			listener(event);
+		}
+	}
+}
+
+// ============================================================================
+// Task Status Sync
+// ============================================================================
+
+const SESSION_TO_TASK_STATUS: Record<string, string> = {
+	[SessionStatusEnum.RUNNING]: TaskStatus.IN_PROGRESS,
+	[SessionStatusEnum.COMPLETED]: TaskStatus.COMPLETED,
+	[SessionStatusEnum.FAILED]: TaskStatus.FAILED,
+	[SessionStatusEnum.CANCELLED]: TaskStatus.CANCELLED,
+	[SessionStatusEnum.BLOCKED]: TaskStatus.IN_PROGRESS,
+};
+
+function syncTaskStatuses(
+	tasks: readonly DevinTask[],
+	sessionStatus: SessionStatus
+): DevinTask[] {
+	const targetTaskStatus = SESSION_TO_TASK_STATUS[sessionStatus];
+	if (!targetTaskStatus) {
+		return [...tasks];
+	}
+
+	const now = Date.now();
+	const terminalTaskStatuses = [
+		TaskStatus.COMPLETED,
+		TaskStatus.FAILED,
+		TaskStatus.CANCELLED,
+	];
+
+	return tasks.map((task) => {
+		if (terminalTaskStatuses.includes(task.status)) {
+			return task;
+		}
+		const isTerminal = terminalTaskStatuses.includes(targetTaskStatus);
+		return {
+			...task,
+			status: targetTaskStatus,
+			...(isTerminal ? { completedAt: now } : {}),
+		} as DevinTask;
+	});
 }

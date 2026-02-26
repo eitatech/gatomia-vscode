@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import type { DevinApiClientInterface } from "../../../../src/features/devin/devin-api-client";
 import type { DevinSessionStorage } from "../../../../src/features/devin/devin-session-storage";
-import { SessionStatus } from "../../../../src/features/devin/types";
+import {
+	SessionStatus,
+	TaskStatus,
+} from "../../../../src/features/devin/types";
 
 function createMockApiClient(): DevinApiClientInterface {
 	return {
@@ -27,7 +30,30 @@ function createMockStorage(): DevinSessionStorage {
 	return {
 		getAll: vi.fn().mockReturnValue([]),
 		getByLocalId: vi.fn(),
-		getBySessionId: vi.fn(),
+		getBySessionId: vi.fn().mockReturnValue({
+			localId: "local-001",
+			sessionId: "devin-sess-001",
+			status: SessionStatus.INITIALIZING,
+			branch: "feature/test",
+			specPath: "/spec.md",
+			tasks: [
+				{
+					taskId: "task-uuid-001",
+					specTaskId: "T001",
+					title: "Create package structure",
+					description: "Set up the project",
+					priority: "high",
+					status: TaskStatus.QUEUED,
+					devinSessionId: "devin-sess-001",
+					startedAt: 1_700_000_000,
+				},
+			],
+			createdAt: 1_700_000_000,
+			updatedAt: 1_700_000_000,
+			pullRequests: [],
+			apiVersion: "v3",
+			retryCount: 0,
+		}),
 		save: vi.fn().mockResolvedValue(undefined),
 		update: vi.fn().mockImplementation((_id, updates) =>
 			Promise.resolve({
@@ -146,5 +172,219 @@ describe("DevinPollingService", () => {
 
 		service.stop();
 		expect(service.isRunning).toBe(false);
+	});
+
+	it("should use statusDetail (status_enum) over base status for mapping", async () => {
+		(
+			mockApiClient.getSession as ReturnType<typeof vi.fn>
+		).mockResolvedValueOnce({
+			sessionId: "devin-sess-001",
+			url: "https://app.devin.ai/sessions/devin-sess-001",
+			status: "suspended",
+			statusDetail: "finished",
+			tags: [],
+			createdAt: 1_700_000_000,
+			updatedAt: 1_700_000_001,
+			acusConsumed: 2,
+			pullRequests: [],
+			isArchived: false,
+		});
+
+		const { DevinPollingService } = await import(
+			"../../../../src/features/devin/devin-polling-service"
+		);
+		const service = new DevinPollingService(mockStorage, mockApiClient);
+
+		await service.pollOnce();
+
+		expect(mockStorage.update).toHaveBeenCalledWith(
+			"local-001",
+			expect.objectContaining({ status: SessionStatus.COMPLETED })
+		);
+	});
+
+	it("should emit blocked event when session transitions to blocked", async () => {
+		(
+			mockApiClient.getSession as ReturnType<typeof vi.fn>
+		).mockResolvedValueOnce({
+			sessionId: "devin-sess-001",
+			url: "https://app.devin.ai/sessions/devin-sess-001",
+			status: "running",
+			statusDetail: "blocked",
+			tags: [],
+			title: "Task T002: Create package structure",
+			createdAt: 1_700_000_000,
+			updatedAt: 1_700_000_001,
+			acusConsumed: 2,
+			pullRequests: [],
+			isArchived: false,
+		});
+
+		const { DevinPollingService } = await import(
+			"../../../../src/features/devin/devin-polling-service"
+		);
+		const service = new DevinPollingService(mockStorage, mockApiClient);
+		const blockedEvents: Array<{ sessionId: string; title: string }> = [];
+
+		service.onBlocked((event) => {
+			blockedEvents.push(event);
+		});
+
+		await service.pollOnce();
+
+		expect(blockedEvents).toHaveLength(1);
+		expect(blockedEvents[0].sessionId).toBe("devin-sess-001");
+		expect(blockedEvents[0].title).toBe("Task T002: Create package structure");
+	});
+
+	it("should not emit blocked event when session was already blocked", async () => {
+		(mockStorage.getActive as ReturnType<typeof vi.fn>).mockReturnValue([
+			{
+				localId: "local-001",
+				sessionId: "devin-sess-001",
+				status: SessionStatus.BLOCKED,
+				branch: "feature/test",
+				specPath: "/spec.md",
+				tasks: [],
+				createdAt: 1_700_000_000,
+				updatedAt: 1_700_000_000,
+				pullRequests: [],
+				apiVersion: "v3",
+				retryCount: 0,
+			},
+		]);
+
+		(
+			mockApiClient.getSession as ReturnType<typeof vi.fn>
+		).mockResolvedValueOnce({
+			sessionId: "devin-sess-001",
+			url: "https://app.devin.ai/sessions/devin-sess-001",
+			status: "running",
+			statusDetail: "blocked",
+			tags: [],
+			title: "Still blocked",
+			createdAt: 1_700_000_000,
+			updatedAt: 1_700_000_001,
+			acusConsumed: 2,
+			pullRequests: [],
+			isArchived: false,
+		});
+
+		const { DevinPollingService } = await import(
+			"../../../../src/features/devin/devin-polling-service"
+		);
+		const service = new DevinPollingService(mockStorage, mockApiClient);
+		const blockedEvents: Array<{ sessionId: string }> = [];
+
+		service.onBlocked((event) => {
+			blockedEvents.push(event);
+		});
+
+		await service.pollOnce();
+
+		expect(blockedEvents).toHaveLength(0);
+	});
+
+	it("should sync task statuses to in_progress when session becomes running", async () => {
+		const { DevinPollingService } = await import(
+			"../../../../src/features/devin/devin-polling-service"
+		);
+		const service = new DevinPollingService(mockStorage, mockApiClient);
+
+		await service.pollOnce();
+
+		expect(mockStorage.update).toHaveBeenCalledWith(
+			"local-001",
+			expect.objectContaining({
+				tasks: expect.arrayContaining([
+					expect.objectContaining({
+						specTaskId: "T001",
+						status: TaskStatus.IN_PROGRESS,
+					}),
+				]),
+			})
+		);
+	});
+
+	it("should sync task statuses to completed when session finishes via v1 status_enum", async () => {
+		(
+			mockApiClient.getSession as ReturnType<typeof vi.fn>
+		).mockResolvedValueOnce({
+			sessionId: "devin-sess-001",
+			url: "",
+			status: "suspended",
+			statusDetail: "finished",
+			tags: [],
+			createdAt: 1_700_000_000,
+			updatedAt: 1_700_000_001,
+			acusConsumed: 2,
+			pullRequests: [],
+			isArchived: false,
+		});
+
+		const { DevinPollingService } = await import(
+			"../../../../src/features/devin/devin-polling-service"
+		);
+		const service = new DevinPollingService(mockStorage, mockApiClient);
+
+		await service.pollOnce();
+
+		expect(mockStorage.update).toHaveBeenCalledWith(
+			"local-001",
+			expect.objectContaining({
+				status: SessionStatus.COMPLETED,
+				tasks: expect.arrayContaining([
+					expect.objectContaining({
+						specTaskId: "T001",
+						status: TaskStatus.COMPLETED,
+					}),
+				]),
+			})
+		);
+	});
+
+	it("should construct devinUrl when v1 session has no URL", async () => {
+		(mockStorage.getBySessionId as ReturnType<typeof vi.fn>).mockReturnValue({
+			localId: "local-001",
+			sessionId: "devin-sess-001",
+			status: SessionStatus.INITIALIZING,
+			branch: "feature/test",
+			specPath: "/spec.md",
+			tasks: [],
+			devinUrl: "",
+			createdAt: 1_700_000_000,
+			updatedAt: 1_700_000_000,
+			pullRequests: [],
+			apiVersion: "v1",
+			retryCount: 0,
+		});
+
+		(
+			mockApiClient.getSession as ReturnType<typeof vi.fn>
+		).mockResolvedValueOnce({
+			sessionId: "devin-sess-001",
+			url: "",
+			status: "running",
+			tags: [],
+			createdAt: 1_700_000_000,
+			updatedAt: 1_700_000_001,
+			acusConsumed: 0,
+			pullRequests: [],
+			isArchived: false,
+		});
+
+		const { DevinPollingService } = await import(
+			"../../../../src/features/devin/devin-polling-service"
+		);
+		const service = new DevinPollingService(mockStorage, mockApiClient);
+
+		await service.pollOnce();
+
+		expect(mockStorage.update).toHaveBeenCalledWith(
+			"local-001",
+			expect.objectContaining({
+				devinUrl: "https://app.devin.ai/sessions/devin-sess-001",
+			})
+		);
 	});
 });

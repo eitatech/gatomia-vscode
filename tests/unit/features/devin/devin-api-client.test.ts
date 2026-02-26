@@ -228,6 +228,35 @@ describe("DevinApiClientV1", () => {
 			expect(result.sessionId).toBe("sess-v1-123");
 			expect(result.createdAt).toBeGreaterThan(0);
 		});
+
+		it("includes repos with branch in the request body", async () => {
+			mockFetch.mockResolvedValueOnce(
+				jsonResponse({
+					session_id: "sess-v1-branch",
+					status: "new",
+					created_at: "2026-02-25T15:12:44.372811Z",
+					updated_at: "2026-02-25T15:12:44.372811Z",
+				})
+			);
+
+			await client.createSession({
+				prompt: "Implement feature on branch",
+				repos: [
+					{
+						url: "https://github.com/org/repo",
+						branch: "feature/my-branch",
+					},
+				],
+			});
+
+			const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+			expect(body.repos).toEqual([
+				{
+					url: "https://github.com/org/repo",
+					branch: "feature/my-branch",
+				},
+			]);
+		});
 	});
 
 	describe("getSession", () => {

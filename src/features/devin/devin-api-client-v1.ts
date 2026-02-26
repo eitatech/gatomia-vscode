@@ -54,6 +54,7 @@ export class DevinApiClientV1 implements DevinApiClientInterface {
 		const body = {
 			prompt: request.prompt,
 			...(request.title && { title: request.title }),
+			...(request.repos && { repos: request.repos }),
 			...(request.playbookId && { playbook_id: request.playbookId }),
 			...(request.tags && { tags: request.tags }),
 		};

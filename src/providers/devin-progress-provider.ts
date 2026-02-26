@@ -202,6 +202,8 @@ function getSessionIcon(status: SessionStatus): ThemeIcon {
 			return new ThemeIcon("loading~spin");
 		case SessionStatus.RUNNING:
 			return new ThemeIcon("sync~spin");
+		case SessionStatus.BLOCKED:
+			return new ThemeIcon("warning");
 		case SessionStatus.COMPLETED:
 			return new ThemeIcon("check");
 		case SessionStatus.FAILED:

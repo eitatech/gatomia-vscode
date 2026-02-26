@@ -607,6 +607,19 @@ export async function activate(context: ExtensionContext) {
 				}
 			}
 		});
+		devinPollingService.onBlocked(async (event) => {
+			const action = await window.showWarningMessage(
+				`Devin session "${event.title}" is blocked and needs your input to continue.`,
+				"Open in Devin"
+			);
+			if (action === "Open in Devin") {
+				const session = devinSessionStorage.getBySessionId(event.sessionId);
+				const url =
+					session?.devinUrl ??
+					`https://app.devin.ai/sessions/${event.sessionId}`;
+				env.openExternal(Uri.parse(url));
+			}
+		});
 		devinPollingService.onPollCycleComplete(() => {
 			devinProgressProvider.refresh();
 		});

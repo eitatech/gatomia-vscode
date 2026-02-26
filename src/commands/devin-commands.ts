@@ -8,11 +8,15 @@
  */
 
 import { commands, window, workspace } from "vscode";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { readFileSync, existsSync } from "node:fs";
 import { parseTasksFromFile } from "../utils/task-parser";
 import { DEVIN_COMMANDS } from "../features/devin/config";
 import type { DevinCredentialsManager } from "../features/devin/devin-credentials-manager";
-import type { DevinSessionManager } from "../features/devin/devin-session-manager";
+import type {
+	DevinSessionManager,
+	ReferenceDocument,
+} from "../features/devin/devin-session-manager";
 import type { DevinProgressPanel } from "../panels/devin-progress-panel";
 import { showDevinErrorNotification } from "../features/devin/error-notifications";
 import {
@@ -518,7 +522,7 @@ async function handleRunGroupWithDevin(
 	const incompleteTasks = result.tasks;
 
 	const confirmed = await window.showInformationMessage(
-		`Run with Devin: commit, push, and delegate ${incompleteTasks.length} task(s) from "${groupName}" to Devin?`,
+		`Run with Devin: commit, push, and delegate "${groupName}" (${incompleteTasks.length} task(s)) as a single session to Devin?`,
 		{ modal: true },
 		"Run with Devin"
 	);
@@ -543,29 +547,28 @@ async function handleRunGroupWithDevin(
 	}
 
 	const repoUrl = (await getRemoteUrl()) ?? "";
-	const { successCount, failCount } = await delegateTasksToDevin(
-		{
-			tasks: incompleteTasks,
-			specPath: tasksFilePath,
-			branch: gitResult.branch,
-			repoUrl,
-		},
-		sessionManager
+	const referenceDocuments = loadReferenceDocuments(tasksFilePath);
+
+	const session = await sessionManager.startTaskGroup({
+		specPath: tasksFilePath,
+		groupName,
+		tasks: incompleteTasks.map((t) => ({
+			taskId: t.id,
+			title: t.title,
+			priority: "P1" as const,
+		})),
+		branch: gitResult.branch,
+		repoUrl,
+		referenceDocuments,
+	});
+
+	const taskIds = incompleteTasks.map((t) => t.id).join(", ");
+	logTaskStartSuccess(taskIds, session.sessionId, session.apiVersion);
+	onSessionCreated?.();
+	await showSessionStartedNotification(
+		`${groupName} (${incompleteTasks.length} tasks)`,
+		session.devinUrl
 	);
-
-	if (successCount > 0) {
-		onSessionCreated?.();
-	}
-
-	if (failCount === 0) {
-		await window.showInformationMessage(
-			`All ${successCount} task(s) from "${groupName}" delegated to Devin.`
-		);
-	} else {
-		await window.showWarningMessage(
-			`Delegated ${successCount} task(s), ${failCount} failed in "${groupName}".`
-		);
-	}
 }
 
 interface ResolveGroupResult {
@@ -612,41 +615,42 @@ function resolveIncompleteGroupTasks(
 	return { tasks: incomplete };
 }
 
-interface DelegateTasksOptions {
-	readonly tasks: { id: string; title: string }[];
-	readonly specPath: string;
-	readonly branch: string;
-	readonly repoUrl: string;
-}
+/**
+ * Load reference documents (spec, plan, design, etc.) from the spec directory.
+ *
+ * Discovers the spec directory from the tasks file path and reads any
+ * available design artifacts to include as context for Devin.
+ */
+function loadReferenceDocuments(tasksFilePath: string): ReferenceDocument[] {
+	const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
+	if (!workspaceRoot) {
+		return [];
+	}
 
-async function delegateTasksToDevin(
-	options: DelegateTasksOptions,
-	sessionManager: DevinSessionManager
-): Promise<{ successCount: number; failCount: number }> {
-	let successCount = 0;
-	let failCount = 0;
+	const specDir = dirname(join(workspaceRoot, tasksFilePath));
+	const documentTypes = [
+		{ file: "spec.md", label: "Specification" },
+		{ file: "plan.md", label: "Implementation Plan" },
+		{ file: "design.md", label: "Design" },
+		{ file: "data-model.md", label: "Data Model" },
+		{ file: "requirements.md", label: "Requirements" },
+	];
 
-	for (const task of options.tasks) {
-		try {
-			const session = await sessionManager.startTask({
-				specPath: options.specPath,
-				taskId: task.id,
-				title: task.title,
-				description: task.title,
-				priority: "P1",
-				branch: options.branch,
-				repoUrl: options.repoUrl,
-			});
-			logTaskStartSuccess(task.id, session.sessionId, session.apiVersion);
-			successCount += 1;
-		} catch (error: unknown) {
-			const errorCode = isDevinError(error) ? error.code : "UNKNOWN";
-			const errorMessage =
-				error instanceof Error ? error.message : String(error);
-			logTaskStartFailure(task.id, errorCode, errorMessage);
-			failCount += 1;
+	const documents: ReferenceDocument[] = [];
+
+	for (const { file, label } of documentTypes) {
+		const filePath = join(specDir, file);
+		if (existsSync(filePath)) {
+			try {
+				const content = readFileSync(filePath, "utf-8");
+				if (content.trim().length > 0) {
+					documents.push({ type: label, content });
+				}
+			} catch {
+				// Skip unreadable files
+			}
 		}
 	}
 
-	return { successCount, failCount };
+	return documents;
 }

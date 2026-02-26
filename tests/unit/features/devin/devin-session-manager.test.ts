@@ -193,5 +193,198 @@ describe("DevinSessionManager", () => {
 			expect(prompt).toContain("Form validates email format");
 			expect(prompt).toContain("Password must be 8+ characters");
 		});
+
+		it("should include branch instructions when branch is provided", async () => {
+			const { mapSpecTaskToDevinPrompt } = await import(
+				"../../../../src/features/devin/devin-session-manager"
+			);
+
+			const prompt = mapSpecTaskToDevinPrompt({
+				title: "Fix bug",
+				description: "Fix the null pointer issue",
+				branch: "feature/my-branch",
+			});
+
+			expect(prompt).toContain("Branch Instructions");
+			expect(prompt).toContain("feature/my-branch");
+			expect(prompt).toContain("Pull Request targeting `feature/my-branch`");
+			expect(prompt).toContain("Do NOT target any other branch");
+		});
+
+		it("should omit branch instructions when branch is not provided", async () => {
+			const { mapSpecTaskToDevinPrompt } = await import(
+				"../../../../src/features/devin/devin-session-manager"
+			);
+
+			const prompt = mapSpecTaskToDevinPrompt({
+				title: "Fix bug",
+				description: "Fix the null pointer issue",
+			});
+
+			expect(prompt).not.toContain("Branch Instructions");
+		});
+	});
+
+	describe("startTaskGroup", () => {
+		it("should create a single session for all tasks in the group", async () => {
+			const { DevinSessionManager } = await import(
+				"../../../../src/features/devin/devin-session-manager"
+			);
+			const manager = new DevinSessionManager(
+				mockStorage,
+				mockCredentials,
+				mockApiClient
+			);
+
+			const session = await manager.startTaskGroup({
+				specPath: ".specify/001-feature/tasks.md",
+				groupName: "Phase 1: Foundation",
+				tasks: [
+					{ taskId: "T001", title: "Create types", priority: "P1" },
+					{ taskId: "T002", title: "Add validation", priority: "P2" },
+					{ taskId: "T003", title: "Write tests", priority: "P1" },
+				],
+				branch: "feature/foundation",
+				repoUrl: "https://github.com/org/repo",
+			});
+
+			expect(mockApiClient.createSession).toHaveBeenCalledOnce();
+			expect(mockStorage.save).toHaveBeenCalledOnce();
+			expect(session.status).toBe(SessionStatus.INITIALIZING);
+			expect(session.tasks).toHaveLength(3);
+			expect(session.tasks[0].specTaskId).toBe("T001");
+			expect(session.tasks[1].specTaskId).toBe("T002");
+			expect(session.tasks[2].specTaskId).toBe("T003");
+		});
+
+		it("should include group name in API request title", async () => {
+			const { DevinSessionManager } = await import(
+				"../../../../src/features/devin/devin-session-manager"
+			);
+			const manager = new DevinSessionManager(
+				mockStorage,
+				mockCredentials,
+				mockApiClient
+			);
+
+			await manager.startTaskGroup({
+				specPath: ".specify/001-feature/tasks.md",
+				groupName: "Phase 1: Foundation",
+				tasks: [{ taskId: "T001", title: "Create types", priority: "P1" }],
+				branch: "feature/foundation",
+				repoUrl: "https://github.com/org/repo",
+			});
+
+			const callArgs = (mockApiClient.createSession as ReturnType<typeof vi.fn>)
+				.mock.calls[0][0];
+			expect(callArgs.title).toBe("Group: Phase 1: Foundation");
+			expect(callArgs.tags).toContain("task-group");
+			expect(callArgs.tags).toContain("task-T001");
+		});
+
+		it("should pass reference documents to the prompt", async () => {
+			const { DevinSessionManager } = await import(
+				"../../../../src/features/devin/devin-session-manager"
+			);
+			const manager = new DevinSessionManager(
+				mockStorage,
+				mockCredentials,
+				mockApiClient
+			);
+
+			await manager.startTaskGroup({
+				specPath: ".specify/001-feature/tasks.md",
+				groupName: "Phase 1",
+				tasks: [{ taskId: "T001", title: "Create types", priority: "P1" }],
+				branch: "feature/foundation",
+				repoUrl: "https://github.com/org/repo",
+				referenceDocuments: [
+					{ type: "Specification", content: "# Spec content here" },
+					{
+						type: "Implementation Plan",
+						content: "# Plan content here",
+					},
+				],
+			});
+
+			const callArgs = (mockApiClient.createSession as ReturnType<typeof vi.fn>)
+				.mock.calls[0][0];
+			expect(callArgs.prompt).toContain("Spec content here");
+			expect(callArgs.prompt).toContain("Plan content here");
+			expect(callArgs.prompt).toContain("Reference Documents");
+		});
+	});
+
+	describe("mapTaskGroupToDevinPrompt", () => {
+		it("should list all tasks in the prompt", async () => {
+			const { mapTaskGroupToDevinPrompt } = await import(
+				"../../../../src/features/devin/devin-session-manager"
+			);
+
+			const prompt = mapTaskGroupToDevinPrompt({
+				groupName: "Phase 1: Foundation",
+				tasks: [
+					{ taskId: "T001", title: "Create types", priority: "P1" },
+					{ taskId: "T002", title: "Add validation", priority: "P2" },
+				],
+			});
+
+			expect(prompt).toContain("Phase 1: Foundation");
+			expect(prompt).toContain("**T001**: Create types");
+			expect(prompt).toContain("**T002**: Add validation");
+			expect(prompt).toContain("ALL of the following tasks");
+			expect(prompt).toContain("one PR");
+		});
+
+		it("should include reference documents as context", async () => {
+			const { mapTaskGroupToDevinPrompt } = await import(
+				"../../../../src/features/devin/devin-session-manager"
+			);
+
+			const prompt = mapTaskGroupToDevinPrompt({
+				groupName: "Phase 1",
+				tasks: [{ taskId: "T001", title: "Create types", priority: "P1" }],
+				referenceDocuments: [
+					{ type: "Specification", content: "Feature X requires..." },
+					{
+						type: "Implementation Plan",
+						content: "Step 1: create module...",
+					},
+				],
+			});
+
+			expect(prompt).toContain("### Specification");
+			expect(prompt).toContain("Feature X requires...");
+			expect(prompt).toContain("### Implementation Plan");
+			expect(prompt).toContain("Step 1: create module...");
+		});
+
+		it("should include branch instructions", async () => {
+			const { mapTaskGroupToDevinPrompt } = await import(
+				"../../../../src/features/devin/devin-session-manager"
+			);
+
+			const prompt = mapTaskGroupToDevinPrompt({
+				groupName: "Phase 1",
+				tasks: [{ taskId: "T001", title: "Create types", priority: "P1" }],
+				branch: "feature/my-branch",
+			});
+
+			expect(prompt).toContain("Branch Instructions");
+			expect(prompt).toContain("feature/my-branch");
+		});
+
+		it("should omit reference documents section when none provided", async () => {
+			const { mapTaskGroupToDevinPrompt } = await import(
+				"../../../../src/features/devin/devin-session-manager"
+			);
+
+			const prompt = mapTaskGroupToDevinPrompt({
+				groupName: "Phase 1",
+				tasks: [{ taskId: "T001", title: "Create types", priority: "P1" }],
+			});
+
+			expect(prompt).not.toContain("Reference Documents");
+		});
 	});
 });

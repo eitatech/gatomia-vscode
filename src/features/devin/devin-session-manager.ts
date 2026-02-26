@@ -52,6 +52,54 @@ export interface PromptParams {
 	readonly title: string;
 	readonly description: string;
 	readonly acceptanceCriteria?: string[];
+	readonly branch?: string;
+	readonly repoUrl?: string;
+}
+
+/**
+ * A single task within a task group.
+ */
+export interface TaskGroupTask {
+	readonly taskId: string;
+	readonly title: string;
+	readonly priority: TaskPriority;
+}
+
+/**
+ * Parameters for starting a task group as a single Devin session.
+ */
+export interface StartTaskGroupParams {
+	/** Path to the tasks file */
+	readonly specPath: string;
+	/** Name of the task group (phase/use case) */
+	readonly groupName: string;
+	/** All tasks in the group */
+	readonly tasks: TaskGroupTask[];
+	/** Git branch to work on */
+	readonly branch: string;
+	/** Repository URL */
+	readonly repoUrl: string;
+	/** Reference documents (spec, plan, design, etc.) */
+	readonly referenceDocuments?: ReferenceDocument[];
+}
+
+/**
+ * A reference document to include as context in the prompt.
+ */
+export interface ReferenceDocument {
+	readonly type: string;
+	readonly content: string;
+}
+
+/**
+ * Parameters for generating a task group prompt.
+ */
+export interface TaskGroupPromptParams {
+	readonly groupName: string;
+	readonly tasks: TaskGroupTask[];
+	readonly branch?: string;
+	readonly repoUrl?: string;
+	readonly referenceDocuments?: ReferenceDocument[];
 }
 
 // ============================================================================
@@ -113,6 +161,8 @@ export class DevinSessionManager {
 			title: params.title,
 			description: params.description,
 			acceptanceCriteria: params.acceptanceCriteria,
+			branch: params.branch,
+			repoUrl: params.repoUrl,
 		});
 
 		const request: CreateSessionRequest = {
@@ -144,6 +194,67 @@ export class DevinSessionManager {
 			branch: params.branch,
 			specPath: params.specPath,
 			tasks: [task],
+			createdAt: Date.now(),
+			updatedAt: Date.now(),
+			devinUrl: response.url,
+			pullRequests: [],
+			apiVersion: client.apiVersion,
+			retryCount: 0,
+		};
+
+		await this.storage.save(session);
+		await this.credentials.markUsed();
+
+		return session;
+	}
+
+	/**
+	 * Start a task group implementation as a single Devin session.
+	 *
+	 * Creates one Devin session for the entire group, with a prompt
+	 * containing all tasks and reference documents (spec, plan, design).
+	 *
+	 * @param params - Task group details and context
+	 * @returns The created local session
+	 */
+	async startTaskGroup(params: StartTaskGroupParams): Promise<DevinSession> {
+		const prompt = mapTaskGroupToDevinPrompt({
+			groupName: params.groupName,
+			tasks: params.tasks,
+			branch: params.branch,
+			repoUrl: params.repoUrl,
+			referenceDocuments: params.referenceDocuments,
+		});
+
+		const taskIds = params.tasks.map((t) => t.taskId);
+		const request: CreateSessionRequest = {
+			prompt,
+			title: `Group: ${params.groupName}`,
+			repos: [{ url: params.repoUrl, branch: params.branch }],
+			tags: ["gatomia", "task-group", ...taskIds.map((id) => `task-${id}`)],
+		};
+
+		const client = await this.resolveApiClient();
+		const response = await client.createSession(request);
+
+		const tasks: DevinTask[] = params.tasks.map((t) => ({
+			taskId: crypto.randomUUID(),
+			specTaskId: t.taskId,
+			title: t.title,
+			description: t.title,
+			priority: t.priority,
+			status: TaskStatus.QUEUED,
+			devinSessionId: response.sessionId,
+			startedAt: Date.now(),
+		}));
+
+		const session: DevinSession = {
+			sessionId: response.sessionId,
+			localId: crypto.randomUUID(),
+			status: SessionStatus.INITIALIZING,
+			branch: params.branch,
+			specPath: params.specPath,
+			tasks,
 			createdAt: Date.now(),
 			updatedAt: Date.now(),
 			devinUrl: response.url,
@@ -229,5 +340,71 @@ export function mapSpecTaskToDevinPrompt(params: PromptParams): string {
 		}
 	}
 
+	appendBranchInstructions(parts, params.branch);
+
 	return parts.join("\n");
+}
+
+/**
+ * Map a task group into a single Devin-compatible prompt.
+ *
+ * Includes all tasks in the group and appends reference documents
+ * (spec, plan, design) as context for Devin to act on.
+ */
+export function mapTaskGroupToDevinPrompt(
+	params: TaskGroupPromptParams
+): string {
+	const parts: string[] = [];
+
+	parts.push(`# Implement: ${params.groupName}`);
+	parts.push("");
+	parts.push(
+		"You must implement ALL of the following tasks as a single cohesive unit."
+	);
+	parts.push(
+		"Do NOT create separate branches or PRs per task. Deliver everything in one PR."
+	);
+
+	parts.push("");
+	parts.push("## Tasks");
+	parts.push("");
+	for (const task of params.tasks) {
+		parts.push(`- **${task.taskId}**: ${task.title}`);
+	}
+
+	if (params.referenceDocuments && params.referenceDocuments.length > 0) {
+		parts.push("");
+		parts.push("## Reference Documents");
+		parts.push("");
+		parts.push(
+			"Use the following project documents as reference for implementation details, architecture decisions, and acceptance criteria."
+		);
+
+		for (const doc of params.referenceDocuments) {
+			parts.push("");
+			parts.push(`### ${doc.type}`);
+			parts.push("");
+			parts.push(doc.content);
+		}
+	}
+
+	appendBranchInstructions(parts, params.branch);
+
+	return parts.join("\n");
+}
+
+function appendBranchInstructions(
+	parts: string[],
+	branch: string | undefined
+): void {
+	if (branch) {
+		parts.push("");
+		parts.push("## Branch Instructions");
+		parts.push(
+			`You MUST create a new branch from \`${branch}\` and open the Pull Request targeting \`${branch}\`.`
+		);
+		parts.push(
+			"Do NOT target any other branch (e.g. main, master, develop, development)."
+		);
+	}
 }

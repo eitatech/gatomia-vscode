@@ -51,6 +51,7 @@ export type DevinStatusDetail =
 	| "working"
 	| "waiting_for_user"
 	| "finished"
+	| "blocked"
 	| (string & {});
 
 // ============================================================================
@@ -65,6 +66,7 @@ export const SessionStatus = {
 	QUEUED: "queued",
 	INITIALIZING: "initializing",
 	RUNNING: "running",
+	BLOCKED: "blocked",
 	COMPLETED: "completed",
 	FAILED: "failed",
 	CANCELLED: "cancelled",
