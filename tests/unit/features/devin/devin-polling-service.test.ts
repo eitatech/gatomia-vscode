@@ -29,7 +29,30 @@ function createMockApiClient(): DevinApiClientInterface {
 function createMockStorage(): DevinSessionStorage {
 	return {
 		getAll: vi.fn().mockReturnValue([]),
-		getByLocalId: vi.fn(),
+		getByLocalId: vi.fn().mockReturnValue({
+			localId: "local-001",
+			sessionId: "devin-sess-001",
+			status: SessionStatus.INITIALIZING,
+			branch: "feature/test",
+			specPath: "/spec.md",
+			tasks: [
+				{
+					taskId: "task-uuid-001",
+					specTaskId: "T001",
+					title: "Create package structure",
+					description: "Set up the project",
+					priority: "high",
+					status: TaskStatus.QUEUED,
+					devinSessionId: "devin-sess-001",
+					startedAt: 1_700_000_000,
+				},
+			],
+			createdAt: 1_700_000_000,
+			updatedAt: 1_700_000_000,
+			pullRequests: [],
+			apiVersion: "v3",
+			retryCount: 0,
+		}),
 		getBySessionId: vi.fn().mockReturnValue({
 			localId: "local-001",
 			sessionId: "devin-sess-001",

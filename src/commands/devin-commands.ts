@@ -460,6 +460,12 @@ async function handleRunSingleTaskWithDevin(
 	const { id: taskId, title: taskTitle } = task;
 	logTaskStart(taskId, "run-with-devin");
 
+	const gitValidation = await validateGitState();
+	if (!gitValidation.isValid) {
+		await showGitValidationError(gitValidation.errors);
+		return;
+	}
+
 	const confirmed = await window.showInformationMessage(
 		`Run with Devin: commit, push, and delegate "${taskId}: ${taskTitle}" to Devin?`,
 		{ modal: true },

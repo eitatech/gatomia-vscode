@@ -34,7 +34,11 @@ export class DevinSessionStorage {
 		}
 
 		try {
-			return JSON.parse(raw) as DevinSession[];
+			const parsed: unknown = JSON.parse(raw);
+			if (!Array.isArray(parsed)) {
+				return [];
+			}
+			return parsed.filter(isValidSession) as DevinSession[];
 		} catch {
 			return [];
 		}
@@ -180,4 +184,30 @@ export class DevinSessionStorage {
 			JSON.stringify(sessions)
 		);
 	}
+}
+
+// ============================================================================
+// Validation
+// ============================================================================
+
+/**
+ * Runtime check that a deserialized value has the minimum required shape of a DevinSession.
+ * Filters out corrupted or schema-incompatible entries after JSON.parse.
+ */
+function isValidSession(value: unknown): boolean {
+	if (typeof value !== "object" || value === null) {
+		return false;
+	}
+	const obj = value as Record<string, unknown>;
+	return (
+		typeof obj.localId === "string" &&
+		typeof obj.sessionId === "string" &&
+		typeof obj.status === "string" &&
+		typeof obj.branch === "string" &&
+		typeof obj.specPath === "string" &&
+		typeof obj.createdAt === "number" &&
+		typeof obj.updatedAt === "number" &&
+		Array.isArray(obj.tasks) &&
+		Array.isArray(obj.pullRequests)
+	);
 }

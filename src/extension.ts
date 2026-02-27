@@ -89,6 +89,8 @@ import { DevinSessionManager } from "./features/devin/devin-session-manager";
 import { DevinSessionStorage } from "./features/devin/devin-session-storage";
 import { DevinPollingService } from "./features/devin/devin-polling-service";
 import { DevinProgressProvider } from "./providers/devin-progress-provider";
+import { DevinProgressPanel } from "./panels/devin-progress-panel";
+import { SessionCleanupService } from "./features/devin/session-cleanup";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -625,6 +627,13 @@ export async function activate(context: ExtensionContext) {
 		});
 		context.subscriptions.push({ dispose: () => devinPollingService.stop() });
 
+		// Start session cleanup service (7-day retention policy)
+		const devinCleanupService = new SessionCleanupService(devinSessionStorage);
+		devinCleanupService.start().catch((err: unknown) => {
+			outputChannel.appendLine(`[Devin] Session cleanup failed: ${err}`);
+		});
+		context.subscriptions.push({ dispose: () => devinCleanupService.stop() });
+
 		// Start polling if there are already active sessions
 		if (devinSessionStorage.getActive().length > 0) {
 			devinPollingService.start();
@@ -644,10 +653,18 @@ export async function activate(context: ExtensionContext) {
 			}
 		);
 
+		const devinProgressPanel = new DevinProgressPanel(
+			context,
+			devinSessionStorage,
+			devinSessionManager,
+			devinPollingService
+		);
+		context.subscriptions.push({ dispose: () => devinProgressPanel.dispose() });
+
 		const devinDisposables = registerDevinCommands(
 			devinSessionManager,
 			devinCredentialsManager,
-			undefined,
+			devinProgressPanel,
 			{
 				onCredentialsConfigured: () => {
 					commands.executeCommand(

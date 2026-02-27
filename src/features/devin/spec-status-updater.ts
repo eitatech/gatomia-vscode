@@ -7,7 +7,8 @@
  * @see specs/001-devin-integration/data-model.md:L108-L119
  */
 
-import { workspace } from "vscode";
+import { Uri, workspace } from "vscode";
+import { isAbsolute, join } from "node:path";
 import type { PullRequest } from "./entities";
 
 // ============================================================================
@@ -38,9 +39,10 @@ export async function updateSpecTaskStatusOnMerge(
 	}
 
 	try {
-		const fileUri = workspace.workspaceFolders![0].uri.with({
-			path: `${workspaceRoot}/${specPath}`,
-		});
+		const resolvedPath = isAbsolute(specPath)
+			? specPath
+			: join(workspaceRoot, specPath);
+		const fileUri = Uri.file(resolvedPath);
 
 		const fileContent = await workspace.fs.readFile(fileUri);
 		const content = new TextDecoder().decode(fileContent);

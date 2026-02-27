@@ -106,10 +106,15 @@ export const RETRY_MAX_DELAY_MS = 30_000;
 export const STORAGE_KEY_SESSIONS = "gatomia.devin.sessions";
 
 /**
- * VS Code SecretStorage key for Devin credentials
+ * VS Code SecretStorage key for Devin credentials metadata
  * @see specs/001-devin-integration/contracts/extension-api.ts:L257
  */
 export const STORAGE_KEY_CREDENTIALS = "gatomia.devin.credentials";
+
+/**
+ * VS Code SecretStorage key for Devin API key (stored separately from metadata)
+ */
+export const STORAGE_KEY_API_KEY = "gatomia.devin.apiKey";
 
 /**
  * VS Code workspace state key for Devin configuration

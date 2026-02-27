@@ -100,7 +100,7 @@ export function extractIncompleteTasks(content: string): string[] {
 // Private Helpers
 // ============================================================================
 
-const INCOMPLETE_TASK_PATTERN = /^\s*-\s*\[ \]\s*(T\d+)\b/;
+const INCOMPLETE_TASK_PATTERN = /^\s*-\s*\[ \]\s*([Tt]\d+)\b/;
 const TASK_LINE_PATTERN = /^\s*-\s*\[[ xX]\]/;
 const HEADING_PATTERN = /^#{1,6}\s/;
 const BULLET_PATTERN = /^\s*[-*]\s+(.+)/;

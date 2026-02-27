@@ -61,6 +61,7 @@ export class DevinError extends Error {
 		context?: Record<string, unknown>
 	) {
 		super(message);
+		Object.setPrototypeOf(this, new.target.prototype);
 		this.name = "DevinError";
 		this.code = code;
 		this.context = context;

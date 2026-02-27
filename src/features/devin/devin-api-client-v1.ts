@@ -152,10 +152,9 @@ export class DevinApiClientV1 implements DevinApiClientInterface {
 		}
 
 		if (response.status === 429) {
-			const retryAfter = response.headers.get("Retry-After");
-			const retryAfterMs = retryAfter
-				? Number.parseInt(retryAfter, 10) * 1000
-				: undefined;
+			const retryAfterMs = parseRetryAfterMs(
+				response.headers.get("Retry-After")
+			);
 			throw new DevinRateLimitedError(retryAfterMs, { url });
 		}
 
@@ -236,6 +235,27 @@ function mapV1CreateSessionResponse(
 		updatedAt: parseTimestamp(raw.updated_at),
 		pullRequests,
 	};
+}
+
+/**
+ * Parse the HTTP Retry-After header value into milliseconds.
+ * Handles both numeric seconds and HTTP-date formats.
+ *
+ * @returns Milliseconds to wait, or undefined if the header is absent or unparseable
+ */
+function parseRetryAfterMs(value: string | null): number | undefined {
+	if (!value) {
+		return;
+	}
+	const seconds = Number.parseInt(value, 10);
+	if (!Number.isNaN(seconds)) {
+		return seconds * 1000;
+	}
+	const date = Date.parse(value);
+	if (!Number.isNaN(date)) {
+		return Math.max(0, date - Date.now());
+	}
+	return;
 }
 
 function mapV1GetSessionResponse(

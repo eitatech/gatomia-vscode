@@ -10,11 +10,23 @@
  */
 
 import type * as vscode from "vscode";
-import { STORAGE_KEY_CREDENTIALS } from "./config";
+import { STORAGE_KEY_CREDENTIALS, STORAGE_KEY_API_KEY } from "./config";
 import { detectApiVersion } from "./api-version-detector";
 import type { DevinCredentials } from "./entities";
 import { DevinCredentialsNotFoundError } from "./errors";
 import { ApiVersion } from "./types";
+
+/**
+ * Credentials metadata stored separately from the raw API key.
+ * This JSON blob never contains the API key itself.
+ */
+interface CredentialsMetadata {
+	readonly apiVersion: ApiVersion;
+	readonly orgId?: string;
+	readonly createdAt: number;
+	readonly lastUsedAt?: number;
+	readonly isValid: boolean;
+}
 
 /**
  * Manages Devin API credentials with secure storage.
@@ -44,20 +56,20 @@ export class DevinCredentialsManager {
 			throw new DevinOrgIdRequiredError();
 		}
 
-		const credentials: DevinCredentials = {
-			apiKey,
+		const metadata: CredentialsMetadata = {
 			apiVersion,
 			orgId: orgId?.trim(),
 			createdAt: Date.now(),
 			isValid: true,
 		};
 
+		await this.secretStorage.store(STORAGE_KEY_API_KEY, apiKey);
 		await this.secretStorage.store(
 			STORAGE_KEY_CREDENTIALS,
-			JSON.stringify(credentials)
+			JSON.stringify(metadata)
 		);
 
-		return credentials;
+		return { apiKey, ...metadata };
 	}
 
 	/**
@@ -66,13 +78,28 @@ export class DevinCredentialsManager {
 	 * @returns The stored credentials, or undefined if none exist
 	 */
 	async get(): Promise<DevinCredentials | undefined> {
-		const raw = await this.secretStorage.get(STORAGE_KEY_CREDENTIALS);
-		if (!raw) {
+		const [raw, apiKey] = await Promise.all([
+			this.secretStorage.get(STORAGE_KEY_CREDENTIALS),
+			this.secretStorage.get(STORAGE_KEY_API_KEY),
+		]);
+		if (!(raw && apiKey)) {
+			// Backward-compat: try legacy format where apiKey was inside the JSON
+			if (raw) {
+				try {
+					const legacy = JSON.parse(raw) as Record<string, unknown>;
+					if (typeof legacy.apiKey === "string") {
+						return legacy as unknown as DevinCredentials;
+					}
+				} catch {
+					// corrupted
+				}
+			}
 			return;
 		}
 
 		try {
-			return JSON.parse(raw) as DevinCredentials;
+			const metadata = JSON.parse(raw) as CredentialsMetadata;
+			return { apiKey, ...metadata };
 		} catch {
 			return;
 		}
@@ -96,7 +123,10 @@ export class DevinCredentialsManager {
 	 * Delete stored credentials.
 	 */
 	async delete(): Promise<void> {
-		await this.secretStorage.delete(STORAGE_KEY_CREDENTIALS);
+		await Promise.all([
+			this.secretStorage.delete(STORAGE_KEY_CREDENTIALS),
+			this.secretStorage.delete(STORAGE_KEY_API_KEY),
+		]);
 	}
 
 	/**
@@ -111,39 +141,47 @@ export class DevinCredentialsManager {
 	 * Update the lastUsedAt timestamp for stored credentials.
 	 */
 	async markUsed(): Promise<void> {
-		const credentials = await this.get();
-		if (!credentials) {
+		const raw = await this.secretStorage.get(STORAGE_KEY_CREDENTIALS);
+		if (!raw) {
 			return;
 		}
 
-		const updated: DevinCredentials = {
-			...credentials,
-			lastUsedAt: Date.now(),
-		};
-
-		await this.secretStorage.store(
-			STORAGE_KEY_CREDENTIALS,
-			JSON.stringify(updated)
-		);
+		try {
+			const metadata = JSON.parse(raw) as CredentialsMetadata;
+			const updated: CredentialsMetadata = {
+				...metadata,
+				lastUsedAt: Date.now(),
+			};
+			await this.secretStorage.store(
+				STORAGE_KEY_CREDENTIALS,
+				JSON.stringify(updated)
+			);
+		} catch {
+			// corrupted metadata; skip
+		}
 	}
 
 	/**
 	 * Mark credentials as invalid (e.g., after authentication failure).
 	 */
 	async markInvalid(): Promise<void> {
-		const credentials = await this.get();
-		if (!credentials) {
+		const raw = await this.secretStorage.get(STORAGE_KEY_CREDENTIALS);
+		if (!raw) {
 			return;
 		}
 
-		const updated: DevinCredentials = {
-			...credentials,
-			isValid: false,
-		};
-
-		await this.secretStorage.store(
-			STORAGE_KEY_CREDENTIALS,
-			JSON.stringify(updated)
-		);
+		try {
+			const metadata = JSON.parse(raw) as CredentialsMetadata;
+			const updated: CredentialsMetadata = {
+				...metadata,
+				isValid: false,
+			};
+			await this.secretStorage.store(
+				STORAGE_KEY_CREDENTIALS,
+				JSON.stringify(updated)
+			);
+		} catch {
+			// corrupted metadata; skip
+		}
 	}
 }

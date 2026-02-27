@@ -283,13 +283,13 @@ export class DevinSessionManager {
 	async cancelSession(localId: string): Promise<DevinSession> {
 		const session = this.storage.getByLocalId(localId);
 
-		const terminalStates: string[] = [
+		const terminalSessionStates: string[] = [
 			SessionStatus.COMPLETED,
 			SessionStatus.FAILED,
 			SessionStatus.CANCELLED,
 		];
 
-		if (terminalStates.includes(session.status)) {
+		if (terminalSessionStates.includes(session.status)) {
 			throw new DevinInvalidSessionStateError(localId, session.status, [
 				SessionStatus.QUEUED,
 				SessionStatus.INITIALIZING,
@@ -297,12 +297,18 @@ export class DevinSessionManager {
 			]);
 		}
 
+		const terminalTaskStates: string[] = [
+			TaskStatus.COMPLETED,
+			TaskStatus.FAILED,
+			TaskStatus.CANCELLED,
+		];
+
 		const cancelledTasks = session.tasks.map((t) => ({
 			...t,
-			status: terminalStates.includes(t.status)
+			status: terminalTaskStates.includes(t.status)
 				? t.status
 				: TaskStatus.CANCELLED,
-			completedAt: terminalStates.includes(t.status)
+			completedAt: terminalTaskStates.includes(t.status)
 				? t.completedAt
 				: Date.now(),
 		}));

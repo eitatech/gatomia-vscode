@@ -135,8 +135,9 @@ export class DevinPollingService {
 			return;
 		}
 		this.timerId = setInterval(() => {
-			this.pollOnce().catch(() => {
-				// Swallow polling errors silently
+			this.pollOnce().catch((error: unknown) => {
+				const msg = error instanceof Error ? error.message : String(error);
+				this.log(`[Polling] Unhandled poll error: ${msg}`);
 			});
 		}, this.intervalMs);
 	}
@@ -258,15 +259,18 @@ export class DevinPollingService {
 				}));
 			}
 
-			const session = this.storage.getBySessionId(sessionId);
-			if (session) {
-				updates.tasks = syncTaskStatuses(session.tasks, newStatus);
+			// Re-read session by localId right before update to minimize stale-read window
+			try {
+				const freshSession = this.storage.getByLocalId(localId);
+				updates.tasks = syncTaskStatuses(freshSession.tasks, newStatus);
 
-				if (!session.devinUrl) {
+				if (!freshSession.devinUrl) {
 					const url =
 						response.url || `https://app.devin.ai/sessions/${sessionId}`;
 					updates.devinUrl = url;
 				}
+			} catch {
+				// Session may have been deleted concurrently; skip task sync
 			}
 
 			await this.storage.update(localId, updates);
@@ -313,13 +317,19 @@ export class DevinPollingService {
 // Task Status Sync
 // ============================================================================
 
-const SESSION_TO_TASK_STATUS: Record<string, string> = {
+const SESSION_TO_TASK_STATUS: Partial<Record<SessionStatus, TaskStatus>> = {
 	[SessionStatusEnum.RUNNING]: TaskStatus.IN_PROGRESS,
 	[SessionStatusEnum.COMPLETED]: TaskStatus.COMPLETED,
 	[SessionStatusEnum.FAILED]: TaskStatus.FAILED,
 	[SessionStatusEnum.CANCELLED]: TaskStatus.CANCELLED,
 	[SessionStatusEnum.BLOCKED]: TaskStatus.IN_PROGRESS,
 };
+
+const TERMINAL_TASK_STATUSES: readonly TaskStatus[] = [
+	TaskStatus.COMPLETED,
+	TaskStatus.FAILED,
+	TaskStatus.CANCELLED,
+];
 
 function syncTaskStatuses(
 	tasks: readonly DevinTask[],
@@ -331,21 +341,16 @@ function syncTaskStatuses(
 	}
 
 	const now = Date.now();
-	const terminalTaskStatuses = [
-		TaskStatus.COMPLETED,
-		TaskStatus.FAILED,
-		TaskStatus.CANCELLED,
-	];
 
-	return tasks.map((task) => {
-		if (terminalTaskStatuses.includes(task.status)) {
+	return tasks.map((task): DevinTask => {
+		if (TERMINAL_TASK_STATUSES.includes(task.status)) {
 			return task;
 		}
-		const isTerminal = terminalTaskStatuses.includes(targetTaskStatus);
+		const isTerminal = TERMINAL_TASK_STATUSES.includes(targetTaskStatus);
 		return {
 			...task,
 			status: targetTaskStatus,
 			...(isTerminal ? { completedAt: now } : {}),
-		} as DevinTask;
+		};
 	});
 }
