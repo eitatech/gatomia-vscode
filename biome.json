@@ -30,7 +30,13 @@
       "!**/coverage/**/*",
       "!**/coverage-*/**/*",
       "!**/docs/**/*",
-      "!**/examples/**/*"
+      "!**/examples/**/*",
+      "!.specify/**/*",
+      "!.specify/extensions/**/*",
+      "!.specify/scripts/**/*",
+      "!.specify/templates/**/*",
+      "!.specify/workflows/**/*",
+      "!.specify/agents/**/*"
     ],
     "ignoreUnknown": false
   },

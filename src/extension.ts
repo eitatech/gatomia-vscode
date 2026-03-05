@@ -601,11 +601,28 @@ export async function activate(context: ExtensionContext) {
 		devinPollingService.onStatusChange(async (event) => {
 			if (event.status === "completed") {
 				const session = devinSessionStorage.getBySessionId(event.sessionId);
-				if (session && session.pullRequests.length > 0) {
-					const { handlePrNotification } = await import(
-						"./features/devin/pr-notification-handler"
-					);
-					await handlePrNotification(session);
+				if (session) {
+					// Sync completed tasks back to spec tasks.md
+					try {
+						const { updateSpecTasksOnSessionComplete } = await import(
+							"./features/devin/spec-status-updater"
+						);
+						await updateSpecTasksOnSessionComplete(session);
+						outputChannel.appendLine(
+							`[Devin] Synced task status for session ${event.sessionId}`
+						);
+					} catch (err: unknown) {
+						outputChannel.appendLine(
+							`[Devin] Failed to sync task status: ${err}`
+						);
+					}
+
+					if (session.pullRequests.length > 0) {
+						const { handlePrNotification } = await import(
+							"./features/devin/pr-notification-handler"
+						);
+						await handlePrNotification(session);
+					}
 				}
 			}
 		});

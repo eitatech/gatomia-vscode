@@ -1,26 +1,74 @@
 /**
  * Spec Status Updater
  *
- * Updates task status in spec/tasks.md files when a Devin PR is merged.
- * Marks the corresponding task as completed in the markdown checkbox format.
+ * Updates task status in spec/tasks.md files when Devin sessions complete
+ * or when a Devin PR is merged. Marks the corresponding tasks as completed
+ * in the markdown checkbox format.
  *
  * @see specs/001-devin-integration/data-model.md:L108-L119
  */
 
 import { Uri, workspace } from "vscode";
-import { isAbsolute, join } from "node:path";
-import type { PullRequest } from "./entities";
+import { dirname, isAbsolute, join } from "node:path";
+import type { DevinSession, PullRequest } from "./entities";
+import { TaskStatus } from "./types";
 
 // ============================================================================
-// Spec Task Status Update
+// Session Completion Sync
+// ============================================================================
+
+/**
+ * Update spec tasks.md when a Devin session completes.
+ *
+ * Reads the tasks file referenced by the session's specPath, finds each
+ * completed task by its specTaskId, and marks it as [x] in one write.
+ *
+ * @param session - The completed Devin session
+ */
+export async function updateSpecTasksOnSessionComplete(
+	session: DevinSession
+): Promise<void> {
+	const completedTaskIds = session.tasks
+		.filter((t) => t.status === TaskStatus.COMPLETED)
+		.map((t) => t.specTaskId);
+
+	if (completedTaskIds.length === 0) {
+		return;
+	}
+
+	const tasksPath = resolveTasksFilePath(session.specPath);
+	if (!tasksPath) {
+		return;
+	}
+
+	try {
+		const fileUri = Uri.file(tasksPath);
+		const fileContent = await workspace.fs.readFile(fileUri);
+		let content = new TextDecoder().decode(fileContent);
+
+		for (const taskId of completedTaskIds) {
+			content = markTaskAsCompleted(content, taskId);
+		}
+
+		const original = new TextDecoder().decode(fileContent);
+		if (content === original) {
+			return;
+		}
+
+		await workspace.fs.writeFile(fileUri, new TextEncoder().encode(content));
+	} catch {
+		// File may not exist or be unreadable; silently skip
+	}
+}
+
+// ============================================================================
+// PR Merge Sync
 // ============================================================================
 
 /**
  * Update a spec task's checkbox status to completed when its PR is merged.
  *
- * Reads the tasks file, finds the task line by ID, and marks it as [x].
- *
- * @param specPath - Relative path to the tasks file in the workspace
+ * @param specPath - Path to the spec/tasks file in the workspace
  * @param specTaskId - The spec task ID (e.g., "T001")
  * @param pullRequest - The merged pull request
  */
@@ -81,4 +129,33 @@ export function markTaskAsCompleted(
 	const pattern = new RegExp(`^(- \\[)( )(\\] ${escapedId}\\b)`, "m");
 
 	return content.replace(pattern, "$1x$3");
+}
+
+// ============================================================================
+// Path Resolution
+// ============================================================================
+
+/**
+ * Resolve a spec path to an absolute tasks.md file path.
+ *
+ * If the specPath already points to a tasks.md file, use it directly.
+ * Otherwise, look for tasks.md in the same directory.
+ */
+function resolveTasksFilePath(specPath: string): string | undefined {
+	const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
+	if (!workspaceRoot) {
+		return;
+	}
+
+	const absolute = isAbsolute(specPath)
+		? specPath
+		: join(workspaceRoot, specPath);
+
+	if (absolute.endsWith("tasks.md")) {
+		return absolute;
+	}
+
+	// specPath may point to spec.md or the spec directory; look for tasks.md sibling
+	const dir = absolute.endsWith(".md") ? dirname(absolute) : absolute;
+	return join(dir, "tasks.md");
 }
