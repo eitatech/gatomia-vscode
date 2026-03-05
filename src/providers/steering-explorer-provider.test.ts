@@ -173,6 +173,35 @@ describe("SteeringExplorerProvider - instruction rules", () => {
 		expect(ruleItems.map((c) => c.label)).toEqual(["Typescript"]);
 	});
 
+	it("shows SpecKit Constitution under Rules when .specify/memory/constitution.md exists", async () => {
+		const specKitConstitutionPath =
+			"/fake/workspace/.specify/memory/constitution.md";
+
+		vi.mocked(workspace.fs.stat).mockImplementation((uri) => {
+			if (uri.fsPath === specKitConstitutionPath) {
+				return Promise.resolve({ type: FileType.File, size: 100 } as any);
+			}
+			return Promise.reject(new Error("not found"));
+		});
+
+		const rootItems = await provider.getChildren();
+		const projectGroup = rootItems.find(
+			(item) => item.contextValue === "group-project"
+		);
+		expect(projectGroup).toBeTruthy();
+
+		const children = await provider.getChildren(projectGroup as any);
+		const constitutionItem = children.find(
+			(c) => c.label === "SpecKit Constitution"
+		);
+		expect(constitutionItem).toBeTruthy();
+		expect(constitutionItem?.contextValue).toBe("constitution-file");
+		expect(constitutionItem?.command?.command).toBe("vscode.open");
+		expect((constitutionItem?.command?.arguments as any[])?.[0]?.fsPath).toBe(
+			specKitConstitutionPath
+		);
+	});
+
 	it("instruction rule items open the underlying file", async () => {
 		const projectRulesRoot = "/fake/workspace/.github/instructions";
 		vi.mocked(workspace.fs.readDirectory).mockImplementation((uri) => {

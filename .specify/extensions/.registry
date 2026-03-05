@@ -1,0 +1,158 @@
+{
+  "schema_version": "1.0",
+  "extensions": {
+    "v-model": {
+      "version": "0.4.0",
+      "source": "local",
+      "manifest_hash": "sha256:e5ccf200a7438e52c408fe6ec02606627de2311089f932dcd17b3760c46d29ea",
+      "enabled": true,
+      "registered_commands": {
+        "claude": [
+          "speckit.v-model.requirements",
+          "speckit.v-model.acceptance",
+          "speckit.v-model.system-design",
+          "speckit.v-model.system-test",
+          "speckit.v-model.architecture-design",
+          "speckit.v-model.integration-test",
+          "speckit.v-model.module-design",
+          "speckit.v-model.unit-test",
+          "speckit.v-model.trace"
+        ],
+        "gemini": [
+          "speckit.v-model.requirements",
+          "speckit.v-model.acceptance",
+          "speckit.v-model.system-design",
+          "speckit.v-model.system-test",
+          "speckit.v-model.architecture-design",
+          "speckit.v-model.integration-test",
+          "speckit.v-model.module-design",
+          "speckit.v-model.unit-test",
+          "speckit.v-model.trace"
+        ],
+        "copilot": [
+          "speckit.v-model.requirements",
+          "speckit.v-model.acceptance",
+          "speckit.v-model.system-design",
+          "speckit.v-model.system-test",
+          "speckit.v-model.architecture-design",
+          "speckit.v-model.integration-test",
+          "speckit.v-model.module-design",
+          "speckit.v-model.unit-test",
+          "speckit.v-model.trace"
+        ],
+        "opencode": [
+          "speckit.v-model.requirements",
+          "speckit.v-model.acceptance",
+          "speckit.v-model.system-design",
+          "speckit.v-model.system-test",
+          "speckit.v-model.architecture-design",
+          "speckit.v-model.integration-test",
+          "speckit.v-model.module-design",
+          "speckit.v-model.unit-test",
+          "speckit.v-model.trace"
+        ],
+        "windsurf": [
+          "speckit.v-model.requirements",
+          "speckit.v-model.acceptance",
+          "speckit.v-model.system-design",
+          "speckit.v-model.system-test",
+          "speckit.v-model.architecture-design",
+          "speckit.v-model.integration-test",
+          "speckit.v-model.module-design",
+          "speckit.v-model.unit-test",
+          "speckit.v-model.trace"
+        ],
+        "qodercli": [
+          "speckit.v-model.requirements",
+          "speckit.v-model.acceptance",
+          "speckit.v-model.system-design",
+          "speckit.v-model.system-test",
+          "speckit.v-model.architecture-design",
+          "speckit.v-model.integration-test",
+          "speckit.v-model.module-design",
+          "speckit.v-model.unit-test",
+          "speckit.v-model.trace"
+        ],
+        "q": [
+          "speckit.v-model.requirements",
+          "speckit.v-model.acceptance",
+          "speckit.v-model.system-design",
+          "speckit.v-model.system-test",
+          "speckit.v-model.architecture-design",
+          "speckit.v-model.integration-test",
+          "speckit.v-model.module-design",
+          "speckit.v-model.unit-test",
+          "speckit.v-model.trace"
+        ]
+      },
+      "installed_at": "2026-02-27T14:46:47.763846+00:00"
+    },
+    "cleanup": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:b15a5e3b4e5b43f867c093d962492f502b01503d0ec174611d0797854b017578",
+      "enabled": true,
+      "registered_commands": {
+        "claude": [
+          "speckit.cleanup.run",
+          "speckit.cleanup"
+        ],
+        "gemini": [
+          "speckit.cleanup.run",
+          "speckit.cleanup"
+        ],
+        "copilot": [
+          "speckit.cleanup.run",
+          "speckit.cleanup"
+        ],
+        "opencode": [
+          "speckit.cleanup.run",
+          "speckit.cleanup"
+        ],
+        "windsurf": [
+          "speckit.cleanup.run",
+          "speckit.cleanup"
+        ],
+        "qodercli": [
+          "speckit.cleanup.run",
+          "speckit.cleanup"
+        ],
+        "q": [
+          "speckit.cleanup.run",
+          "speckit.cleanup"
+        ]
+      },
+      "installed_at": "2026-02-27T14:47:27.704471+00:00"
+    },
+    "retrospective": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:43dbaba249c6e7322de1130446632197bbcb21c3c9f08fbe16654e86f6d5d922",
+      "enabled": true,
+      "registered_commands": {
+        "claude": [
+          "speckit.retrospective.analyze"
+        ],
+        "gemini": [
+          "speckit.retrospective.analyze"
+        ],
+        "copilot": [
+          "speckit.retrospective.analyze"
+        ],
+        "opencode": [
+          "speckit.retrospective.analyze"
+        ],
+        "windsurf": [
+          "speckit.retrospective.analyze"
+        ],
+        "qodercli": [
+          "speckit.retrospective.analyze"
+        ],
+        "q": [
+          "speckit.retrospective.analyze"
+        ]
+      },
+      "installed_at": "2026-02-27T14:48:14.251563+00:00"
+    }
+  }
+}

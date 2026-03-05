@@ -93,6 +93,9 @@ class ActionItem extends TreeItem {
 		if (contextValue === "action-template") {
 			return new ThemeIcon("file-code");
 		}
+		if (contextValue === "action-constitution") {
+			return new ThemeIcon("law");
+		}
 		if (contextValue === "action-file") {
 			return new ThemeIcon("file");
 		}
@@ -285,8 +288,8 @@ export class ActionsExplorerProvider implements TreeDataProvider<ActionItem> {
 					isAgent: true,
 					isSpecKit: true,
 				});
-			case "speckit-instructions":
-				return await this.getFiles({
+			case "speckit-instructions": {
+				const ghItems = await this.getFiles({
 					root: joinPath(wsUri, ".github", "instructions"),
 					patterns: ["*.instructions.md"],
 					contextValue: "action-runnable",
@@ -294,6 +297,11 @@ export class ActionsExplorerProvider implements TreeDataProvider<ActionItem> {
 					isAgent: false,
 					isSpecKit: true,
 				});
+				const memoryItems = await this.getMemoryFiles(
+					joinPath(wsUri, ".specify", "memory")
+				);
+				return [...memoryItems, ...ghItems];
+			}
 			case "speckit-scripts":
 				return await this.getScripts(wsUri, true);
 			case "speckit-templates":
@@ -432,6 +440,40 @@ export class ActionsExplorerProvider implements TreeDataProvider<ActionItem> {
 			/* ignore */
 		}
 		return files;
+	}
+
+	private async getMemoryFiles(root: Uri): Promise<ActionItem[]> {
+		const items: ActionItem[] = [];
+		try {
+			const entries = await workspace.fs.readDirectory(root);
+			for (const [name, type] of entries) {
+				if (type === FileType.File && name.endsWith(".md")) {
+					const fileUri = joinPath(root, name);
+					const displayName = await this.readDisplayName(fileUri, name);
+					const isConstitution = name === "constitution.md";
+					items.push(
+						new ActionItem(
+							displayName,
+							TreeItemCollapsibleState.None,
+							isConstitution ? "action-constitution" : "action-file",
+							{
+								resourceUri: fileUri,
+								command: {
+									command: "vscode.open",
+									title: "Open File",
+									arguments: [fileUri],
+								},
+								category: "instructions",
+								description: name,
+							}
+						)
+					);
+				}
+			}
+		} catch {
+			/* directory does not exist */
+		}
+		return items;
 	}
 
 	private async getSkills(root: Uri): Promise<ActionItem[]> {

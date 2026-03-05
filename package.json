@@ -145,6 +145,25 @@
           "description": "The language GitHub Copilot should use for responses.",
           "order": 3
         },
+        "gatomia.devin.pollingInterval": {
+          "type": "number",
+          "default": 5,
+          "minimum": 3,
+          "maximum": 60,
+          "description": "Polling interval in seconds for Devin session status updates."
+        },
+        "gatomia.devin.maxRetries": {
+          "type": "number",
+          "default": 3,
+          "minimum": 0,
+          "maximum": 10,
+          "description": "Maximum number of retry attempts for failed Devin API calls."
+        },
+        "gatomia.devin.verboseLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable verbose logging for Devin integration in the output channel."
+        },
         "gatomia.customInstructions.global": {
           "type": "string",
           "default": "",
@@ -265,6 +284,12 @@
           "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.wiki.visible"
         },
         {
+          "id": "gatomia.views.devinProgress",
+          "name": "Devin Progress",
+          "icon": "sync",
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0)"
+        },
+        {
           "id": "gatomia.views.overview",
           "name": "Quick Access",
           "icon": "zap",
@@ -292,6 +317,11 @@
       {
         "view": "gatomia.views.wikiExplorer",
         "contents": "Browse and manage documentation from the docs/ directory.\n\n[$(refresh) Refresh](command:gatomia.wiki.refresh)"
+      },
+      {
+        "view": "gatomia.views.devinProgress",
+        "contents": "Delegate spec tasks to Devin for remote implementation.\n\n[$(gear) Configure Credentials](command:gatomia.devin.configureCredentials)",
+        "when": "!gatomia.devin.hasCredentials"
       }
     ],
     "commands": [
@@ -329,6 +359,15 @@
         "title": "Run Task",
         "category": "GatomIA",
         "icon": "$(play)"
+      },
+      {
+        "command": "gatomia.devin.runWithDevin",
+        "title": "Run with Devin",
+        "category": "GatomIA",
+        "icon": {
+          "light": "assets/icons/devin-light.svg",
+          "dark": "assets/icons/devin-dark.svg"
+        }
       },
       {
         "command": "gatomia.spec.runTaskGroup",
@@ -650,6 +689,36 @@
         "command": "gatomia.migration.createBackup",
         "title": "Create OpenSpec Backup",
         "category": "GatomIA"
+      },
+      {
+        "command": "gatomia.devin.startTask",
+        "title": "Implement with Devin",
+        "category": "GatomIA",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "gatomia.devin.startAllTasks",
+        "title": "Implement All with Devin",
+        "category": "GatomIA",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "gatomia.devin.openProgress",
+        "title": "Open Devin Progress",
+        "category": "GatomIA",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "gatomia.devin.cancelSession",
+        "title": "Cancel Devin Session",
+        "category": "GatomIA",
+        "icon": "$(circle-slash)"
+      },
+      {
+        "command": "gatomia.devin.configureCredentials",
+        "title": "Configure Devin Credentials",
+        "category": "GatomIA",
+        "icon": "$(key)"
       }
     ],
     "menus": {
@@ -764,12 +833,22 @@
         {
           "command": "gatomia.spec.runTask",
           "when": "view == gatomia.views.specExplorer && viewItem == task-item",
-          "group": "inline"
+          "group": "inline@1"
+        },
+        {
+          "command": "gatomia.devin.runWithDevin",
+          "when": "view == gatomia.views.specExplorer && viewItem == task-item",
+          "group": "inline@2"
         },
         {
           "command": "gatomia.spec.runTaskGroup",
           "when": "view == gatomia.views.specExplorer && viewItem == task-group",
-          "group": "inline"
+          "group": "inline@1"
+        },
+        {
+          "command": "gatomia.devin.runWithDevin",
+          "when": "view == gatomia.views.specExplorer && viewItem == task-group",
+          "group": "inline@2"
         },
         {
           "command": "gatomia.spec.sendToReview",
@@ -810,6 +889,11 @@
           "command": "gatomia.actions.delete",
           "when": "view == gatomia.views.actionsExplorer && (viewItem == prompt || viewItem == prompt-runnable)",
           "group": "7_modification@2"
+        },
+        {
+          "command": "gatomia.devin.cancelSession",
+          "when": "view == gatomia.views.devinProgress && (viewItem == devinSession.queued || viewItem == devinSession.initializing || viewItem == devinSession.running)",
+          "group": "inline@1"
         },
         {
           "command": "gatomia.hooks.disable",

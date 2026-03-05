@@ -3,7 +3,7 @@ description: "Guidelines for writing Node.js and JavaScript code with Vitest tes
 applyTo: '**/*.js, **/*.mjs, **/*.cjs'
 ---
 
-# Code Generation Guidelines
+# Node.js and JavaScript code with Vitest testing code Generation Guidelines
 
 ## Coding standards
 - Use JavaScript with ES2022 features and Node.js (20+) ESM modules
