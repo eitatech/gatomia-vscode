@@ -99,7 +99,10 @@ import { registerCloudAgentCommands } from "./commands/cloud-agent-commands";
 import { AgentSessionStorage } from "./features/cloud-agents/agent-session-storage";
 import { AgentPollingService } from "./features/cloud-agents/agent-polling-service";
 import { SessionCleanupService as CloudSessionCleanupService } from "./features/cloud-agents/session-cleanup-service";
-import { logInfo as cloudAgentLogInfo } from "./features/cloud-agents/logging";
+import {
+	logInfo as cloudAgentLogInfo,
+	disposeCloudAgentsOutputChannel,
+} from "./features/cloud-agents/logging";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -687,6 +690,7 @@ export async function activate(context: ExtensionContext) {
 			context.secrets
 		);
 		await migrationService.migrateIfNeeded();
+		await migrationService.detectOrphanedConfig(cloudRegistry);
 		await cloudRegistry.restoreActive();
 
 		const cloudSessionStorage = new AgentSessionStorage(context.workspaceState);
@@ -698,7 +702,9 @@ export async function activate(context: ExtensionContext) {
 		const cloudTreeView = window.createTreeView("gatomia.views.cloudAgents", {
 			treeDataProvider: cloudProgressProvider,
 		});
-		context.subscriptions.push(cloudTreeView);
+		context.subscriptions.push(cloudTreeView, {
+			dispose: () => cloudProgressProvider.dispose(),
+		});
 		await cloudProgressProvider.updateContextKeys();
 
 		const cloudPollingService = new AgentPollingService(
@@ -733,6 +739,7 @@ export async function activate(context: ExtensionContext) {
 	} catch (error) {
 		outputChannel.appendLine(`[CloudAgents] Failed to bootstrap: ${error}`);
 	}
+	context.subscriptions.push({ dispose: disposeCloudAgentsOutputChannel });
 
 	// Set up file watchers
 	setupFileWatchers(context, specExplorer, steeringExplorer, actionsExplorer);

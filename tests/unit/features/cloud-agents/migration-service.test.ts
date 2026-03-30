@@ -73,7 +73,7 @@ describe("MigrationService", () => {
 
 	it("should detect existing Devin credentials and set Devin as active", async () => {
 		const secrets = createMockSecretStorage({
-			"gatomia.devin.apiToken": "apk_test123",
+			"gatomia.devin.apiKey": "apk_test123",
 		});
 		const memento = createMockMemento();
 		const migration = new MigrationService(configStore, memento, secrets);
@@ -107,7 +107,7 @@ describe("MigrationService", () => {
 			configStore.getActiveProvider as ReturnType<typeof vi.fn>
 		).mockResolvedValue("github-copilot");
 		const secrets = createMockSecretStorage({
-			"gatomia.devin.apiToken": "apk_test123",
+			"gatomia.devin.apiKey": "apk_test123",
 		});
 		const memento = createMockMemento();
 		const migration = new MigrationService(configStore, memento, secrets);

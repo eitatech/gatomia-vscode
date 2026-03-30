@@ -9,6 +9,9 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DevinAdapter } from "../../../../../src/features/cloud-agents/adapters/devin-adapter";
+import type { DevinApiClientInterface } from "../../../../../src/features/devin/devin-api-client";
+
+const CREDENTIALS_NOT_CONFIGURED_PATTERN = /credentials not configured/i;
 
 // ============================================================================
 // Helpers
@@ -28,6 +31,56 @@ function createMockSecretStorage(data: Record<string, string> = {}) {
 		}),
 		onDidChange: vi.fn(),
 	};
+}
+
+function createMockApiClient(
+	overrides: Partial<DevinApiClientInterface> = {}
+): DevinApiClientInterface {
+	return {
+		apiVersion: "v1" as const,
+		createSession: vi.fn().mockResolvedValue({
+			sessionId: "devin-session-123",
+			url: "https://app.devin.ai/sessions/devin-session-123",
+			status: "new",
+			acusConsumed: 0,
+			createdAt: Date.now(),
+			updatedAt: Date.now(),
+			pullRequests: [],
+		}),
+		getSession: vi.fn().mockResolvedValue({
+			sessionId: "devin-session-123",
+			url: "https://app.devin.ai/sessions/devin-session-123",
+			status: "running",
+			tags: [],
+			createdAt: Date.now(),
+			updatedAt: Date.now(),
+			acusConsumed: 0,
+			pullRequests: [],
+			isArchived: false,
+		}),
+		listSessions: vi.fn().mockResolvedValue({
+			sessions: [],
+			pageInfo: { hasNextPage: false },
+		}),
+		validateCredentials: vi.fn().mockResolvedValue(true),
+		...overrides,
+	};
+}
+
+/**
+ * Creates a mock secret storage pre-populated with valid DevinCredentialsManager data.
+ * DevinCredentialsManager stores: apiKey under "gatomia.devin.apiKey" and
+ * metadata JSON under "gatomia.devin.credentials".
+ */
+function createSeededSecretStorage() {
+	return createMockSecretStorage({
+		"gatomia.devin.apiKey": "apk_test123",
+		"gatomia.devin.credentials": JSON.stringify({
+			apiVersion: "v1",
+			createdAt: Date.now(),
+			isValid: true,
+		}),
+	});
 }
 
 // ============================================================================
@@ -79,15 +132,12 @@ describe("DevinAdapter", () => {
 		});
 
 		it("should return true when credentials exist", async () => {
-			secrets = createMockSecretStorage({
-				"gatomia.devin.apiToken": "apk_test123",
-			});
+			secrets = createSeededSecretStorage();
 			adapter = new DevinAdapter(secrets);
 			expect(await adapter.hasCredentials()).toBe(true);
 		});
 
 		it("should store credentials via configureCredentials", async () => {
-			// Mock the VS Code input box to return a token
 			const { window } = await import("vscode");
 			(window.showInputBox as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
 				"apk_test_token_123"
@@ -96,7 +146,7 @@ describe("DevinAdapter", () => {
 			const result = await adapter.configureCredentials();
 			expect(result).toBe(true);
 			expect(secrets.store).toHaveBeenCalledWith(
-				"gatomia.devin.apiToken",
+				"gatomia.devin.apiKey",
 				"apk_test_token_123"
 			);
 		});
@@ -109,6 +159,20 @@ describe("DevinAdapter", () => {
 
 			const result = await adapter.configureCredentials();
 			expect(result).toBe(false);
+		});
+
+		it("should prompt for org ID when v3 token is provided", async () => {
+			const { window } = await import("vscode");
+			(window.showInputBox as ReturnType<typeof vi.fn>)
+				.mockResolvedValueOnce("cog_test_v3_token")
+				.mockResolvedValueOnce("org-12345");
+
+			const result = await adapter.configureCredentials();
+			expect(result).toBe(true);
+			expect(secrets.store).toHaveBeenCalledWith(
+				"gatomia.devin.apiKey",
+				"cog_test_v3_token"
+			);
 		});
 	});
 
@@ -205,9 +269,52 @@ describe("DevinAdapter", () => {
 			expect(adapter.handleBlockedSession(session)).toBeNull();
 		});
 
-		it("should resolve pollSessions with empty array (stub)", async () => {
+		it("should resolve pollSessions with empty array when no sessions", async () => {
 			const result = await adapter.pollSessions([]);
 			expect(result).toEqual([]);
+		});
+
+		it("should poll the Devin API for session updates", async () => {
+			const mockClient = createMockApiClient({
+				getSession: vi.fn().mockResolvedValue({
+					sessionId: "ext-1",
+					url: "https://app.devin.ai/sessions/ext-1",
+					status: "running",
+					statusDetail: "working",
+					tags: [],
+					createdAt: Date.now(),
+					updatedAt: Date.now(),
+					acusConsumed: 1,
+					pullRequests: [],
+					isArchived: false,
+				}),
+			});
+			const pollingAdapter = new DevinAdapter(
+				createSeededSecretStorage(),
+				mockClient
+			);
+
+			const sessions = [
+				{
+					localId: "s1",
+					providerId: "devin",
+					providerSessionId: "ext-1",
+					status: "pending" as const,
+					branch: "main",
+					specPath: "/spec.md",
+					tasks: [],
+					pullRequests: [],
+					createdAt: Date.now(),
+					updatedAt: Date.now(),
+					completedAt: undefined,
+					isReadOnly: false,
+				},
+			];
+
+			const updates = await pollingAdapter.pollSessions(sessions);
+			expect(mockClient.getSession).toHaveBeenCalledWith("ext-1");
+			expect(updates.length).toBe(1);
+			expect(updates[0].status).toBe("running");
 		});
 	});
 
@@ -217,12 +324,14 @@ describe("DevinAdapter", () => {
 
 	describe("dispatch", () => {
 		let adapter: DevinAdapter;
+		let mockClient: DevinApiClientInterface;
 
 		beforeEach(() => {
-			adapter = new DevinAdapter(createMockSecretStorage());
+			mockClient = createMockApiClient();
+			adapter = new DevinAdapter(createSeededSecretStorage(), mockClient);
 		});
 
-		it("should create a session with pending status", async () => {
+		it("should create a session via the Devin API with pending status", async () => {
 			const task = {
 				id: "T-001",
 				title: "Test task",
@@ -236,11 +345,16 @@ describe("DevinAdapter", () => {
 			};
 
 			const session = await adapter.createSession(task, context);
+			expect(mockClient.createSession).toHaveBeenCalled();
 			expect(session.providerId).toBe("devin");
 			expect(session.status).toBe("pending");
 			expect(session.branch).toBe("main");
 			expect(session.specPath).toBe("/specs/test/spec.md");
 			expect(session.localId).toBeTruthy();
+			expect(session.providerSessionId).toBe("devin-session-123");
+			expect(session.externalUrl).toBe(
+				"https://app.devin.ai/sessions/devin-session-123"
+			);
 		});
 
 		it("should include tasks in the created session", async () => {
@@ -261,6 +375,25 @@ describe("DevinAdapter", () => {
 			expect(session.tasks[0].specTaskId).toBe("T-002");
 			expect(session.tasks[0].title).toBe("Another task");
 		});
+
+		it("should throw ProviderError when no credentials configured", async () => {
+			const noCredsAdapter = new DevinAdapter(createMockSecretStorage());
+			const task = {
+				id: "T-001",
+				title: "Test",
+				description: "desc",
+				priority: "high" as const,
+			};
+			const ctx = {
+				branch: "main",
+				specPath: "/spec.md",
+				workspaceUri: "file:///ws",
+			};
+
+			await expect(noCredsAdapter.createSession(task, ctx)).rejects.toThrow(
+				CREDENTIALS_NOT_CONFIGURED_PATTERN
+			);
+		});
 	});
 
 	// ========================================================================
@@ -274,23 +407,9 @@ describe("DevinAdapter", () => {
 			adapter = new DevinAdapter(createMockSecretStorage());
 		});
 
-		it("should cancel a session by updating its status", async () => {
-			const task = {
-				id: "T-001",
-				title: "Test",
-				description: "desc",
-				priority: "high" as const,
-			};
-			const ctx = {
-				branch: "main",
-				specPath: "/spec.md",
-				workspaceUri: "file:///ws",
-			};
-			const session = await adapter.createSession(task, ctx);
-
-			// cancelSession should resolve without error
+		it("should cancel a session without error", async () => {
 			await expect(
-				adapter.cancelSession(session.localId)
+				adapter.cancelSession("some-local-id")
 			).resolves.not.toThrow();
 		});
 

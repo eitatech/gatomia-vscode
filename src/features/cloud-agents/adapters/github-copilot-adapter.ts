@@ -12,8 +12,8 @@ import { window } from "vscode";
 import type { CloudAgentProvider } from "../cloud-agent-provider";
 import { logInfo } from "../logging";
 import {
-	SessionStatus,
-	TaskStatus,
+	ProviderError,
+	ErrorCode,
 	type AgentSession,
 	type ProviderAction,
 	type ProviderMetadata,
@@ -98,36 +98,15 @@ export class GitHubCopilotAdapter implements CloudAgentProvider {
 	// ========================================================================
 
 	createSession(
-		task: SpecTask,
-		context: SessionContext
+		_task: SpecTask,
+		_context: SessionContext
 	): Promise<AgentSession> {
-		const now = Date.now();
-		const localId = `gh-copilot-${now}-${Math.random().toString(36).slice(2, 9)}`;
-		const session: AgentSession = {
-			localId,
-			providerId: GitHubCopilotAdapter.PROVIDER_ID,
-			providerSessionId: undefined,
-			status: SessionStatus.PENDING,
-			branch: context.branch,
-			specPath: context.specPath,
-			tasks: [
-				{
-					id: `task-${localId}`,
-					specTaskId: task.id,
-					title: task.title,
-					description: task.description,
-					priority: task.priority,
-					status: TaskStatus.PENDING,
-				},
-			],
-			pullRequests: [],
-			createdAt: now,
-			updatedAt: now,
-			completedAt: undefined,
-			isReadOnly: false,
-		};
-		logInfo(`GitHub Copilot session created: ${localId} for task ${task.id}`);
-		return Promise.resolve(session);
+		throw new ProviderError(
+			"GitHub Copilot coding agent integration is not yet implemented. Please use a different provider.",
+			ErrorCode.SESSION_CREATION_FAILED,
+			GitHubCopilotAdapter.PROVIDER_ID,
+			false
+		);
 	}
 
 	cancelSession(sessionId: string): Promise<void> {

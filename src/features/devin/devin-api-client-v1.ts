@@ -18,13 +18,7 @@ import type {
 	ListSessionsRequest,
 	ListSessionsResponse,
 } from "./devin-api-client";
-import {
-	DevinApiError,
-	DevinAuthenticationError,
-	DevinNetworkError,
-	DevinRateLimitedError,
-	DevinTimeoutError,
-} from "./errors";
+import { devinApiRequest } from "./devin-api-http";
 import { ApiVersion } from "./types";
 
 // ============================================================================
@@ -59,19 +53,24 @@ export class DevinApiClientV1 implements DevinApiClientInterface {
 			...(request.tags && { tags: request.tags }),
 		};
 
-		const raw = await this.request<RawV1CreateSessionResponse>(url, {
-			method: "POST",
-			body: JSON.stringify(body),
-		});
+		const raw = await devinApiRequest<RawV1CreateSessionResponse>(
+			url,
+			{ method: "POST", body: JSON.stringify(body) },
+			this.token,
+			"v1"
+		);
 
 		return mapV1CreateSessionResponse(raw);
 	}
 
 	async getSession(sessionId: string): Promise<GetSessionResponse> {
 		const url = `${this.baseUrl}${API_PATH_PREFIX.V1}/sessions/${sessionId}`;
-		const raw = await this.request<RawV1GetSessionResponse>(url, {
-			method: "GET",
-		});
+		const raw = await devinApiRequest<RawV1GetSessionResponse>(
+			url,
+			{ method: "GET" },
+			this.token,
+			"v1"
+		);
 		return mapV1GetSessionResponse(raw);
 	}
 
@@ -100,9 +99,12 @@ export class DevinApiClientV1 implements DevinApiClientInterface {
 		const query = params.toString();
 		const url = `${this.baseUrl}${API_PATH_PREFIX.V1}/sessions${query ? `?${query}` : ""}`;
 
-		const raw = await this.request<RawV1ListSessionsResponse>(url, {
-			method: "GET",
-		});
+		const raw = await devinApiRequest<RawV1ListSessionsResponse>(
+			url,
+			{ method: "GET" },
+			this.token,
+			"v1"
+		);
 
 		return {
 			sessions: (raw.sessions ?? []).map(mapV1GetSessionResponse),
@@ -120,60 +122,6 @@ export class DevinApiClientV1 implements DevinApiClientInterface {
 		} catch {
 			return false;
 		}
-	}
-
-	// ============================================================================
-	// Private HTTP helper
-	// ============================================================================
-
-	private async request<T>(url: string, init: RequestInit): Promise<T> {
-		const headers: Record<string, string> = {
-			Authorization: `Bearer ${this.token}`,
-			"Content-Type": "application/json",
-			Accept: "application/json",
-		};
-
-		let response: Response;
-		try {
-			response = await fetch(url, { ...init, headers });
-		} catch (error: unknown) {
-			if (error instanceof Error && error.name === "AbortError") {
-				throw new DevinTimeoutError(undefined, { url });
-			}
-			const message = error instanceof Error ? error.message : String(error);
-			throw new DevinNetworkError(message, { url });
-		}
-
-		if (response.status === 401 || response.status === 403) {
-			throw new DevinAuthenticationError(undefined, {
-				url,
-				statusCode: response.status,
-			});
-		}
-
-		if (response.status === 429) {
-			const retryAfterMs = parseRetryAfterMs(
-				response.headers.get("Retry-After")
-			);
-			throw new DevinRateLimitedError(retryAfterMs, { url });
-		}
-
-		if (!response.ok) {
-			let errorBody: string | undefined;
-			try {
-				errorBody = await response.text();
-			} catch {
-				// ignore read errors
-			}
-			throw new DevinApiError(
-				response.status,
-				`Devin API v1 error: ${response.status} ${response.statusText}`,
-				undefined,
-				{ url, body: errorBody }
-			);
-		}
-
-		return (await response.json()) as T;
 	}
 }
 
@@ -235,27 +183,6 @@ function mapV1CreateSessionResponse(
 		updatedAt: parseTimestamp(raw.updated_at),
 		pullRequests,
 	};
-}
-
-/**
- * Parse the HTTP Retry-After header value into milliseconds.
- * Handles both numeric seconds and HTTP-date formats.
- *
- * @returns Milliseconds to wait, or undefined if the header is absent or unparseable
- */
-function parseRetryAfterMs(value: string | null): number | undefined {
-	if (!value) {
-		return;
-	}
-	const seconds = Number.parseInt(value, 10);
-	if (!Number.isNaN(seconds)) {
-		return seconds * 1000;
-	}
-	const date = Date.parse(value);
-	if (!Number.isNaN(date)) {
-		return Math.max(0, date - Date.now());
-	}
-	return;
 }
 
 function mapV1GetSessionResponse(

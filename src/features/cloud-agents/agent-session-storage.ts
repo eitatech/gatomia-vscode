@@ -43,9 +43,11 @@ export class AgentSessionStorage {
 	 * Get all sessions for the current workspace.
 	 */
 	getAll(): Promise<AgentSession[]> {
-		return Promise.resolve(
-			this.workspaceState.get<AgentSession[]>(SESSIONS_KEY) ?? []
-		);
+		const raw = this.workspaceState.get<unknown[]>(SESSIONS_KEY);
+		if (!Array.isArray(raw)) {
+			return Promise.resolve([]);
+		}
+		return Promise.resolve(raw.filter(isValidAgentSession) as AgentSession[]);
 	}
 
 	/**
@@ -167,4 +169,30 @@ export class AgentSessionStorage {
 	private async persist(sessions: AgentSession[]): Promise<void> {
 		await this.workspaceState.update(SESSIONS_KEY, sessions);
 	}
+}
+
+// ============================================================================
+// Validation
+// ============================================================================
+
+/**
+ * Runtime check that a deserialized value has the minimum required shape of an AgentSession.
+ * Filters out corrupted or schema-incompatible entries after deserialization.
+ */
+function isValidAgentSession(value: unknown): boolean {
+	if (typeof value !== "object" || value === null) {
+		return false;
+	}
+	const obj = value as Record<string, unknown>;
+	return (
+		typeof obj.localId === "string" &&
+		typeof obj.providerId === "string" &&
+		typeof obj.status === "string" &&
+		typeof obj.branch === "string" &&
+		typeof obj.specPath === "string" &&
+		typeof obj.createdAt === "number" &&
+		typeof obj.updatedAt === "number" &&
+		Array.isArray(obj.tasks) &&
+		Array.isArray(obj.pullRequests)
+	);
 }

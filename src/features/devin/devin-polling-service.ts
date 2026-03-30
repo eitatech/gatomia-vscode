@@ -262,6 +262,13 @@ export class DevinPollingService {
 			// Re-read session by localId right before update to minimize stale-read window
 			try {
 				const freshSession = this.storage.getByLocalId(localId);
+
+				// If the session was cancelled/completed locally while we were polling,
+				// do not overwrite the terminal state with stale API data.
+				if (isTerminalStatus(freshSession.status)) {
+					return;
+				}
+
 				updates.tasks = syncTaskStatuses(freshSession.tasks, newStatus);
 
 				if (!freshSession.devinUrl) {
@@ -270,7 +277,8 @@ export class DevinPollingService {
 					updates.devinUrl = url;
 				}
 			} catch {
-				// Session may have been deleted concurrently; skip task sync
+				// Session may have been deleted concurrently; skip update entirely
+				return;
 			}
 
 			await this.storage.update(localId, updates);

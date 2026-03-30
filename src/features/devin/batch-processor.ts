@@ -15,6 +15,7 @@ import {
 	type StartTaskParams,
 } from "./devin-session-manager";
 import type { DevinSession } from "./entities";
+import type { RateLimiter } from "./rate-limiter";
 import type { TaskPriority } from "./types";
 
 // ============================================================================
@@ -83,18 +84,21 @@ type ProgressListener = (event: BatchProgressEvent) => void;
  */
 export class BatchProcessor {
 	private readonly sessionManager: DevinSessionManager;
+	private readonly rateLimiter: RateLimiter | undefined;
 	private readonly listeners: Set<ProgressListener> = new Set();
 
 	constructor(
 		apiClient: DevinApiClientInterface,
 		storage: DevinSessionStorage,
-		credentials: DevinCredentialsManager
+		credentials: DevinCredentialsManager,
+		rateLimiter?: RateLimiter
 	) {
 		this.sessionManager = new DevinSessionManager(
 			storage,
 			credentials,
 			apiClient
 		);
+		this.rateLimiter = rateLimiter;
 	}
 
 	/**
@@ -131,6 +135,8 @@ export class BatchProcessor {
 			});
 
 			try {
+				this.rateLimiter?.acquire();
+
 				const params: StartTaskParams = {
 					specPath: request.specPath,
 					taskId: task.taskId,

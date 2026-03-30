@@ -118,6 +118,7 @@ describe("AgentPollingService", () => {
 		expect(sessionStorage.update).toHaveBeenCalledWith("s1", {
 			status: SessionStatus.COMPLETED,
 			timestamp: Date.now(),
+			completedAt: Date.now(),
 		});
 	});
 

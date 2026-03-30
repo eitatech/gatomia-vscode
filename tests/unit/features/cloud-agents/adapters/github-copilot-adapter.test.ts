@@ -10,6 +10,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GitHubCopilotAdapter } from "../../../../../src/features/cloud-agents/adapters/github-copilot-adapter";
 
+const NOT_YET_IMPLEMENTED_PATTERN = /not yet implemented/;
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -203,7 +205,7 @@ describe("GitHubCopilotAdapter", () => {
 			adapter = new GitHubCopilotAdapter(createMockSecretStorage());
 		});
 
-		it("should create a session with pending status", async () => {
+		it("should throw ProviderError indicating feature is not yet implemented", () => {
 			const task = {
 				id: "T-001",
 				title: "Implement feature",
@@ -216,31 +218,9 @@ describe("GitHubCopilotAdapter", () => {
 				workspaceUri: "file:///workspace",
 			};
 
-			const session = await adapter.createSession(task, context);
-			expect(session.providerId).toBe("github-copilot");
-			expect(session.status).toBe("pending");
-			expect(session.branch).toBe("main");
-			expect(session.specPath).toBe("/specs/test/spec.md");
-			expect(session.localId).toBeTruthy();
-		});
-
-		it("should include tasks in the created session", async () => {
-			const task = {
-				id: "T-003",
-				title: "Fix bug",
-				description: "Fix the bug",
-				priority: "low" as const,
-			};
-			const context = {
-				branch: "fix/bug",
-				specPath: "/specs/test/spec.md",
-				workspaceUri: "file:///workspace",
-			};
-
-			const session = await adapter.createSession(task, context);
-			expect(session.tasks).toHaveLength(1);
-			expect(session.tasks[0].specTaskId).toBe("T-003");
-			expect(session.tasks[0].title).toBe("Fix bug");
+			expect(() => adapter.createSession(task, context)).toThrow(
+				NOT_YET_IMPLEMENTED_PATTERN
+			);
 		});
 	});
 
@@ -256,20 +236,8 @@ describe("GitHubCopilotAdapter", () => {
 		});
 
 		it("should cancel a session without error", async () => {
-			const task = {
-				id: "T-001",
-				title: "Test",
-				description: "desc",
-				priority: "high" as const,
-			};
-			const ctx = {
-				branch: "main",
-				specPath: "/spec.md",
-				workspaceUri: "file:///ws",
-			};
-			const session = await adapter.createSession(task, ctx);
 			await expect(
-				adapter.cancelSession(session.localId)
+				adapter.cancelSession("some-local-id")
 			).resolves.not.toThrow();
 		});
 

@@ -170,7 +170,12 @@ describe("AgentSessionStorage", () => {
 			const oldTime = Date.now() - 8 * 24 * 60 * 60 * 1000; // 8 days ago
 			const newTime = Date.now();
 			await storage.create(
-				createTestSession({ localId: "old", updatedAt: oldTime })
+				createTestSession({
+					localId: "old",
+					status: SessionStatus.COMPLETED,
+					updatedAt: oldTime,
+					completedAt: oldTime,
+				})
 			);
 			await storage.create(
 				createTestSession({ localId: "new", updatedAt: newTime })

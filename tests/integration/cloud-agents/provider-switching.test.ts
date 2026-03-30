@@ -133,7 +133,7 @@ describe("Provider Switching Integration", () => {
 	it("should auto-migrate existing Devin users", async () => {
 		registry.register(createMockProvider("devin"));
 		const secrets = createMockSecretStorage({
-			"gatomia.devin.apiToken": "apk_test123",
+			"gatomia.devin.apiKey": "apk_test123",
 		});
 		const migration = new MigrationService(configStore, memento, secrets);
 		const migrated = await migration.migrateIfNeeded();

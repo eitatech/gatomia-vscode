@@ -30,6 +30,7 @@ import {
 	showSessionStartedNotification,
 } from "../features/devin/task-initiation-ui";
 import { BatchProcessor } from "../features/devin/batch-processor";
+import { RateLimiter } from "../features/devin/rate-limiter";
 import {
 	confirmBatchInitiation,
 	showBatchResultNotification,
@@ -341,7 +342,7 @@ async function handleStartAllTasks(
 					taskId: details.taskId,
 					title: details.title,
 					description: details.description,
-					priority: "P1" as const,
+					priority: "P2" as const,
 					acceptanceCriteria: details.acceptanceCriteria,
 				},
 			];
@@ -371,7 +372,8 @@ async function handleStartAllTasks(
 		const processor = new BatchProcessor(
 			apiClient,
 			sessionManager.getStorage(),
-			credentialsManager
+			credentialsManager,
+			new RateLimiter()
 		);
 
 		const results = await runBatchWithProgress(processor, {
@@ -561,7 +563,7 @@ async function handleRunGroupWithDevin(
 		tasks: incompleteTasks.map((t) => ({
 			taskId: t.id,
 			title: t.title,
-			priority: "P1" as const,
+			priority: (t.priority ?? "P2") as "P1" | "P2" | "P3",
 		})),
 		branch: gitResult.branch,
 		repoUrl,
@@ -578,7 +580,7 @@ async function handleRunGroupWithDevin(
 }
 
 interface ResolveGroupResult {
-	readonly tasks?: { id: string; title: string }[];
+	readonly tasks?: { id: string; title: string; priority?: string }[];
 	readonly reason?: string;
 }
 
@@ -618,7 +620,13 @@ function resolveIncompleteGroupTasks(
 		};
 	}
 
-	return { tasks: incomplete };
+	return {
+		tasks: incomplete.map((t) => ({
+			id: t.id,
+			title: t.title,
+			priority: t.priority,
+		})),
+	};
 }
 
 /**

@@ -53,6 +53,7 @@ describe("DocumentPreviewService", () => {
 		} as any);
 
 		expect(artifact.sections.map((section) => section.title)).toEqual([
+			"Repository Wiki",
 			"Overview",
 			"Details",
 		]);
