@@ -161,20 +161,6 @@ export function registerDevinCommands(
 		)
 	);
 
-	disposables.push(
-		commands.registerCommand(
-			DEVIN_COMMANDS.RUN_WITH_DEVIN,
-			async (item?: RunWithDevinTreeItem) => {
-				await handleRunWithDevin(
-					item,
-					sessionManager,
-					credentialsManager,
-					callbacks?.onSessionCreated
-				);
-			}
-		)
-	);
-
 	return disposables;
 }
 

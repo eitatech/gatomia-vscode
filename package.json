@@ -284,9 +284,9 @@
           "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.wiki.visible"
         },
         {
-          "id": "gatomia.views.devinProgress",
-          "name": "Devin Progress",
-          "icon": "sync",
+          "id": "gatomia.views.cloudAgents",
+          "name": "Cloud Agents",
+          "icon": "cloud",
           "when": "!(workbenchState == empty || workspaceFolderCount == 0)"
         },
         {
@@ -319,9 +319,9 @@
         "contents": "Browse and manage documentation from the docs/ directory.\n\n[$(refresh) Refresh](command:gatomia.wiki.refresh)"
       },
       {
-        "view": "gatomia.views.devinProgress",
-        "contents": "Delegate spec tasks to Devin for remote implementation.\n\n[$(gear) Configure Credentials](command:gatomia.devin.configureCredentials)",
-        "when": "!gatomia.devin.hasCredentials"
+        "view": "gatomia.views.cloudAgents",
+        "contents": "Select a cloud agent provider to get started:\n\n[$(rocket) Devin](command:gatomia.selectProvider?%22devin%22)\n[$(github) GitHub Copilot](command:gatomia.selectProvider?%22github-copilot%22)",
+        "when": "!gatomia.cloudAgent.hasProvider"
       }
     ],
     "commands": [
@@ -359,15 +359,6 @@
         "title": "Run Task",
         "category": "GatomIA",
         "icon": "$(play)"
-      },
-      {
-        "command": "gatomia.devin.runWithDevin",
-        "title": "Run with Devin",
-        "category": "GatomIA",
-        "icon": {
-          "light": "assets/icons/devin-light.svg",
-          "dark": "assets/icons/devin-dark.svg"
-        }
       },
       {
         "command": "gatomia.spec.runTaskGroup",
@@ -719,10 +710,45 @@
         "title": "Configure Devin Credentials",
         "category": "GatomIA",
         "icon": "$(key)"
+      },
+      {
+        "command": "gatomia.selectProvider",
+        "title": "Select Cloud Agent Provider",
+        "category": "GatomIA",
+        "icon": "$(cloud)"
+      },
+      {
+        "command": "gatomia.changeProvider",
+        "title": "Change Cloud Agent Provider",
+        "category": "GatomIA",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "gatomia.configureProvider",
+        "title": "Configure Provider Credentials",
+        "category": "GatomIA",
+        "icon": "$(key)"
+      },
+      {
+        "command": "gatomia.dispatchTask",
+        "title": "Run on Cloud",
+        "category": "GatomIA",
+        "icon": "$(cloud)"
+      },
+      {
+        "command": "gatomia.cancelSession",
+        "title": "Cancel Cloud Agent Session",
+        "category": "GatomIA",
+        "icon": "$(circle-slash)"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "gatomia.changeProvider",
+          "when": "view == gatomia.views.cloudAgents && gatomia.cloudAgent.hasProvider",
+          "group": "navigation@1"
+        },
         {
           "command": "gatomia.spec.create",
           "when": "view == gatomia.views.specExplorer",
@@ -836,7 +862,7 @@
           "group": "inline@1"
         },
         {
-          "command": "gatomia.devin.runWithDevin",
+          "command": "gatomia.dispatchTask",
           "when": "view == gatomia.views.specExplorer && viewItem == task-item",
           "group": "inline@2"
         },
@@ -846,7 +872,7 @@
           "group": "inline@1"
         },
         {
-          "command": "gatomia.devin.runWithDevin",
+          "command": "gatomia.dispatchTask",
           "when": "view == gatomia.views.specExplorer && viewItem == task-group",
           "group": "inline@2"
         },
@@ -892,7 +918,7 @@
         },
         {
           "command": "gatomia.devin.cancelSession",
-          "when": "view == gatomia.views.devinProgress && (viewItem == devinSession.queued || viewItem == devinSession.initializing || viewItem == devinSession.running)",
+          "when": "view == gatomia.views.cloudAgents && (viewItem == devinSession.queued || viewItem == devinSession.initializing || viewItem == devinSession.running)",
           "group": "inline@1"
         },
         {

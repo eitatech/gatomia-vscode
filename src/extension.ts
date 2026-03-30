@@ -88,9 +88,18 @@ import { DevinCredentialsManager } from "./features/devin/devin-credentials-mana
 import { DevinSessionManager } from "./features/devin/devin-session-manager";
 import { DevinSessionStorage } from "./features/devin/devin-session-storage";
 import { DevinPollingService } from "./features/devin/devin-polling-service";
-import { DevinProgressProvider } from "./providers/devin-progress-provider";
-import { DevinProgressPanel } from "./panels/devin-progress-panel";
 import { SessionCleanupService } from "./features/devin/session-cleanup";
+import { ProviderConfigStore } from "./features/cloud-agents/provider-config-store";
+import { ProviderRegistry } from "./features/cloud-agents/provider-registry";
+import { DevinAdapter } from "./features/cloud-agents/adapters/devin-adapter";
+import { GitHubCopilotAdapter } from "./features/cloud-agents/adapters/github-copilot-adapter";
+import { MigrationService } from "./features/cloud-agents/migration-service";
+import { CloudAgentProgressProvider } from "./providers/cloud-agent-progress-provider";
+import { registerCloudAgentCommands } from "./commands/cloud-agent-commands";
+import { AgentSessionStorage } from "./features/cloud-agents/agent-session-storage";
+import { AgentPollingService } from "./features/cloud-agents/agent-polling-service";
+import { SessionCleanupService as CloudSessionCleanupService } from "./features/cloud-agents/session-cleanup-service";
+import { logInfo as cloudAgentLogInfo } from "./features/cloud-agents/logging";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -572,7 +581,7 @@ export async function activate(context: ExtensionContext) {
 		})
 	);
 
-	// Register Devin integration commands and progress view
+	// Register Devin integration commands (progress view now in Cloud Agents)
 	try {
 		const devinCredentialsManager = new DevinCredentialsManager(
 			context.secrets
@@ -582,14 +591,6 @@ export async function activate(context: ExtensionContext) {
 			devinSessionStorage,
 			devinCredentialsManager
 		);
-
-		const devinProgressProvider = new DevinProgressProvider(
-			devinSessionStorage
-		);
-		const devinTreeView = window.createTreeView(DevinProgressProvider.viewId, {
-			treeDataProvider: devinProgressProvider,
-		});
-		context.subscriptions.push(devinTreeView);
 
 		// Set up polling service for session status updates
 		const devinPollingService = new DevinPollingService(
@@ -602,7 +603,6 @@ export async function activate(context: ExtensionContext) {
 			if (event.status === "completed") {
 				const session = devinSessionStorage.getBySessionId(event.sessionId);
 				if (session) {
-					// Sync completed tasks back to spec tasks.md
 					try {
 						const { updateSpecTasksOnSessionComplete } = await import(
 							"./features/devin/spec-status-updater"
@@ -639,9 +639,6 @@ export async function activate(context: ExtensionContext) {
 				env.openExternal(Uri.parse(url));
 			}
 		});
-		devinPollingService.onPollCycleComplete(() => {
-			devinProgressProvider.refresh();
-		});
 		context.subscriptions.push({ dispose: () => devinPollingService.stop() });
 
 		// Start session cleanup service (7-day retention policy)
@@ -651,60 +648,88 @@ export async function activate(context: ExtensionContext) {
 		});
 		context.subscriptions.push({ dispose: () => devinCleanupService.stop() });
 
-		// Start polling if there are already active sessions
 		if (devinSessionStorage.getActive().length > 0) {
 			devinPollingService.start();
 		}
 
-		// Set initial context key for welcome view visibility
-		devinCredentialsManager.hasCredentials().then(
-			(has) => {
-				commands.executeCommand(
-					"setContext",
-					"gatomia.devin.hasCredentials",
-					has
-				);
-			},
-			() => {
-				// Ignore credential check failure during activation
-			}
-		);
-
-		const devinProgressPanel = new DevinProgressPanel(
-			context,
-			devinSessionStorage,
-			devinSessionManager,
-			devinPollingService
-		);
-		context.subscriptions.push({ dispose: () => devinProgressPanel.dispose() });
-
 		const devinDisposables = registerDevinCommands(
 			devinSessionManager,
 			devinCredentialsManager,
-			devinProgressPanel,
+			undefined,
 			{
 				onCredentialsConfigured: () => {
-					commands.executeCommand(
-						"setContext",
-						"gatomia.devin.hasCredentials",
-						true
-					);
-					devinProgressProvider.refresh();
 					devinPollingService.start();
 				},
 				onSessionCreated: () => {
-					devinProgressProvider.refresh();
 					devinPollingService.start();
-				},
-				onSessionCancelled: () => {
-					devinProgressProvider.refresh();
 				},
 			}
 		);
 		context.subscriptions.push(...devinDisposables);
-		outputChannel.appendLine("[Devin] Commands and progress view registered");
+		outputChannel.appendLine("[Devin] Commands registered");
 	} catch (error) {
 		outputChannel.appendLine(`[Devin] Failed to register commands: ${error}`);
+	}
+
+	// ========================================================================
+	// Cloud Agents (Multi-Provider) Bootstrap
+	// ========================================================================
+	try {
+		const cloudConfigStore = new ProviderConfigStore(context.workspaceState);
+		const cloudRegistry = new ProviderRegistry(cloudConfigStore);
+
+		cloudRegistry.register(new DevinAdapter(context.secrets));
+		cloudRegistry.register(new GitHubCopilotAdapter(context.secrets));
+
+		const migrationService = new MigrationService(
+			cloudConfigStore,
+			context.workspaceState,
+			context.secrets
+		);
+		await migrationService.migrateIfNeeded();
+		await cloudRegistry.restoreActive();
+
+		const cloudSessionStorage = new AgentSessionStorage(context.workspaceState);
+
+		const cloudProgressProvider = new CloudAgentProgressProvider(
+			cloudRegistry,
+			cloudSessionStorage
+		);
+		const cloudTreeView = window.createTreeView("gatomia.views.cloudAgents", {
+			treeDataProvider: cloudProgressProvider,
+		});
+		context.subscriptions.push(cloudTreeView);
+		await cloudProgressProvider.updateContextKeys();
+
+		const cloudPollingService = new AgentPollingService(
+			cloudRegistry,
+			cloudSessionStorage
+		);
+		const cloudCleanupService = new CloudSessionCleanupService(
+			cloudSessionStorage
+		);
+		await cloudCleanupService.cleanup();
+
+		if (cloudRegistry.getActive()) {
+			cloudPollingService.start(30_000);
+		}
+		context.subscriptions.push({ dispose: () => cloudPollingService.stop() });
+
+		const cloudCmdDisposables = registerCloudAgentCommands({
+			registry: cloudRegistry,
+			sessionStorage: cloudSessionStorage,
+			pollingService: cloudPollingService,
+			onSessionCreated: () => {
+				cloudProgressProvider.refresh();
+				cloudProgressProvider.updateContextKeys();
+			},
+		});
+		context.subscriptions.push(...cloudCmdDisposables);
+
+		cloudAgentLogInfo("Cloud Agents module bootstrapped");
+		outputChannel.appendLine("[CloudAgents] Module bootstrapped successfully");
+	} catch (error) {
+		outputChannel.appendLine(`[CloudAgents] Failed to bootstrap: ${error}`);
 	}
 
 	// Set up file watchers

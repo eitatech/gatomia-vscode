@@ -47,6 +47,15 @@ export const window = {
 	showQuickPick: vi.fn(),
 	createTerminal: vi.fn(),
 	onDidEndTerminalShellExecution: vi.fn(),
+	createOutputChannel: vi.fn((name: string) => ({
+		appendLine: vi.fn(),
+		append: vi.fn(),
+		clear: vi.fn(),
+		show: vi.fn(),
+		hide: vi.fn(),
+		dispose: vi.fn(),
+		name,
+	})),
 	createWebviewPanel: vi.fn(() => ({
 		webview: {
 			html: "",
