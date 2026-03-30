@@ -19,6 +19,8 @@ import { SessionStatus } from "./types";
  */
 export class DevinSessionStorage {
 	private readonly workspaceState: vscode.Memento;
+	private cachedRaw: string | undefined;
+	private cachedSessions: DevinSession[] | undefined;
 
 	constructor(workspaceState: vscode.Memento) {
 		this.workspaceState = workspaceState;
@@ -33,12 +35,19 @@ export class DevinSessionStorage {
 			return [];
 		}
 
+		if (raw === this.cachedRaw && this.cachedSessions) {
+			return [...this.cachedSessions];
+		}
+
 		try {
 			const parsed: unknown = JSON.parse(raw);
 			if (!Array.isArray(parsed)) {
 				return [];
 			}
-			return parsed.filter(isValidSession) as DevinSession[];
+			const sessions = parsed.filter(isValidSession) as DevinSession[];
+			this.cachedRaw = raw;
+			this.cachedSessions = sessions;
+			return [...sessions];
 		} catch {
 			return [];
 		}
@@ -179,10 +188,10 @@ export class DevinSessionStorage {
 	// ============================================================================
 
 	private async persist(sessions: DevinSession[]): Promise<void> {
-		await this.workspaceState.update(
-			STORAGE_KEY_SESSIONS,
-			JSON.stringify(sessions)
-		);
+		const raw = JSON.stringify(sessions);
+		this.cachedRaw = raw;
+		this.cachedSessions = sessions;
+		await this.workspaceState.update(STORAGE_KEY_SESSIONS, raw);
 	}
 }
 

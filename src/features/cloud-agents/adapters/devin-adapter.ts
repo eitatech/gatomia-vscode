@@ -26,7 +26,7 @@ import {
 // Constants
 // ============================================================================
 
-const DEVIN_SECRET_KEY = "gatomia.devin.apiToken";
+const DEVIN_SECRET_KEY = "gatomia.devin.apiKey";
 
 // ============================================================================
 // SecretStorage Interface

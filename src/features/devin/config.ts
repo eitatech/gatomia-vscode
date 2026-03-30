@@ -143,6 +143,7 @@ export const DEVIN_COMMANDS = {
 	OPEN_PROGRESS: "gatomia.devin.openProgress",
 	CANCEL_SESSION: "gatomia.devin.cancelSession",
 	CONFIGURE_CREDENTIALS: "gatomia.devin.configureCredentials",
+	RUN_WITH_DEVIN: "gatomia.devin.runWithDevin",
 } as const;
 
 // ============================================================================

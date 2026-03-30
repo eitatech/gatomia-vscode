@@ -10,7 +10,12 @@
 
 import { logInfo, logDebug } from "./logging";
 import type { Memento } from "./provider-config-store";
-import { type AgentSession, StoreError, StoreErrorCode } from "./types";
+import {
+	SessionStatus,
+	type AgentSession,
+	StoreError,
+	StoreErrorCode,
+} from "./types";
 
 // ============================================================================
 // Storage Key
@@ -60,11 +65,23 @@ export class AgentSessionStorage {
 	}
 
 	/**
-	 * Get active (non-read-only) sessions.
+	 * Get active (non-terminal, non-read-only) sessions.
 	 */
 	async getActive(): Promise<AgentSession[]> {
 		const sessions = await this.getAll();
-		return sessions.filter((s) => !s.isReadOnly);
+		return sessions.filter((s) => {
+			if (s.isReadOnly) {
+				return false;
+			}
+			switch (s.status) {
+				case SessionStatus.COMPLETED:
+				case SessionStatus.FAILED:
+				case SessionStatus.CANCELLED:
+					return false;
+				default:
+					return true;
+			}
+		});
 	}
 
 	/**
@@ -129,11 +146,22 @@ export class AgentSessionStorage {
 	}
 
 	/**
-	 * Get sessions that need cleanup (updated before cutoff time).
+	 * Get terminal sessions that need cleanup (updated before cutoff time).
+	 * Only returns sessions in completed/failed/cancelled state.
 	 */
 	async getForCleanup(cutoffTime: number): Promise<AgentSession[]> {
 		const sessions = await this.getAll();
-		return sessions.filter((s) => s.updatedAt < cutoffTime);
+		return sessions.filter((s) => {
+			const isTerminal =
+				s.status === SessionStatus.COMPLETED ||
+				s.status === SessionStatus.FAILED ||
+				s.status === SessionStatus.CANCELLED;
+			if (!isTerminal) {
+				return false;
+			}
+			const completionTime = s.completedAt ?? s.updatedAt;
+			return completionTime < cutoffTime;
+		});
 	}
 
 	private async persist(sessions: AgentSession[]): Promise<void> {

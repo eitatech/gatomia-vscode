@@ -74,17 +74,14 @@ export class AgentPollingService {
 			const updates = await provider.pollSessions(sessions);
 			for (const update of updates) {
 				const { localId, ...fields } = update;
-				await this.sessionStorage.update(localId, fields);
-
-				if (
+				const isTerminal =
 					update.status === SessionStatus.COMPLETED ||
 					update.status === SessionStatus.FAILED ||
-					update.status === SessionStatus.CANCELLED
-				) {
-					await this.sessionStorage.update(localId, {
-						completedAt: Date.now(),
-					});
-				}
+					update.status === SessionStatus.CANCELLED;
+				await this.sessionStorage.update(localId, {
+					...fields,
+					...(isTerminal ? { completedAt: Date.now() } : {}),
+				});
 			}
 
 			this.consecutiveFailures = 0;

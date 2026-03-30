@@ -8,12 +8,13 @@
  * @see specs/016-multi-provider-agents/plan.md
  */
 
-import { commands, window } from "vscode";
+import { commands, window, workspace } from "vscode";
 import type { AgentSessionStorage } from "../features/cloud-agents/agent-session-storage";
 import type { AgentPollingService } from "../features/cloud-agents/agent-polling-service";
 import type { ProviderRegistry } from "../features/cloud-agents/provider-registry";
 import { logInfo, logError } from "../features/cloud-agents/logging";
 import type { SpecTask, SessionContext } from "../features/cloud-agents/types";
+import { getCurrentBranch } from "../features/devin/git-validator";
 
 // ============================================================================
 // Types
@@ -59,6 +60,7 @@ export interface CloudAgentCommandOptions {
 	sessionStorage?: AgentSessionStorage;
 	pollingService?: AgentPollingService;
 	onSessionCreated?: () => void;
+	onRefresh?: () => void;
 }
 
 /**
@@ -173,12 +175,12 @@ async function handleSelectProvider(
 			if (!configured) {
 				await registry.clearActive();
 				logInfo("Credential configuration cancelled, provider deselected");
-				opts.onSessionCreated?.();
+				opts.onRefresh?.();
 				return;
 			}
 		}
 
-		opts.onSessionCreated?.();
+		opts.onRefresh?.();
 	} catch (error) {
 		logError("Failed to select provider", error);
 		window.showErrorMessage("Failed to select provider.");
@@ -190,7 +192,7 @@ async function handleChangeProvider(
 ): Promise<void> {
 	try {
 		await opts.registry.clearActive();
-		opts.onSessionCreated?.();
+		opts.onRefresh?.();
 		logInfo("Provider cleared, showing selection");
 		await commands.executeCommand(CLOUD_AGENT_COMMANDS.SELECT_PROVIDER);
 	} catch (error) {
@@ -235,7 +237,13 @@ async function handleDispatchTask(
 	itemOrTaskId?: DispatchTreeItem | string,
 	specPathArg?: string
 ): Promise<void> {
-	const { registry, sessionStorage, pollingService, onSessionCreated } = opts;
+	const {
+		registry,
+		sessionStorage,
+		pollingService,
+		onSessionCreated,
+		onRefresh,
+	} = opts;
 	try {
 		const provider = registry.getActive();
 		if (!provider) {
@@ -294,10 +302,12 @@ async function handleDispatchTask(
 			description: taskDescription,
 			priority: "medium",
 		};
+		const branch = (await getCurrentBranch()) ?? "main";
+		const workspaceUri = workspace.workspaceFolders?.[0]?.uri.toString() ?? "";
 		const context: SessionContext = {
-			branch: "main",
+			branch,
 			specPath: path,
-			workspaceUri: "",
+			workspaceUri,
 		};
 
 		const session = await provider.createSession(task, context);
@@ -311,6 +321,7 @@ async function handleDispatchTask(
 		}
 
 		onSessionCreated?.();
+		onRefresh?.();
 
 		logInfo(`Task dispatched to ${provider.metadata.id}: ${taskId}`);
 		window.showInformationMessage(
@@ -326,7 +337,7 @@ async function handleCancelSession(
 	opts: CloudAgentCommandOptions,
 	localId?: string
 ): Promise<void> {
-	const { registry, sessionStorage, onSessionCreated } = opts;
+	const { registry, sessionStorage, onRefresh } = opts;
 	try {
 		if (!localId) {
 			window.showErrorMessage("No session specified to cancel.");
@@ -361,7 +372,7 @@ async function handleCancelSession(
 			completedAt: Date.now(),
 		});
 
-		onSessionCreated?.();
+		onRefresh?.();
 		logInfo(`Session cancelled: ${localId}`);
 		window.showInformationMessage("Session cancelled.");
 	} catch (error) {

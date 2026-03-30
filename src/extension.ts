@@ -715,14 +715,16 @@ export async function activate(context: ExtensionContext) {
 		}
 		context.subscriptions.push({ dispose: () => cloudPollingService.stop() });
 
+		const refreshCloudUI = () => {
+			cloudProgressProvider.refresh();
+			cloudProgressProvider.updateContextKeys();
+		};
 		const cloudCmdDisposables = registerCloudAgentCommands({
 			registry: cloudRegistry,
 			sessionStorage: cloudSessionStorage,
 			pollingService: cloudPollingService,
-			onSessionCreated: () => {
-				cloudProgressProvider.refresh();
-				cloudProgressProvider.updateContextKeys();
-			},
+			onSessionCreated: refreshCloudUI,
+			onRefresh: refreshCloudUI,
 		});
 		context.subscriptions.push(...cloudCmdDisposables);
 

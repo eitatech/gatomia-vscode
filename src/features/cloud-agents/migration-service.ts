@@ -19,7 +19,7 @@ import type { ProviderRegistry } from "./provider-registry";
 
 const LEGACY_KEYS = {
 	DEVIN_SESSIONS: "gatomia.devin.sessions",
-	DEVIN_API_TOKEN: "gatomia.devin.apiToken",
+	DEVIN_API_TOKEN: "gatomia.devin.apiKey",
 } as const;
 
 // ============================================================================

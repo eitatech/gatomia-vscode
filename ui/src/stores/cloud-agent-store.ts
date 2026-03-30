@@ -74,9 +74,11 @@ export interface CloudAgentState {
 // Store
 // ============================================================================
 
+type Listener = () => void;
+
 /**
  * Creates a simple state store for the Cloud Agents webview.
- * No external dependencies - framework-agnostic.
+ * Includes subscribe/notify pattern for React integration.
  */
 export function createCloudAgentStore() {
 	let state: CloudAgentState = {
@@ -86,25 +88,44 @@ export function createCloudAgentStore() {
 		error: null,
 	};
 
+	const listeners = new Set<Listener>();
+
+	function notify(): void {
+		for (const listener of listeners) {
+			listener();
+		}
+	}
+
 	return {
 		getState(): CloudAgentState {
 			return state;
 		},
 
+		subscribe(listener: Listener): () => void {
+			listeners.add(listener);
+			return () => {
+				listeners.delete(listener);
+			};
+		},
+
 		setSessions(sessions: AgentSessionView[]): void {
 			state = { ...state, sessions };
+			notify();
 		},
 
 		setActiveProvider(provider: ActiveProviderInfo | null): void {
 			state = { ...state, activeProvider: provider };
+			notify();
 		},
 
 		setLoading(isLoading: boolean): void {
 			state = { ...state, isLoading };
+			notify();
 		},
 
 		setError(error: string | null): void {
 			state = { ...state, error };
+			notify();
 		},
 	};
 }
