@@ -70,12 +70,14 @@ export async function devinApiRequest<T>(
 		} catch {
 			// ignore read errors
 		}
-		throw new DevinApiError(
-			response.status,
-			`Devin API ${apiVersionLabel} error: ${response.status} ${response.statusText}`,
-			undefined,
-			{ url, body: errorBody }
-		);
+		const detail = extractApiErrorDetail(errorBody);
+		const message = detail
+			? `Devin API ${apiVersionLabel} error: ${response.status} - ${detail}`
+			: `Devin API ${apiVersionLabel} error: ${response.status} ${response.statusText}`;
+		throw new DevinApiError(response.status, message, undefined, {
+			url,
+			body: errorBody,
+		});
 	}
 
 	return (await response.json()) as T;
@@ -100,4 +102,29 @@ export function parseRetryAfterMs(value: string | null): number | undefined {
 		return Math.max(0, date - Date.now());
 	}
 	return;
+}
+
+/**
+ * Extract a human-readable error detail from a Devin API error response body.
+ * Tries to parse JSON and extract common error fields.
+ */
+function extractApiErrorDetail(body: string | undefined): string | undefined {
+	if (!body) {
+		return;
+	}
+	try {
+		const parsed = JSON.parse(body) as Record<string, unknown>;
+		if (typeof parsed.detail === "string") {
+			return parsed.detail;
+		}
+		if (typeof parsed.message === "string") {
+			return parsed.message;
+		}
+		if (typeof parsed.error === "string") {
+			return parsed.error;
+		}
+		return body.slice(0, 300);
+	} catch {
+		return body.slice(0, 300);
+	}
 }

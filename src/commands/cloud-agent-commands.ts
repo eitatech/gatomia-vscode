@@ -55,7 +55,9 @@ export const CLOUD_AGENT_COMMANDS = {
 	CHANGE_PROVIDER: "gatomia.changeProvider",
 	CONFIGURE_PROVIDER: "gatomia.configureProvider",
 	DISPATCH_TASK: "gatomia.dispatchTask",
+	DISPATCH_FULL_SPEC: "gatomia.dispatchFullSpec",
 	CANCEL_SESSION: "gatomia.cancelSession",
+	REMOVE_SESSION: "gatomia.removeSession",
 	REFRESH: "gatomia.refreshCloudAgents",
 } as const;
 
@@ -125,8 +127,19 @@ export function registerCloudAgentCommands(
 	disposables.push(
 		commands.registerCommand(
 			CLOUD_AGENT_COMMANDS.CANCEL_SESSION,
-			async (localId?: string) => {
+			async (arg?: string | { session?: { localId?: string } }) => {
+				const localId = typeof arg === "string" ? arg : arg?.session?.localId;
 				await handleCancelSession(options, localId);
+			}
+		)
+	);
+
+	disposables.push(
+		commands.registerCommand(
+			CLOUD_AGENT_COMMANDS.REMOVE_SESSION,
+			async (arg?: string | { session?: { localId?: string } }) => {
+				const localId = typeof arg === "string" ? arg : arg?.session?.localId;
+				await handleRemoveSession(options, localId);
 			}
 		)
 	);
@@ -135,6 +148,15 @@ export function registerCloudAgentCommands(
 		commands.registerCommand(CLOUD_AGENT_COMMANDS.REFRESH, async () => {
 			await handleRefresh(options);
 		})
+	);
+
+	disposables.push(
+		commands.registerCommand(
+			CLOUD_AGENT_COMMANDS.DISPATCH_FULL_SPEC,
+			async (item?: DispatchTreeItem) => {
+				await handleDispatchFullSpec(options, item);
+			}
+		)
 	);
 
 	return disposables;
@@ -357,8 +379,8 @@ async function handleDispatchTask(
 			workspaceUri,
 			repoUrl,
 			featurePath,
-			isFullFeature: extracted.isTaskGroup,
-			taskIds: extracted.isTaskGroup ? undefined : [extracted.taskId],
+			isFullFeature: false,
+			taskIds: [extracted.taskId],
 		};
 
 		const session = await createSessionWithRetry(provider, task, context);
@@ -436,6 +458,66 @@ async function isTaskAlreadyRunning(
 	return true;
 }
 
+async function handleDispatchFullSpec(
+	opts: CloudAgentCommandOptions,
+	item?: DispatchTreeItem
+): Promise<void> {
+	try {
+		const provider = await ensureActiveProvider(opts.registry);
+		if (!provider) {
+			return;
+		}
+
+		const path = item?.filePath ?? "";
+		if (!path) {
+			window.showErrorMessage("No spec selected.");
+			return;
+		}
+
+		const featurePath = computeFeaturePath(path);
+		const specName = featurePath.split("/").pop() ?? featurePath;
+
+		const task: SpecTask = {
+			id: specName,
+			title: `Full Spec: ${specName}`,
+			description: `Implement the entire feature: ${specName}`,
+			priority: "medium",
+		};
+		const branch = (await getCurrentBranch()) ?? "main";
+		const workspaceUri = workspace.workspaceFolders?.[0]?.uri.toString() ?? "";
+		const repoUrl = (await getRemoteUrl()) ?? "";
+		const context: SessionContext = {
+			branch,
+			specPath: path,
+			workspaceUri,
+			repoUrl,
+			featurePath,
+			isFullFeature: true,
+		};
+
+		const session = await createSessionWithRetry(provider, task, context);
+
+		if (opts.sessionStorage) {
+			await opts.sessionStorage.create(session);
+		}
+		if (opts.pollingService && !opts.pollingService.isRunning) {
+			opts.pollingService.start(30_000);
+		}
+
+		opts.onSessionCreated?.();
+		opts.onRefresh?.();
+
+		logInfo(`Full spec dispatched to ${provider.metadata.id}: ${specName}`);
+		window.showInformationMessage(
+			`Full spec "${specName}" dispatched to ${provider.metadata.displayName}.`
+		);
+	} catch (error) {
+		logError("Failed to dispatch full spec", error);
+		const reason = extractErrorMessage(error);
+		window.showErrorMessage(`Failed to dispatch full spec: ${reason}`);
+	}
+}
+
 async function handleRefresh(opts: CloudAgentCommandOptions): Promise<void> {
 	try {
 		if (opts.pollingService) {
@@ -455,18 +537,14 @@ async function handleCancelSession(
 	const { registry, sessionStorage, onRefresh } = opts;
 	try {
 		if (!localId) {
-			window.showErrorMessage("No session specified to cancel.");
 			return;
 		}
-
 		if (!sessionStorage) {
-			window.showErrorMessage("Session storage not available.");
 			return;
 		}
 
 		const session = await sessionStorage.getById(localId);
 		if (!session) {
-			window.showErrorMessage(`Session "${localId}" not found.`);
 			return;
 		}
 
@@ -482,17 +560,33 @@ async function handleCancelSession(
 			await provider.cancelSession(localId);
 		}
 
-		await sessionStorage.update(localId, {
-			status: "cancelled" as const,
-			completedAt: Date.now(),
-		});
-
+		await sessionStorage.delete(localId);
 		onRefresh?.();
-		logInfo(`Session cancelled: ${localId}`);
-		window.showInformationMessage("Session cancelled.");
+		logInfo(`Session cancelled and removed: ${localId}`);
+		window.showInformationMessage("Session cancelled and removed.");
 	} catch (error) {
 		logError("Failed to cancel session", error);
 		window.showErrorMessage("Failed to cancel session.");
+	}
+}
+
+async function handleRemoveSession(
+	opts: CloudAgentCommandOptions,
+	localId?: string
+): Promise<void> {
+	try {
+		if (!localId) {
+			return;
+		}
+		if (!opts.sessionStorage) {
+			return;
+		}
+
+		await opts.sessionStorage.delete(localId);
+		opts.onRefresh?.();
+		logInfo(`Session removed: ${localId}`);
+	} catch (error) {
+		logError("Failed to remove session", error);
 	}
 }
 

@@ -979,6 +979,25 @@ function registerCommands({
 		),
 
 		commands.registerCommand(
+			"gatomia.spec.runFullSpec",
+			async (args?: { filePath?: string; specName?: string }) => {
+				const specName = args?.specName ?? "spec";
+				outputChannel.appendLine(
+					`[Run Full Spec] Triggering speckit.implement for full spec: ${specName}`
+				);
+
+				try {
+					await sendPromptToChat("/speckit.implement");
+				} catch (error) {
+					const message =
+						error instanceof Error ? error.message : String(error);
+					window.showErrorMessage(`Failed to run full spec: ${message}`);
+					outputChannel.appendLine(`[Run Full Spec] Failed: ${message}`);
+				}
+			}
+		),
+
+		commands.registerCommand(
 			"gatomia.spec.open",
 			async (relativePath: string, type: string, line?: number) => {
 				const uri = resolveWorkspaceRelativeUri(relativePath);

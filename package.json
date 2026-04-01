@@ -367,6 +367,18 @@
         "icon": "$(play)"
       },
       {
+        "command": "gatomia.spec.runFullSpec",
+        "title": "Run Full Spec",
+        "category": "GatomIA",
+        "icon": "$(play)"
+      },
+      {
+        "command": "gatomia.dispatchFullSpec",
+        "title": "Run Full Spec on Cloud",
+        "category": "GatomIA",
+        "icon": "$(cloud)"
+      },
+      {
         "command": "gatomia.spec.sendToReview",
         "title": "Send to Review",
         "category": "GatomIA",
@@ -745,7 +757,13 @@
         "command": "gatomia.cancelSession",
         "title": "Cancel Cloud Agent Session",
         "category": "GatomIA",
-        "icon": "$(circle-slash)"
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "gatomia.removeSession",
+        "title": "Remove Session from List",
+        "category": "GatomIA",
+        "icon": "$(trash)"
       },
       {
         "command": "gatomia.refreshCloudAgents",
@@ -894,6 +912,16 @@
           "group": "inline@2"
         },
         {
+          "command": "gatomia.spec.runFullSpec",
+          "when": "view == gatomia.views.specExplorer && viewItem == tasks-folder",
+          "group": "inline@1"
+        },
+        {
+          "command": "gatomia.dispatchFullSpec",
+          "when": "view == gatomia.views.specExplorer && viewItem == tasks-folder",
+          "group": "inline@2"
+        },
+        {
           "command": "gatomia.spec.sendToReview",
           "when": "view == gatomia.views.specExplorer && viewItem == spec-current",
           "group": "inline@1"
@@ -934,9 +962,14 @@
           "group": "7_modification@2"
         },
         {
-          "command": "gatomia.devin.cancelSession",
-          "when": "view == gatomia.views.cloudAgents && (viewItem == devinSession.queued || viewItem == devinSession.initializing || viewItem == devinSession.running)",
+          "command": "gatomia.cancelSession",
+          "when": "view == gatomia.views.cloudAgents && (viewItem == session.pending || viewItem == session.running || viewItem == session.blocked)",
           "group": "inline@1"
+        },
+        {
+          "command": "gatomia.removeSession",
+          "when": "view == gatomia.views.cloudAgents && (viewItem =~ /^session\\./)",
+          "group": "inline@2"
         },
         {
           "command": "gatomia.hooks.disable",
