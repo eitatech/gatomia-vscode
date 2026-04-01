@@ -746,14 +746,25 @@
         "title": "Cancel Cloud Agent Session",
         "category": "GatomIA",
         "icon": "$(circle-slash)"
+      },
+      {
+        "command": "gatomia.refreshCloudAgents",
+        "title": "Refresh Cloud Agent Sessions",
+        "category": "GatomIA",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "gatomia.changeProvider",
+          "command": "gatomia.refreshCloudAgents",
           "when": "view == gatomia.views.cloudAgents && gatomia.cloudAgent.hasProvider",
           "group": "navigation@1"
+        },
+        {
+          "command": "gatomia.changeProvider",
+          "when": "view == gatomia.views.cloudAgents && gatomia.cloudAgent.hasProvider",
+          "group": "navigation@2"
         },
         {
           "command": "gatomia.spec.create",

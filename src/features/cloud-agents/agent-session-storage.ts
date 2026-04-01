@@ -47,7 +47,17 @@ export class AgentSessionStorage {
 		if (!Array.isArray(raw)) {
 			return Promise.resolve([]);
 		}
-		return Promise.resolve(raw.filter(isValidAgentSession) as AgentSession[]);
+		const valid: AgentSession[] = [];
+		for (const entry of raw) {
+			if (isValidAgentSession(entry)) {
+				valid.push(entry as AgentSession);
+			} else {
+				logDebug(
+					`Skipping invalid session entry: ${JSON.stringify(entry).slice(0, 200)}`
+				);
+			}
+		}
+		return Promise.resolve(valid);
 	}
 
 	/**
@@ -87,6 +97,17 @@ export class AgentSessionStorage {
 	}
 
 	/**
+	 * Check if a task (by specTaskId) is already in a non-terminal session.
+	 * Returns the running session if found, undefined otherwise.
+	 */
+	async findActiveBySpecTaskId(
+		specTaskId: string
+	): Promise<AgentSession | undefined> {
+		const active = await this.getActive();
+		return active.find((s) => s.tasks.some((t) => t.specTaskId === specTaskId));
+	}
+
+	/**
 	 * Save a new session.
 	 * @throws StoreError if localId already exists
 	 */
@@ -118,7 +139,8 @@ export class AgentSessionStorage {
 				"update"
 			);
 		}
-		sessions[index] = { ...sessions[index], ...updates };
+		const cleaned = stripUndefined(updates);
+		sessions[index] = { ...sessions[index], ...cleaned, updatedAt: Date.now() };
 		await this.persist(sessions);
 		logDebug(`Session updated: ${localId}`);
 	}
@@ -179,6 +201,21 @@ export class AgentSessionStorage {
  * Runtime check that a deserialized value has the minimum required shape of an AgentSession.
  * Filters out corrupted or schema-incompatible entries after deserialization.
  */
+/**
+ * Remove undefined values from an object to prevent overwriting
+ * existing fields (especially arrays like tasks/pullRequests) with undefined
+ * during a partial update spread.
+ */
+function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+	const result: Record<string, unknown> = {};
+	for (const key of Object.keys(obj)) {
+		if (obj[key] !== undefined) {
+			result[key] = obj[key];
+		}
+	}
+	return result as Partial<T>;
+}
+
 function isValidAgentSession(value: unknown): boolean {
 	if (typeof value !== "object" || value === null) {
 		return false;

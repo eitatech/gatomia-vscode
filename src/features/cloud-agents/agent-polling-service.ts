@@ -11,7 +11,12 @@
 import type { AgentSessionStorage } from "./agent-session-storage";
 import { logDebug, logError, logWarn } from "./logging";
 import type { ProviderRegistry } from "./provider-registry";
-import { ErrorCode, ProviderError, SessionStatus } from "./types";
+import {
+	ErrorCode,
+	ProviderError,
+	SessionStatus,
+	type SessionUpdate,
+} from "./types";
 
 // ============================================================================
 // Constants
@@ -34,7 +39,14 @@ export class AgentPollingService {
 	private readonly sessionStorage: AgentSessionStorage;
 	private intervalId: ReturnType<typeof setInterval> | undefined;
 	private consecutiveFailures = 0;
-	private onCredentialExpiry: (() => void) | undefined;
+	private readonly callbacks = {
+		onCredentialExpiry: undefined as (() => void) | undefined,
+		onSessionCompleted: undefined as
+			| ((localId: string, specPath: string) => void)
+			| undefined,
+		onError: undefined as ((message: string) => void) | undefined,
+		onUpdated: undefined as (() => void) | undefined,
+	};
 
 	/**
 	 * Whether interval-based polling is currently running.
@@ -52,7 +64,33 @@ export class AgentPollingService {
 	 * Register a callback for credential-expiry events (FR-020).
 	 */
 	setOnCredentialExpiry(handler: () => void): void {
-		this.onCredentialExpiry = handler;
+		this.callbacks.onCredentialExpiry = handler;
+	}
+
+	/**
+	 * Register a callback for provider errors (SC-006).
+	 * Called with a user-facing error message when an API failure is detected.
+	 */
+	setOnError(handler: (message: string) => void): void {
+		this.callbacks.onError = handler;
+	}
+
+	/**
+	 * Register a callback fired after each poll cycle that applied updates.
+	 * Used to refresh the tree view UI.
+	 */
+	setOnUpdated(handler: () => void): void {
+		this.callbacks.onUpdated = handler;
+	}
+
+	/**
+	 * Register a callback for session completion events (FR-017).
+	 * Called with (localId, specPath) when a session reaches a terminal state.
+	 */
+	setOnSessionCompleted(
+		handler: (localId: string, specPath: string) => void
+	): void {
+		this.callbacks.onSessionCompleted = handler;
 	}
 
 	/**
@@ -73,38 +111,16 @@ export class AgentPollingService {
 
 			const updates = await provider.pollSessions(sessions);
 			for (const update of updates) {
-				const { localId, ...fields } = update;
-				const isTerminal =
-					update.status === SessionStatus.COMPLETED ||
-					update.status === SessionStatus.FAILED ||
-					update.status === SessionStatus.CANCELLED;
-				await this.sessionStorage.update(localId, {
-					...fields,
-					...(isTerminal ? { completedAt: Date.now() } : {}),
-				});
+				await this.applyUpdate(update);
 			}
 
 			this.consecutiveFailures = 0;
 			if (updates.length > 0) {
 				logDebug(`Applied ${updates.length} session update(s)`);
+				this.callbacks.onUpdated?.();
 			}
 		} catch (error) {
-			this.consecutiveFailures += 1;
-
-			if (this.isCredentialError(error)) {
-				logWarn("Credential expiry detected during polling");
-				this.onCredentialExpiry?.();
-				return;
-			}
-
-			logError("Polling cycle failed", error);
-
-			if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-				logWarn(
-					`Polling paused after ${MAX_CONSECUTIVE_FAILURES} consecutive failures`
-				);
-				this.stop();
-			}
+			this.handlePollError(error);
 		}
 	}
 
@@ -133,6 +149,50 @@ export class AgentPollingService {
 			clearInterval(this.intervalId);
 			this.intervalId = undefined;
 			logDebug("Polling stopped");
+		}
+	}
+
+	private async applyUpdate(update: SessionUpdate): Promise<void> {
+		const { localId, ...fields } = update;
+		const isTerminal =
+			update.status === SessionStatus.COMPLETED ||
+			update.status === SessionStatus.FAILED ||
+			update.status === SessionStatus.CANCELLED;
+		await this.sessionStorage.update(localId, {
+			...fields,
+			...(isTerminal ? { completedAt: Date.now() } : {}),
+		});
+
+		if (isTerminal && update.status === SessionStatus.COMPLETED) {
+			const session = await this.sessionStorage.getById(localId);
+			if (session) {
+				this.callbacks.onSessionCompleted?.(localId, session.specPath);
+			}
+		}
+	}
+
+	private handlePollError(error: unknown): void {
+		this.consecutiveFailures += 1;
+
+		if (this.isCredentialError(error)) {
+			logWarn("Credential expiry detected during polling");
+			this.callbacks.onCredentialExpiry?.();
+			return;
+		}
+
+		logError("Polling cycle failed", error);
+
+		const errorMsg =
+			error instanceof ProviderError
+				? error.message
+				: "Cloud agent polling failed. Check the output channel for details.";
+		this.callbacks.onError?.(errorMsg);
+
+		if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+			logWarn(
+				`Polling paused after ${MAX_CONSECUTIVE_FAILURES} consecutive failures`
+			);
+			this.stop();
 		}
 	}
 

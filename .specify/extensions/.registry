@@ -153,6 +153,41 @@
         ]
       },
       "installed_at": "2026-02-27T14:48:14.251563+00:00"
+    },
+    "ralph": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:6267a8fe75d3badbcb2674440c4542b21c0ee84b199e82f5208ce4757ab5e9bb",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "claude": [
+          "speckit.ralph.run",
+          "speckit.ralph.iterate"
+        ],
+        "gemini": [
+          "speckit.ralph.run",
+          "speckit.ralph.iterate"
+        ],
+        "copilot": [
+          "speckit.ralph.run",
+          "speckit.ralph.iterate"
+        ],
+        "opencode": [
+          "speckit.ralph.run",
+          "speckit.ralph.iterate"
+        ],
+        "windsurf": [
+          "speckit.ralph.run",
+          "speckit.ralph.iterate"
+        ],
+        "qodercli": [
+          "speckit.ralph.run",
+          "speckit.ralph.iterate"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-03-31T10:59:29.134339+00:00"
     }
   }
 }

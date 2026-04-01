@@ -199,10 +199,18 @@ export interface SpecTask {
 export interface SessionContext {
 	/** Git branch for this session */
 	readonly branch: string;
-	/** Absolute path to the spec file */
+	/** Relative path to the spec/tasks file (e.g., "specs/001-auth/tasks.md") */
 	readonly specPath: string;
 	/** Workspace folder URI */
 	readonly workspaceUri: string;
+	/** Repository remote URL */
+	readonly repoUrl?: string;
+	/** Relative path to the feature spec dir (e.g., "specs/001-auth") */
+	readonly featurePath?: string;
+	/** Whether this dispatches the entire feature (true) or specific tasks (false) */
+	readonly isFullFeature?: boolean;
+	/** Specific task IDs to execute (when not full feature) */
+	readonly taskIds?: string[];
 }
 
 // ============================================================================

@@ -10,7 +10,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GitHubCopilotAdapter } from "../../../../../src/features/cloud-agents/adapters/github-copilot-adapter";
 
-const NOT_YET_IMPLEMENTED_PATTERN = /not yet implemented/;
+const TOKEN_NOT_CONFIGURED_PATTERN = /token not configured/i;
 
 // ============================================================================
 // Helpers
@@ -90,15 +90,19 @@ describe("GitHubCopilotAdapter", () => {
 
 		it("should store credentials via configureCredentials", async () => {
 			const { window } = await import("vscode");
-			(window.showInputBox as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-				"ghp_test_token_456"
-			);
+			(window.showInputBox as ReturnType<typeof vi.fn>)
+				.mockResolvedValueOnce("ghp_test_token_456")
+				.mockResolvedValueOnce("myorg/myrepo");
 
 			const result = await adapter.configureCredentials();
 			expect(result).toBe(true);
 			expect(secrets.store).toHaveBeenCalledWith(
 				"gatomia.github-copilot.token",
 				"ghp_test_token_456"
+			);
+			expect(secrets.store).toHaveBeenCalledWith(
+				"gatomia.github-copilot.repo",
+				"myorg/myrepo"
 			);
 		});
 
@@ -199,13 +203,8 @@ describe("GitHubCopilotAdapter", () => {
 	// ========================================================================
 
 	describe("dispatch", () => {
-		let adapter: GitHubCopilotAdapter;
-
-		beforeEach(() => {
-			adapter = new GitHubCopilotAdapter(createMockSecretStorage());
-		});
-
-		it("should throw ProviderError indicating feature is not yet implemented", () => {
+		it("should reject with ProviderError when credentials are missing", async () => {
+			const adapter = new GitHubCopilotAdapter(createMockSecretStorage());
 			const task = {
 				id: "T-001",
 				title: "Implement feature",
@@ -218,8 +217,8 @@ describe("GitHubCopilotAdapter", () => {
 				workspaceUri: "file:///workspace",
 			};
 
-			expect(() => adapter.createSession(task, context)).toThrow(
-				NOT_YET_IMPLEMENTED_PATTERN
+			await expect(adapter.createSession(task, context)).rejects.toThrow(
+				TOKEN_NOT_CONFIGURED_PATTERN
 			);
 		});
 	});

@@ -42,6 +42,115 @@ export interface SecretStorage {
 }
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+const DEVIN_PLAYBOOK_KEY = "gatomia.devin.playbookId";
+
+// ============================================================================
+// Prompt Builder
+// ============================================================================
+
+/**
+ * Build a short referential Devin prompt.
+ * Points the agent to read artifacts from the repository instead of pasting content.
+ */
+function buildDevinPrompt(task: SpecTask, context: SessionContext): string {
+	const featurePath = context.featurePath ?? "";
+
+	if (context.isFullFeature) {
+		return buildFullFeaturePrompt(featurePath, context.branch);
+	}
+
+	const taskIds = context.taskIds ?? [task.id];
+	return buildTaskBatchPrompt(featurePath, taskIds, context.branch);
+}
+
+function buildFullFeaturePrompt(featurePath: string, branch: string): string {
+	return [
+		"You are working in this repository and must execute a spec-driven implementation.",
+		"",
+		`Feature path: ${featurePath}`,
+		"",
+		"Read these files as source of truth (MANDATORY):",
+		`- ${featurePath}/spec.md`,
+		`- ${featurePath}/plan.md`,
+		`- ${featurePath}/tasks.md`,
+		"",
+		"Also read if they exist:",
+		`- ${featurePath}/research.md`,
+		`- ${featurePath}/data-model.md`,
+		`- ${featurePath}/contracts/ (all files)`,
+		`- ${featurePath}/quickstart.md`,
+		"",
+		"Instructions:",
+		"1. Read ALL artifacts before modifying any code.",
+		"2. Summarize the objective and approach before implementing.",
+		"3. Execute tasks in order defined in tasks.md.",
+		"4. Do NOT expand scope beyond what is defined in the artifacts.",
+		"5. Preserve existing patterns, conventions, and architecture.",
+		"6. Run tests, lint, and validations.",
+		"7. Fix failures before concluding.",
+		"8. Mark completed tasks as [X] in tasks.md.",
+		"9. Deliver: summary of changes, files altered, tests run, risks, PR title/description.",
+		"",
+		"Restrictions:",
+		"- No broad refactors outside scope.",
+		"- No changes to unrelated files without clear necessity.",
+		"- If ambiguous, follow the most conservative interpretation and document the decision.",
+		"- If essential context is missing, stop and state exactly what is needed.",
+		"",
+		buildBranchInstructions(branch),
+	].join("\n");
+}
+
+function buildTaskBatchPrompt(
+	featurePath: string,
+	taskIds: string[],
+	branch: string
+): string {
+	return [
+		"You are working in this repository and must execute specific tasks from a spec-driven plan.",
+		"",
+		`Feature path: ${featurePath}`,
+		"",
+		"Read these files (MANDATORY):",
+		`- ${featurePath}/spec.md`,
+		`- ${featurePath}/plan.md`,
+		`- ${featurePath}/tasks.md`,
+		"",
+		"Also read if they exist:",
+		`- ${featurePath}/research.md`,
+		`- ${featurePath}/data-model.md`,
+		`- ${featurePath}/contracts/ (all files)`,
+		`- ${featurePath}/quickstart.md`,
+		"",
+		`Execute ONLY these tasks: ${taskIds.join(", ")}`,
+		"",
+		"Rules:",
+		"- Follow strictly the scope of the listed tasks.",
+		"- Preserve repository patterns and conventions.",
+		"- Run tests and lint for affected code.",
+		"- Mark completed tasks as [X] in tasks.md.",
+		"- Report files altered, validations executed, and any remaining risks.",
+		"- Do NOT implement tasks outside the list above, even if they seem related.",
+		"",
+		buildBranchInstructions(branch),
+	].join("\n");
+}
+
+function buildBranchInstructions(branch: string): string {
+	if (!branch) {
+		return "";
+	}
+	return [
+		"Branch Instructions:",
+		`You MUST create a new branch from \`${branch}\` and open the Pull Request targeting \`${branch}\`.`,
+		"Do NOT target any other branch (e.g. main, master, develop, development).",
+	].join("\n");
+}
+
+// ============================================================================
 // Devin Status -> Cloud Agent Status Mapping
 // ============================================================================
 
@@ -86,11 +195,11 @@ export class DevinAdapter implements CloudAgentProvider {
 	};
 
 	private readonly credentialsManager: DevinCredentialsManager;
+	private readonly secrets: SecretStorage;
 	private apiClient: DevinApiClientInterface | undefined;
 
 	constructor(secrets: SecretStorage, apiClient?: DevinApiClientInterface) {
-		// SecretStorage is structurally compatible with vscode.SecretStorage at runtime
-		// (context.secrets is always a full vscode.SecretStorage instance)
+		this.secrets = secrets;
 		this.credentialsManager = new DevinCredentialsManager(
 			secrets as unknown as vscode.SecretStorage
 		);
@@ -129,8 +238,17 @@ export class DevinAdapter implements CloudAgentProvider {
 			}
 		}
 
+		const playbookId = await window.showInputBox({
+			prompt: "Enter your Devin Playbook ID (optional, press Enter to skip)",
+			placeHolder: "playbook-...",
+			ignoreFocusOut: true,
+		});
+
 		try {
 			await this.credentialsManager.store(apiKey, orgId);
+			if (playbookId) {
+				await this.secrets.store(DEVIN_PLAYBOOK_KEY, playbookId);
+			}
 			this.apiClient = undefined;
 			logInfo("Devin credentials configured via Cloud Agents");
 			return true;
@@ -175,10 +293,17 @@ export class DevinAdapter implements CloudAgentProvider {
 			);
 		}
 
+		const prompt = buildDevinPrompt(task, context);
+		const repos = context.repoUrl
+			? [{ url: context.repoUrl, branch: context.branch }]
+			: [];
+		const playbookId = await this.secrets.get(DEVIN_PLAYBOOK_KEY);
 		const response = await client.createSession({
-			prompt: `# Task: ${task.title}\n\n${task.description}`,
+			prompt,
 			title: `${task.id}: ${task.title}`,
 			tags: ["gatomia", `task-${task.id}`],
+			...(repos.length > 0 ? { repos } : {}),
+			...(playbookId ? { playbookId } : {}),
 		});
 
 		const now = Date.now();
@@ -260,21 +385,21 @@ export class DevinAdapter implements CloudAgentProvider {
 					continue;
 				}
 
-				updates.push({
+				const updateEntry: SessionUpdate = {
 					localId: session.localId,
 					status: mappedStatus,
 					timestamp: Date.now(),
 					externalUrl: response.url || session.externalUrl,
-					pullRequests:
-						response.pullRequests.length > 0
-							? response.pullRequests.map((pr) => ({
-									url: pr.prUrl,
-									state: pr.prState,
-									branch: session.branch,
-									createdAt: Date.now(),
-								}))
-							: undefined,
-				});
+				};
+				if (response.pullRequests.length > 0) {
+					updateEntry.pullRequests = response.pullRequests.map((pr) => ({
+						url: pr.prUrl,
+						state: pr.prState,
+						branch: session.branch,
+						createdAt: Date.now(),
+					}));
+				}
+				updates.push(updateEntry);
 			} catch (error) {
 				logError(
 					`Failed to poll Devin session ${session.providerSessionId}`,

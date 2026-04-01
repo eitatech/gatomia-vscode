@@ -10,7 +10,6 @@
 import { commands, window, workspace } from "vscode";
 import { join, dirname } from "node:path";
 import { readFileSync, existsSync } from "node:fs";
-import { parseTasksFromFile } from "../utils/task-parser";
 import { DEVIN_COMMANDS } from "../features/devin/config";
 import type { DevinCredentialsManager } from "../features/devin/devin-credentials-manager";
 import type {
@@ -23,7 +22,6 @@ import {
 	getRemoteUrl,
 	validateGitState,
 } from "../features/devin/git-validator";
-import { commitAndPush } from "../features/devin/git-operations";
 import {
 	showGitValidationError,
 	confirmTaskInitiation,
@@ -154,20 +152,6 @@ export function registerDevinCommands(
 			async (specPath?: string) => {
 				await handleStartAllTasks(
 					specPath,
-					sessionManager,
-					credentialsManager,
-					callbacks?.onSessionCreated
-				);
-			}
-		)
-	);
-
-	disposables.push(
-		commands.registerCommand(
-			DEVIN_COMMANDS.RUN_WITH_DEVIN,
-			async (item?: RunWithDevinTreeItem) => {
-				await handleRunWithDevin(
-					item,
 					sessionManager,
 					credentialsManager,
 					callbacks?.onSessionCreated
@@ -395,239 +379,9 @@ async function handleStartAllTasks(
 	}
 }
 
-async function handleRunWithDevin(
-	item: RunWithDevinTreeItem | undefined,
-	sessionManager: DevinSessionManager,
-	credentialsManager: DevinCredentialsManager,
-	onSessionCreated?: () => void
-): Promise<void> {
-	const isTaskGroup = item?.contextValue === "task-group";
-	const isTaskItem = item?.task !== undefined;
-
-	if (!(isTaskGroup || isTaskItem)) {
-		await window.showErrorMessage(
-			"No task selected. Use this action from the Spec Explorer task list."
-		);
-		return;
-	}
-
-	try {
-		const hasCredentials = await credentialsManager.hasCredentials();
-		if (!hasCredentials) {
-			const configure = await window.showWarningMessage(
-				"Devin credentials are not configured. Configure them now?",
-				"Configure",
-				"Cancel"
-			);
-			if (configure === "Configure") {
-				await commands.executeCommand(DEVIN_COMMANDS.CONFIGURE_CREDENTIALS);
-			}
-			return;
-		}
-
-		if (isTaskGroup) {
-			await handleRunGroupWithDevin(
-				item,
-				sessionManager,
-				credentialsManager,
-				onSessionCreated
-			);
-		} else {
-			await handleRunSingleTaskWithDevin(
-				item,
-				sessionManager,
-				credentialsManager,
-				onSessionCreated
-			);
-		}
-	} catch (error: unknown) {
-		const errorCode = isDevinError(error) ? error.code : "UNKNOWN";
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		logTaskStartFailure("", errorCode, errorMessage);
-		await showDevinErrorNotification(error);
-	}
-}
-
-async function handleRunSingleTaskWithDevin(
-	item: RunWithDevinTreeItem,
-	sessionManager: DevinSessionManager,
-	credentialsManager: DevinCredentialsManager,
-	onSessionCreated?: () => void
-): Promise<void> {
-	const task = item.task;
-	if (!task) {
-		return;
-	}
-
-	const { id: taskId, title: taskTitle } = task;
-	logTaskStart(taskId, "run-with-devin");
-
-	const gitValidation = await validateGitState();
-	if (!gitValidation.isValid) {
-		await showGitValidationError(gitValidation.errors);
-		return;
-	}
-
-	const confirmed = await window.showInformationMessage(
-		`Run with Devin: commit, push, and delegate "${taskId}: ${taskTitle}" to Devin?`,
-		{ modal: true },
-		"Run with Devin"
-	);
-
-	if (confirmed !== "Run with Devin") {
-		return;
-	}
-
-	const gitResult = await window.withProgress(
-		{
-			location: { viewId: "gatomia.views.specExplorer" },
-			title: "Committing and pushing changes...",
-		},
-		() => commitAndPush(taskId, taskTitle)
-	);
-
-	if (!gitResult.success) {
-		await window.showErrorMessage(`Git operation failed: ${gitResult.error}`);
-		return;
-	}
-
-	const repoUrl = (await getRemoteUrl()) ?? "";
-
-	const session = await sessionManager.startTask({
-		specPath: item.filePath ?? "",
-		taskId,
-		title: taskTitle,
-		description: taskTitle,
-		priority: (task.priority as "P1" | "P2" | "P3") ?? "P1",
-		branch: gitResult.branch,
-		repoUrl,
-	});
-
-	logTaskStartSuccess(taskId, session.sessionId, session.apiVersion);
-	onSessionCreated?.();
-	await showSessionStartedNotification(taskId, session.devinUrl);
-}
-
-async function handleRunGroupWithDevin(
-	item: RunWithDevinTreeItem,
-	sessionManager: DevinSessionManager,
-	credentialsManager: DevinCredentialsManager,
-	onSessionCreated?: () => void
-): Promise<void> {
-	const groupName = item.parentName;
-	const tasksFilePath = item.filePath;
-
-	if (!(groupName && tasksFilePath)) {
-		await window.showErrorMessage("Could not determine the task group.");
-		return;
-	}
-
-	const result = resolveIncompleteGroupTasks(groupName, tasksFilePath);
-	if (!result.tasks) {
-		await window.showWarningMessage(result.reason ?? "No tasks to delegate.");
-		return;
-	}
-	const incompleteTasks = result.tasks;
-
-	const confirmed = await window.showInformationMessage(
-		`Run with Devin: commit, push, and delegate "${groupName}" (${incompleteTasks.length} task(s)) as a single session to Devin?`,
-		{ modal: true },
-		"Run with Devin"
-	);
-
-	if (confirmed !== "Run with Devin") {
-		return;
-	}
-
-	logTaskStart(incompleteTasks[0].id, "run-with-devin-group");
-
-	const gitResult = await window.withProgress(
-		{
-			location: { viewId: "gatomia.views.specExplorer" },
-			title: "Committing and pushing changes...",
-		},
-		() => commitAndPush(groupName, `group: ${groupName}`)
-	);
-
-	if (!gitResult.success) {
-		await window.showErrorMessage(`Git operation failed: ${gitResult.error}`);
-		return;
-	}
-
-	const repoUrl = (await getRemoteUrl()) ?? "";
-	const referenceDocuments = loadReferenceDocuments(tasksFilePath);
-
-	const session = await sessionManager.startTaskGroup({
-		specPath: tasksFilePath,
-		groupName,
-		tasks: incompleteTasks.map((t) => ({
-			taskId: t.id,
-			title: t.title,
-			priority: (t.priority ?? "P2") as "P1" | "P2" | "P3",
-		})),
-		branch: gitResult.branch,
-		repoUrl,
-		referenceDocuments,
-	});
-
-	const taskIds = incompleteTasks.map((t) => t.id).join(", ");
-	logTaskStartSuccess(taskIds, session.sessionId, session.apiVersion);
-	onSessionCreated?.();
-	await showSessionStartedNotification(
-		`${groupName} (${incompleteTasks.length} tasks)`,
-		session.devinUrl
-	);
-}
-
-interface ResolveGroupResult {
-	readonly tasks?: { id: string; title: string; priority?: string }[];
-	readonly reason?: string;
-}
-
-function resolveIncompleteGroupTasks(
-	groupName: string,
-	tasksFilePath: string
-): ResolveGroupResult {
-	const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
-	if (!workspaceRoot) {
-		return { reason: "No workspace folder open." };
-	}
-
-	const absolutePath = join(workspaceRoot, tasksFilePath);
-	const taskGroups = parseTasksFromFile(absolutePath);
-
-	if (taskGroups.length === 0) {
-		return { reason: `No task groups found in "${tasksFilePath}".` };
-	}
-
-	const group = taskGroups.find((g) => g.name === groupName);
-
-	if (!group) {
-		const available = taskGroups.map((g) => g.name).join(", ");
-		return {
-			reason: `Group "${groupName}" not found. Available groups: ${available}`,
-		};
-	}
-
-	if (group.tasks.length === 0) {
-		return { reason: `Group "${groupName}" has no tasks.` };
-	}
-
-	const incomplete = group.tasks.filter((t) => t.status !== "completed");
-	if (incomplete.length === 0) {
-		return {
-			reason: `All ${group.tasks.length} task(s) in "${groupName}" are already completed.`,
-		};
-	}
-
-	return {
-		tasks: incomplete.map((t) => ({
-			id: t.id,
-			title: t.title,
-			priority: t.priority,
-		})),
-	};
-}
+// handleRunWithDevin, handleRunSingleTaskWithDevin, handleRunGroupWithDevin,
+// and resolveIncompleteGroupTasks were removed in the Cloud Agents migration.
+// Task dispatch is now handled by gatomia.dispatchTask in cloud-agent-commands.ts.
 
 /**
  * Load reference documents (spec, plan, design, etc.) from the spec directory.

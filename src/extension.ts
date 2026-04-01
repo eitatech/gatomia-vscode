@@ -89,20 +89,7 @@ import { DevinSessionManager } from "./features/devin/devin-session-manager";
 import { DevinSessionStorage } from "./features/devin/devin-session-storage";
 import { DevinPollingService } from "./features/devin/devin-polling-service";
 import { SessionCleanupService } from "./features/devin/session-cleanup";
-import { ProviderConfigStore } from "./features/cloud-agents/provider-config-store";
-import { ProviderRegistry } from "./features/cloud-agents/provider-registry";
-import { DevinAdapter } from "./features/cloud-agents/adapters/devin-adapter";
-import { GitHubCopilotAdapter } from "./features/cloud-agents/adapters/github-copilot-adapter";
-import { MigrationService } from "./features/cloud-agents/migration-service";
-import { CloudAgentProgressProvider } from "./providers/cloud-agent-progress-provider";
-import { registerCloudAgentCommands } from "./commands/cloud-agent-commands";
-import { AgentSessionStorage } from "./features/cloud-agents/agent-session-storage";
-import { AgentPollingService } from "./features/cloud-agents/agent-polling-service";
-import { SessionCleanupService as CloudSessionCleanupService } from "./features/cloud-agents/session-cleanup-service";
-import {
-	logInfo as cloudAgentLogInfo,
-	disposeCloudAgentsOutputChannel,
-} from "./features/cloud-agents/logging";
+import { disposeCloudAgentsOutputChannel } from "./features/cloud-agents/logging";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -677,68 +664,7 @@ export async function activate(context: ExtensionContext) {
 	// ========================================================================
 	// Cloud Agents (Multi-Provider) Bootstrap
 	// ========================================================================
-	try {
-		const cloudConfigStore = new ProviderConfigStore(context.workspaceState);
-		const cloudRegistry = new ProviderRegistry(cloudConfigStore);
-
-		cloudRegistry.register(new DevinAdapter(context.secrets));
-		cloudRegistry.register(new GitHubCopilotAdapter(context.secrets));
-
-		const migrationService = new MigrationService(
-			cloudConfigStore,
-			context.workspaceState,
-			context.secrets
-		);
-		await migrationService.migrateIfNeeded();
-		await migrationService.detectOrphanedConfig(cloudRegistry);
-		await cloudRegistry.restoreActive();
-
-		const cloudSessionStorage = new AgentSessionStorage(context.workspaceState);
-
-		const cloudProgressProvider = new CloudAgentProgressProvider(
-			cloudRegistry,
-			cloudSessionStorage
-		);
-		const cloudTreeView = window.createTreeView("gatomia.views.cloudAgents", {
-			treeDataProvider: cloudProgressProvider,
-		});
-		context.subscriptions.push(cloudTreeView, {
-			dispose: () => cloudProgressProvider.dispose(),
-		});
-		await cloudProgressProvider.updateContextKeys();
-
-		const cloudPollingService = new AgentPollingService(
-			cloudRegistry,
-			cloudSessionStorage
-		);
-		const cloudCleanupService = new CloudSessionCleanupService(
-			cloudSessionStorage
-		);
-		await cloudCleanupService.cleanup();
-
-		if (cloudRegistry.getActive()) {
-			cloudPollingService.start(30_000);
-		}
-		context.subscriptions.push({ dispose: () => cloudPollingService.stop() });
-
-		const refreshCloudUI = () => {
-			cloudProgressProvider.refresh();
-			cloudProgressProvider.updateContextKeys();
-		};
-		const cloudCmdDisposables = registerCloudAgentCommands({
-			registry: cloudRegistry,
-			sessionStorage: cloudSessionStorage,
-			pollingService: cloudPollingService,
-			onSessionCreated: refreshCloudUI,
-			onRefresh: refreshCloudUI,
-		});
-		context.subscriptions.push(...cloudCmdDisposables);
-
-		cloudAgentLogInfo("Cloud Agents module bootstrapped");
-		outputChannel.appendLine("[CloudAgents] Module bootstrapped successfully");
-	} catch (error) {
-		outputChannel.appendLine(`[CloudAgents] Failed to bootstrap: ${error}`);
-	}
+	await bootstrapCloudAgents(context);
 	context.subscriptions.push({ dispose: disposeCloudAgentsOutputChannel });
 
 	// Set up file watchers
@@ -2135,4 +2061,139 @@ async function openActivePreviewInEditor(): Promise<void> {
 	}
 
 	await openDocumentInEditor(activePreviewUri);
+}
+
+// ============================================================================
+// Cloud Agents Bootstrap (extracted to reduce activate() complexity)
+// ============================================================================
+
+async function bootstrapCloudAgents(context: ExtensionContext): Promise<void> {
+	const { ProviderConfigStore } = await import(
+		"./features/cloud-agents/provider-config-store"
+	);
+	const { ProviderRegistry } = await import(
+		"./features/cloud-agents/provider-registry"
+	);
+	const { DevinAdapter } = await import(
+		"./features/cloud-agents/adapters/devin-adapter"
+	);
+	const { GitHubCopilotAdapter } = await import(
+		"./features/cloud-agents/adapters/github-copilot-adapter"
+	);
+	const { MigrationService } = await import(
+		"./features/cloud-agents/migration-service"
+	);
+	const { CloudAgentProgressProvider } = await import(
+		"./providers/cloud-agent-progress-provider"
+	);
+	const { registerCloudAgentCommands } = await import(
+		"./commands/cloud-agent-commands"
+	);
+	const { AgentSessionStorage } = await import(
+		"./features/cloud-agents/agent-session-storage"
+	);
+	const { AgentPollingService } = await import(
+		"./features/cloud-agents/agent-polling-service"
+	);
+	const { SessionCleanupService: CloudCleanup } = await import(
+		"./features/cloud-agents/session-cleanup-service"
+	);
+	const { logInfo: cloudLog } = await import("./features/cloud-agents/logging");
+
+	try {
+		const configStore = new ProviderConfigStore(context.workspaceState);
+		const registry = new ProviderRegistry(configStore);
+
+		registry.register(new DevinAdapter(context.secrets));
+		registry.register(new GitHubCopilotAdapter(context.secrets));
+
+		const migration = new MigrationService(
+			configStore,
+			context.workspaceState,
+			context.secrets
+		);
+		await migration.migrateIfNeeded();
+		await migration.detectOrphanedConfig(registry);
+		await registry.restoreActive();
+
+		const sessionStorage = new AgentSessionStorage(context.workspaceState);
+
+		const existingSessions = await sessionStorage.getAll();
+		outputChannel.appendLine(
+			`[CloudAgents] Loaded ${existingSessions.length} session(s) from storage`
+		);
+		const activeSessions = await sessionStorage.getActive();
+		outputChannel.appendLine(
+			`[CloudAgents] ${activeSessions.length} active (pollable) session(s)`
+		);
+
+		const progressProvider = new CloudAgentProgressProvider(
+			registry,
+			sessionStorage
+		);
+		const treeView = window.createTreeView("gatomia.views.cloudAgents", {
+			treeDataProvider: progressProvider,
+		});
+		context.subscriptions.push(treeView, {
+			dispose: () => progressProvider.dispose(),
+		});
+		await progressProvider.updateContextKeys();
+
+		const pollingService = new AgentPollingService(registry, sessionStorage);
+		const cleanupService = new CloudCleanup(sessionStorage);
+		await cleanupService.cleanup();
+
+		pollingService.setOnSessionCompleted(async (localId, specPath) => {
+			try {
+				const { updateSpecTasksOnSessionComplete } = await import(
+					"./features/devin/spec-status-updater"
+				);
+				const session = await sessionStorage.getById(localId);
+				if (session) {
+					await updateSpecTasksOnSessionComplete(session as never);
+					outputChannel.appendLine(
+						`[CloudAgents] Synced task status (spec: ${specPath})`
+					);
+				}
+			} catch (err: unknown) {
+				outputChannel.appendLine(
+					`[CloudAgents] Failed to sync task status: ${err}`
+				);
+			}
+		});
+
+		pollingService.setOnError((message) => {
+			window.showErrorMessage(`Cloud Agent: ${message}`);
+		});
+
+		pollingService.setOnUpdated(() => {
+			progressProvider.refresh();
+		});
+
+		if (registry.getActive() && activeSessions.length > 0) {
+			pollingService.start(30_000);
+			outputChannel.appendLine(
+				`[CloudAgents] Polling started for ${activeSessions.length} active session(s)`
+			);
+		}
+		context.subscriptions.push({ dispose: () => pollingService.stop() });
+
+		const refreshUI = () => {
+			progressProvider.refresh();
+			progressProvider.updateContextKeys();
+		};
+		const cmdDisposables = registerCloudAgentCommands({
+			registry,
+			sessionStorage,
+			pollingService,
+			onSessionCreated: refreshUI,
+			onRefresh: refreshUI,
+		});
+		context.subscriptions.push(...cmdDisposables);
+
+		cloudLog("Cloud Agents module bootstrapped");
+		outputChannel.appendLine("[CloudAgents] Module bootstrapped successfully");
+	} catch (error) {
+		outputChannel.appendLine(`[CloudAgents] Failed to bootstrap: ${error}`);
+	}
 }
