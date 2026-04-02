@@ -629,6 +629,9 @@ export async function activate(context: ExtensionContext) {
 				env.openExternal(Uri.parse(url));
 			}
 		});
+		devinPollingService.onPrStateChange(async (event) => {
+			await handleDevinPrStateChange(event, devinSessionStorage);
+		});
 		context.subscriptions.push({ dispose: () => devinPollingService.stop() });
 
 		// Start session cleanup service (7-day retention policy)
@@ -731,6 +734,53 @@ export async function activate(context: ExtensionContext) {
 	}
 
 	// No UI mode toggle commands required
+}
+
+async function handleDevinPrStateChange(
+	event: import("./features/devin/devin-polling-service").PrStateChangeEvent,
+	storage: DevinSessionStorage
+): Promise<void> {
+	if (event.newState !== "merged") {
+		return;
+	}
+	outputChannel.appendLine(
+		`[Devin] PR merged for session ${event.sessionId}: ${event.prUrl}`
+	);
+	const session = storage.getBySessionId(event.sessionId);
+	if (!session) {
+		return;
+	}
+
+	try {
+		const { updateSpecTaskStatusOnMerge } = await import(
+			"./features/devin/spec-status-updater"
+		);
+		const pr = session.pullRequests.find((p) => p.prUrl === event.prUrl);
+		if (pr) {
+			await updateSpecTaskStatusOnMerge(session.specPath, event.specTaskId, {
+				...pr,
+				prState: "merged",
+			});
+			outputChannel.appendLine(
+				`[Devin] Marked task ${event.specTaskId} as completed in tasks.md (PR merged)`
+			);
+		}
+	} catch (err: unknown) {
+		outputChannel.appendLine(
+			`[Devin] Failed to update spec task on PR merge: ${err}`
+		);
+	}
+
+	try {
+		const { handlePrStateChange } = await import(
+			"./features/devin/pr-notification-handler"
+		);
+		await handlePrStateChange(session, event.previousState, event.newState);
+	} catch (err: unknown) {
+		outputChannel.appendLine(
+			`[Devin] Failed to notify PR state change: ${err}`
+		);
+	}
 }
 
 async function syncAllSpecReviewFlowSummaries(

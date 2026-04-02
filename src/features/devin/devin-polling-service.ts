@@ -44,14 +44,34 @@ export interface BlockedSessionEvent {
 }
 
 /**
+ * Event emitted when a PR state changes (e.g., open -> merged).
+ */
+export interface PrStateChangeEvent {
+	readonly localId: string;
+	readonly sessionId: string;
+	readonly specPath: string;
+	readonly specTaskId: string;
+	readonly prUrl: string;
+	readonly previousState: string | undefined;
+	readonly newState: string;
+}
+
+/**
  * Options for configuring the polling service.
  */
 export interface PollingServiceOptions {
 	readonly intervalSeconds?: number;
 }
 
+/**
+ * Number of extra poll cycles after all sessions become terminal.
+ * Allows catching late PR state changes (e.g., merge after session completes).
+ */
+const GRACE_CYCLES_AFTER_TERMINAL = 6;
+
 type StatusChangeListener = (event: StatusChangeEvent) => void;
 type BlockedSessionListener = (event: BlockedSessionEvent) => void;
+type PrStateChangeListener = (event: PrStateChangeEvent) => void;
 type PollCycleListener = () => void;
 type LogFn = (message: string) => void;
 
@@ -73,9 +93,11 @@ export class DevinPollingService {
 	private readonly intervalMs: number;
 	private readonly listeners: Set<StatusChangeListener> = new Set();
 	private readonly blockedListeners: Set<BlockedSessionListener> = new Set();
+	private readonly prStateListeners: Set<PrStateChangeListener> = new Set();
 	private readonly cycleListeners: Set<PollCycleListener> = new Set();
 	private readonly log: LogFn;
 	private timerId: ReturnType<typeof setInterval> | undefined;
+	private graceCyclesRemaining = 0;
 
 	constructor(
 		storage: DevinSessionStorage,
@@ -180,6 +202,21 @@ export class DevinPollingService {
 	}
 
 	/**
+	 * Register a listener for PR state change events.
+	 *
+	 * Called when a PR transitions state (e.g., open -> merged),
+	 * enabling downstream actions like marking tasks.md checkboxes.
+	 *
+	 * @returns A dispose function to unregister the listener
+	 */
+	onPrStateChange(listener: PrStateChangeListener): () => void {
+		this.prStateListeners.add(listener);
+		return () => {
+			this.prStateListeners.delete(listener);
+		};
+	}
+
+	/**
 	 * Register a listener called after every poll cycle completes.
 	 *
 	 * @returns A dispose function to unregister the listener
@@ -196,10 +233,26 @@ export class DevinPollingService {
 	 */
 	async pollOnce(): Promise<void> {
 		const activeSessions = this.storage.getActive();
+		const recentlyCompleted = this.getRecentlyCompletedSessions();
+		const sessionsToPoll = [...activeSessions, ...recentlyCompleted];
 
-		if (activeSessions.length === 0) {
-			this.log("[Polling] No active sessions, stopping poller");
-			this.stop();
+		if (sessionsToPoll.length === 0) {
+			if (this.graceCyclesRemaining > 0) {
+				this.graceCyclesRemaining -= 1;
+				this.log(
+					`[Polling] Grace period: ${this.graceCyclesRemaining} cycles remaining`
+				);
+			} else {
+				this.log("[Polling] No active sessions, stopping poller");
+				this.stop();
+				return;
+			}
+		}
+
+		if (activeSessions.length === 0 && recentlyCompleted.length === 0) {
+			for (const listener of this.cycleListeners) {
+				listener();
+			}
 			return;
 		}
 
@@ -209,9 +262,15 @@ export class DevinPollingService {
 			return;
 		}
 
-		this.log(`[Polling] Polling ${activeSessions.length} active session(s)...`);
+		this.log(
+			`[Polling] Polling ${activeSessions.length} active + ${recentlyCompleted.length} recently-completed session(s)...`
+		);
 
-		for (const session of activeSessions) {
+		if (activeSessions.length > 0) {
+			this.graceCyclesRemaining = GRACE_CYCLES_AFTER_TERMINAL;
+		}
+
+		for (const session of sessionsToPoll) {
 			await this.pollSession(
 				client,
 				session.localId,
@@ -229,6 +288,20 @@ export class DevinPollingService {
 	// Private
 	// ============================================================================
 
+	private getRecentlyCompletedSessions() {
+		if (this.graceCyclesRemaining <= 0) {
+			return [];
+		}
+		const all = this.storage.getAll();
+		const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+		return all.filter(
+			(s) =>
+				isTerminalStatus(s.status) &&
+				s.updatedAt > fiveMinutesAgo &&
+				s.pullRequests.length > 0
+		);
+	}
+
 	private async pollSession(
 		client: DevinApiClientInterface,
 		localId: string,
@@ -242,6 +315,14 @@ export class DevinPollingService {
 				response.statusDetail
 			);
 
+			// Re-read session by localId right before update to minimize stale-read window
+			let freshSession: import("./entities").DevinSession;
+			try {
+				freshSession = this.storage.getByLocalId(localId);
+			} catch {
+				return;
+			}
+
 			const updates: Record<string, unknown> = {
 				status: newStatus,
 			};
@@ -251,34 +332,39 @@ export class DevinPollingService {
 			}
 
 			if (response.pullRequests.length > 0) {
-				updates.pullRequests = response.pullRequests.map((pr) => ({
-					prUrl: pr.prUrl,
-					prState: pr.prState,
-					branch: "",
-					createdAt: Date.now(),
-				}));
+				updates.pullRequests = response.pullRequests.map((pr) => {
+					const existing = freshSession.pullRequests.find(
+						(p) => p.prUrl === pr.prUrl
+					);
+					return {
+						prUrl: pr.prUrl,
+						prState: pr.prState,
+						branch: existing?.branch || freshSession.branch,
+						createdAt: existing?.createdAt ?? Date.now(),
+					};
+				});
+
+				this.detectPrStateChanges(freshSession, response.pullRequests);
 			}
 
-			// Re-read session by localId right before update to minimize stale-read window
-			try {
-				const freshSession = this.storage.getByLocalId(localId);
-
-				// If the session was cancelled/completed locally while we were polling,
-				// do not overwrite the terminal state with stale API data.
-				if (isTerminalStatus(freshSession.status)) {
-					return;
+			// For terminal sessions being re-polled (grace period),
+			// only update PR data, not status or tasks
+			if (isTerminalStatus(freshSession.status)) {
+				if (response.pullRequests.length > 0) {
+					await this.storage.update(localId, {
+						pullRequests:
+							updates.pullRequests as import("./entities").PullRequest[],
+					});
 				}
-
-				updates.tasks = syncTaskStatuses(freshSession.tasks, newStatus);
-
-				if (!freshSession.devinUrl) {
-					const url =
-						response.url || `https://app.devin.ai/sessions/${sessionId}`;
-					updates.devinUrl = url;
-				}
-			} catch {
-				// Session may have been deleted concurrently; skip update entirely
 				return;
+			}
+
+			updates.tasks = syncTaskStatuses(freshSession.tasks, newStatus);
+
+			if (!freshSession.devinUrl) {
+				const url =
+					response.url || `https://app.devin.ai/sessions/${sessionId}`;
+				updates.devinUrl = url;
 			}
 
 			await this.storage.update(localId, updates);
@@ -308,6 +394,37 @@ export class DevinPollingService {
 		}
 	}
 
+	private detectPrStateChanges(
+		session: import("./entities").DevinSession,
+		newPrs: import("./devin-api-client").PullRequestInfo[]
+	): void {
+		const specTaskId =
+			session.tasks.length > 0 ? session.tasks[0].specTaskId : "";
+
+		for (const newPr of newPrs) {
+			const existing = session.pullRequests.find(
+				(p) => p.prUrl === newPr.prUrl
+			);
+			const previousState = existing?.prState;
+			const newState = newPr.prState;
+
+			if (newState && previousState !== newState) {
+				this.log(
+					`[Polling] PR state changed: ${previousState ?? "(new)"} -> ${newState} for ${newPr.prUrl}`
+				);
+				this.emitPrStateChange({
+					localId: session.localId,
+					sessionId: session.sessionId,
+					specPath: session.specPath,
+					specTaskId,
+					prUrl: newPr.prUrl,
+					previousState,
+					newState,
+				});
+			}
+		}
+	}
+
 	private emit(event: StatusChangeEvent): void {
 		for (const listener of this.listeners) {
 			listener(event);
@@ -316,6 +433,12 @@ export class DevinPollingService {
 
 	private emitBlocked(event: BlockedSessionEvent): void {
 		for (const listener of this.blockedListeners) {
+			listener(event);
+		}
+	}
+
+	private emitPrStateChange(event: PrStateChangeEvent): void {
+		for (const listener of this.prStateListeners) {
 			listener(event);
 		}
 	}
