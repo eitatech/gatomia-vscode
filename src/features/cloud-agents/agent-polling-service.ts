@@ -27,6 +27,7 @@ import {
 
 const MAX_CONSECUTIVE_FAILURES = 3;
 const PR_GRACE_PERIOD_MS = 5 * 60 * 1000;
+const PR_UNKNOWN_STATE_GRACE_PERIOD_MS = 60 * 60 * 1000;
 
 const TERMINAL_PR_STATES = new Set(["merged", "closed"]);
 
@@ -173,7 +174,11 @@ export class AgentPollingService {
 				continue;
 			}
 			const completedAt = session.completedAt ?? session.updatedAt;
-			if (now - completedAt >= PR_GRACE_PERIOD_MS) {
+			const hasUnknownPrState = session.pullRequests.some((pr) => !pr.state);
+			const effectiveGracePeriod = hasUnknownPrState
+				? PR_UNKNOWN_STATE_GRACE_PERIOD_MS
+				: PR_GRACE_PERIOD_MS;
+			if (now - completedAt >= effectiveGracePeriod) {
 				continue;
 			}
 			if (session.pullRequests.length === 0) {

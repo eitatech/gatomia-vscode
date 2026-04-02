@@ -12,7 +12,10 @@ import { logInfo, logDebug } from "./logging";
 import type { Memento } from "./provider-config-store";
 import {
 	SessionStatus,
+	TaskStatus,
 	type AgentSession,
+	type AgentTask,
+	type PullRequest,
 	StoreError,
 	StoreErrorCode,
 } from "./types";
@@ -50,7 +53,7 @@ export class AgentSessionStorage {
 		const valid: AgentSession[] = [];
 		for (const entry of raw) {
 			if (isValidAgentSession(entry)) {
-				valid.push(entry as AgentSession);
+				valid.push(normalizeSession(entry as AgentSession));
 			} else {
 				logDebug(
 					`Skipping invalid session entry: ${JSON.stringify(entry).slice(0, 200)}`
@@ -214,6 +217,65 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
 		}
 	}
 	return result as Partial<T>;
+}
+
+const TERMINAL_SESSION_STATUSES: ReadonlySet<string> = new Set([
+	SessionStatus.COMPLETED,
+	SessionStatus.FAILED,
+	SessionStatus.CANCELLED,
+]);
+
+const TERMINAL_TASK_STATUSES: ReadonlySet<string> = new Set([
+	TaskStatus.COMPLETED,
+	TaskStatus.FAILED,
+	TaskStatus.SKIPPED,
+]);
+
+const SESSION_TO_TASK_STATUS: Record<string, TaskStatus> = {
+	[SessionStatus.COMPLETED]: TaskStatus.COMPLETED,
+	[SessionStatus.FAILED]: TaskStatus.FAILED,
+	[SessionStatus.CANCELLED]: TaskStatus.SKIPPED,
+};
+
+function normalizeSession(session: AgentSession): AgentSession {
+	if (!TERMINAL_SESSION_STATUSES.has(session.status)) {
+		return session;
+	}
+
+	let tasks: AgentTask[] | undefined;
+	const hasStaleTask = session.tasks.some(
+		(t) => !TERMINAL_TASK_STATUSES.has(t.status)
+	);
+	if (hasStaleTask) {
+		const targetStatus =
+			SESSION_TO_TASK_STATUS[session.status] ?? TaskStatus.SKIPPED;
+		const now = Date.now();
+		tasks = session.tasks.map((task) => {
+			if (TERMINAL_TASK_STATUSES.has(task.status)) {
+				return task;
+			}
+			return { ...task, status: targetStatus, completedAt: now };
+		});
+	}
+
+	let pullRequests: PullRequest[] | undefined;
+	const hasUnknownPrState = session.pullRequests.some((pr) => !pr.state);
+	if (hasUnknownPrState) {
+		const defaultState =
+			session.status === SessionStatus.COMPLETED ? "merged" : "open";
+		pullRequests = session.pullRequests.map((pr) =>
+			pr.state ? pr : { ...pr, state: defaultState }
+		);
+	}
+
+	if (tasks || pullRequests) {
+		return {
+			...session,
+			...(tasks ? { tasks } : {}),
+			...(pullRequests ? { pullRequests } : {}),
+		};
+	}
+	return session;
 }
 
 function isValidAgentSession(value: unknown): boolean {

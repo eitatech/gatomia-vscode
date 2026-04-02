@@ -129,13 +129,21 @@ export class DevinApiClientV1 implements DevinApiClientInterface {
 // Raw API response shapes (snake_case from API)
 // ============================================================================
 
+interface RawV1PullRequest {
+	pr_url?: string;
+	pr_state?: string;
+	url?: string;
+	state?: string;
+}
+
 interface RawV1CreateSessionResponse {
 	session_id: string;
 	url?: string;
 	status: string;
 	created_at: string | number;
 	updated_at: string | number;
-	pull_request?: { url: string; state?: string } | null;
+	pull_request?: RawV1PullRequest | null;
+	pull_requests?: RawV1PullRequest[];
 }
 
 interface RawV1GetSessionResponse {
@@ -146,7 +154,8 @@ interface RawV1GetSessionResponse {
 	updated_at: string | number;
 	title?: string;
 	tags?: string[];
-	pull_request?: { url: string; state?: string } | null;
+	pull_request?: RawV1PullRequest | null;
+	pull_requests?: RawV1PullRequest[];
 	snapshot_id?: string;
 	structured_output?: object;
 }
@@ -167,12 +176,34 @@ function parseTimestamp(value: string | number): number {
 	return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function extractV1PullRequests(
+	singular: RawV1PullRequest | null | undefined,
+	plural: RawV1PullRequest[] | undefined
+): { prUrl: string; prState?: string }[] {
+	if (plural && plural.length > 0) {
+		return plural.map((pr) => ({
+			prUrl: pr.pr_url ?? pr.url ?? "",
+			prState: pr.pr_state ?? pr.state,
+		}));
+	}
+	if (singular) {
+		return [
+			{
+				prUrl: singular.pr_url ?? singular.url ?? "",
+				prState: singular.pr_state ?? singular.state,
+			},
+		];
+	}
+	return [];
+}
+
 function mapV1CreateSessionResponse(
 	raw: RawV1CreateSessionResponse
 ): CreateSessionResponse {
-	const pullRequests = raw.pull_request
-		? [{ prUrl: raw.pull_request.url, prState: raw.pull_request.state }]
-		: [];
+	const pullRequests = extractV1PullRequests(
+		raw.pull_request,
+		raw.pull_requests
+	);
 
 	return {
 		sessionId: raw.session_id,
@@ -188,9 +219,10 @@ function mapV1CreateSessionResponse(
 function mapV1GetSessionResponse(
 	raw: RawV1GetSessionResponse
 ): GetSessionResponse {
-	const pullRequests = raw.pull_request
-		? [{ prUrl: raw.pull_request.url, prState: raw.pull_request.state }]
-		: [];
+	const pullRequests = extractV1PullRequests(
+		raw.pull_request,
+		raw.pull_requests
+	);
 
 	return {
 		sessionId: raw.session_id,
