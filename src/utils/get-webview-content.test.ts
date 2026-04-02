@@ -53,4 +53,19 @@ describe("get-webview-content", () => {
 		const nonceMatch = cspContent.match(/script-src 'nonce-([a-zA-Z0-9]{32})'/);
 		expect(nonceMatch).not.toBeNull();
 	});
+
+	// 4. CSP Nonce Meta Tag: Test that csp-nonce meta tag is injected for Vite dynamic imports
+	it("should inject csp-nonce meta tag for Vite dynamic imports", () => {
+		const html = getWebviewContent(mockWebview, mockExtensionUri, "test");
+		const cspNonceMatch = html.match(
+			/<meta property="csp-nonce" nonce="([a-zA-Z0-9]{32})" \/>/
+		);
+		expect(cspNonceMatch).not.toBeNull();
+		expect(cspNonceMatch?.[1].length).toBe(32);
+
+		// Verify nonce matches the one in CSP
+		const cspMatch = html.match(/script-src 'nonce-([a-zA-Z0-9]{32})'/);
+		expect(cspMatch).not.toBeNull();
+		expect(cspNonceMatch?.[1]).toBe(cspMatch?.[1]);
+	});
 });

@@ -1,14 +1,43 @@
-import { CreateSpecView } from "./features/create-spec-view";
-import { CreateSteeringView } from "./features/create-steering-view";
-import { InteractiveView } from "./features/interactive-view";
-import { SimpleView } from "./features/simple-view";
-import { HooksView } from "./features/hooks-view";
-import { DependenciesView } from "./features/dependencies-view";
-import { PreviewApp } from "./features/preview/preview-app";
-import {
-	WelcomeScreen,
-	ErrorBoundary as WelcomeErrorBoundary,
-} from "./features/welcome/welcome-screen";
+import { lazy, Suspense, type ComponentType } from "react";
+import { ErrorBoundary as WelcomeErrorBoundary } from "./features/welcome/welcome-screen";
+
+// Lazy-loaded page components for code-splitting
+const CreateSpecView = lazy(() =>
+	import("./features/create-spec-view").then((m) => ({
+		default: m.CreateSpecView,
+	}))
+);
+const CreateSteeringView = lazy(() =>
+	import("./features/create-steering-view").then((m) => ({
+		default: m.CreateSteeringView,
+	}))
+);
+const InteractiveView = lazy(() =>
+	import("./features/interactive-view").then((m) => ({
+		default: m.InteractiveView,
+	}))
+);
+const SimpleView = lazy(() =>
+	import("./features/simple-view").then((m) => ({ default: m.SimpleView }))
+);
+const HooksView = lazy(() =>
+	import("./features/hooks-view").then((m) => ({ default: m.HooksView }))
+);
+const DependenciesView = lazy(() =>
+	import("./features/dependencies-view").then((m) => ({
+		default: m.DependenciesView,
+	}))
+);
+const PreviewApp = lazy(() =>
+	import("./features/preview/preview-app").then((m) => ({
+		default: m.PreviewApp,
+	}))
+);
+const WelcomeScreen = lazy(() =>
+	import("./features/welcome/welcome-screen").then((m) => ({
+		default: m.WelcomeScreen,
+	}))
+);
 
 export type SupportedPage =
 	| "simple"
@@ -20,18 +49,44 @@ export type SupportedPage =
 	| "document-preview"
 	| "welcome-screen";
 
+function LoadingFallback() {
+	return (
+		<div
+			style={{
+				display: "flex",
+				alignItems: "center",
+				justifyContent: "center",
+				height: "100%",
+				color: "var(--vscode-foreground)",
+			}}
+		>
+			Loading...
+		</div>
+	);
+}
+
+function withSuspense(Component: ComponentType) {
+	return (
+		<Suspense fallback={<LoadingFallback />}>
+			<Component />
+		</Suspense>
+	);
+}
+
 const pageRenderers = {
-	simple: () => <SimpleView />,
-	interactive: () => <InteractiveView />,
-	"create-spec": () => <CreateSpecView />,
-	"create-steering": () => <CreateSteeringView />,
-	hooks: () => <HooksView />,
-	dependencies: () => <DependenciesView />,
-	"document-preview": () => <PreviewApp />,
+	simple: () => withSuspense(SimpleView),
+	interactive: () => withSuspense(InteractiveView),
+	"create-spec": () => withSuspense(CreateSpecView),
+	"create-steering": () => withSuspense(CreateSteeringView),
+	hooks: () => withSuspense(HooksView),
+	dependencies: () => withSuspense(DependenciesView),
+	"document-preview": () => withSuspense(PreviewApp),
 	"welcome-screen": () => (
-		<WelcomeErrorBoundary>
-			<WelcomeScreen />
-		</WelcomeErrorBoundary>
+		<Suspense fallback={<LoadingFallback />}>
+			<WelcomeErrorBoundary>
+				<WelcomeScreen />
+			</WelcomeErrorBoundary>
+		</Suspense>
 	),
 } satisfies Record<SupportedPage, () => JSX.Element>;
 
