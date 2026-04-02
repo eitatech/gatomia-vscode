@@ -15,6 +15,9 @@ import {
 	ErrorCode,
 	ProviderError,
 	SessionStatus,
+	TaskStatus,
+	type AgentSession,
+	type AgentTask,
 	type SessionUpdate,
 } from "./types";
 
@@ -23,6 +26,9 @@ import {
 // ============================================================================
 
 const MAX_CONSECUTIVE_FAILURES = 3;
+const PR_GRACE_PERIOD_MS = 5 * 60 * 1000;
+
+const TERMINAL_PR_STATES = new Set(["merged", "closed"]);
 
 // ============================================================================
 // AgentPollingService
@@ -104,7 +110,7 @@ export class AgentPollingService {
 		}
 
 		try {
-			const sessions = await this.sessionStorage.getActive();
+			const sessions = await this.getSessionsToPoll();
 			if (sessions.length === 0) {
 				return;
 			}
@@ -152,14 +158,57 @@ export class AgentPollingService {
 		}
 	}
 
+	private async getSessionsToPoll(): Promise<AgentSession[]> {
+		const active = await this.sessionStorage.getActive();
+		const all = await this.sessionStorage.getAll();
+		const now = Date.now();
+		const activeIds = new Set(active.map((s) => s.localId));
+
+		for (const session of all) {
+			if (activeIds.has(session.localId)) {
+				continue;
+			}
+			if (session.isReadOnly) {
+				continue;
+			}
+			const completedAt = session.completedAt ?? session.updatedAt;
+			if (now - completedAt >= PR_GRACE_PERIOD_MS) {
+				continue;
+			}
+			if (session.pullRequests.length === 0) {
+				continue;
+			}
+			if (
+				session.pullRequests.every((pr) =>
+					TERMINAL_PR_STATES.has(pr.state ?? "")
+				)
+			) {
+				continue;
+			}
+			active.push(session);
+		}
+
+		return active;
+	}
+
 	private async applyUpdate(update: SessionUpdate): Promise<void> {
 		const { localId, ...fields } = update;
 		const isTerminal =
 			update.status === SessionStatus.COMPLETED ||
 			update.status === SessionStatus.FAILED ||
 			update.status === SessionStatus.CANCELLED;
+
+		let derivedTasks: AgentTask[] | undefined;
+		if (isTerminal && !update.tasks) {
+			const current = await this.sessionStorage.getById(localId);
+			if (current && current.tasks.length > 0) {
+				derivedTasks = deriveTerminalTaskStatuses(current.tasks, update.status);
+			}
+		}
+
 		await this.sessionStorage.update(localId, {
 			...fields,
+			...(derivedTasks ? { tasks: derivedTasks } : {}),
 			...(isTerminal ? { completedAt: Date.now() } : {}),
 		});
 
@@ -205,4 +254,32 @@ export class AgentPollingService {
 		}
 		return false;
 	}
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function deriveTerminalTaskStatuses(
+	tasks: readonly AgentTask[],
+	sessionStatus: SessionStatus | undefined
+): AgentTask[] {
+	let targetStatus: TaskStatus = TaskStatus.SKIPPED;
+	if (sessionStatus === SessionStatus.COMPLETED) {
+		targetStatus = TaskStatus.COMPLETED;
+	} else if (sessionStatus === SessionStatus.FAILED) {
+		targetStatus = TaskStatus.FAILED;
+	}
+
+	const now = Date.now();
+	return tasks.map((task) => {
+		if (
+			task.status === TaskStatus.COMPLETED ||
+			task.status === TaskStatus.FAILED ||
+			task.status === TaskStatus.SKIPPED
+		) {
+			return task;
+		}
+		return { ...task, status: targetStatus, completedAt: now };
+	});
 }
