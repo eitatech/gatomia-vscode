@@ -163,6 +163,7 @@ export class AgentPollingService {
 		const all = await this.sessionStorage.getAll();
 		const now = Date.now();
 		const activeIds = new Set(active.map((s) => s.localId));
+		const gracePeriodSessions: AgentSession[] = [];
 
 		for (const session of all) {
 			if (activeIds.has(session.localId)) {
@@ -185,14 +186,14 @@ export class AgentPollingService {
 			) {
 				continue;
 			}
-			active.push(session);
+			gracePeriodSessions.push(session);
 		}
 
-		return active;
+		return [...active, ...gracePeriodSessions];
 	}
 
 	private async applyUpdate(update: SessionUpdate): Promise<void> {
-		const { localId, ...fields } = update;
+		const { localId, timestamp: _timestamp, ...fields } = update;
 		const isTerminal =
 			update.status === SessionStatus.COMPLETED ||
 			update.status === SessionStatus.FAILED ||

@@ -289,7 +289,7 @@ export class DevinAdapter implements CloudAgentProvider {
 				"Devin credentials not configured. Please configure credentials first.",
 				ErrorCode.CREDENTIALS_MISSING,
 				DevinAdapter.PROVIDER_ID,
-				true
+				false
 			);
 		}
 
@@ -378,9 +378,11 @@ export class DevinAdapter implements CloudAgentProvider {
 				);
 				const mappedStatus = mapDevinToCloudStatus(devinStatus);
 
+				const newExternalUrl = response.url || session.externalUrl;
 				if (
 					mappedStatus === session.status &&
-					response.pullRequests.length === 0
+					response.pullRequests.length === 0 &&
+					newExternalUrl === session.externalUrl
 				) {
 					continue;
 				}

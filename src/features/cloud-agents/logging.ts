@@ -20,11 +20,15 @@ const CLOUD_AGENTS_CHANNEL_NAME = "Cloud Agents";
 // ============================================================================
 
 let outputChannel: OutputChannel | undefined;
+let disposed = false;
 
 /**
  * Get or create the Cloud Agents output channel.
  */
 export function getCloudAgentsOutputChannel(): OutputChannel {
+	if (disposed) {
+		return outputChannel as unknown as OutputChannel;
+	}
 	if (!outputChannel) {
 		outputChannel = window.createOutputChannel(CLOUD_AGENTS_CHANNEL_NAME);
 	}
@@ -77,4 +81,5 @@ export function logDebug(message: string): void {
 export function disposeCloudAgentsOutputChannel(): void {
 	outputChannel?.dispose();
 	outputChannel = undefined;
+	disposed = true;
 }

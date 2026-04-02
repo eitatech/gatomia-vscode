@@ -292,6 +292,7 @@ export class ProviderError extends Error {
 		recoverable = false
 	) {
 		super(message);
+		Object.setPrototypeOf(this, new.target.prototype);
 		this.name = "ProviderError";
 		this.code = code;
 		this.providerId = providerId;
@@ -329,6 +330,7 @@ export class StoreError extends Error {
 
 	constructor(message: string, code: StoreErrorCode, operation: string) {
 		super(message);
+		Object.setPrototypeOf(this, new.target.prototype);
 		this.name = "StoreError";
 		this.code = code;
 		this.operation = operation;

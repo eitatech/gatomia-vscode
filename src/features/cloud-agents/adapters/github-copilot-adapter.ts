@@ -358,10 +358,14 @@ export class GitHubCopilotAdapter implements CloudAgentProvider {
 		if (!match) {
 			return;
 		}
+		const issueNumber = Number.parseInt(match[3], 10);
+		if (Number.isNaN(issueNumber)) {
+			return;
+		}
 		return {
 			owner: match[1],
 			repo: match[2],
-			number: Number.parseInt(match[3], 10),
+			number: issueNumber,
 		};
 	}
 

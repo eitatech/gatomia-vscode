@@ -319,13 +319,16 @@ function extractTaskFromItem(
 async function ensureActiveProvider(
 	registry: ProviderRegistry
 ): Promise<CloudAgentProvider | undefined> {
-	const provider = registry.getActive();
+	let provider = registry.getActive();
 	if (!provider) {
 		window.showInformationMessage(
 			"No provider selected. Please select a provider first."
 		);
 		await commands.executeCommand(CLOUD_AGENT_COMMANDS.SELECT_PROVIDER);
-		return;
+		provider = registry.getActive();
+		if (!provider) {
+			return;
+		}
 	}
 	const hasCreds = await provider.hasCredentials();
 	if (!hasCreds) {
@@ -557,8 +560,8 @@ async function handleCancelSession(
 		}
 
 		const provider = registry.get(session.providerId);
-		if (provider && session.providerSessionId) {
-			await provider.cancelSession(session.providerSessionId);
+		if (provider && session.localId) {
+			await provider.cancelSession(session.localId);
 		}
 
 		await sessionStorage.update(localId, {
