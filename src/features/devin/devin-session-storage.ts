@@ -190,7 +190,7 @@ export class DevinSessionStorage {
 	private async persist(sessions: DevinSession[]): Promise<void> {
 		const raw = JSON.stringify(sessions);
 		this.cachedRaw = raw;
-		this.cachedSessions = JSON.parse(raw) as DevinSession[];
+		this.cachedSessions = sessions.map((s) => ({ ...s }));
 		await this.workspaceState.update(STORAGE_KEY_SESSIONS, raw);
 	}
 }

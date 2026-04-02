@@ -7,15 +7,10 @@
  * @see specs/001-devin-integration/contracts/extension-api.ts:L243-L249
  */
 
-import { commands, window, workspace } from "vscode";
-import { join, dirname } from "node:path";
-import { readFileSync, existsSync } from "node:fs";
+import { commands, window } from "vscode";
 import { DEVIN_COMMANDS } from "../features/devin/config";
 import type { DevinCredentialsManager } from "../features/devin/devin-credentials-manager";
-import type {
-	DevinSessionManager,
-	ReferenceDocument,
-} from "../features/devin/devin-session-manager";
+import type { DevinSessionManager } from "../features/devin/devin-session-manager";
 import type { DevinProgressPanel } from "../panels/devin-progress-panel";
 import { showDevinErrorNotification } from "../features/devin/error-notifications";
 import {
@@ -380,45 +375,6 @@ async function handleStartAllTasks(
 }
 
 // handleRunWithDevin, handleRunSingleTaskWithDevin, handleRunGroupWithDevin,
-// and resolveIncompleteGroupTasks were removed in the Cloud Agents migration.
-// Task dispatch is now handled by gatomia.dispatchTask in cloud-agent-commands.ts.
-
-/**
- * Load reference documents (spec, plan, design, etc.) from the spec directory.
- *
- * Discovers the spec directory from the tasks file path and reads any
- * available design artifacts to include as context for Devin.
- */
-function loadReferenceDocuments(tasksFilePath: string): ReferenceDocument[] {
-	const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
-	if (!workspaceRoot) {
-		return [];
-	}
-
-	const specDir = dirname(join(workspaceRoot, tasksFilePath));
-	const documentTypes = [
-		{ file: "spec.md", label: "Specification" },
-		{ file: "plan.md", label: "Implementation Plan" },
-		{ file: "design.md", label: "Design" },
-		{ file: "data-model.md", label: "Data Model" },
-		{ file: "requirements.md", label: "Requirements" },
-	];
-
-	const documents: ReferenceDocument[] = [];
-
-	for (const { file, label } of documentTypes) {
-		const filePath = join(specDir, file);
-		if (existsSync(filePath)) {
-			try {
-				const content = readFileSync(filePath, "utf-8");
-				if (content.trim().length > 0) {
-					documents.push({ type: label, content });
-				}
-			} catch {
-				// Skip unreadable files
-			}
-		}
-	}
-
-	return documents;
-}
+// resolveIncompleteGroupTasks, and loadReferenceDocuments were removed in the
+// Cloud Agents migration. Task dispatch is now handled by
+// gatomia.dispatchTask in cloud-agent-commands.ts.

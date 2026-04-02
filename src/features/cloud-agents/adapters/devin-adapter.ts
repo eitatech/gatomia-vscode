@@ -392,12 +392,17 @@ export class DevinAdapter implements CloudAgentProvider {
 					externalUrl: response.url || session.externalUrl,
 				};
 				if (response.pullRequests.length > 0) {
-					updateEntry.pullRequests = response.pullRequests.map((pr) => ({
-						url: pr.prUrl,
-						state: pr.prState,
-						branch: session.branch,
-						createdAt: Date.now(),
-					}));
+					updateEntry.pullRequests = response.pullRequests.map((pr) => {
+						const existing = session.pullRequests.find(
+							(p) => p.url === pr.prUrl
+						);
+						return {
+							url: pr.prUrl,
+							state: pr.prState,
+							branch: session.branch,
+							createdAt: existing?.createdAt ?? Date.now(),
+						};
+					});
 				}
 				updates.push(updateEntry);
 			} catch (error) {

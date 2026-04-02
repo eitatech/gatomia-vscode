@@ -1228,25 +1228,30 @@ function registerCommands({
 
 	// Add file save confirmation for agent files
 	context.subscriptions.push(
-		workspace.onWillSaveTextDocument(async (event) => {
-			const document = event.document;
-			const filePath = document.fileName;
+		workspace.onWillSaveTextDocument((event) => {
+			const filePath = event.document.fileName;
 
-			// Check if this is an agent file in .copilot directories
-			if (filePath.includes(".copilot/agents/") && filePath.endsWith(".md")) {
-				// Show confirmation dialog
-				const result = await window.showWarningMessage(
-					"Are you sure you want to save changes to this agent file?",
-					{ modal: true },
-					"Save",
-					"Cancel"
+			// Check if this is an agent file in .github/agents or .copilot/agents directories
+			const isAgentFile =
+				(filePath.includes(".copilot/agents/") ||
+					filePath.includes(".github/agents/")) &&
+				filePath.endsWith(".md");
+
+			if (isAgentFile) {
+				event.waitUntil(
+					window
+						.showWarningMessage(
+							"Are you sure you want to save changes to this agent file?",
+							{ modal: true },
+							"Save"
+						)
+						.then((result) => {
+							if (result !== "Save") {
+								throw new Error("Save cancelled by user");
+							}
+							return [];
+						})
 				);
-
-				if (result !== "Save") {
-					// Cancel the save operation by waiting forever
-					// biome-ignore lint/suspicious/noEmptyBlockStatements: ignore
-					event.waitUntil(new Promise(() => {}));
-				}
 			}
 		})
 	);
@@ -2169,7 +2174,7 @@ async function bootstrapCloudAgents(context: ExtensionContext): Promise<void> {
 				);
 				const session = await sessionStorage.getById(localId);
 				if (session) {
-					await updateSpecTasksOnSessionComplete(session as never);
+					await updateSpecTasksOnSessionComplete(session);
 					outputChannel.appendLine(
 						`[CloudAgents] Synced task status (spec: ${specPath})`
 					);

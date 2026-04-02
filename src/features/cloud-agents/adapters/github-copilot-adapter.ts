@@ -385,12 +385,17 @@ export class GitHubCopilotAdapter implements CloudAgentProvider {
 
 		const prs = issue.timelineItems.nodes
 			.filter((n) => n.__typename === "CrossReferencedEvent" && n.source?.url)
-			.map((n) => ({
-				url: n.source!.url,
-				state: n.source!.state?.toLowerCase(),
-				branch: session.branch,
-				createdAt: Date.now(),
-			}));
+			.map((n) => {
+				const existing = session.pullRequests.find(
+					(p) => p.url === n.source!.url
+				);
+				return {
+					url: n.source!.url,
+					state: n.source!.state?.toLowerCase(),
+					branch: session.branch,
+					createdAt: existing?.createdAt ?? Date.now(),
+				};
+			});
 
 		if (newStatus === session.status && prs.length === 0) {
 			return;

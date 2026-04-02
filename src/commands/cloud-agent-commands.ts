@@ -17,6 +17,7 @@ import type { ProviderRegistry } from "../features/cloud-agents/provider-registr
 import { logInfo, logError } from "../features/cloud-agents/logging";
 import {
 	ProviderError,
+	SessionStatus,
 	type AgentSession,
 	type SpecTask,
 	type SessionContext,
@@ -556,14 +557,17 @@ async function handleCancelSession(
 		}
 
 		const provider = registry.get(session.providerId);
-		if (provider) {
-			await provider.cancelSession(localId);
+		if (provider && session.providerSessionId) {
+			await provider.cancelSession(session.providerSessionId);
 		}
 
-		await sessionStorage.delete(localId);
+		await sessionStorage.update(localId, {
+			status: SessionStatus.CANCELLED,
+			completedAt: Date.now(),
+		});
 		onRefresh?.();
-		logInfo(`Session cancelled and removed: ${localId}`);
-		window.showInformationMessage("Session cancelled and removed.");
+		logInfo(`Session cancelled: ${localId}`);
+		window.showInformationMessage("Session cancelled.");
 	} catch (error) {
 		logError("Failed to cancel session", error);
 		window.showErrorMessage("Failed to cancel session.");

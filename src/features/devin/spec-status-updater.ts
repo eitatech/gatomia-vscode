@@ -10,23 +10,39 @@
 
 import { Uri, workspace } from "vscode";
 import { dirname, isAbsolute, join } from "node:path";
-import type { DevinSession, PullRequest } from "./entities";
+import type { PullRequest } from "./entities";
 import { TaskStatus } from "./types";
+
+// ============================================================================
+// Minimal session shape accepted by the updater
+// ============================================================================
+
+/**
+ * Minimal session contract needed for task-status sync.
+ * Satisfied by both DevinSession and AgentSession.
+ */
+interface SessionWithTasks {
+	readonly specPath: string;
+	readonly tasks: ReadonlyArray<{
+		readonly specTaskId: string;
+		readonly status: string;
+	}>;
+}
 
 // ============================================================================
 // Session Completion Sync
 // ============================================================================
 
 /**
- * Update spec tasks.md when a Devin session completes.
+ * Update spec tasks.md when a session completes.
  *
  * Reads the tasks file referenced by the session's specPath, finds each
  * completed task by its specTaskId, and marks it as [x] in one write.
  *
- * @param session - The completed Devin session
+ * @param session - The completed session (Devin or cloud-agent)
  */
 export async function updateSpecTasksOnSessionComplete(
-	session: DevinSession
+	session: SessionWithTasks
 ): Promise<void> {
 	const completedTaskIds = session.tasks
 		.filter((t) => t.status === TaskStatus.COMPLETED)
