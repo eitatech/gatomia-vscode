@@ -304,11 +304,13 @@ export class DocumentPreviewService {
 			if (match) {
 				if (currentTitle) {
 					commit();
+				} else {
+					this.commitIntroSection(preSectionBody, sections, slugCounts);
 				}
 
 				currentTitle = match[1].trim();
 				currentId = this.slugify(currentTitle);
-				currentBody = preSectionBody.length > 0 ? [...preSectionBody] : [];
+				currentBody = [];
 				preSectionBody = [];
 				continue;
 			}
@@ -325,20 +327,43 @@ export class DocumentPreviewService {
 			return sections;
 		}
 
-		const fallbackBody = preSectionBody.join("\n").trim();
-		if (fallbackBody.length === 0) {
-			return sections;
-		}
-
-		const fallbackTitle = this.inferFallbackSectionTitle(preSectionBody);
-		const fallbackId = this.slugify(fallbackTitle);
-		sections.push({
-			id: this.uniqueSlug(fallbackId, slugCounts),
-			title: fallbackTitle,
-			body: fallbackBody,
-		});
-
+		this.commitIntroSection(preSectionBody, sections, slugCounts);
 		return sections;
+	}
+
+	/**
+	 * Create an intro section from content that appears before the first H2 heading.
+	 * The section title is inferred from the first heading or non-empty line,
+	 * and that heading line is stripped from the body to avoid duplication.
+	 */
+	private commitIntroSection(
+		lines: string[],
+		sections: PreviewSection[],
+		slugCounts: Map<string, number>
+	): void {
+		const body = lines.join("\n").trim();
+		if (body.length === 0) {
+			return;
+		}
+		const title = this.inferFallbackSectionTitle(lines);
+		const id = this.slugify(title);
+		sections.push({
+			id: this.uniqueSlug(id, slugCounts),
+			title,
+			body: this.stripTitleHeadingFromBody(lines, title),
+		});
+	}
+
+	/**
+	 * Remove the heading line that was used as the section title from the body
+	 * to avoid rendering the title twice (once as `<h2>` and once inside the body).
+	 */
+	private stripTitleHeadingFromBody(lines: string[], title: string): string {
+		const filtered = lines.filter((line) => {
+			const m = FALLBACK_HEADING_PATTERN.exec(line);
+			return !(m && m[1].trim() === title);
+		});
+		return filtered.join("\n").trim();
 	}
 
 	private inferFallbackSectionTitle(lines: string[]): string {

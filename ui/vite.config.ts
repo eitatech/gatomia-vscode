@@ -13,15 +13,24 @@ export default defineConfig({
 			"@": resolve(__dirname, "src"),
 		},
 	},
+	html: {
+		cspNonce: "PLACEHOLDER",
+	},
 	build: {
 		outDir: resolve(__dirname, "../dist/webview/app"),
 		emptyOutDir: true,
 		rollupOptions: {
 			input: resolve(__dirname, "index.html"),
 			output: {
-				inlineDynamicImports: true,
 				entryFileNames: "index.js",
+				chunkFileNames: "[name].js",
 				assetFileNames: "assets/[name][extname]",
+				manualChunks: {
+					"vendor-react": ["react", "react-dom"],
+					"vendor-mermaid": ["mermaid", "markdown-it-mermaid"],
+					"vendor-highlight": ["highlight.js"],
+					"vendor-markdown": ["markdown-it", "markdown-it-plantuml"],
+				},
 			},
 		},
 	},

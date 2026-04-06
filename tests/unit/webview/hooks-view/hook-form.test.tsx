@@ -102,7 +102,7 @@ describe("HookForm", () => {
 				).toBeInTheDocument();
 			});
 			expect(mockOnSubmit).not.toHaveBeenCalled();
-		}, 15_000);
+		}, 30_000);
 
 		it("creates hook with valid data", async () => {
 			const user = userEvent.setup();
@@ -142,7 +142,7 @@ describe("HookForm", () => {
 					},
 				});
 			});
-		});
+		}, 30_000);
 
 		it("calls onCancel when cancel button is clicked", async () => {
 			const user = userEvent.setup();

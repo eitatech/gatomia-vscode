@@ -83,6 +83,13 @@ import {
 	isGlobalResourceAccessAllowed,
 	openGlobalResourceAccessSettings,
 } from "./features/steering/global-resource-access-consent";
+import { registerDevinCommands } from "./commands/devin-commands";
+import { DevinCredentialsManager } from "./features/devin/devin-credentials-manager";
+import { DevinSessionManager } from "./features/devin/devin-session-manager";
+import { DevinSessionStorage } from "./features/devin/devin-session-storage";
+import { DevinPollingService } from "./features/devin/devin-polling-service";
+import { SessionCleanupService } from "./features/devin/session-cleanup";
+import { disposeCloudAgentsOutputChannel } from "./features/cloud-agents/logging";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -564,6 +571,105 @@ export async function activate(context: ExtensionContext) {
 		})
 	);
 
+	// Register Devin integration commands (progress view now in Cloud Agents)
+	try {
+		const devinCredentialsManager = new DevinCredentialsManager(
+			context.secrets
+		);
+		const devinSessionStorage = new DevinSessionStorage(context.workspaceState);
+		const devinSessionManager = new DevinSessionManager(
+			devinSessionStorage,
+			devinCredentialsManager
+		);
+
+		// Set up polling service for session status updates
+		const devinPollingService = new DevinPollingService(
+			devinSessionStorage,
+			devinCredentialsManager,
+			undefined,
+			(msg) => outputChannel.appendLine(msg)
+		);
+		devinPollingService.onStatusChange(async (event) => {
+			if (event.status === "completed") {
+				const session = devinSessionStorage.getBySessionId(event.sessionId);
+				if (session) {
+					try {
+						const { updateSpecTasksOnSessionComplete } = await import(
+							"./features/devin/spec-status-updater"
+						);
+						await updateSpecTasksOnSessionComplete(session);
+						outputChannel.appendLine(
+							`[Devin] Synced task status for session ${event.sessionId}`
+						);
+					} catch (err: unknown) {
+						outputChannel.appendLine(
+							`[Devin] Failed to sync task status: ${err}`
+						);
+					}
+
+					if (session.pullRequests.length > 0) {
+						const { handlePrNotification } = await import(
+							"./features/devin/pr-notification-handler"
+						);
+						await handlePrNotification(session);
+					}
+				}
+			}
+		});
+		devinPollingService.onBlocked(async (event) => {
+			const action = await window.showWarningMessage(
+				`Devin session "${event.title}" is blocked and needs your input to continue.`,
+				"Open in Devin"
+			);
+			if (action === "Open in Devin") {
+				const session = devinSessionStorage.getBySessionId(event.sessionId);
+				const url =
+					session?.devinUrl ??
+					`https://app.devin.ai/sessions/${event.sessionId}`;
+				env.openExternal(Uri.parse(url));
+			}
+		});
+		devinPollingService.onPrStateChange(async (event) => {
+			await handleDevinPrStateChange(event, devinSessionStorage);
+		});
+		context.subscriptions.push({ dispose: () => devinPollingService.stop() });
+
+		// Start session cleanup service (7-day retention policy)
+		const devinCleanupService = new SessionCleanupService(devinSessionStorage);
+		devinCleanupService.start().catch((err: unknown) => {
+			outputChannel.appendLine(`[Devin] Session cleanup failed: ${err}`);
+		});
+		context.subscriptions.push({ dispose: () => devinCleanupService.stop() });
+
+		if (devinSessionStorage.getActive().length > 0) {
+			devinPollingService.start();
+		}
+
+		const devinDisposables = registerDevinCommands(
+			devinSessionManager,
+			devinCredentialsManager,
+			undefined,
+			{
+				onCredentialsConfigured: () => {
+					devinPollingService.start();
+				},
+				onSessionCreated: () => {
+					devinPollingService.start();
+				},
+			}
+		);
+		context.subscriptions.push(...devinDisposables);
+		outputChannel.appendLine("[Devin] Commands registered");
+	} catch (error) {
+		outputChannel.appendLine(`[Devin] Failed to register commands: ${error}`);
+	}
+
+	// ========================================================================
+	// Cloud Agents (Multi-Provider) Bootstrap
+	// ========================================================================
+	await bootstrapCloudAgents(context);
+	context.subscriptions.push({ dispose: disposeCloudAgentsOutputChannel });
+
 	// Set up file watchers
 	setupFileWatchers(context, specExplorer, steeringExplorer, actionsExplorer);
 
@@ -628,6 +734,53 @@ export async function activate(context: ExtensionContext) {
 	}
 
 	// No UI mode toggle commands required
+}
+
+async function handleDevinPrStateChange(
+	event: import("./features/devin/devin-polling-service").PrStateChangeEvent,
+	storage: DevinSessionStorage
+): Promise<void> {
+	if (event.newState !== "merged") {
+		return;
+	}
+	outputChannel.appendLine(
+		`[Devin] PR merged for session ${event.sessionId}: ${event.prUrl}`
+	);
+	const session = storage.getBySessionId(event.sessionId);
+	if (!session) {
+		return;
+	}
+
+	try {
+		const { updateSpecTaskStatusOnMerge } = await import(
+			"./features/devin/spec-status-updater"
+		);
+		const pr = session.pullRequests.find((p) => p.prUrl === event.prUrl);
+		if (pr) {
+			await updateSpecTaskStatusOnMerge(session.specPath, event.specTaskId, {
+				...pr,
+				prState: "merged",
+			});
+			outputChannel.appendLine(
+				`[Devin] Marked task ${event.specTaskId} as completed in tasks.md (PR merged)`
+			);
+		}
+	} catch (err: unknown) {
+		outputChannel.appendLine(
+			`[Devin] Failed to update spec task on PR merge: ${err}`
+		);
+	}
+
+	try {
+		const { handlePrStateChange } = await import(
+			"./features/devin/pr-notification-handler"
+		);
+		await handlePrStateChange(session, event.previousState, event.newState);
+	} catch (err: unknown) {
+		outputChannel.appendLine(
+			`[Devin] Failed to notify PR state change: ${err}`
+		);
+	}
 }
 
 async function syncAllSpecReviewFlowSummaries(
@@ -876,6 +1029,25 @@ function registerCommands({
 		),
 
 		commands.registerCommand(
+			"gatomia.spec.runFullSpec",
+			async (args?: { filePath?: string; specName?: string }) => {
+				const specName = args?.specName ?? "spec";
+				outputChannel.appendLine(
+					`[Run Full Spec] Triggering speckit.implement for full spec: ${specName}`
+				);
+
+				try {
+					await sendPromptToChat("/speckit.implement");
+				} catch (error) {
+					const message =
+						error instanceof Error ? error.message : String(error);
+					window.showErrorMessage(`Failed to run full spec: ${message}`);
+					outputChannel.appendLine(`[Run Full Spec] Failed: ${message}`);
+				}
+			}
+		),
+
+		commands.registerCommand(
 			"gatomia.spec.open",
 			async (relativePath: string, type: string, line?: number) => {
 				const uri = resolveWorkspaceRelativeUri(relativePath);
@@ -1106,25 +1278,30 @@ function registerCommands({
 
 	// Add file save confirmation for agent files
 	context.subscriptions.push(
-		workspace.onWillSaveTextDocument(async (event) => {
-			const document = event.document;
-			const filePath = document.fileName;
+		workspace.onWillSaveTextDocument((event) => {
+			const filePath = event.document.fileName;
 
-			// Check if this is an agent file in .copilot directories
-			if (filePath.includes(".copilot/agents/") && filePath.endsWith(".md")) {
-				// Show confirmation dialog
-				const result = await window.showWarningMessage(
-					"Are you sure you want to save changes to this agent file?",
-					{ modal: true },
-					"Save",
-					"Cancel"
+			// Check if this is an agent file in .github/agents or .copilot/agents directories
+			const isAgentFile =
+				(filePath.includes(".copilot/agents/") ||
+					filePath.includes(".github/agents/")) &&
+				filePath.endsWith(".md");
+
+			if (isAgentFile) {
+				event.waitUntil(
+					window
+						.showWarningMessage(
+							"Are you sure you want to save changes to this agent file?",
+							{ modal: true },
+							"Save"
+						)
+						.then((result) => {
+							if (result !== "Save") {
+								throw new Error("Save cancelled by user");
+							}
+							return [];
+						})
 				);
-
-				if (result !== "Save") {
-					// Cancel the save operation by waiting forever
-					// biome-ignore lint/suspicious/noEmptyBlockStatements: ignore
-					event.waitUntil(new Promise(() => {}));
-				}
 			}
 		})
 	);
@@ -1958,4 +2135,139 @@ async function openActivePreviewInEditor(): Promise<void> {
 	}
 
 	await openDocumentInEditor(activePreviewUri);
+}
+
+// ============================================================================
+// Cloud Agents Bootstrap (extracted to reduce activate() complexity)
+// ============================================================================
+
+async function bootstrapCloudAgents(context: ExtensionContext): Promise<void> {
+	const { ProviderConfigStore } = await import(
+		"./features/cloud-agents/provider-config-store"
+	);
+	const { ProviderRegistry } = await import(
+		"./features/cloud-agents/provider-registry"
+	);
+	const { DevinAdapter } = await import(
+		"./features/cloud-agents/adapters/devin-adapter"
+	);
+	const { GitHubCopilotAdapter } = await import(
+		"./features/cloud-agents/adapters/github-copilot-adapter"
+	);
+	const { MigrationService } = await import(
+		"./features/cloud-agents/migration-service"
+	);
+	const { CloudAgentProgressProvider } = await import(
+		"./providers/cloud-agent-progress-provider"
+	);
+	const { registerCloudAgentCommands } = await import(
+		"./commands/cloud-agent-commands"
+	);
+	const { AgentSessionStorage } = await import(
+		"./features/cloud-agents/agent-session-storage"
+	);
+	const { AgentPollingService } = await import(
+		"./features/cloud-agents/agent-polling-service"
+	);
+	const { SessionCleanupService: CloudCleanup } = await import(
+		"./features/cloud-agents/session-cleanup-service"
+	);
+	const { logInfo: cloudLog } = await import("./features/cloud-agents/logging");
+
+	try {
+		const configStore = new ProviderConfigStore(context.workspaceState);
+		const registry = new ProviderRegistry(configStore);
+
+		registry.register(new DevinAdapter(context.secrets));
+		registry.register(new GitHubCopilotAdapter(context.secrets));
+
+		const migration = new MigrationService(
+			configStore,
+			context.workspaceState,
+			context.secrets
+		);
+		await migration.migrateIfNeeded();
+		await migration.detectOrphanedConfig(registry);
+		await registry.restoreActive();
+
+		const sessionStorage = new AgentSessionStorage(context.workspaceState);
+
+		const existingSessions = await sessionStorage.getAll();
+		outputChannel.appendLine(
+			`[CloudAgents] Loaded ${existingSessions.length} session(s) from storage`
+		);
+		const activeSessions = await sessionStorage.getActive();
+		outputChannel.appendLine(
+			`[CloudAgents] ${activeSessions.length} active (pollable) session(s)`
+		);
+
+		const progressProvider = new CloudAgentProgressProvider(
+			registry,
+			sessionStorage
+		);
+		const treeView = window.createTreeView("gatomia.views.cloudAgents", {
+			treeDataProvider: progressProvider,
+		});
+		context.subscriptions.push(treeView, {
+			dispose: () => progressProvider.dispose(),
+		});
+		await progressProvider.updateContextKeys();
+
+		const pollingService = new AgentPollingService(registry, sessionStorage);
+		const cleanupService = new CloudCleanup(sessionStorage);
+		await cleanupService.cleanup();
+
+		pollingService.setOnSessionCompleted(async (localId, specPath) => {
+			try {
+				const { updateSpecTasksOnSessionComplete } = await import(
+					"./features/devin/spec-status-updater"
+				);
+				const session = await sessionStorage.getById(localId);
+				if (session) {
+					await updateSpecTasksOnSessionComplete(session);
+					outputChannel.appendLine(
+						`[CloudAgents] Synced task status (spec: ${specPath})`
+					);
+				}
+			} catch (err: unknown) {
+				outputChannel.appendLine(
+					`[CloudAgents] Failed to sync task status: ${err}`
+				);
+			}
+		});
+
+		pollingService.setOnError((message) => {
+			window.showErrorMessage(`Cloud Agent: ${message}`);
+		});
+
+		pollingService.setOnUpdated(() => {
+			progressProvider.refresh();
+		});
+
+		if (registry.getActive() && activeSessions.length > 0) {
+			pollingService.start(30_000);
+			outputChannel.appendLine(
+				`[CloudAgents] Polling started for ${activeSessions.length} active session(s)`
+			);
+		}
+		context.subscriptions.push({ dispose: () => pollingService.stop() });
+
+		const refreshUI = () => {
+			progressProvider.refresh();
+			progressProvider.updateContextKeys();
+		};
+		const cmdDisposables = registerCloudAgentCommands({
+			registry,
+			sessionStorage,
+			pollingService,
+			onSessionCreated: refreshUI,
+			onRefresh: refreshUI,
+		});
+		context.subscriptions.push(...cmdDisposables);
+
+		cloudLog("Cloud Agents module bootstrapped");
+		outputChannel.appendLine("[CloudAgents] Module bootstrapped successfully");
+	} catch (error) {
+		outputChannel.appendLine(`[CloudAgents] Failed to bootstrap: ${error}`);
+	}
 }

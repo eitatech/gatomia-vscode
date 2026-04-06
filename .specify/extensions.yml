@@ -1,0 +1,35 @@
+installed: []
+settings:
+  auto_execute_hooks: true
+hooks:
+  after_tasks:
+  - extension: v-model
+    command: speckit.v-model.trace
+    enabled: true
+    optional: true
+    prompt: Run traceability matrix to validate requirement coverage?
+    description: Builds the traceability matrix after tasks are generated
+    condition: null
+  - extension: ralph
+    command: speckit.ralph.run
+    enabled: true
+    optional: true
+    prompt: Run ralph loop to implement tasks?
+    description: Start autonomous implementation after task generation
+    condition: null
+  after_implement:
+  - extension: cleanup
+    command: speckit.cleanup.run
+    enabled: true
+    optional: true
+    prompt: Run cleanup to review implementation changes and identify tech debt?
+    description: Post-implementation quality gate
+    condition: null
+  - extension: retrospective
+    command: speckit.retrospective.analyze
+    enabled: true
+    optional: true
+    prompt: Run retrospective analysis now? (spec changes require explicit confirmation)
+    description: Offer a retrospective after implementation without modifying spec
+      unless approved.
+    condition: null

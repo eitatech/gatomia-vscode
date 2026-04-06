@@ -145,6 +145,25 @@
           "description": "The language GitHub Copilot should use for responses.",
           "order": 3
         },
+        "gatomia.devin.pollingInterval": {
+          "type": "number",
+          "default": 5,
+          "minimum": 3,
+          "maximum": 60,
+          "description": "Polling interval in seconds for Devin session status updates."
+        },
+        "gatomia.devin.maxRetries": {
+          "type": "number",
+          "default": 3,
+          "minimum": 0,
+          "maximum": 10,
+          "description": "Maximum number of retry attempts for failed Devin API calls."
+        },
+        "gatomia.devin.verboseLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable verbose logging for Devin integration in the output channel."
+        },
         "gatomia.customInstructions.global": {
           "type": "string",
           "default": "",
@@ -265,6 +284,12 @@
           "when": "!(workbenchState == empty || workspaceFolderCount == 0) && config.gatomia.views.wiki.visible"
         },
         {
+          "id": "gatomia.views.cloudAgents",
+          "name": "Cloud Agents",
+          "icon": "cloud",
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0)"
+        },
+        {
           "id": "gatomia.views.overview",
           "name": "Quick Access",
           "icon": "zap",
@@ -292,6 +317,11 @@
       {
         "view": "gatomia.views.wikiExplorer",
         "contents": "Browse and manage documentation from the docs/ directory.\n\n[$(refresh) Refresh](command:gatomia.wiki.refresh)"
+      },
+      {
+        "view": "gatomia.views.cloudAgents",
+        "contents": "Select a cloud agent provider to get started:\n\n[$(rocket) Devin](command:gatomia.selectProvider?%22devin%22)\n[$(github) GitHub Copilot](command:gatomia.selectProvider?%22github-copilot%22)",
+        "when": "!gatomia.cloudAgent.hasProvider"
       }
     ],
     "commands": [
@@ -335,6 +365,18 @@
         "title": "Run Task Group",
         "category": "GatomIA",
         "icon": "$(play)"
+      },
+      {
+        "command": "gatomia.spec.runFullSpec",
+        "title": "Run Full Spec",
+        "category": "GatomIA",
+        "icon": "$(play)"
+      },
+      {
+        "command": "gatomia.dispatchFullSpec",
+        "title": "Run Full Spec on Cloud",
+        "category": "GatomIA",
+        "icon": "$(cloud)"
       },
       {
         "command": "gatomia.spec.sendToReview",
@@ -650,10 +692,98 @@
         "command": "gatomia.migration.createBackup",
         "title": "Create OpenSpec Backup",
         "category": "GatomIA"
+      },
+      {
+        "command": "gatomia.devin.startTask",
+        "title": "Implement with Devin",
+        "category": "GatomIA",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "gatomia.devin.startAllTasks",
+        "title": "Implement All with Devin",
+        "category": "GatomIA",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "gatomia.devin.openProgress",
+        "title": "Open Devin Progress",
+        "category": "GatomIA",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "gatomia.devin.cancelSession",
+        "title": "Cancel Devin Session",
+        "category": "GatomIA",
+        "icon": "$(circle-slash)"
+      },
+      {
+        "command": "gatomia.devin.configureCredentials",
+        "title": "Configure Devin Credentials",
+        "category": "GatomIA",
+        "icon": "$(key)"
+      },
+      {
+        "command": "gatomia.devin.runWithDevin",
+        "title": "Run with Devin",
+        "category": "GatomIA",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "gatomia.selectProvider",
+        "title": "Select Cloud Agent Provider",
+        "category": "GatomIA",
+        "icon": "$(cloud)"
+      },
+      {
+        "command": "gatomia.changeProvider",
+        "title": "Change Cloud Agent Provider",
+        "category": "GatomIA",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "gatomia.configureProvider",
+        "title": "Configure Provider Credentials",
+        "category": "GatomIA",
+        "icon": "$(key)"
+      },
+      {
+        "command": "gatomia.dispatchTask",
+        "title": "Run on Cloud",
+        "category": "GatomIA",
+        "icon": "$(cloud)"
+      },
+      {
+        "command": "gatomia.cancelSession",
+        "title": "Cancel Cloud Agent Session",
+        "category": "GatomIA",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "gatomia.removeSession",
+        "title": "Remove Session from List",
+        "category": "GatomIA",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "gatomia.refreshCloudAgents",
+        "title": "Refresh Cloud Agent Sessions",
+        "category": "GatomIA",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "gatomia.refreshCloudAgents",
+          "when": "view == gatomia.views.cloudAgents && gatomia.cloudAgent.hasProvider",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gatomia.changeProvider",
+          "when": "view == gatomia.views.cloudAgents && gatomia.cloudAgent.hasProvider",
+          "group": "navigation@2"
+        },
         {
           "command": "gatomia.spec.create",
           "when": "view == gatomia.views.specExplorer",
@@ -764,12 +894,32 @@
         {
           "command": "gatomia.spec.runTask",
           "when": "view == gatomia.views.specExplorer && viewItem == task-item",
-          "group": "inline"
+          "group": "inline@1"
+        },
+        {
+          "command": "gatomia.dispatchTask",
+          "when": "view == gatomia.views.specExplorer && viewItem == task-item",
+          "group": "inline@2"
         },
         {
           "command": "gatomia.spec.runTaskGroup",
           "when": "view == gatomia.views.specExplorer && viewItem == task-group",
-          "group": "inline"
+          "group": "inline@1"
+        },
+        {
+          "command": "gatomia.dispatchTask",
+          "when": "view == gatomia.views.specExplorer && viewItem == task-group",
+          "group": "inline@2"
+        },
+        {
+          "command": "gatomia.spec.runFullSpec",
+          "when": "view == gatomia.views.specExplorer && viewItem == tasks-folder",
+          "group": "inline@1"
+        },
+        {
+          "command": "gatomia.dispatchFullSpec",
+          "when": "view == gatomia.views.specExplorer && viewItem == tasks-folder",
+          "group": "inline@2"
         },
         {
           "command": "gatomia.spec.sendToReview",
@@ -810,6 +960,16 @@
           "command": "gatomia.actions.delete",
           "when": "view == gatomia.views.actionsExplorer && (viewItem == prompt || viewItem == prompt-runnable)",
           "group": "7_modification@2"
+        },
+        {
+          "command": "gatomia.cancelSession",
+          "when": "view == gatomia.views.cloudAgents && (viewItem == session.pending || viewItem == session.running || viewItem == session.blocked)",
+          "group": "inline@1"
+        },
+        {
+          "command": "gatomia.removeSession",
+          "when": "view == gatomia.views.cloudAgents && (viewItem =~ /^session\\./)",
+          "group": "inline@2"
         },
         {
           "command": "gatomia.hooks.disable",
