@@ -1074,7 +1074,7 @@
     "@vitest/ui": "^4.0.18",
     "@vscode/codicons": "^0.0.43",
     "concurrently": "^9.2.0",
-    "copy-webpack-plugin": "^13.0.0",
+    "copy-webpack-plugin": "^14.0.0",
     "esbuild": "^0.27.2",
     "husky": "^9.1.7",
     "jsdom": "^27.2.0",
