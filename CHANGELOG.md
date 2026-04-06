@@ -2,6 +2,49 @@
 
 ---
 
+## v0.35.0 2026-04-06
+
+### Added
+
+- add ralph extension as git submodule at .specify/extensions/ralph
+- add PR state normalization and extend grace period for unknown PR states
+- add grace period polling for PR state changes and auto-derive terminal task statuses
+- add PR state change detection and auto-update tasks.md on merge
+- improve cloud agent session management and fix save confirmation for agent files
+- add code-splitting with lazy loading and improve webview CSP for Vite dynamic imports
+- add full spec dispatch and improve cloud agent session management
+- add Ralph autonomous implementation loop with iterate and run commands
+- implement live Devin session polling and improve cloud agent error handling
+- restore gatomia.devin.runWithDevin command and improve cloud agent state management
+- rename Devin Progress view to Cloud Agents and add multi-provider infrastructure
+- add new subprojects for cleanup, retrospective, and v-model extensions
+- add speckit.cleanup prompt for post-implementation quality gate
+- enhance Devin integration with progress panel, credentials security, and session cleanup
+- add contracts folder support to SpecKit feature structure
+- add SpecKit memory folder support for constitution and instructions
+- Enhance Devin integration with task group handling and session management
+- update Devin API v1 client to handle ISO timestamps and new PR field names
+- add cancel session button to Devin Progress view and improve PR display
+- add Devin integration UI components, commands, and configuration
+- Implement hooks refactor with dynamic model selection, MCP grouping, expanded Git/GitHub operations, and ACP integration
+
+### Fixed
+
+- improve cloud agent error handling and polling reliability
+
+### Changed
+
+- chore: update rollup and related packages to version 4.60.1
+- chore: update copy-webpack-plugin to version 14.0.0
+
+### Release Info
+
+- **Source Branch**: `develop`
+- **Release Type**: minor
+
+---
+
+
 ## v0.34.2 2026-02-24
 
 ### Added
