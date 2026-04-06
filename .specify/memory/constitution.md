@@ -103,11 +103,11 @@ These rules are enforced by our linter and MUST be followed:
   - ✅ GOOD: Define `const AGENT_FILE_PATTERN = /\.agent\.md$/;` at top level, then use `filename.replace(AGENT_FILE_PATTERN, "")`
   - **Reason**: Regex literals inside functions are recompiled on every call, causing performance degradation
   - **Rule applies to**: Production code, test files, and ANY file where regex is used inside a function/loop
-  - **How to fix**: 
+  - **How to fix**:
     1. Move regex to top-level constant with descriptive name
     2. Use SCREAMING_SNAKE_CASE for the constant name
     3. Add a comment if the pattern isn't obvious
-  - **Examples of affected locations**: 
+  - **Examples of affected locations**:
     - Inside `describe()` or `it()` test blocks
     - Inside class methods
     - Inside arrow functions or callbacks
@@ -116,16 +116,20 @@ These rules are enforced by our linter and MUST be followed:
 #### Code Quality Rules
 
 - **noShadow**: Variables MUST NOT shadow outer scope variables with the same name
-  - ❌ BAD: 
+  - ❌ BAD:
+
     ```typescript
     const agents = getAgents();
     callback((agents) => { /* shadows outer 'agents' */ });
     ```
-  - ✅ GOOD: 
+
+  - ✅ GOOD:
+
     ```typescript
     const agents = getAgents();
     callback((agentList) => { /* different name */ });
     ```
+
   - Reason: Variable shadowing makes code confusing and error-prone
 
 - **noExcessiveCognitiveComplexity** (CRITICAL): Functions MUST NOT exceed complexity score of 15
@@ -137,6 +141,7 @@ These rules are enforced by our linter and MUST be followed:
     3. Extract complex conditions into well-named boolean variables
     4. Split validation/processing into separate functions
   - **Example pattern for refactoring**:
+
     ```typescript
     // ❌ BAD: High complexity (21)
     async validateData(data: Data): Promise<Result> {
@@ -190,6 +195,7 @@ These rules are enforced by our linter and MUST be followed:
       return [];
     }
     ```
+
   - **Naming helper functions**: Use descriptive names that explain WHAT is being validated/processed
 
 - **noUndeclaredVariables**: All variables MUST be declared before use
@@ -350,6 +356,7 @@ describe("File validation", () => {
 ---
 
 ❌ **DON'T: Shadow variables in callbacks**
+
 ```typescript
 const items = getItems();
 items.forEach((items) => { // ❌ Confusing shadowing
@@ -358,6 +365,7 @@ items.forEach((items) => { // ❌ Confusing shadowing
 ```
 
 ✅ **DO: Use distinct parameter names**
+
 ```typescript
 const items = getItems();
 items.forEach((item) => { // ✅ Clear and distinct
@@ -368,6 +376,7 @@ items.forEach((item) => { // ✅ Clear and distinct
 ---
 
 ❌ **DON'T: Ignore errors silently**
+
 ```typescript
 try {
   await riskyOperation();
@@ -377,6 +386,7 @@ try {
 ```
 
 ✅ **DO: Log errors with context**
+
 ```typescript
 try {
   await riskyOperation();
@@ -389,6 +399,7 @@ try {
 ---
 
 ❌ **DON'T: Create overly complex functions**
+
 ```typescript
 function processData(data: Data) {
   // ❌ 200 lines, nested loops, multiple if-else chains
@@ -397,6 +408,7 @@ function processData(data: Data) {
 ```
 
 ✅ **DO: Break down into smaller functions**
+
 ```typescript
 function processData(data: Data) {
   const validated = validateData(data);
@@ -409,12 +421,14 @@ function processData(data: Data) {
 ---
 
 ❌ **DON'T: Leave unnecessary biome-ignore comments**
+
 ```typescript
 // biome-ignore lint/style/useReadonlyClassProperties: Will be reassigned
 private property = "value"; // ❌ Comment no longer applies after implementation
 ```
 
 ✅ **DO: Remove obsolete ignore comments**
+
 ```typescript
 private property = "value"; // ✅ Clean code without unnecessary suppressions
 ```
@@ -526,12 +540,14 @@ This is a VS Code extension that provides Agentic Spec-Driven Development capabi
 **Why**: JavaScript recompiles regex literals on every function call, causing significant performance degradation in hot paths.
 
 **Where this applies**:
+
 - ✅ Production code: functions, methods, callbacks
 - ✅ Test code: `it()`, `describe()`, `beforeEach()`, etc.
 - ✅ Inline callbacks: `.forEach()`, `.map()`, `.filter()`, etc.
 - ✅ Event handlers: click handlers, onChange, etc.
 
 **Naming convention**:
+
 - Use SCREAMING_SNAKE_CASE
 - Include context: `AGENT_FILE_PATTERN`, not just `FILE_PATTERN`
 - Group related patterns together
@@ -568,6 +584,7 @@ function parseFile(path: string) {
 ```
 
 **Tools to check**:
+
 ```bash
 # Biome will warn about inline regex
 npm run check
@@ -646,10 +663,11 @@ npm test -- -t "MCP"
 - Verify bridge communication in extension logs
 
 ## Recent Changes
+
 - 010-copilot-agents: Added TypeScript 5.3 (target: ES2022, strict mode enabled)
 - 001-steering-instructions-rules: Added TypeScript 5.x (strict), target ES2022 + VS Code Extension API, Node.js (extension host), React 18 + Vite (webview), Biome
 
-
 ## Active Technologies
+
 - TypeScript 5.x (strict), target ES2022 + VS Code Extension API, Node.js (extension host), React 18 + Vite (webview), Biome (001-steering-instructions-rules)
 - TypeScript 5.3 (target: ES2022, strict mode enabled) (010-copilot-agents)

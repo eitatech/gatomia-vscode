@@ -2,10 +2,7 @@ import MarkdownIt from "markdown-it";
 import hljs from "highlight.js";
 import { checkboxPlugin } from "./plugins/checkbox-plugin";
 import { taskGroupPlugin } from "./plugins/task-group-plugin";
-
-// Note: markdown-it-mermaid and markdown-it-plantuml are disabled because they
-// access the DOM during module initialization, which fails in webview contexts.
-// TODO: Implement lazy loading for diagram plugins if needed.
+import { mermaidPlugin } from "./plugins/mermaid-plugin";
 
 export interface PreviewRendererOptions {
 	markdown?: MarkdownIt.Options;
@@ -50,9 +47,10 @@ export const createPreviewRenderer = (
 	// Add task group button plugin
 	md.use(taskGroupPlugin);
 
-	// Diagram plugins are disabled - they access document during initialization
-	// if (options.enableMermaid !== false) { ... }
-	// if (options.enablePlantUML !== false) { ... }
+	// Add mermaid/plantuml diagram support
+	if (options.enableMermaid !== false) {
+		md.use(mermaidPlugin);
+	}
 
 	return md;
 };

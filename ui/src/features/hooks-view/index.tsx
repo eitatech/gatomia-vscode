@@ -64,6 +64,9 @@ export const HooksView = () => {
 					setHooks(syncedHooks);
 					setIsLoading(false);
 					setError(undefined);
+					// Update execution statuses for existing hooks
+					// Note: Form state is NOT reset here to avoid race conditions
+					// Form closes only on explicit cancel or successful save/delete
 					setExecutionStatuses((prev) => {
 						const next: Record<string, HookExecutionStatusEntry> = {};
 						for (const hook of syncedHooks) {
@@ -75,52 +78,21 @@ export const HooksView = () => {
 					});
 					break;
 				}
-				case "hooks/created":
-				case "hooks.created": {
-					if (!body?.hook) {
-						break;
-					}
-					setHooks((prev) => [...prev, body.hook]);
-					setError(undefined);
-					setShowForm(false);
-					setEditingHook(undefined);
-					break;
-				}
-				case "hooks/updated":
-				case "hooks.updated": {
-					if (!body?.hook) {
-						break;
-					}
-					setHooks((prev) =>
-						prev.map((hook) => (hook.id === body.hook.id ? body.hook : hook))
-					);
-					setError(undefined);
-					setShowForm(false);
-					setEditingHook(undefined);
-					break;
-				}
-				case "hooks/deleted":
-				case "hooks.deleted": {
-					if (!body?.id) {
-						break;
-					}
-					setHooks((prev) => prev.filter((hook) => hook.id !== body.id));
-					setError(undefined);
-					setExecutionStatuses((prev) => {
-						if (!prev[body.id]) {
-							return prev;
-						}
-						const { [body.id]: _removed, ...rest } = prev;
-						return rest;
-					});
-					break;
-				}
+				// Individual hook events removed - hooks are synced automatically via hooks/sync
 				case "hooks/error":
 				case "hooks.error": {
 					if (!body?.message) {
 						break;
 					}
-					setError(body.message);
+					// Format validation errors if present
+					if (body.validationErrors && Array.isArray(body.validationErrors)) {
+						const errorList = body.validationErrors
+							.map((err: any) => `${err.field}: ${err.message}`)
+							.join("\n");
+						setError(`${body.message}:\n${errorList}`);
+					} else {
+						setError(body.message);
+					}
 					break;
 				}
 				case "hooks/execution-status":
@@ -306,13 +278,12 @@ export const HooksView = () => {
 					className="rounded border border-[color:var(--vscode-inputValidation-errorBorder)] bg-[color:var(--vscode-inputValidation-errorBackground)] px-3 py-2 text-[color:var(--vscode-inputValidation-errorForeground)] text-sm"
 					role="alert"
 				>
-					{error}
+					<div className="whitespace-pre-wrap">{error}</div>
 				</div>
 			)}
 
 			{showForm ? (
 				<HookForm
-					error={error}
 					initialData={editingHook}
 					mode={editingHook ? "edit" : "create"}
 					onCancel={handleFormCancel}

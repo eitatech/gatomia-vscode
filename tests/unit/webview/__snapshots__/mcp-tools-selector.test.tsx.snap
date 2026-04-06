@@ -1,0 +1,216 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MCPToolsSelector (grouped rendering) > matches snapshot with 3 servers and one selected tool 1`] = `
+<div>
+  <div
+    class="flex flex-col gap-3"
+  >
+    <div
+      class="flex items-center justify-between"
+    >
+      <span
+        class="font-medium text-sm"
+        style="color: var(--vscode-foreground);"
+      >
+        Select MCP Tools
+      </span>
+      <span
+        class="rounded px-2 py-1 text-xs"
+        style="background-color: var(--vscode-badge-background); color: var(--vscode-badge-foreground);"
+      >
+        1
+         selected
+      </span>
+    </div>
+    <input
+      class="w-full rounded border px-3 py-2 text-sm"
+      placeholder="Search tools..."
+      style="background-color: var(--vscode-input-background); color: var(--vscode-input-foreground); border-color: var(--vscode-input-border);"
+      type="text"
+      value=""
+    />
+    <div
+      class="max-h-96 overflow-y-auto rounded border"
+      style="border-color: var(--vscode-panel-border);"
+    >
+      <div
+        class="divide-y"
+        style="border-color: var(--vscode-panel-border);"
+      >
+        <div>
+          <div
+            class="flex items-center gap-2 px-3 py-2 transition-colors hover:bg-opacity-50"
+            style="background-color: transparent;"
+          >
+            <span
+              class="relative inline-flex items-center justify-center"
+            >
+              <input
+                checked=""
+                class="peer appearance-none border rounded size-4 bg-[var(--vscode-checkbox-background,transparent)] border-[var(--vscode-checkbox-border,#6b6b6b)] checked:bg-[var(--vscode-checkbox-selectBackground,#0078d4)] checked:border-[var(--vscode-checkbox-selectBorder,#0078d4)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--vscode-focusBorder,#007fd4)] cursor-pointer"
+                id=":r9:"
+                type="checkbox"
+              />
+              <span
+                class="pointer-events-none absolute hidden peer-checked:block size-4"
+              >
+                <svg
+                  class="size-full"
+                  fill="none"
+                  stroke="var(--vscode-checkbox-foreground, #fff)"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2.5"
+                  viewBox="0 0 16 16"
+                >
+                  <path
+                    d="M4 8l3 3 5-6"
+                  />
+                </svg>
+              </span>
+            </span>
+            <button
+              class="flex flex-1 items-center gap-2 text-left font-medium text-sm"
+              style="color: var(--vscode-foreground);"
+              type="button"
+            >
+              <span
+                class="text-xs"
+              >
+                ▶
+              </span>
+              <span>
+                Alpha MCP
+              </span>
+              <span
+                class="text-xs"
+                style="color: var(--vscode-descriptionForeground);"
+              >
+                (
+                1
+                /
+                1
+                )
+              </span>
+            </button>
+          </div>
+        </div>
+        <div>
+          <div
+            class="flex items-center gap-2 px-3 py-2 transition-colors hover:bg-opacity-50"
+            style="background-color: transparent;"
+          >
+            <span
+              class="relative inline-flex items-center justify-center"
+            >
+              <input
+                class="peer appearance-none border rounded size-4 bg-[var(--vscode-checkbox-background,transparent)] border-[var(--vscode-checkbox-border,#6b6b6b)] checked:bg-[var(--vscode-checkbox-selectBackground,#0078d4)] checked:border-[var(--vscode-checkbox-selectBorder,#0078d4)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--vscode-focusBorder,#007fd4)] cursor-pointer"
+                id=":ra:"
+                type="checkbox"
+              />
+              <span
+                class="pointer-events-none absolute hidden peer-checked:block size-4"
+              >
+                <svg
+                  class="size-full"
+                  fill="none"
+                  stroke="var(--vscode-checkbox-foreground, #fff)"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2.5"
+                  viewBox="0 0 16 16"
+                >
+                  <path
+                    d="M4 8l3 3 5-6"
+                  />
+                </svg>
+              </span>
+            </span>
+            <button
+              class="flex flex-1 items-center gap-2 text-left font-medium text-sm"
+              style="color: var(--vscode-foreground);"
+              type="button"
+            >
+              <span
+                class="text-xs"
+              >
+                ▶
+              </span>
+              <span>
+                Beta MCP
+              </span>
+              <span
+                class="text-xs"
+                style="color: var(--vscode-descriptionForeground);"
+              >
+                (
+                0
+                /
+                3
+                )
+              </span>
+            </button>
+          </div>
+        </div>
+        <div>
+          <div
+            class="flex items-center gap-2 px-3 py-2 transition-colors hover:bg-opacity-50"
+            style="background-color: transparent;"
+          >
+            <span
+              class="relative inline-flex items-center justify-center"
+            >
+              <input
+                class="peer appearance-none border rounded size-4 bg-[var(--vscode-checkbox-background,transparent)] border-[var(--vscode-checkbox-border,#6b6b6b)] checked:bg-[var(--vscode-checkbox-selectBackground,#0078d4)] checked:border-[var(--vscode-checkbox-selectBorder,#0078d4)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--vscode-focusBorder,#007fd4)] cursor-pointer"
+                id=":rb:"
+                type="checkbox"
+              />
+              <span
+                class="pointer-events-none absolute hidden peer-checked:block size-4"
+              >
+                <svg
+                  class="size-full"
+                  fill="none"
+                  stroke="var(--vscode-checkbox-foreground, #fff)"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2.5"
+                  viewBox="0 0 16 16"
+                >
+                  <path
+                    d="M4 8l3 3 5-6"
+                  />
+                </svg>
+              </span>
+            </span>
+            <button
+              class="flex flex-1 items-center gap-2 text-left font-medium text-sm"
+              style="color: var(--vscode-foreground);"
+              type="button"
+            >
+              <span
+                class="text-xs"
+              >
+                ▶
+              </span>
+              <span>
+                Charlie MCP
+              </span>
+              <span
+                class="text-xs"
+                style="color: var(--vscode-descriptionForeground);"
+              >
+                (
+                0
+                /
+                2
+                )
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;

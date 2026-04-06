@@ -41,6 +41,9 @@ export interface TemplateContext {
 	branch?: string; // Current git branch
 	feature?: string; // Current feature name
 
+	// Output capture variables
+	acpAgentOutput?: string; // Output produced by a local ACP agent hook action
+
 	// Dynamic variables (populated based on trigger type)
 	[key: string]: string | number | boolean | undefined;
 }

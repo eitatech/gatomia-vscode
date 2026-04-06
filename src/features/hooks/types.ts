@@ -102,7 +102,8 @@ export type ActionType =
 	| "git" // Git commit/push operation
 	| "github" // GitHub via MCP Server
 	| "mcp" // MCP server tool execution
-	| "custom"; // Custom agent invocation
+	| "custom" // Custom agent invocation
+	| "acp"; // ACP agent via stdio/JSON-RPC subprocess
 
 /**
  * ActionParameters - Union type for all action parameter types
@@ -112,7 +113,8 @@ export type ActionParameters =
 	| GitActionParams
 	| GitHubActionParams
 	| MCPActionParams
-	| CustomActionParams;
+	| CustomActionParams
+	| ACPActionParams;
 
 // ============================================================================
 // Action-Specific Parameters
@@ -132,12 +134,24 @@ export interface GitActionParams {
 	operation: GitOperation;
 	messageTemplate: string; // Supports template variables
 	pushToRemote?: boolean; // Auto-push after commit (default: false)
+	branchName?: string; // For create-branch, checkout-branch, merge
+	tagName?: string; // For tag operation
+	tagMessage?: string; // For tag operation (optional annotation)
+	stashMessage?: string; // For stash operation (optional label)
 }
 
 /**
  * GitOperation - Git operations
  */
-export type GitOperation = "commit" | "push";
+export type GitOperation =
+	| "commit"
+	| "push"
+	| "create-branch"
+	| "checkout-branch"
+	| "pull"
+	| "merge"
+	| "tag"
+	| "stash";
 
 /**
  * GitHubActionParams - Parameters for GitHub operations via MCP Server
@@ -147,7 +161,18 @@ export interface GitHubActionParams {
 	repository?: string; // Format: 'owner/repo' (optional, defaults to current)
 	titleTemplate?: string; // For issue/PR creation
 	bodyTemplate?: string; // For issue/PR creation
-	issueNumber?: number; // For close/update operations
+	issueNumber?: number; // For close/update/label/assign operations
+	prNumber?: number; // For merge-pr, close-pr, request-review
+	mergeMethod?: "merge" | "squash" | "rebase"; // For merge-pr
+	labels?: string[]; // For add-label
+	labelName?: string; // For remove-label
+	reviewers?: string[]; // For request-review
+	assignees?: string[]; // For assign-issue
+	tagName?: string; // For create-release
+	releaseName?: string; // For create-release
+	releaseBody?: string; // For create-release
+	draft?: boolean; // For create-release
+	prerelease?: boolean; // For create-release
 }
 
 /**
@@ -157,7 +182,14 @@ export type GitHubOperation =
 	| "open-issue"
 	| "close-issue"
 	| "create-pr"
-	| "add-comment";
+	| "add-comment"
+	| "merge-pr"
+	| "close-pr"
+	| "add-label"
+	| "remove-label"
+	| "request-review"
+	| "assign-issue"
+	| "create-release";
 
 /**
  * CustomActionParams - Parameters for custom agent invocations
@@ -168,13 +200,53 @@ export interface CustomActionParams {
 	agentType?: "local" | "background"; // Explicit type override
 
 	// EXISTING: Legacy GitHub Copilot agent support
-	agentName: string; // Custom agent identifier (will be deprecated in favor of agentId)
+	agentName?: string; // Custom agent identifier (deprecated - use agentId instead)
 	prompt?: string; // Instruction/action text for the agent
 	selectedTools?: SelectedMCPTool[]; // Optional: MCP tools available to agent
 	arguments?: string; // Template string with {variable} syntax for passing trigger context
 
 	// GitHub Copilot CLI Options
 	cliOptions?: CopilotCliOptions; // All CLI parameters supported by GitHub Copilot
+}
+
+/**
+ * ACPExecutionMode - Execution mode for ACP agent actions.
+ * Only "local" (stdio/JSON-RPC subprocess) is supported in v1.
+ */
+export type ACPExecutionMode = "local";
+
+/**
+ * ACPExecutionState - ACP execution lifecycle states (used in telemetry and logging).
+ */
+export type ACPExecutionState =
+	| "PENDING"
+	| "SPAWNING"
+	| "HANDSHAKE"
+	| "SESSION_CREATED"
+	| "PROMPTING"
+	| "COLLECTING"
+	| "DONE"
+	| "TIMEOUT"
+	| "ERROR";
+
+/**
+ * ACPActionParams - Parameters for ACP Agent hook actions.
+ * Executes a local ACP-compatible agent as a subprocess via stdio/JSON-RPC.
+ */
+export interface ACPActionParams {
+	mode: ACPExecutionMode;
+	/** The subprocess command that starts the ACP agent.
+	 *  Examples:
+	 *    "npx @github/copilot-language-server@latest --acp"
+	 *    "npx opencode-ai@latest acp"
+	 */
+	agentCommand: string;
+	/** Human-readable label shown in hook list and logs. */
+	agentDisplayName?: string;
+	/** Task instruction sent to the agent. Supports $variable template substitution. */
+	taskInstruction: string;
+	/** Working directory for the subprocess. Defaults to workspace root. */
+	cwd?: string;
 }
 
 /**
@@ -211,7 +283,7 @@ export interface CopilotCliOptions {
 
 	// Execution Options
 	agent?: string; // --agent: Custom agent to use
-	model?: CopilotModel; // --model: AI model to use
+	modelId?: CopilotModel; // --model: AI model to use
 	noAskUser?: boolean; // --no-ask-user: Disable ask_user tool (autonomous mode)
 	disableParallelToolsExecution?: boolean; // --disable-parallel-tools-execution: Sequential tool execution
 	noCustomInstructions?: boolean; // --no-custom-instructions: Disable AGENTS.md loading
@@ -242,21 +314,10 @@ export interface CopilotCliOptions {
 
 /**
  * CopilotModel - Available AI models in GitHub Copilot
+ * @deprecated Use LanguageModelInfo.id (string) from ModelCacheService instead.
+ *   This type is kept as a string alias to avoid breaking external consumers.
  */
-export type CopilotModel =
-	| "claude-sonnet-4.5"
-	| "claude-haiku-4.5"
-	| "claude-opus-4.5"
-	| "claude-sonnet-4"
-	| "gpt-5.2-codex"
-	| "gpt-5.1-codex-max"
-	| "gpt-5.1-codex"
-	| "gpt-5.2"
-	| "gpt-5.1"
-	| "gpt-5"
-	| "gpt-5.1-codex-mini"
-	| "gpt-5-mini"
-	| "gpt-4.1";
+export type CopilotModel = string;
 
 /**
  * CopilotLogLevel - Log level options
@@ -274,8 +335,8 @@ export type CopilotLogLevel =
  * MCPActionParams - Parameters for MCP server tool execution
  */
 export interface MCPActionParams {
-	// Agent and instruction
-	agentId?: string; // Optional: GitHub Copilot agent ID (e.g., 'copilot', 'workspace')
+	// Model and instruction
+	modelId?: string; // Optional: LLM model ID from GitHub subscription (e.g., 'gpt-4o', 'claude-3-5-sonnet')
 	prompt: string; // Instruction/action text for the agent to execute
 
 	// Selected tools (multiple selection supported)
@@ -423,6 +484,7 @@ export interface TemplateContext {
 	agentOutput?: string; // Output content from triggering agent
 	clipboardContent?: string; // Current clipboard content
 	outputPath?: string; // Path to output file
+	acpAgentOutput?: string; // Output produced by a local ACP agent hook action
 }
 
 /**
@@ -577,6 +639,8 @@ export function isValidAction(obj: unknown): obj is ActionConfig {
 			return isValidMCPParams(action.parameters);
 		case "custom":
 			return isValidCustomParams(action.parameters);
+		case "acp":
+			return isACPActionParams(action.parameters);
 		default:
 			return false;
 	}
@@ -609,14 +673,26 @@ export function isValidGitParams(obj: unknown): obj is GitActionParams {
 	}
 	const params = obj as GitActionParams;
 
-	const validOperations: GitOperation[] = ["commit", "push"];
+	const validOperations: GitOperation[] = [
+		"commit",
+		"push",
+		"create-branch",
+		"checkout-branch",
+		"pull",
+		"merge",
+		"tag",
+		"stash",
+	];
+
+	const COMMIT_REQUIRED_OPERATIONS: GitOperation[] = ["commit"];
 
 	return (
 		typeof params.operation === "string" &&
 		validOperations.includes(params.operation) &&
 		typeof params.messageTemplate === "string" &&
-		params.messageTemplate.length > 0 &&
 		params.messageTemplate.length <= MAX_MESSAGE_TEMPLATE_LENGTH &&
+		(!COMMIT_REQUIRED_OPERATIONS.includes(params.operation) ||
+			params.messageTemplate.length > 0) &&
 		(params.pushToRemote === undefined ||
 			typeof params.pushToRemote === "boolean")
 	);
@@ -633,6 +709,13 @@ function isValidGitHubOperation(
 		"close-issue",
 		"create-pr",
 		"add-comment",
+		"merge-pr",
+		"close-pr",
+		"add-label",
+		"remove-label",
+		"request-review",
+		"assign-issue",
+		"create-release",
 	];
 	return (
 		typeof operation === "string" &&
@@ -723,15 +806,35 @@ export function isValidCustomParams(obj: unknown): obj is CustomActionParams {
 	}
 	const params = obj as CustomActionParams;
 
-	return (
-		typeof params.agentName === "string" &&
-		params.agentName.length > 0 &&
-		params.agentName.length <= MAX_AGENT_NAME_LENGTH &&
-		AGENT_NAME_PATTERN.test(params.agentName) &&
-		(params.arguments === undefined ||
-			(typeof params.arguments === "string" &&
-				params.arguments.length <= MAX_ARGUMENTS_LENGTH))
-	);
+	// Must have either agentId (preferred) or agentName (legacy)
+	const hasAgentId =
+		typeof params.agentId === "string" && params.agentId.length > 0;
+	const hasAgentName =
+		typeof params.agentName === "string" && params.agentName.length > 0;
+
+	if (!(hasAgentId || hasAgentName)) {
+		return false;
+	}
+
+	// Validate agentName if present (legacy format without prefix)
+	if (
+		hasAgentName &&
+		(params.agentName!.length > MAX_AGENT_NAME_LENGTH ||
+			!AGENT_NAME_PATTERN.test(params.agentName!))
+	) {
+		return false;
+	}
+
+	// Validate arguments if present
+	if (
+		params.arguments !== undefined &&
+		(typeof params.arguments !== "string" ||
+			params.arguments.length > MAX_ARGUMENTS_LENGTH)
+	) {
+		return false;
+	}
+
+	return true;
 }
 
 /**
@@ -784,7 +887,7 @@ export function isValidMCPParams(obj: unknown): obj is MCPActionParams {
 
 	// Validate optional fields
 	const hasValidOptionalFields =
-		(params.agentId === undefined || typeof params.agentId === "string") &&
+		(params.modelId === undefined || typeof params.modelId === "string") &&
 		(params.parameterMappings === undefined ||
 			(Array.isArray(params.parameterMappings) &&
 				params.parameterMappings.every(isValidParameterMapping))) &&
@@ -883,5 +986,25 @@ export function isValidMCPTool(obj: unknown): obj is MCPTool {
 		tool.inputSchema !== null &&
 		typeof tool.serverId === "string" &&
 		tool.serverId.length > 0
+	);
+}
+
+/**
+ * Type guard: checks whether an ActionParameters value is an ACPActionParams.
+ */
+export function isACPActionParams(obj: unknown): obj is ACPActionParams {
+	if (typeof obj !== "object" || obj === null) {
+		return false;
+	}
+	const params = obj as ACPActionParams;
+	return (
+		params.mode === "local" &&
+		typeof params.agentCommand === "string" &&
+		params.agentCommand.length > 0 &&
+		typeof params.taskInstruction === "string" &&
+		params.taskInstruction.length > 0 &&
+		(params.agentDisplayName === undefined ||
+			typeof params.agentDisplayName === "string") &&
+		(params.cwd === undefined || typeof params.cwd === "string")
 	);
 }

@@ -40,7 +40,9 @@ import type {
 	WelcomeScreenState,
 	ConfigurationState,
 	FeatureAction,
+	LearningResource,
 	WelcomeErrorCodeType,
+	InstallableDependency,
 } from "../types/welcome";
 import { WelcomeErrorCode } from "../types/welcome";
 import { DependencyChecker } from "../services/dependency-checker";
@@ -238,7 +240,7 @@ export class WelcomeScreenProvider {
 	 * Handle dependency install action
 	 */
 	async installDependency(
-		dependency: "copilot-chat" | "speckit" | "openspec",
+		dependency: InstallableDependency,
 		panel: WelcomeScreenPanel
 	): Promise<void> {
 		switch (dependency) {
@@ -283,6 +285,50 @@ export class WelcomeScreenProvider {
 						}
 					});
 				break;
+
+			case "copilot-cli":
+				await env.clipboard.writeText("npm install -g @github/copilot");
+				window
+					.showInformationMessage(
+						"GitHub Copilot CLI install command copied to clipboard. Paste and run in your terminal.",
+						"Open Terminal"
+					)
+					.then((selection) => {
+						if (selection === "Open Terminal") {
+							commands.executeCommand("workbench.action.terminal.new");
+						}
+					});
+				break;
+
+			case "gatomia-cli": {
+				const dependencies = await this.dependencyChecker.checkAll();
+				const prerequisitesMet =
+					dependencies.copilotChat.installed &&
+					dependencies.copilotCli.installed &&
+					(dependencies.speckit.installed || dependencies.openspec.installed);
+
+				if (!prerequisitesMet) {
+					window.showWarningMessage(
+						"Install GitHub Copilot Chat, Copilot CLI, and at least one spec system (SpecKit or OpenSpec) before installing GatomIA CLI."
+					);
+					return;
+				}
+
+				await env.clipboard.writeText(
+					"uv tool install gatomia --from git+https://github.com/eitatech/gatomia-cli.git"
+				);
+				window
+					.showInformationMessage(
+						"GatomIA CLI install command copied to clipboard. Paste and run in your terminal.",
+						"Open Terminal"
+					)
+					.then((selection) => {
+						if (selection === "Open Terminal") {
+							commands.executeCommand("workbench.action.terminal.new");
+						}
+					});
+				break;
+			}
 			default:
 				// Should never reach here due to TypeScript type checking
 				this.outputChannel.appendLine(
@@ -332,9 +378,7 @@ export class WelcomeScreenProvider {
 	/**
 	 * Search learning resources by keyword
 	 */
-	searchResources(
-		query: string
-	): typeof this.learningResources.searchByKeyword {
+	searchResources(query: string): LearningResource[] {
 		// Ensure resources are loaded before searching
 		if (!this.learningResources.isLoaded()) {
 			this.learningResources.loadResources(this.context.extensionPath);
@@ -443,22 +487,40 @@ export class WelcomeScreenProvider {
 				enabled: true,
 				icon: "codicon-refresh",
 			},
-			// Prompts (T047)
+			// Actions (T047)
 			{
 				id: "create-prompt",
-				featureArea: "Prompts",
+				featureArea: "Actions",
 				label: "Create Prompt",
 				description: "Create a new custom prompt file",
-				commandId: "gatomia.prompts.create",
+				commandId: "gatomia.actions.create",
 				enabled: true,
 				icon: "codicon-add",
 			},
 			{
-				id: "refresh-prompts",
-				featureArea: "Prompts",
-				label: "Refresh Prompts",
-				description: "Reload prompts from workspace",
-				commandId: "gatomia.prompts.refresh",
+				id: "create-agent",
+				featureArea: "Actions",
+				label: "Create Agent",
+				description: "Create a new agent definition file",
+				commandId: "gatomia.actions.createAgentFile",
+				enabled: true,
+				icon: "codicon-robot",
+			},
+			{
+				id: "create-skill",
+				featureArea: "Actions",
+				label: "Create Skill",
+				description: "Create a new reusable skill directory",
+				commandId: "gatomia.actions.createSkill",
+				enabled: true,
+				icon: "codicon-tools",
+			},
+			{
+				id: "refresh-actions",
+				featureArea: "Actions",
+				label: "Refresh Actions",
+				description: "Reload actions from workspace",
+				commandId: "gatomia.actions.refresh",
 				enabled: true,
 				icon: "codicon-refresh",
 			},
@@ -595,9 +657,7 @@ export class WelcomeScreenProvider {
 				await this.updateConfiguration(key, value, getPanel());
 			},
 			// T030: Handle welcome/install-dependency message
-			onInstallDependency: async (
-				dependency: "copilot-chat" | "speckit" | "openspec"
-			) => {
+			onInstallDependency: async (dependency: InstallableDependency) => {
 				this.outputChannel.appendLine(
 					`[WelcomeScreenProvider] Install dependency: ${dependency}`
 				);

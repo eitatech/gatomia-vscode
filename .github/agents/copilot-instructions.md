@@ -4,6 +4,9 @@ This file provides guidance to AI agents when working with code in this reposito
 
 ## MANDATORY ACTIONS
 
+- Follow Visual Studio Code Extension Guidelines provided by Microsoft present at [https://code.visualstudio.com/api/extension-guides/overview](https://code.visualstudio.com/api/extension-guides/overview)
+- Follow Visual Studio Code UX guidelines provided by Microsoft present at [https://code.visualstudio.com/api/ux-guidelines/overview](https://code.visualstudio.com/api/ux-guidelines/overview)
+- Follow GitHub Copilot SDK guidelines provided by GitHub present at [https://github.com/github/copilot-sdk](https://github.com/github/copilot-sdk)
 - Always run `npm run check` before marking any task as complete. This ensures code quality and formatting standards are met.
 - Never use emoji in source code files (from global user instructions).
 
@@ -257,8 +260,9 @@ npm test && npm run check
 - Verify bridge communication in extension logs
 
 ## Recent Changes
+- 013-create-spec-ui-redesign: Added TypeScript 5.3+ (strict mode, target ES2022) + VS Code Extension API 1.84.0+; React 18.3+ (webview); Vite (webview build); esbuild (extension build); Biome (linter/formatter); Vitest 3.2+ (tests)
+- 013-create-spec-ui-redesign: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
 - 010-copilot-agents: Added TypeScript 5.3 (target: ES2022, strict mode enabled)
-- 001-steering-instructions-rules: Added TypeScript 5.x (strict), target ES2022 + VS Code Extension API, Node.js (extension host), React 18 + Vite (webview), Biome
 
 
 <!-- MANUAL ADDITIONS START -->
@@ -266,3 +270,7 @@ npm test && npm run check
 
 This project follows strict principles defined in [.specify/memory/constitution.md](../../.specify/memory/constitution.md):
 <!-- MANUAL ADDITIONS END -->
+
+## Active Technologies
+- TypeScript 5.3+ (strict mode, target ES2022) + VS Code Extension API 1.84.0+; React 18.3+ (webview); Vite (webview build); esbuild (extension build); Biome (linter/formatter); Vitest 3.2+ (tests) (013-create-spec-ui-redesign)
+- `context.workspaceState` — key `createSpecDraftState`; shape `{ formData: { description: string }; lastUpdated: number }`. Draft migration required for old 5-field shape. (013-create-spec-ui-redesign)

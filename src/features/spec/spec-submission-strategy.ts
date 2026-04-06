@@ -3,11 +3,8 @@ import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../../constants";
 import { workspace, Uri } from "vscode";
 
 export interface SpecSubmissionContext {
-	productContext: string;
-	keyScenarios: string;
-	technicalConstraints: string;
-	relatedFiles: string;
-	openQuestions: string;
+	description: string;
+	imageUris: string[];
 }
 
 export interface SpecSubmissionStrategy {
@@ -21,8 +18,6 @@ export class OpenSpecSubmissionStrategy implements SpecSubmissionStrategy {
 			throw new Error("No workspace folder open");
 		}
 
-		const payload = this.formatDescription(context);
-
 		const promptUri = Uri.joinPath(
 			workspaceFolder.uri,
 			".github",
@@ -33,69 +28,34 @@ export class OpenSpecSubmissionStrategy implements SpecSubmissionStrategy {
 		try {
 			const fileData = await workspace.fs.readFile(promptUri);
 			promptTemplate = new TextDecoder().decode(fileData);
-		} catch (error) {
+		} catch {
 			throw new Error(
 				"Required prompt file not found: .github/prompts/openspec-proposal.prompt.md"
 			);
 		}
 
-		const prompt = `${promptTemplate}\n\nThe following sections describe the specification and context for this change request.\n\n${payload}\n\nIMPORTANT:\nAfter generating the proposal documents, you MUST STOP and ask the user for confirmation.\nDo NOT proceed with any implementation steps until the user has explicitly approved the proposal.`;
+		const payload = context.description.trim();
+		const prompt = `${promptTemplate}\n\nThe following describes the specification and context for this change request.\n\n${payload}\n\nIMPORTANT:\nAfter generating the proposal documents, you MUST STOP and ask the user for confirmation.\nDo NOT proceed with any implementation steps until the user has explicitly approved the proposal.`;
 
-		await sendPromptToChat(prompt, { instructionType: "createSpec" });
-	}
+		const files =
+			context.imageUris.length > 0
+				? context.imageUris.map((uri) => Uri.parse(uri))
+				: undefined;
 
-	private formatDescription(data: SpecSubmissionContext): string {
-		const sections = [
-			data.productContext.trim()
-				? `Product Context / Goal:\n${data.productContext.trim()}`
-				: undefined,
-			data.keyScenarios.trim()
-				? `Key Scenarios / Acceptance Criteria:\n${data.keyScenarios.trim()}`
-				: undefined,
-			data.technicalConstraints.trim()
-				? `Technical Constraints:\n${data.technicalConstraints.trim()}`
-				: undefined,
-			data.relatedFiles.trim()
-				? `Related Files / Impact:\n${data.relatedFiles.trim()}`
-				: undefined,
-			data.openQuestions.trim()
-				? `Open Questions:\n${data.openQuestions.trim()}`
-				: undefined,
-		].filter(Boolean);
-
-		return sections.join("\n\n");
+		await sendPromptToChat(prompt, { instructionType: "createSpec" }, files);
 	}
 }
 
 export class SpecKitSubmissionStrategy implements SpecSubmissionStrategy {
 	async submit(context: SpecSubmissionContext): Promise<void> {
-		// Format the description and send to Speckit agent
-		const payload = this.formatDescription(context);
-		const prompt = `/speckit.specify ${payload}`;
+		const prompt = `/speckit.specify ${context.description.trim()}`;
 
-		await sendPromptToChat(prompt, { instructionType: "createSpec" });
-	}
+		const files =
+			context.imageUris.length > 0
+				? context.imageUris.map((uri) => Uri.parse(uri))
+				: undefined;
 
-	private formatDescription(data: SpecSubmissionContext): string {
-		const sections = [
-			data.productContext.trim()
-				? `Product Context / Goal:\n${data.productContext.trim()}`
-				: undefined,
-			data.keyScenarios.trim()
-				? `Key Scenarios / Acceptance Criteria:\n${data.keyScenarios.trim()}`
-				: undefined,
-			data.technicalConstraints.trim()
-				? `Technical Constraints:\n${data.technicalConstraints.trim()}`
-				: undefined,
-			data.relatedFiles.trim()
-				? `Related Files / Impact:\n${data.relatedFiles.trim()}`
-				: undefined,
-			data.openQuestions.trim()
-				? `Open Questions:\n${data.openQuestions.trim()}`
-				: undefined,
-		].filter(Boolean);
-
-		return sections.join("\n\n");
+		await sendPromptToChat(prompt, { instructionType: "createSpec" }, files);
 	}
 }
 

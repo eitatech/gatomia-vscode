@@ -4,6 +4,9 @@ This file provides guidance to AI agents when working with code in this reposito
 
 ## MANDATORY ACTIONS
 
+- Follow Visual Studio Code Extension Guidelines provided by Microsoft present at [https://code.visualstudio.com/api/extension-guides/overview](https://code.visualstudio.com/api/extension-guides/overview)
+- Follow Visual Studio Code UX guidelines provided by Microsoft present at [https://code.visualstudio.com/api/ux-guidelines/overview](https://code.visualstudio.com/api/ux-guidelines/overview)
+- Follow GitHub Copilot SDK guidelines provided by GitHub present at [https://github.com/github/copilot-sdk](https://github.com/github/copilot-sdk)
 - Always run `npm run check` before marking any task as complete. This ensures code quality and formatting standards are met.
 - Never use emoji in source code files (from global user instructions).
 

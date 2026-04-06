@@ -410,6 +410,16 @@ export const OUTPUT_VARIABLES: TemplateVariable[] = [
 		example: "/workspace/.specify/specs/011-custom-agent-hooks/spec.md",
 		category: "trigger",
 	},
+	{
+		name: "acpAgentOutput",
+		description: "Output produced by a local ACP agent hook action",
+		valueType: "string",
+		availableFor: [], // Available for all triggers
+		required: false,
+		defaultValue: "",
+		example: "The spec has been reviewed and approved.",
+		category: "trigger",
+	},
 ];
 
 // ============================================================================

@@ -139,8 +139,11 @@ export class FileAgentDiscovery {
 			throw new SchemaValidationError("No YAML frontmatter found in file");
 		}
 
-		// Validate required fields
-		const schema = this.validateAndExtractSchema(parsed.data);
+		// Extract filename without extension as fallback ID
+		const filename = filePath.split("/").pop()?.replace(".agent.md", "") || "";
+
+		// Validate required fields (uses filename as fallback for id)
+		const schema = this.validateAndExtractSchema(parsed.data, filename);
 
 		// Generate agent ID: "local:{agent-id}"
 		const agentId = `${AGENT_ID_PREFIX.FILE}:${schema.id}`;
@@ -175,27 +178,32 @@ export class FileAgentDiscovery {
 	 * Validate agent schema from YAML frontmatter
 	 *
 	 * @param data Parsed YAML data
+	 * @param fallbackId Filename to use as fallback ID if not in frontmatter
 	 * @returns Validated agent config schema
 	 * @throws SchemaValidationError if validation fails
 	 */
 	private validateAndExtractSchema(
-		data: Record<string, unknown>
+		data: Record<string, unknown>,
+		fallbackId: string
 	): AgentConfigSchema {
-		// Validate required fields
-		if (typeof data.id !== "string" || !data.id) {
-			throw new SchemaValidationError("Missing or invalid 'id' field");
+		// Extract ID from frontmatter or use filename as fallback
+		const id = typeof data.id === "string" && data.id ? data.id : fallbackId;
+
+		if (!id) {
+			throw new SchemaValidationError(
+				"Missing 'id' field and no valid filename fallback"
+			);
 		}
 
-		if (typeof data.name !== "string" || !data.name) {
-			throw new SchemaValidationError("Missing or invalid 'name' field");
-		}
+		// Extract name from frontmatter or use ID as fallback
+		const name = typeof data.name === "string" && data.name ? data.name : id;
 
 		if (typeof data.description !== "string" || !data.description) {
 			throw new SchemaValidationError("Missing or invalid 'description' field");
 		}
 
 		// Validate ID format (lowercase-with-hyphens)
-		if (!AGENT_ID_FORMAT_REGEX.test(data.id)) {
+		if (!AGENT_ID_FORMAT_REGEX.test(id)) {
 			throw new SchemaValidationError(
 				"Invalid 'id' format. Must be lowercase-with-hyphens (e.g., 'code-reviewer')"
 			);
@@ -203,9 +211,9 @@ export class FileAgentDiscovery {
 
 		// Extract schema with optional fields
 		const schema: AgentConfigSchema = {
-			id: data.id,
-			name: data.name,
-			fullName: typeof data.fullName === "string" ? data.fullName : data.name,
+			id,
+			name,
+			fullName: typeof data.fullName === "string" ? data.fullName : name,
 			description: data.description,
 			icon: typeof data.icon === "string" ? data.icon : undefined,
 			commands: Array.isArray(data.commands) ? data.commands : [],

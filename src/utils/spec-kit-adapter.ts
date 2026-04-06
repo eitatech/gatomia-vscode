@@ -298,16 +298,23 @@ export class SpecSystemAdapter {
 	private getSpecKitFeatureFiles(featurePath: string): Record<string, string> {
 		const files: Record<string, string> = {};
 
-		const documentTypes = [
-			"spec",
-			"plan",
-			"tasks",
-			"research",
-			"data-model",
-			"quickstart",
-		];
+		// Order: Spec, Plan, Research, Contracts, Data Model, Quickstart, Checklists, Tasks
+		const preContractDocs = ["spec", "plan", "research"];
+		for (const docType of preContractDocs) {
+			const filePath = join(featurePath, `${docType}.md`);
+			if (existsSync(filePath)) {
+				files[docType] = filePath;
+			}
+		}
 
-		for (const docType of documentTypes) {
+		// Check for contracts folder
+		const contractsPath = join(featurePath, "contracts");
+		if (existsSync(contractsPath) && statSync(contractsPath).isDirectory()) {
+			files.contracts = contractsPath;
+		}
+
+		const postContractDocs = ["data-model", "quickstart"];
+		for (const docType of postContractDocs) {
 			const filePath = join(featurePath, `${docType}.md`);
 			if (existsSync(filePath)) {
 				files[docType] = filePath;
@@ -318,6 +325,12 @@ export class SpecSystemAdapter {
 		const checklistsPath = join(featurePath, "checklists");
 		if (existsSync(checklistsPath) && statSync(checklistsPath).isDirectory()) {
 			files.checklists = checklistsPath;
+		}
+
+		// Tasks last
+		const tasksPath = join(featurePath, "tasks.md");
+		if (existsSync(tasksPath)) {
+			files.tasks = tasksPath;
 		}
 
 		return files;

@@ -1,4 +1,5 @@
 ---
+name: Example Test Generator
 description: Example agent for generating test stubs when new features are added. Demonstrates template variable usage for file-based triggers.
 ---
 

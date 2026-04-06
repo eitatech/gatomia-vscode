@@ -30,6 +30,12 @@ interface CreateSpecInputControllerDependencies {
 
 const CREATE_SPEC_DRAFT_STATE_KEY = "createSpecDraftState";
 
+const MARKDOWN_SIZE_LIMIT_BYTES = 524_288; // 512 KB
+const IMAGE_MAX_SIZE_BYTES = 10_485_760; // 10 MB
+const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
+const IMAGE_EXTENSION_PATTERN = /\.(?:png|jpe?g|gif|webp|svg)$/i;
+const IMAGE_MAX_COUNT = 5;
+
 const isMessageItem = (value: unknown): value is MessageItem => {
 	if (typeof value !== "object" || value === null) {
 		return false;
@@ -39,13 +45,59 @@ const isMessageItem = (value: unknown): value is MessageItem => {
 	return typeof candidate.title === "string";
 };
 
-const normalizeFormData = (data: CreateSpecFormData): CreateSpecFormData => ({
-	productContext: data.productContext ?? "",
-	keyScenarios: data.keyScenarios ?? "",
-	technicalConstraints: data.technicalConstraints ?? "",
-	relatedFiles: data.relatedFiles ?? "",
-	openQuestions: data.openQuestions ?? "",
+const normalizeFormData = (
+	data: Partial<CreateSpecFormData> | undefined
+): CreateSpecFormData => ({
+	description: typeof data?.description === "string" ? data.description : "",
 });
+
+interface LegacyFormData {
+	productContext?: string;
+	keyScenarios?: string;
+	technicalConstraints?: string;
+	relatedFiles?: string;
+	openQuestions?: string;
+}
+
+const migrateDraftFormData = (
+	raw: unknown
+): CreateSpecDraftState | undefined => {
+	if (!raw || typeof raw !== "object") {
+		return;
+	}
+
+	const candidate = raw as { formData?: unknown; lastUpdated?: unknown };
+	if (typeof candidate.lastUpdated !== "number" || !candidate.formData) {
+		return;
+	}
+
+	const formData = candidate.formData as Record<string, unknown>;
+
+	// New format: already has description
+	if (typeof formData.description === "string") {
+		return {
+			formData: { description: formData.description },
+			lastUpdated: candidate.lastUpdated,
+		};
+	}
+
+	// Legacy format: concatenate non-empty fields into description
+	const legacy = formData as LegacyFormData;
+	const parts = [
+		legacy.productContext,
+		legacy.keyScenarios,
+		legacy.technicalConstraints,
+		legacy.relatedFiles,
+		legacy.openQuestions,
+	]
+		.map((v) => (typeof v === "string" ? v.trim() : ""))
+		.filter(Boolean);
+
+	return {
+		formData: { description: parts.join("\n\n") },
+		lastUpdated: candidate.lastUpdated,
+	};
+};
 
 export class CreateSpecInputController {
 	private readonly context: ExtensionContext;
@@ -152,17 +204,32 @@ export class CreateSpecInputController {
 		panel.webview.onDidReceiveMessage(
 			async (message: CreateSpecWebviewMessage) => {
 				if (message.type === "create-spec/submit") {
-					await this.handleSubmit(message.payload);
+					await this.handleSubmit({
+						description: message.payload.description,
+						imageUris: message.payload.imageUris,
+					});
 					return;
 				}
 
 				if (message.type === "create-spec/autosave") {
-					await this.handleAutosave(message.payload);
+					await this.handleAutosave({
+						description: message.payload.description,
+					});
 					return;
 				}
 
 				if (message.type === "create-spec/close-attempt") {
 					await this.handleCloseAttempt(message.payload.hasDirtyChanges);
+					return;
+				}
+
+				if (message.type === "create-spec/import-markdown:request") {
+					await this.handleImportMarkdownRequest();
+					return;
+				}
+
+				if (message.type === "create-spec/attach-images:request") {
+					await this.handleAttachImagesRequest(message.payload.currentCount);
 					return;
 				}
 
@@ -201,28 +268,32 @@ export class CreateSpecInputController {
 		await this.panel.webview.postMessage(message);
 	}
 
-	private async handleSubmit(data: CreateSpecFormData): Promise<void> {
+	private async handleSubmit({
+		description,
+		imageUris,
+	}: {
+		description: string;
+		imageUris: string[];
+	}): Promise<void> {
 		if (!this.panel) {
 			return;
 		}
 
-		const sanitizedContext = data.productContext?.trim();
-		if (!sanitizedContext) {
+		const trimmedDescription = description?.trim();
+		if (!trimmedDescription) {
 			await this.panel.webview.postMessage({
 				type: "create-spec/submit:error",
-				payload: { message: "Product Context is required." },
+				payload: { message: "Description is required." },
 			});
 			return;
 		}
 
-		const normalized = normalizeFormData({
-			...data,
-			productContext: sanitizedContext,
-		});
-
 		try {
 			const strategy = SpecSubmissionStrategyFactory.create(this.activeSystem);
-			await strategy.submit(normalized);
+			await strategy.submit({
+				description: trimmedDescription,
+				imageUris: imageUris ?? [],
+			});
 
 			await this.clearDraftState();
 
@@ -250,6 +321,141 @@ export class CreateSpecInputController {
 			lastUpdated: Date.now(),
 		};
 		await this.saveDraftState(this.draft);
+	}
+
+	private async handleImportMarkdownRequest(): Promise<void> {
+		if (!this.panel) {
+			return;
+		}
+
+		const uris = await window.showOpenDialog({
+			canSelectMany: false,
+			filters: { Markdown: ["md"] },
+		});
+
+		if (!uris || uris.length === 0) {
+			return;
+		}
+
+		try {
+			const bytes = await workspace.fs.readFile(uris[0]);
+
+			if (bytes.byteLength > MARKDOWN_SIZE_LIMIT_BYTES) {
+				await this.panel.webview.postMessage({
+					type: "create-spec/import-markdown:result",
+					payload: { error: "File exceeds the 512 KB limit." },
+				});
+				return;
+			}
+
+			const content = new TextDecoder().decode(bytes);
+
+			if (!content) {
+				await this.panel.webview.postMessage({
+					type: "create-spec/import-markdown:result",
+					payload: { content: "", warning: "The selected file is empty." },
+				});
+				return;
+			}
+
+			await this.panel.webview.postMessage({
+				type: "create-spec/import-markdown:result",
+				payload: { content },
+			});
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			this.outputChannel.appendLine(
+				`[CreateSpecInputController] Failed to read markdown file: ${message}`
+			);
+			await this.panel.webview.postMessage({
+				type: "create-spec/import-markdown:result",
+				payload: { error: "Failed to read the selected file." },
+			});
+		}
+	}
+
+	private async readImageAsDataUrl(
+		uri: Uri,
+		fileName: string
+	): Promise<{ dataUrl: string } | { error: string }> {
+		try {
+			const bytes = await workspace.fs.readFile(uri);
+			if (bytes.byteLength > IMAGE_MAX_SIZE_BYTES) {
+				return { error: "One or more files exceed the 10 MB size limit." };
+			}
+			const ext = fileName.split(".").pop()?.toLowerCase() ?? "png";
+			const mimeType =
+				ext === "svg"
+					? "image/svg+xml"
+					: `image/${ext === "jpg" ? "jpeg" : ext}`;
+			const base64 = Buffer.from(bytes).toString("base64");
+			return { dataUrl: `data:${mimeType};base64,${base64}` };
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			this.outputChannel.appendLine(
+				`[CreateSpecInputController] Failed to read image file: ${message}`
+			);
+			return { error: "Failed to read one or more image files." };
+		}
+	}
+
+	private async handleAttachImagesRequest(currentCount: number): Promise<void> {
+		if (!this.panel) {
+			return;
+		}
+
+		const uris = await window.showOpenDialog({
+			canSelectMany: true,
+			filters: { Images: IMAGE_EXTENSIONS },
+		});
+
+		if (!uris || uris.length === 0) {
+			return;
+		}
+
+		const remaining = IMAGE_MAX_COUNT - currentCount;
+		const toProcess = uris.slice(0, remaining);
+		const capped = uris.length > remaining;
+
+		const images: Array<{
+			id: string;
+			uri: string;
+			name: string;
+			dataUrl: string;
+		}> = [];
+
+		for (const uri of toProcess) {
+			const fileName = uri.fsPath.split("/").pop() ?? uri.fsPath;
+
+			if (!IMAGE_EXTENSION_PATTERN.test(fileName)) {
+				await this.panel.webview.postMessage({
+					type: "create-spec/attach-images:result",
+					payload: { error: "One or more files are not valid image files." },
+				});
+				return;
+			}
+
+			const result = await this.readImageAsDataUrl(uri, fileName);
+			if ("error" in result) {
+				await this.panel.webview.postMessage({
+					type: "create-spec/attach-images:result",
+					payload: { error: result.error },
+				});
+				return;
+			}
+
+			images.push({
+				id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+				uri: uri.toString(),
+				name: fileName,
+				dataUrl: result.dataUrl,
+			});
+		}
+
+		await this.panel.webview.postMessage({
+			type: "create-spec/attach-images:result",
+			payload: { images, ...(capped ? { capped: true } : {}) },
+		});
 	}
 
 	private async handleCloseAttempt(hasDirtyChanges: boolean): Promise<void> {
@@ -288,9 +494,10 @@ export class CreateSpecInputController {
 	}
 
 	private getDraftState(): CreateSpecDraftState | undefined {
-		return this.context.workspaceState.get<CreateSpecDraftState>(
+		const raw = this.context.workspaceState.get<unknown>(
 			CREATE_SPEC_DRAFT_STATE_KEY
 		);
+		return migrateDraftFormData(raw);
 	}
 
 	private async saveDraftState(state: CreateSpecDraftState): Promise<void> {

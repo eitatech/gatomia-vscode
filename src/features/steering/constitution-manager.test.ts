@@ -2,9 +2,19 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import path from "node:path";
 import { workspace, type Uri, window, ViewColumn } from "vscode";
 
-// Mock fs module BEFORE importing anything that uses it
-vi.mock("fs");
-vi.mock("node:fs");
+// Create mock functions via vi.hoisted() so they are available in module factories
+const { mockExistsSync } = vi.hoisted(() => ({
+	mockExistsSync: vi.fn(),
+}));
+
+vi.mock("fs", () => ({
+	default: { existsSync: mockExistsSync },
+	existsSync: mockExistsSync,
+}));
+vi.mock("node:fs", () => ({
+	default: { existsSync: mockExistsSync },
+	existsSync: mockExistsSync,
+}));
 
 // biome-ignore lint/performance/noNamespaceImport: Required for vitest mocking with vi.mocked()
 import * as fs from "fs";

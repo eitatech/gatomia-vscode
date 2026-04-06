@@ -25,6 +25,21 @@ interface CommitOptions {
 interface GitRepository {
 	commit(message: string, options?: CommitOptions): Promise<void>;
 	push(remote?: string, branch?: string, setUpstream?: boolean): Promise<void>;
+	createBranch(name: string, checkout: boolean): Promise<void>;
+	checkout(treeish: string): Promise<void>;
+	pull(): Promise<void>;
+	merge(ref: string): Promise<void>;
+	tag(name: string, message?: string): Promise<void>;
+	createStash(message?: string, includeUntracked?: boolean): Promise<void>;
+}
+
+const TEMPLATE_VAR_PATTERN = /\$([a-zA-Z_][a-zA-Z0-9_]*)/g;
+
+function logTelemetry(
+	event: string,
+	properties: Record<string, string | number | boolean>
+): void {
+	console.log(`[GitAction] Telemetry: ${event}`, properties);
 }
 
 export class GitExtensionNotFoundError extends Error {
@@ -40,6 +55,13 @@ export class GitRepositoryNotFoundError extends Error {
 	constructor() {
 		super("No Git repository found in the current workspace.");
 		this.name = "GitRepositoryNotFoundError";
+	}
+}
+
+export class GitActionValidationError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "GitActionValidationError";
 	}
 }
 
@@ -65,20 +87,119 @@ export class GitActionExecutor {
 				throw new GitRepositoryNotFoundError();
 			}
 
-			if (params.operation === "commit") {
-				await this.executeCommit(repository, params, templateContext);
-			} else {
-				await repository.push();
-			}
+			await this.executeOperation(repository, params, templateContext);
 
-			return { success: true, duration: Date.now() - startTime };
+			const duration = Date.now() - startTime;
+			logTelemetry("git-action.execute.success", {
+				operation: params.operation,
+				duration,
+			});
+			return { success: true, duration };
 		} catch (error) {
+			const duration = Date.now() - startTime;
+			const err = error as Error;
+			logTelemetry("git-action.execute.failure", {
+				operation: params.operation,
+				errorName: err.name,
+				duration,
+			});
 			return {
 				success: false,
-				error: error as Error,
-				duration: Date.now() - startTime,
+				error: err,
+				duration,
 			};
 		}
+	}
+
+	private async executeOperation(
+		repository: GitRepository,
+		params: GitActionParams,
+		templateContext: TemplateContext
+	): Promise<void> {
+		switch (params.operation) {
+			case "commit": {
+				await this.executeCommit(repository, params, templateContext);
+				break;
+			}
+			case "push": {
+				await repository.push();
+				break;
+			}
+			case "create-branch": {
+				const branchName = this.requireExpandedString(
+					params.branchName,
+					templateContext,
+					"Branch name"
+				);
+				await repository.createBranch(branchName, false);
+				break;
+			}
+			case "checkout-branch": {
+				const branchName = this.requireExpandedString(
+					params.branchName,
+					templateContext,
+					"Branch name"
+				);
+				await repository.checkout(branchName);
+				break;
+			}
+			case "pull": {
+				await repository.pull();
+				break;
+			}
+			case "merge": {
+				const branchName = this.requireExpandedString(
+					params.branchName,
+					templateContext,
+					"Branch name"
+				);
+				await repository.merge(branchName);
+				break;
+			}
+			case "tag": {
+				const tagName = this.requireExpandedString(
+					params.tagName,
+					templateContext,
+					"Tag name"
+				);
+				const tagMessage = params.tagMessage
+					? this.expandTemplate(params.tagMessage, templateContext)
+					: undefined;
+				await repository.tag(tagName, tagMessage);
+				break;
+			}
+			case "stash": {
+				const stashMessage = params.stashMessage
+					? this.expandTemplate(params.stashMessage, templateContext)
+					: undefined;
+				await repository.createStash(stashMessage);
+				break;
+			}
+			default: {
+				throw new GitActionValidationError(
+					`Unsupported Git operation: ${String(params.operation)}`
+				);
+			}
+		}
+	}
+
+	private requireExpandedString(
+		value: string | undefined,
+		context: TemplateContext,
+		label: string
+	): string {
+		if (!value?.trim()) {
+			throw new GitActionValidationError(
+				`${label} is required for this operation.`
+			);
+		}
+		const expanded = this.expandTemplate(value, context).trim();
+		if (!expanded) {
+			throw new GitActionValidationError(
+				`${label} cannot be empty after template expansion.`
+			);
+		}
+		return expanded;
 	}
 
 	private async executeCommit(
@@ -109,7 +230,7 @@ export class GitActionExecutor {
 			return template;
 		}
 
-		return template.replace(/\$([a-zA-Z_][a-zA-Z0-9_]*)/g, (_match, key) => {
+		return template.replace(TEMPLATE_VAR_PATTERN, (_match, key) => {
 			const value = context[key as keyof TemplateContext];
 			if (value === undefined || value === null) {
 				return "";

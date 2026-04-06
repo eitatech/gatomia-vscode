@@ -1,5 +1,5 @@
 ---
-applyTo: ['*']
+applyTo: '.github/instructions/*.instructions.md', '.agents/**/*.md', '.specs/**/*.md', '.github/prompts/**/*.md', '.github/templates/**/*.md', '.github/agents/**/*.md', '.github/skills/**/*.md'
 description: "Comprehensive best practices for AI prompt engineering, safety frameworks, bias mitigation, and responsible AI usage for Copilot and LLMs."
 ---
 

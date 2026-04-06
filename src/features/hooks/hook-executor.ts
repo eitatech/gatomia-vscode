@@ -39,6 +39,7 @@ import { AgentActionExecutor } from "./actions/agent-action";
 import { GitActionExecutor } from "./actions/git-action";
 import { GitHubActionExecutor } from "./actions/github-action";
 import { MCPActionExecutor } from "./actions/mcp-action";
+import { ACPActionExecutor } from "./actions/acp-action";
 import { MCPClientService } from "./services/mcp-client";
 import { MCPParameterResolver } from "./services/mcp-parameter-resolver";
 import { MCPExecutionPool } from "./services/mcp-execution-pool";
@@ -56,6 +57,7 @@ import type {
 	GitHubActionParams,
 	MCPActionParams,
 	CustomActionParams,
+	ACPActionParams,
 	OperationType,
 	TriggerEvent,
 } from "./types";
@@ -71,9 +73,10 @@ import {
 const FEATURE_NAME_PATTERN = /^\d+-(.+)$/;
 
 /**
- * Regex pattern for extracting agent name from agentId (format: "file:agent-name")
+ * Regex pattern for extracting agent name from agentId (format: "local:agent-name")
+ * Matches the AGENT_ID_PREFIX.FILE constant which is "local"
  */
-const AGENT_ID_PREFIX_PATTERN = /^file:/;
+const AGENT_ID_PREFIX_PATTERN = /^local:/;
 
 /**
  * Regex patterns for parsing Git remote URLs
@@ -515,6 +518,27 @@ export class HookExecutor {
 						throw new Error(
 							`Unknown agent type: ${agentType}. Agent ID: ${customParams.agentId}`
 						);
+					}
+					break;
+				}
+
+				case "acp": {
+					const acpParams = hook.action.parameters as ACPActionParams;
+					const acpExecutor = new ACPActionExecutor({
+						timeoutMs: ACTION_TIMEOUT_MS,
+					});
+					try {
+						const acpResult = await acpExecutor.execute(
+							acpParams,
+							templateContext
+						);
+						templateContext.acpAgentOutput = acpResult.output;
+						actionResult = { success: true };
+					} catch (err) {
+						actionResult = {
+							success: false,
+							error: err instanceof Error ? err : new Error(String(err)),
+						};
 					}
 					break;
 				}
@@ -1173,7 +1197,7 @@ export class HookExecutor {
 
 		return (async () => {
 			try {
-				// Extract agent name from agentId (format: "file:agent-name")
+				// Extract agent name from agentId (format: "local:agent-name")
 				const agentName =
 					params.agentId?.replace(AGENT_ID_PREFIX_PATTERN, "") ||
 					params.agentName;
@@ -1257,7 +1281,7 @@ export class HookExecutor {
 
 		return (async () => {
 			try {
-				// Extract agent name from agentId (format: "file:agent-name")
+				// Extract agent name from agentId (format: "local:agent-name")
 				const agentName =
 					params.agentId?.replace(AGENT_ID_PREFIX_PATTERN, "") ||
 					params.agentName;
@@ -1523,8 +1547,8 @@ export class HookExecutor {
 		if (opts.agent) {
 			args.push("--agent", opts.agent);
 		}
-		if (opts.model) {
-			args.push("--model", opts.model);
+		if (opts.modelId) {
+			args.push("--model", opts.modelId);
 		}
 		if (opts.noAskUser) {
 			args.push("--no-ask-user");

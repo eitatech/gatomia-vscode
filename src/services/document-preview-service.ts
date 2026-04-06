@@ -27,6 +27,7 @@ export interface LoadDocumentOptions {
 
 const LINE_SPLIT_PATTERN = /\r?\n/;
 const HEADING_PATTERN = /^##\s+(.+)/;
+const FALLBACK_HEADING_PATTERN = /^#+\s+(.+)/;
 
 export class DocumentPreviewService {
 	private readonly changeEmitter = new EventEmitter<Uri>();
@@ -280,12 +281,16 @@ export class DocumentPreviewService {
 	private extractSections(content: string): PreviewSection[] {
 		const lines = content.split(LINE_SPLIT_PATTERN);
 		const sections: PreviewSection[] = [];
-		let currentTitle = "Overview";
-		let currentId = "overview";
+		let currentTitle: string | undefined;
+		let currentId: string | undefined;
 		let currentBody: string[] = [];
+		let preSectionBody: string[] = [];
 		const slugCounts = new Map<string, number>();
 
 		const commit = () => {
+			if (!(currentTitle && currentId)) {
+				return;
+			}
 			const body = currentBody.join("\n").trim();
 			sections.push({
 				id: this.uniqueSlug(currentId, slugCounts),
@@ -297,22 +302,87 @@ export class DocumentPreviewService {
 		for (const line of lines) {
 			const match = line.match(HEADING_PATTERN);
 			if (match) {
-				if (currentBody.length > 0 || sections.length === 0) {
+				if (currentTitle) {
 					commit();
+				} else {
+					this.commitIntroSection(preSectionBody, sections, slugCounts);
 				}
+
 				currentTitle = match[1].trim();
 				currentId = this.slugify(currentTitle);
 				currentBody = [];
+				preSectionBody = [];
 				continue;
 			}
-			currentBody.push(line);
+
+			if (currentTitle) {
+				currentBody.push(line);
+			} else {
+				preSectionBody.push(line);
+			}
 		}
 
-		if (currentBody.length > 0 || sections.length === 0) {
+		if (currentTitle) {
 			commit();
+			return sections;
 		}
 
+		this.commitIntroSection(preSectionBody, sections, slugCounts);
 		return sections;
+	}
+
+	/**
+	 * Create an intro section from content that appears before the first H2 heading.
+	 * The section title is inferred from the first heading or non-empty line,
+	 * and that heading line is stripped from the body to avoid duplication.
+	 */
+	private commitIntroSection(
+		lines: string[],
+		sections: PreviewSection[],
+		slugCounts: Map<string, number>
+	): void {
+		const body = lines.join("\n").trim();
+		if (body.length === 0) {
+			return;
+		}
+		const title = this.inferFallbackSectionTitle(lines);
+		const id = this.slugify(title);
+		sections.push({
+			id: this.uniqueSlug(id, slugCounts),
+			title,
+			body: this.stripTitleHeadingFromBody(lines, title),
+		});
+	}
+
+	/**
+	 * Remove the heading line that was used as the section title from the body
+	 * to avoid rendering the title twice (once as `<h2>` and once inside the body).
+	 */
+	private stripTitleHeadingFromBody(lines: string[], title: string): string {
+		const filtered = lines.filter((line) => {
+			const m = FALLBACK_HEADING_PATTERN.exec(line);
+			return !(m && m[1].trim() === title);
+		});
+		return filtered.join("\n").trim();
+	}
+
+	private inferFallbackSectionTitle(lines: string[]): string {
+		for (const line of lines) {
+			const headingMatch = FALLBACK_HEADING_PATTERN.exec(line);
+			if (headingMatch) {
+				const heading = headingMatch[1].trim();
+				if (heading.length > 0) {
+					return heading;
+				}
+			}
+
+			const text = line.trim();
+			if (text.length > 0) {
+				return text;
+			}
+		}
+
+		return "section";
 	}
 
 	private slugify(value: string): string {

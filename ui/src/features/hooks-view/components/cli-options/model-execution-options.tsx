@@ -1,5 +1,6 @@
 import type { CopilotCliOptions, CopilotModel } from "../../types";
 import { InfoTooltip } from "../../../../components/cli-options";
+import { useAvailableModels } from "../../hooks/use-available-models";
 import "./model-execution-options.css";
 
 export interface ModelExecutionOptionsProps {
@@ -11,31 +12,24 @@ export interface ModelExecutionOptionsProps {
 	disabled?: boolean;
 }
 
-const AVAILABLE_MODELS: { value: CopilotModel; label: string }[] = [
-	{ value: "claude-sonnet-4.5", label: "Claude Sonnet 4.5 (Recommended)" },
-	{ value: "claude-opus-4.5", label: "Claude Opus 4.5" },
-	{ value: "claude-haiku-4.5", label: "Claude Haiku 4.5" },
-	{ value: "claude-sonnet-4", label: "Claude Sonnet 4" },
-	{ value: "gpt-5.2-codex", label: "GPT-5.2 Codex" },
-	{ value: "gpt-5.1-codex-max", label: "GPT-5.1 Codex Max" },
-	{ value: "gpt-5.2", label: "GPT-5.2" },
-	{ value: "gpt-5.1", label: "GPT-5.1" },
-	{ value: "gpt-5", label: "GPT-5" },
-];
-
 /**
  * ModelExecutionOptions component for AI model and execution configuration.
+ * Model list is fetched dynamically from the extension via useAvailableModels.
  */
 export function ModelExecutionOptions({
 	value,
 	onChange,
 	disabled = false,
 }: ModelExecutionOptionsProps) {
+	const { models, isStale, error } = useAvailableModels();
+
+	const selectorDisabled = disabled || !!error || models.length === 0;
+
 	return (
 		<div className="model-execution-options">
 			<div className="model-execution-header">
 				<h4>
-					Model & Execution
+					Model &amp; Execution
 					<InfoTooltip
 						description="Configure which AI model to use and how it should execute tasks. These settings control the agent's behavior and capabilities."
 						title="Model and Execution Settings"
@@ -53,18 +47,38 @@ export function ModelExecutionOptions({
 							title="--model"
 						/>
 					</label>
+
+					{isStale && (
+						<span
+							className="models-stale-warning"
+							data-testid="models-stale-warning"
+						>
+							Model list may be outdated
+						</span>
+					)}
+
+					{error && (
+						<span
+							className="models-error-notice"
+							data-testid="models-error-notice"
+						>
+							{error}
+						</span>
+					)}
+
 					<select
+						aria-label="AI Model"
 						className="model-select"
-						disabled={disabled}
+						disabled={selectorDisabled}
 						id="model-select"
 						onChange={(e) =>
-							onChange({ model: e.target.value as CopilotModel })
+							onChange({ modelId: e.target.value as CopilotModel })
 						}
-						value={value.model || "claude-sonnet-4.5"}
+						value={value.modelId || ""}
 					>
-						{AVAILABLE_MODELS.map((model) => (
-							<option key={model.value} value={model.value}>
-								{model.label}
+						{models.map((model) => (
+							<option key={model.id} value={model.id}>
+								{model.name}
 							</option>
 						))}
 					</select>

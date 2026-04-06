@@ -105,6 +105,8 @@ describe("DependencyChecker", () => {
 			expect(secondCall.copilotChat).toEqual(firstCall.copilotChat);
 			expect(secondCall.speckit).toEqual(firstCall.speckit);
 			expect(secondCall.openspec).toEqual(firstCall.openspec);
+			expect(secondCall.copilotCli).toEqual(firstCall.copilotCli);
+			expect(secondCall.gatomiaCli).toEqual(firstCall.gatomiaCli);
 		});
 
 		it("should invalidate cache when explicitly requested", async () => {
@@ -134,6 +136,8 @@ describe("DependencyChecker", () => {
 			expect(result).toHaveProperty("copilotChat");
 			expect(result).toHaveProperty("speckit");
 			expect(result).toHaveProperty("openspec");
+			expect(result).toHaveProperty("copilotCli");
+			expect(result).toHaveProperty("gatomiaCli");
 			expect(result).toHaveProperty("lastChecked");
 
 			expect(result.copilotChat).toHaveProperty("installed");
@@ -145,6 +149,12 @@ describe("DependencyChecker", () => {
 
 			expect(result.openspec).toHaveProperty("installed");
 			expect(result.openspec).toHaveProperty("version");
+
+			expect(result.copilotCli).toHaveProperty("installed");
+			expect(result.copilotCli).toHaveProperty("version");
+
+			expect(result.gatomiaCli).toHaveProperty("installed");
+			expect(result.gatomiaCli).toHaveProperty("version");
 		});
 
 		it("should set lastChecked timestamp", async () => {

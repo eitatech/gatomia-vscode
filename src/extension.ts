@@ -27,10 +27,11 @@ import { ActionsExplorerProvider } from "./providers/actions-explorer-provider";
 import { SpecExplorerProvider } from "./providers/spec-explorer-provider";
 import { SpecTaskCodeLensProvider } from "./providers/spec-task-code-lens-provider";
 import { SteeringExplorerProvider } from "./providers/steering-explorer-provider";
+import { WikiExplorerProvider } from "./providers/wiki-explorer-provider";
 import { PromptLoader } from "./services/prompt-loader";
 import { sendPromptToChat } from "./utils/chat-prompt-runner";
 import { ConfigManager } from "./utils/config-manager";
-import { getVSCodeUserDataPath } from "./utils/platform-utils";
+import { getMcpConfigPath } from "./utils/platform-utils";
 import { getSpecSystemAdapter } from "./utils/spec-kit-adapter";
 import { parseTasksFromFile, getTasksFilePath } from "./utils/task-parser";
 import { getChecklistStatusFromFile } from "./utils/checklist-parser";
@@ -41,6 +42,11 @@ import { HookExecutor } from "./features/hooks/hook-executor";
 import { AgentRegistry } from "./features/hooks/agent-registry";
 import { CommandCompletionDetector } from "./features/hooks/services/command-completion-detector";
 import { MCPDiscoveryService } from "./features/hooks/services/mcp-discovery";
+import { ModelCacheService } from "./features/hooks/services/model-cache-service";
+import { AcpAgentDiscoveryService } from "./features/hooks/services/acp-agent-discovery-service";
+import { KnownAgentDetector } from "./features/hooks/services/known-agent-detector";
+import { KnownAgentPreferencesService } from "./features/hooks/services/known-agent-preferences-service";
+import { KNOWN_AGENTS } from "./features/hooks/services/known-agent-catalog";
 import { HookViewProvider } from "./providers/hook-view-provider";
 import { HooksExplorerProvider } from "./providers/hooks-explorer-provider";
 import { DependenciesViewProvider } from "./providers/dependencies-view-provider";
@@ -73,6 +79,17 @@ import {
 	shouldShowWelcomeAutomatically,
 	markWelcomeAsShown,
 } from "./utils/workspace-state";
+import {
+	isGlobalResourceAccessAllowed,
+	openGlobalResourceAccessSettings,
+} from "./features/steering/global-resource-access-consent";
+import { registerDevinCommands } from "./commands/devin-commands";
+import { DevinCredentialsManager } from "./features/devin/devin-credentials-manager";
+import { DevinSessionManager } from "./features/devin/devin-session-manager";
+import { DevinSessionStorage } from "./features/devin/devin-session-storage";
+import { DevinPollingService } from "./features/devin/devin-polling-service";
+import { SessionCleanupService } from "./features/devin/session-cleanup";
+import { disposeCloudAgentsOutputChannel } from "./features/cloud-agents/logging";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -183,6 +200,34 @@ export async function activate(context: ExtensionContext) {
 	mcpDiscoveryService = new MCPDiscoveryService();
 	outputChannel.appendLine("MCPDiscoveryService initialized");
 
+	// Initialize ModelCacheService for dynamic model selection (T018 / US1)
+	const modelCacheService = new ModelCacheService();
+	outputChannel.appendLine("ModelCacheService initialized");
+
+	// Initialize AcpAgentDiscoveryService for ACP agent hooks (Phase 6)
+	const knownAgentDetector = new KnownAgentDetector();
+	const knownAgentPreferencesService = new KnownAgentPreferencesService(
+		context
+	);
+	const acpAgentDiscoveryService = new AcpAgentDiscoveryService(
+		workspaceFolders?.[0]?.uri.fsPath ?? "",
+		knownAgentDetector,
+		knownAgentPreferencesService
+	);
+	outputChannel.appendLine("AcpAgentDiscoveryService initialized");
+	// Warm the agent detection cache eagerly in the background — results will be
+	// ready by the time the user opens the Hooks panel. Fire-and-forget (non-blocking).
+	knownAgentDetector
+		.preloadAll(KNOWN_AGENTS)
+		.then(() => {
+			outputChannel.appendLine("KnownAgentDetector: preload complete");
+		})
+		.catch((err: unknown) => {
+			outputChannel.appendLine(
+				`KnownAgentDetector: preload error: ${(err as Error).message}`
+			);
+		});
+
 	// Initialize AgentRegistry for custom agent hooks (Phase 2 - T010, T018)
 	// Must be initialized before HookManager to enable agent validation
 	const agentWorkspaceRoot = workspaceFolders?.[0]?.uri.fsPath || "";
@@ -221,7 +266,11 @@ export async function activate(context: ExtensionContext) {
 		hookManager,
 		hookExecutor,
 		mcpDiscoveryService,
+		modelCacheService,
+		acpAgentDiscoveryService,
 		outputChannel,
+		knownAgentPreferencesService,
+		knownAgentDetector,
 	});
 	hookViewProvider.initialize();
 
@@ -406,18 +455,21 @@ export async function activate(context: ExtensionContext) {
 	// Register tree data providers
 	const quickAccessExplorer = new QuickAccessExplorerProvider();
 	const specExplorer = new SpecExplorerProvider(context);
-	const steeringExplorer = new SteeringExplorerProvider(context);
+	const steeringExplorer = new SteeringExplorerProvider(context, outputChannel);
 	const actionsExplorer = new ActionsExplorerProvider(context);
 	const hooksExplorer = new HooksExplorerProvider(hookManager);
 	hooksExplorer.initialize();
+
+	// Initialize Wiki Explorer Provider
+	const wikiExplorer = new WikiExplorerProvider(context);
 
 	// Set managers
 	specExplorer.setSpecManager(specManager);
 	steeringExplorer.setSteeringManager(steeringManager);
 	initializeAutoReviewTransitions();
 	outputChannel.appendLine("[ReviewFlow] Auto review transitions initialized");
-	await syncAllSpecReviewFlowSummaries(specManager);
 
+	// Register tree providers immediately so VS Code can render initial state
 	context.subscriptions.push(
 		window.registerTreeDataProvider(
 			QuickAccessExplorerProvider.viewId,
@@ -432,12 +484,43 @@ export async function activate(context: ExtensionContext) {
 			"gatomia.views.actionsExplorer",
 			actionsExplorer
 		),
-		window.registerTreeDataProvider(HooksExplorerProvider.viewId, hooksExplorer)
+		window.registerTreeDataProvider(
+			HooksExplorerProvider.viewId,
+			hooksExplorer
+		),
+		window.registerTreeDataProvider(WikiExplorerProvider.viewId, wikiExplorer)
 	);
+
+	// Deferred refresh: gives VS Code one tick to complete internal tree setup
+	// before the first data push (guards against settled-state empty render)
+	setImmediate(() => {
+		specExplorer.refresh();
+		steeringExplorer.refresh();
+		hooksExplorer.refresh();
+		actionsExplorer.refresh();
+		outputChannel.appendLine(
+			"[TreeView] Post-registration deferred refresh fired"
+		);
+	});
+
+	// Run heavyweight sync non-blocking; refresh spec explorer when pending counts are ready
+	syncAllSpecReviewFlowSummaries(specManager)
+		.then(() => {
+			specExplorer.refresh();
+			outputChannel.appendLine(
+				"[ReviewFlow] Initial sync complete, spec explorer refreshed"
+			);
+		})
+		.catch((err: unknown) => {
+			outputChannel.appendLine(
+				`[ReviewFlow] Failed to sync initial pending summaries: ${err}`
+			);
+		});
 	context.subscriptions.push(
 		{ dispose: () => hookManager.dispose() },
 		{ dispose: () => hookExecutor.dispose() },
 		{ dispose: () => commandCompletionDetector.dispose() },
+		{ dispose: () => modelCacheService.dispose() },
 		{ dispose: () => hookViewProvider.dispose() },
 		{ dispose: () => hooksExplorer.dispose() },
 		{ dispose: () => quickAccessExplorer.dispose() },
@@ -451,7 +534,141 @@ export async function activate(context: ExtensionContext) {
 		steeringExplorer,
 		actionsExplorer,
 		hooksExplorer,
+		wikiExplorer,
 	});
+
+	// Register wiki commands
+	context.subscriptions.push(
+		commands.registerCommand(WikiExplorerProvider.refreshCommandId, () => {
+			outputChannel.appendLine("[Wiki] Refreshing wiki explorer...");
+			wikiExplorer.refresh();
+		}),
+		commands.registerCommand(
+			WikiExplorerProvider.openCommandId,
+			async (documentPath: string) => {
+				if (documentPath) {
+					const uri = Uri.file(documentPath);
+					await renderPreviewForUri(uri);
+				}
+			}
+		),
+		commands.registerCommand(
+			WikiExplorerProvider.updateCommandId,
+			async (documentPath: string) => {
+				if (documentPath) {
+					await wikiExplorer.updateDocument(documentPath);
+				}
+			}
+		),
+		commands.registerCommand(
+			WikiExplorerProvider.updateAllCommandId,
+			async () => {
+				await wikiExplorer.updateAllDocuments();
+			}
+		),
+		commands.registerCommand(WikiExplorerProvider.showTocCommandId, () => {
+			window.showInformationMessage("Table of Contents - Coming soon!");
+		})
+	);
+
+	// Register Devin integration commands (progress view now in Cloud Agents)
+	try {
+		const devinCredentialsManager = new DevinCredentialsManager(
+			context.secrets
+		);
+		const devinSessionStorage = new DevinSessionStorage(context.workspaceState);
+		const devinSessionManager = new DevinSessionManager(
+			devinSessionStorage,
+			devinCredentialsManager
+		);
+
+		// Set up polling service for session status updates
+		const devinPollingService = new DevinPollingService(
+			devinSessionStorage,
+			devinCredentialsManager,
+			undefined,
+			(msg) => outputChannel.appendLine(msg)
+		);
+		devinPollingService.onStatusChange(async (event) => {
+			if (event.status === "completed") {
+				const session = devinSessionStorage.getBySessionId(event.sessionId);
+				if (session) {
+					try {
+						const { updateSpecTasksOnSessionComplete } = await import(
+							"./features/devin/spec-status-updater"
+						);
+						await updateSpecTasksOnSessionComplete(session);
+						outputChannel.appendLine(
+							`[Devin] Synced task status for session ${event.sessionId}`
+						);
+					} catch (err: unknown) {
+						outputChannel.appendLine(
+							`[Devin] Failed to sync task status: ${err}`
+						);
+					}
+
+					if (session.pullRequests.length > 0) {
+						const { handlePrNotification } = await import(
+							"./features/devin/pr-notification-handler"
+						);
+						await handlePrNotification(session);
+					}
+				}
+			}
+		});
+		devinPollingService.onBlocked(async (event) => {
+			const action = await window.showWarningMessage(
+				`Devin session "${event.title}" is blocked and needs your input to continue.`,
+				"Open in Devin"
+			);
+			if (action === "Open in Devin") {
+				const session = devinSessionStorage.getBySessionId(event.sessionId);
+				const url =
+					session?.devinUrl ??
+					`https://app.devin.ai/sessions/${event.sessionId}`;
+				env.openExternal(Uri.parse(url));
+			}
+		});
+		devinPollingService.onPrStateChange(async (event) => {
+			await handleDevinPrStateChange(event, devinSessionStorage);
+		});
+		context.subscriptions.push({ dispose: () => devinPollingService.stop() });
+
+		// Start session cleanup service (7-day retention policy)
+		const devinCleanupService = new SessionCleanupService(devinSessionStorage);
+		devinCleanupService.start().catch((err: unknown) => {
+			outputChannel.appendLine(`[Devin] Session cleanup failed: ${err}`);
+		});
+		context.subscriptions.push({ dispose: () => devinCleanupService.stop() });
+
+		if (devinSessionStorage.getActive().length > 0) {
+			devinPollingService.start();
+		}
+
+		const devinDisposables = registerDevinCommands(
+			devinSessionManager,
+			devinCredentialsManager,
+			undefined,
+			{
+				onCredentialsConfigured: () => {
+					devinPollingService.start();
+				},
+				onSessionCreated: () => {
+					devinPollingService.start();
+				},
+			}
+		);
+		context.subscriptions.push(...devinDisposables);
+		outputChannel.appendLine("[Devin] Commands registered");
+	} catch (error) {
+		outputChannel.appendLine(`[Devin] Failed to register commands: ${error}`);
+	}
+
+	// ========================================================================
+	// Cloud Agents (Multi-Provider) Bootstrap
+	// ========================================================================
+	await bootstrapCloudAgents(context);
+	context.subscriptions.push({ dispose: disposeCloudAgentsOutputChannel });
 
 	// Set up file watchers
 	setupFileWatchers(context, specExplorer, steeringExplorer, actionsExplorer);
@@ -517,6 +734,53 @@ export async function activate(context: ExtensionContext) {
 	}
 
 	// No UI mode toggle commands required
+}
+
+async function handleDevinPrStateChange(
+	event: import("./features/devin/devin-polling-service").PrStateChangeEvent,
+	storage: DevinSessionStorage
+): Promise<void> {
+	if (event.newState !== "merged") {
+		return;
+	}
+	outputChannel.appendLine(
+		`[Devin] PR merged for session ${event.sessionId}: ${event.prUrl}`
+	);
+	const session = storage.getBySessionId(event.sessionId);
+	if (!session) {
+		return;
+	}
+
+	try {
+		const { updateSpecTaskStatusOnMerge } = await import(
+			"./features/devin/spec-status-updater"
+		);
+		const pr = session.pullRequests.find((p) => p.prUrl === event.prUrl);
+		if (pr) {
+			await updateSpecTaskStatusOnMerge(session.specPath, event.specTaskId, {
+				...pr,
+				prState: "merged",
+			});
+			outputChannel.appendLine(
+				`[Devin] Marked task ${event.specTaskId} as completed in tasks.md (PR merged)`
+			);
+		}
+	} catch (err: unknown) {
+		outputChannel.appendLine(
+			`[Devin] Failed to update spec task on PR merge: ${err}`
+		);
+	}
+
+	try {
+		const { handlePrStateChange } = await import(
+			"./features/devin/pr-notification-handler"
+		);
+		await handlePrStateChange(session, event.previousState, event.newState);
+	} catch (err: unknown) {
+		outputChannel.appendLine(
+			`[Devin] Failed to notify PR state change: ${err}`
+		);
+	}
 }
 
 async function syncAllSpecReviewFlowSummaries(
@@ -638,6 +902,7 @@ interface RegisterCommandsOptions {
 	steeringExplorer: SteeringExplorerProvider;
 	actionsExplorer: ActionsExplorerProvider;
 	hooksExplorer: HooksExplorerProvider;
+	wikiExplorer: WikiExplorerProvider;
 }
 
 function registerCommands({
@@ -646,6 +911,7 @@ function registerCommands({
 	steeringExplorer,
 	actionsExplorer,
 	hooksExplorer,
+	wikiExplorer,
 }: RegisterCommandsOptions) {
 	const createSpecCommand = commands.registerCommand(
 		"gatomia.spec.create",
@@ -758,6 +1024,25 @@ function registerCommands({
 						error instanceof Error ? error.message : String(error);
 					window.showErrorMessage(`Failed to run task group: ${message} `);
 					outputChannel.appendLine(`[Run Task Group]Failed: ${message} `);
+				}
+			}
+		),
+
+		commands.registerCommand(
+			"gatomia.spec.runFullSpec",
+			async (args?: { filePath?: string; specName?: string }) => {
+				const specName = args?.specName ?? "spec";
+				outputChannel.appendLine(
+					`[Run Full Spec] Triggering speckit.implement for full spec: ${specName}`
+				);
+
+				try {
+					await sendPromptToChat("/speckit.implement");
+				} catch (error) {
+					const message =
+						error instanceof Error ? error.message : String(error);
+					window.showErrorMessage(`Failed to run full spec: ${message}`);
+					outputChannel.appendLine(`[Run Full Spec] Failed: ${message}`);
 				}
 			}
 		),
@@ -965,50 +1250,58 @@ function registerCommands({
 				steeringExplorer.refresh();
 			}
 		}),
-
 		commands.registerCommand("gatomia.steering.createProjectRule", async () => {
 			const created = await steeringManager.createProjectInstructionRule();
 			if (created) {
 				steeringExplorer.refresh();
 			}
 		}),
-
 		commands.registerCommand(
 			"gatomia.steering.createConstitution",
 			async () => {
 				await steeringManager.createConstitutionRequest();
 			}
 		),
-
 		commands.registerCommand("gatomia.steering.refresh", () => {
 			outputChannel.appendLine(
 				"[Manual Refresh] Refreshing steering explorer..."
 			);
 			steeringExplorer.refresh();
-		})
+		}),
+		commands.registerCommand(
+			"gatomia.steering.openGlobalResourceAccessSettings",
+			async () => {
+				await openGlobalResourceAccessSettings();
+			}
+		)
 	);
 
 	// Add file save confirmation for agent files
 	context.subscriptions.push(
-		workspace.onWillSaveTextDocument(async (event) => {
-			const document = event.document;
-			const filePath = document.fileName;
+		workspace.onWillSaveTextDocument((event) => {
+			const filePath = event.document.fileName;
 
-			// Check if this is an agent file in .copilot directories
-			if (filePath.includes(".copilot/agents/") && filePath.endsWith(".md")) {
-				// Show confirmation dialog
-				const result = await window.showWarningMessage(
-					"Are you sure you want to save changes to this agent file?",
-					{ modal: true },
-					"Save",
-					"Cancel"
+			// Check if this is an agent file in .github/agents or .copilot/agents directories
+			const isAgentFile =
+				(filePath.includes(".copilot/agents/") ||
+					filePath.includes(".github/agents/")) &&
+				filePath.endsWith(".md");
+
+			if (isAgentFile) {
+				event.waitUntil(
+					window
+						.showWarningMessage(
+							"Are you sure you want to save changes to this agent file?",
+							{ modal: true },
+							"Save"
+						)
+						.then((result) => {
+							if (result !== "Save") {
+								throw new Error("Save cancelled by user");
+							}
+							return [];
+						})
 				);
-
-				if (result !== "Save") {
-					// Cancel the save operation by waiting forever
-					// biome-ignore lint/suspicious/noEmptyBlockStatements: ignore
-					event.waitUntil(new Promise(() => {}));
-				}
 			}
 		})
 	);
@@ -1114,8 +1407,39 @@ function registerCommands({
 			);
 			actionsExplorer.refresh();
 		}),
-		commands.registerCommand("gatomia.actions.createInstructions", async () => {
-			await commands.executeCommand("workbench.command.new.instructions");
+		commands.registerCommand("gatomia.actions.createSkill", async () => {
+			const ws = workspace.workspaceFolders?.[0];
+			if (!ws) {
+				window.showErrorMessage("No workspace folder found");
+				return;
+			}
+
+			const name = await window.showInputBox({
+				title: "Create Skill",
+				placeHolder: "skill-name (kebab-case)",
+				prompt: "A SKILL.md file will be created under .github/skills/<name>/",
+				validateInput: (v) => (v ? undefined : "Name is required"),
+			});
+
+			if (!name) {
+				return;
+			}
+
+			const skillDir = Uri.joinPath(ws.uri, ".github", "skills", name);
+			const skillFile = Uri.joinPath(skillDir, "SKILL.md");
+
+			try {
+				await workspace.fs.createDirectory(skillDir);
+				const content = Buffer.from(
+					`# ${name}\n\n## Description\nDescribe the purpose of this skill.\n\n## Instructions\nProvide specific instructions for Copilot on how to use this skill.\n`
+				);
+				await workspace.fs.writeFile(skillFile, content);
+				const doc = await workspace.openTextDocument(skillFile);
+				await window.showTextDocument(doc);
+				actionsExplorer.refresh();
+			} catch (e) {
+				window.showErrorMessage(`Failed to create skill: ${e}`);
+			}
 		}),
 		commands.registerCommand(
 			"gatomia.actions.createCopilotPrompt",
@@ -1141,8 +1465,8 @@ function registerCommands({
 			}
 
 			const name = await window.showInputBox({
-				title: "Create Action",
-				placeHolder: "action name (kebab-case)",
+				title: "Create Prompt",
+				placeHolder: "prompt-name (kebab-case)",
 				prompt: `A markdown file will be created under ${actionsPathLabel} `,
 				validateInput: (v) => (v ? undefined : "Name is required"),
 			});
@@ -1474,11 +1798,6 @@ async function toggleViews() {
 	}
 }
 
-async function getMcpConfigPath(): Promise<string> {
-	const userDataPath = await getVSCodeUserDataPath();
-	return join(userDataPath, "mcp.json");
-}
-
 function setupFileWatchers(
 	context: ExtensionContext,
 	specExplorer: SpecExplorerProvider,
@@ -1596,20 +1915,36 @@ function setupFileWatchers(
 	context.subscriptions.push(...watchers);
 
 	// Watch for changes in copilot-instructions.md files
-	const globalHome = homedir() || process.env.USERPROFILE || "";
-	const globalCopilotMdWatcher = workspace.createFileSystemWatcher(
-		new RelativePattern(globalHome, ".github/copilot-instructions.md")
-	);
 	const projectCopilotMdWatcher = workspace.createFileSystemWatcher(
 		"**/copilot-instructions.md"
 	);
 
-	globalCopilotMdWatcher.onDidCreate(() => steeringExplorer.refresh());
-	globalCopilotMdWatcher.onDidDelete(() => steeringExplorer.refresh());
+	setupGlobalCopilotWatcher(context, steeringExplorer);
+
 	projectCopilotMdWatcher.onDidCreate(() => steeringExplorer.refresh());
 	projectCopilotMdWatcher.onDidDelete(() => steeringExplorer.refresh());
 
-	context.subscriptions.push(globalCopilotMdWatcher, projectCopilotMdWatcher);
+	context.subscriptions.push(projectCopilotMdWatcher);
+}
+
+function setupGlobalCopilotWatcher(
+	context: ExtensionContext,
+	steeringExplorer: SteeringExplorerProvider
+): void {
+	if (!isGlobalResourceAccessAllowed()) {
+		outputChannel.appendLine(
+			"[Steering Consent] Global watcher disabled (access not allowed)"
+		);
+		return;
+	}
+
+	const globalHome = homedir() || process.env.USERPROFILE || "";
+	const globalCopilotMdWatcher = workspace.createFileSystemWatcher(
+		new RelativePattern(globalHome, ".github/copilot-instructions.md")
+	);
+	globalCopilotMdWatcher.onDidCreate(() => steeringExplorer.refresh());
+	globalCopilotMdWatcher.onDidDelete(() => steeringExplorer.refresh());
+	context.subscriptions.push(globalCopilotMdWatcher);
 }
 
 function getDefaultWorkspaceFileUri(fileName: string): Uri | undefined {
@@ -1800,4 +2135,139 @@ async function openActivePreviewInEditor(): Promise<void> {
 	}
 
 	await openDocumentInEditor(activePreviewUri);
+}
+
+// ============================================================================
+// Cloud Agents Bootstrap (extracted to reduce activate() complexity)
+// ============================================================================
+
+async function bootstrapCloudAgents(context: ExtensionContext): Promise<void> {
+	const { ProviderConfigStore } = await import(
+		"./features/cloud-agents/provider-config-store"
+	);
+	const { ProviderRegistry } = await import(
+		"./features/cloud-agents/provider-registry"
+	);
+	const { DevinAdapter } = await import(
+		"./features/cloud-agents/adapters/devin-adapter"
+	);
+	const { GitHubCopilotAdapter } = await import(
+		"./features/cloud-agents/adapters/github-copilot-adapter"
+	);
+	const { MigrationService } = await import(
+		"./features/cloud-agents/migration-service"
+	);
+	const { CloudAgentProgressProvider } = await import(
+		"./providers/cloud-agent-progress-provider"
+	);
+	const { registerCloudAgentCommands } = await import(
+		"./commands/cloud-agent-commands"
+	);
+	const { AgentSessionStorage } = await import(
+		"./features/cloud-agents/agent-session-storage"
+	);
+	const { AgentPollingService } = await import(
+		"./features/cloud-agents/agent-polling-service"
+	);
+	const { SessionCleanupService: CloudCleanup } = await import(
+		"./features/cloud-agents/session-cleanup-service"
+	);
+	const { logInfo: cloudLog } = await import("./features/cloud-agents/logging");
+
+	try {
+		const configStore = new ProviderConfigStore(context.workspaceState);
+		const registry = new ProviderRegistry(configStore);
+
+		registry.register(new DevinAdapter(context.secrets));
+		registry.register(new GitHubCopilotAdapter(context.secrets));
+
+		const migration = new MigrationService(
+			configStore,
+			context.workspaceState,
+			context.secrets
+		);
+		await migration.migrateIfNeeded();
+		await migration.detectOrphanedConfig(registry);
+		await registry.restoreActive();
+
+		const sessionStorage = new AgentSessionStorage(context.workspaceState);
+
+		const existingSessions = await sessionStorage.getAll();
+		outputChannel.appendLine(
+			`[CloudAgents] Loaded ${existingSessions.length} session(s) from storage`
+		);
+		const activeSessions = await sessionStorage.getActive();
+		outputChannel.appendLine(
+			`[CloudAgents] ${activeSessions.length} active (pollable) session(s)`
+		);
+
+		const progressProvider = new CloudAgentProgressProvider(
+			registry,
+			sessionStorage
+		);
+		const treeView = window.createTreeView("gatomia.views.cloudAgents", {
+			treeDataProvider: progressProvider,
+		});
+		context.subscriptions.push(treeView, {
+			dispose: () => progressProvider.dispose(),
+		});
+		await progressProvider.updateContextKeys();
+
+		const pollingService = new AgentPollingService(registry, sessionStorage);
+		const cleanupService = new CloudCleanup(sessionStorage);
+		await cleanupService.cleanup();
+
+		pollingService.setOnSessionCompleted(async (localId, specPath) => {
+			try {
+				const { updateSpecTasksOnSessionComplete } = await import(
+					"./features/devin/spec-status-updater"
+				);
+				const session = await sessionStorage.getById(localId);
+				if (session) {
+					await updateSpecTasksOnSessionComplete(session);
+					outputChannel.appendLine(
+						`[CloudAgents] Synced task status (spec: ${specPath})`
+					);
+				}
+			} catch (err: unknown) {
+				outputChannel.appendLine(
+					`[CloudAgents] Failed to sync task status: ${err}`
+				);
+			}
+		});
+
+		pollingService.setOnError((message) => {
+			window.showErrorMessage(`Cloud Agent: ${message}`);
+		});
+
+		pollingService.setOnUpdated(() => {
+			progressProvider.refresh();
+		});
+
+		if (registry.getActive() && activeSessions.length > 0) {
+			pollingService.start(30_000);
+			outputChannel.appendLine(
+				`[CloudAgents] Polling started for ${activeSessions.length} active session(s)`
+			);
+		}
+		context.subscriptions.push({ dispose: () => pollingService.stop() });
+
+		const refreshUI = () => {
+			progressProvider.refresh();
+			progressProvider.updateContextKeys();
+		};
+		const cmdDisposables = registerCloudAgentCommands({
+			registry,
+			sessionStorage,
+			pollingService,
+			onSessionCreated: refreshUI,
+			onRefresh: refreshUI,
+		});
+		context.subscriptions.push(...cmdDisposables);
+
+		cloudLog("Cloud Agents module bootstrapped");
+		outputChannel.appendLine("[CloudAgents] Module bootstrapped successfully");
+	} catch (error) {
+		outputChannel.appendLine(`[CloudAgents] Failed to bootstrap: ${error}`);
+	}
 }

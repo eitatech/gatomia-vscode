@@ -2,9 +2,29 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { Stats } from "fs";
 import { window } from "vscode";
 
-// Auto-mock fs modules
-vi.mock("fs");
-vi.mock("node:fs");
+// Create mock functions via vi.hoisted() so they are available in module factories
+const fsMockModule = vi.hoisted(() => ({
+	existsSync: vi.fn(),
+	readdirSync: vi.fn(),
+	statSync: vi.fn(),
+	mkdirSync: vi.fn(),
+	copyFileSync: vi.fn(),
+	readFileSync: vi.fn(),
+	writeFileSync: vi.fn(),
+}));
+
+const {
+	existsSync: mockExistsSync,
+	readdirSync: mockReaddirSync,
+	statSync: mockStatSync,
+	mkdirSync: mockMkdirSync,
+	copyFileSync: mockCopyFileSync,
+	readFileSync: mockReadFileSync,
+	writeFileSync: mockWriteFileSync,
+} = fsMockModule;
+
+vi.mock("fs", () => ({ default: fsMockModule, ...fsMockModule }));
+vi.mock("node:fs", () => ({ default: fsMockModule, ...fsMockModule }));
 
 // biome-ignore lint/performance/noNamespaceImport: Required for vitest mocking with vi.mocked()
 import * as fs from "fs";

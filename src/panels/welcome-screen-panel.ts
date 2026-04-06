@@ -15,6 +15,7 @@ import {
 import { getWebviewContent } from "../utils/get-webview-content";
 import type {
 	ExtensionToWebviewMessage,
+	InstallableDependency,
 	WebviewToExtensionMessage,
 } from "../types/welcome";
 
@@ -22,7 +23,6 @@ export interface WelcomeScreenPanelCallbacks {
 	onReady?: () => Promise<void> | void;
 	onExecuteCommand?: (
 		commandId: string,
-		panel: WelcomeScreenPanel,
 		args?: unknown[]
 	) => Promise<void> | void;
 	onUpdateConfig?: (
@@ -30,7 +30,7 @@ export interface WelcomeScreenPanelCallbacks {
 		value: string | boolean
 	) => Promise<void> | void;
 	onInstallDependency?: (
-		dependency: "copilot-chat" | "speckit" | "openspec"
+		dependency: InstallableDependency
 	) => Promise<void> | void;
 	onRefreshDependencies?: () => Promise<void> | void;
 	onUpdatePreference?: (
@@ -242,7 +242,6 @@ export class WelcomeScreenPanel {
 			case "welcome/execute-command":
 				await this.callbacks.onExecuteCommand?.(
 					message.commandId,
-					this,
 					message.args
 				);
 				return;

@@ -11,6 +11,13 @@ vi.mock("os", () => ({
 	homedir: vi.fn(() => "/home/test"),
 }));
 
+vi.mock("node:os", () => ({
+	default: {
+		homedir: vi.fn(() => "/home/test"),
+	},
+	homedir: vi.fn(() => "/home/test"),
+}));
+
 vi.mock("fs", () => ({
 	default: {
 		existsSync: vi.fn(() => false),
@@ -30,6 +37,18 @@ describe("SteeringExplorerProvider - instruction rules", () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(workspace.getConfiguration).mockReturnValue({
+			get: vi.fn((key: string) => {
+				if (key === "steering.workspaceGlobalResourceAccess") {
+					return "allow";
+				}
+				if (key === "steering.globalResourceAccessDefault") {
+					return "ask";
+				}
+				return;
+			}),
+			update: vi.fn().mockResolvedValue(undefined),
+		} as any);
 		// biome-ignore lint/complexity/useLiteralKeys: accessing private test helper
 		(ConfigManager as any)["instance"] = {
 			getSettings: () => ({ specSystem: SPEC_SYSTEM_MODE.AUTO }),
@@ -39,6 +58,30 @@ describe("SteeringExplorerProvider - instruction rules", () => {
 		vi.mocked(workspace.fs.readDirectory).mockResolvedValue([] as any);
 
 		provider = new SteeringExplorerProvider(context);
+	});
+
+	it("shows informative item when global access is denied", async () => {
+		vi.mocked(workspace.getConfiguration).mockReturnValue({
+			get: vi.fn((key: string) => {
+				if (key === "steering.workspaceGlobalResourceAccess") {
+					return "deny";
+				}
+				if (key === "steering.globalResourceAccessDefault") {
+					return "ask";
+				}
+				return;
+			}),
+			update: vi.fn().mockResolvedValue(undefined),
+		} as any);
+
+		const rootItems = await provider.getChildren();
+		const userGroup = rootItems.find(
+			(item) => item.contextValue === "group-user"
+		);
+
+		const children = await provider.getChildren(userGroup as any);
+		expect(children).toHaveLength(1);
+		expect(children[0].contextValue).toBe("global-access-disabled");
 	});
 
 	it("shows project + user instruction rules groups at the root", async () => {
@@ -128,6 +171,35 @@ describe("SteeringExplorerProvider - instruction rules", () => {
 			(c) => c.contextValue === "instruction-rule"
 		);
 		expect(ruleItems.map((c) => c.label)).toEqual(["Typescript"]);
+	});
+
+	it("shows SpecKit Constitution under Rules when .specify/memory/constitution.md exists", async () => {
+		const specKitConstitutionPath =
+			"/fake/workspace/.specify/memory/constitution.md";
+
+		vi.mocked(workspace.fs.stat).mockImplementation((uri) => {
+			if (uri.fsPath === specKitConstitutionPath) {
+				return Promise.resolve({ type: FileType.File, size: 100 } as any);
+			}
+			return Promise.reject(new Error("not found"));
+		});
+
+		const rootItems = await provider.getChildren();
+		const projectGroup = rootItems.find(
+			(item) => item.contextValue === "group-project"
+		);
+		expect(projectGroup).toBeTruthy();
+
+		const children = await provider.getChildren(projectGroup as any);
+		const constitutionItem = children.find(
+			(c) => c.label === "SpecKit Constitution"
+		);
+		expect(constitutionItem).toBeTruthy();
+		expect(constitutionItem?.contextValue).toBe("constitution-file");
+		expect(constitutionItem?.command?.command).toBe("vscode.open");
+		expect((constitutionItem?.command?.arguments as any[])?.[0]?.fsPath).toBe(
+			specKitConstitutionPath
+		);
 	});
 
 	it("instruction rule items open the underlying file", async () => {

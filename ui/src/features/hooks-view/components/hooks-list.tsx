@@ -162,7 +162,7 @@ const ACTION_GROUPS: Array<{
 	},
 	{
 		type: "github",
-		title: "GitHub MCP",
+		title: "GitHub Tools",
 		description:
 			"Open issues, PRs, or comments via the GitHub Model Context Protocol integration.",
 	},
@@ -171,5 +171,11 @@ const ACTION_GROUPS: Array<{
 		title: "Custom Agents",
 		description:
 			"Chain workspace-specific automations or external agents using arguments and templates.",
+	},
+	{
+		type: "mcp",
+		title: "Custom Tools",
+		description:
+			"Execute custom MCP tools with natural language instructions using GitHub Copilot models.",
 	},
 ];

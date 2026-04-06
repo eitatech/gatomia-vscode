@@ -56,15 +56,19 @@ export class DependencyChecker {
 		);
 
 		const copilotChat = this.checkCopilotChat();
-		const [speckit, openspec] = await Promise.all([
+		const [speckit, openspec, copilotCli, gatomiaCli] = await Promise.all([
 			this.checkSpecKitCLI(),
 			this.checkOpenSpecCLI(),
+			this.checkCopilotCLI(),
+			this.checkGatomiaCLI(),
 		]);
 
 		const result: DependencyStatus = {
 			copilotChat,
 			speckit,
 			openspec,
+			copilotCli,
+			gatomiaCli,
 			lastChecked: Date.now(),
 		};
 
@@ -75,7 +79,7 @@ export class DependencyChecker {
 		};
 
 		this.outputChannel.appendLine(
-			`[DependencyChecker] Check complete: Copilot=${copilotChat.installed}, SpecKit=${speckit.installed}, OpenSpec=${openspec.installed}`
+			`[DependencyChecker] Check complete: Copilot=${copilotChat.installed}, SpecKit=${speckit.installed}, OpenSpec=${openspec.installed}, CopilotCLI=${copilotCli.installed}, GatomIA=${gatomiaCli.installed}`
 		);
 
 		return result;
@@ -166,6 +170,47 @@ export class DependencyChecker {
 
 		this.outputChannel.appendLine(
 			`[DependencyChecker] OpenSpec CLI: ${result.installed ? `installed (v${result.version || "unknown"})` : "NOT installed"}${result.error ? ` - ${result.error}` : ""}`
+		);
+
+		return {
+			installed: result.installed,
+			version: result.version,
+		};
+	}
+
+	private async checkCopilotCLI(): Promise<DependencyStatus["copilotCli"]> {
+		const primary = await checkCLI(
+			"copilot --version",
+			DependencyChecker.CLI_TIMEOUT_MS
+		);
+		const result = primary.installed
+			? primary
+			: await checkCLI(
+					"github-copilot --version",
+					DependencyChecker.CLI_TIMEOUT_MS
+				);
+
+		this.outputChannel.appendLine(
+			`[DependencyChecker] Copilot CLI: ${result.installed ? `installed (v${result.version || "unknown"})` : "NOT installed"}${result.error ? ` - ${result.error}` : ""}`
+		);
+
+		return {
+			installed: result.installed,
+			version: result.version,
+		};
+	}
+
+	private async checkGatomiaCLI(): Promise<DependencyStatus["gatomiaCli"]> {
+		const primary = await checkCLI(
+			"gatomia --version",
+			DependencyChecker.CLI_TIMEOUT_MS
+		);
+		const result = primary.installed
+			? primary
+			: await checkCLI("mia --version", DependencyChecker.CLI_TIMEOUT_MS);
+
+		this.outputChannel.appendLine(
+			`[DependencyChecker] GatomIA CLI: ${result.installed ? `installed (v${result.version || "unknown"})` : "NOT installed"}${result.error ? ` - ${result.error}` : ""}`
 		);
 
 		return {

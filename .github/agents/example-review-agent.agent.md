@@ -1,4 +1,5 @@
 ---
+name: Example Review Agent
 description: Example agent for reviewing specs after clarification. This is a simple template demonstrating custom agent usage with hooks.
 ---
 

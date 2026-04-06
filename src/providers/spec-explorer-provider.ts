@@ -409,6 +409,26 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 						continue;
 					}
 
+					// Handle contracts folder
+					if (docType === "contracts") {
+						const relativePath = workspace.asRelativePath(absolutePath);
+						items.push(
+							new SpecItem(
+								"Contracts",
+								TreeItemCollapsibleState.Collapsed,
+								"contracts-folder",
+								this.context,
+								element.specName,
+								"contracts",
+								undefined,
+								relativePath,
+								undefined,
+								element.system
+							)
+						);
+						continue;
+					}
+
 					const fileInfo = fileMap[fileName] || {
 						label: fileName,
 						type: "file",
@@ -610,6 +630,64 @@ export class SpecExplorerProvider implements TreeDataProvider<SpecItem> {
 			}
 		}
 
+		// Handle contracts folder - show individual contract files
+		if (element.contextValue === "contracts-folder") {
+			const contractsFolderPath = element.filePath;
+			if (!contractsFolderPath) {
+				return [];
+			}
+
+			const workspaceRoot = workspace.workspaceFolders?.[0].uri.fsPath;
+			if (!workspaceRoot) {
+				return [];
+			}
+
+			const absolutePath = join(workspaceRoot, contractsFolderPath);
+
+			try {
+				const { readdirSync, statSync } = await import("node:fs");
+				const entries = readdirSync(absolutePath);
+				const contractItems: SpecItem[] = [];
+
+				for (const entry of entries) {
+					const filePath = join(absolutePath, entry);
+					const stat = statSync(filePath);
+
+					if (stat.isFile()) {
+						const relativePath = workspace.asRelativePath(filePath);
+						const displayName = entry.replace(MARKDOWN_EXTENSION_PATTERN, "");
+						const formattedName =
+							displayName.charAt(0).toUpperCase() +
+							displayName.slice(1).replace(/-/g, " ");
+
+						contractItems.push(
+							new SpecItem(
+								formattedName,
+								TreeItemCollapsibleState.None,
+								"contract-item",
+								this.context,
+								element.specName,
+								"contract",
+								{
+									command: SpecExplorerProvider.openSpecCommandId,
+									title: `Open ${formattedName}`,
+									arguments: [relativePath, "contract"],
+								},
+								relativePath,
+								undefined,
+								element.system
+							)
+						);
+					}
+				}
+
+				return contractItems;
+			} catch (error) {
+				console.error("Error reading contracts folder:", error);
+				return [];
+			}
+		}
+
 		if (element.contextValue === "change") {
 			const basePath = `openspec/changes/${element.specName}`;
 			return [
@@ -787,6 +865,8 @@ class SpecItem extends TreeItem {
 			"task-item": () => this.handleTaskItemIcon(),
 			"checklists-folder": () => this.handleChecklistsFolderIcon(),
 			"checklist-item": () => this.handleChecklistItemIcon(),
+			"contracts-folder": () => this.handleContractsFolderIcon(),
+			"contract-item": () => this.handleContractItemIcon(),
 			"change-request": () => this.handleChangeRequestIcon(),
 		};
 
@@ -852,6 +932,16 @@ class SpecItem extends TreeItem {
 		const statusText = getTaskStatusTooltip(status);
 		this.tooltip = `Checklist: ${this.label} - ${statusText}`;
 		this.description = statusText;
+	}
+
+	private handleContractsFolderIcon(): void {
+		this.iconPath = new ThemeIcon("law");
+		this.tooltip = "Contracts - Click to expand";
+	}
+
+	private handleContractItemIcon(): void {
+		this.iconPath = new ThemeIcon("file-code");
+		this.tooltip = `Contract: ${this.label}`;
 	}
 
 	private handleChangeRequestIcon(): void {

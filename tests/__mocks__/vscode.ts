@@ -18,6 +18,7 @@ export const workspace = {
 	fs: {
 		createDirectory: vi.fn(),
 		writeFile: vi.fn(),
+		readFile: vi.fn(),
 		readDirectory: vi.fn(),
 		stat: vi.fn(),
 		delete: vi.fn(),
@@ -41,10 +42,20 @@ export const window = {
 	showErrorMessage: vi.fn().mockResolvedValue(undefined),
 	showWarningMessage: vi.fn().mockResolvedValue(undefined),
 	showInformationMessage: vi.fn().mockResolvedValue(undefined),
+	showOpenDialog: vi.fn(),
 	showInputBox: vi.fn(),
 	showQuickPick: vi.fn(),
 	createTerminal: vi.fn(),
 	onDidEndTerminalShellExecution: vi.fn(),
+	createOutputChannel: vi.fn((name: string) => ({
+		appendLine: vi.fn(),
+		append: vi.fn(),
+		clear: vi.fn(),
+		show: vi.fn(),
+		hide: vi.fn(),
+		dispose: vi.fn(),
+		name,
+	})),
 	createWebviewPanel: vi.fn(() => ({
 		webview: {
 			html: "",
@@ -85,6 +96,8 @@ export const Uri = {
 		fsPath: str.replace("file://", ""),
 	})),
 };
+
+export const version = "1.95.0";
 
 export const ViewColumn = {
 	Active: 1,
@@ -234,3 +247,13 @@ export class ChatResponseStream {
 	reference = vi.fn();
 	push = vi.fn();
 }
+
+// Mock for vscode.lm (Language Models API, vscode 1.90+).
+// Tests can overwrite this export directly after vi.resetModules() to configure
+// what selectChatModels returns.
+export const lm:
+	| {
+			selectChatModels(filter: { vendor: string }): Promise<unknown[]>;
+			onDidChangeChatModels(listener: () => void): { dispose: () => void };
+	  }
+	| undefined = undefined;

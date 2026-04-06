@@ -46,8 +46,23 @@ export interface WelcomeDependencyStatusMessage {
 		installed: boolean;
 		version: string | null;
 	};
+	copilotCli: {
+		installed: boolean;
+		version: string | null;
+	};
+	gatomiaCli: {
+		installed: boolean;
+		version: string | null;
+	};
 	lastChecked: number;
 }
+
+export type InstallableDependency =
+	| "copilot-chat"
+	| "speckit"
+	| "openspec"
+	| "copilot-cli"
+	| "gatomia-cli";
 
 export interface WelcomeDiagnosticAddedMessage {
 	type: "welcome/diagnostic-added";
@@ -91,7 +106,7 @@ export interface WelcomeUpdateConfigMessage {
 
 export interface WelcomeInstallDependencyMessage {
 	type: "welcome/install-dependency";
-	dependency: "copilot-chat" | "speckit" | "openspec";
+	dependency: InstallableDependency;
 }
 
 export interface WelcomeRefreshDependenciesMessage {
@@ -148,6 +163,14 @@ export interface DependencyStatus {
 		installed: boolean;
 		version: string | null;
 	};
+	copilotCli: {
+		installed: boolean;
+		version: string | null;
+	};
+	gatomiaCli: {
+		installed: boolean;
+		version: string | null;
+	};
 	lastChecked: number;
 }
 
@@ -193,11 +216,12 @@ export interface LearningResource {
 
 export interface FeatureAction {
 	id: string;
-	featureArea: "Specs" | "Prompts" | "Hooks" | "Steering";
+	featureArea: "Specs" | "Actions" | "Hooks" | "Steering";
 	label: string;
 	description: string;
 	commandId: string;
 	enabled: boolean;
+	icon?: string;
 }
 
 // ============================================================================
@@ -205,6 +229,8 @@ export interface FeatureAction {
 // ============================================================================
 
 export interface WelcomeScreenState {
+	extensionVersion: string;
+	vscodeVersion: string;
 	hasShownBefore: boolean;
 	dontShowOnStartup: boolean;
 	currentView: "setup" | "features" | "configuration" | "status" | "learning";

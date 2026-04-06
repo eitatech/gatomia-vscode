@@ -37,6 +37,13 @@ const createClient = () => ({
 	closeIssue: vi.fn().mockResolvedValue(undefined),
 	createPullRequest: vi.fn().mockResolvedValue(undefined),
 	addComment: vi.fn().mockResolvedValue(undefined),
+	mergePullRequest: vi.fn().mockResolvedValue(undefined),
+	closePullRequest: vi.fn().mockResolvedValue(undefined),
+	addLabel: vi.fn().mockResolvedValue(undefined),
+	removeLabel: vi.fn().mockResolvedValue(undefined),
+	requestReview: vi.fn().mockResolvedValue(undefined),
+	assignIssue: vi.fn().mockResolvedValue(undefined),
+	createRelease: vi.fn().mockResolvedValue(undefined),
 });
 
 const noopLogger = {
@@ -214,5 +221,215 @@ describe("GitHubActionExecutor", () => {
 		expect(result.success).toBe(false);
 		expect(result.error).toBeInstanceOf(GitHubRepositoryResolutionError);
 		expect(client.openIssue).not.toHaveBeenCalled();
+	});
+
+	it("merges a pull request with the given prNumber and mergeMethod", async () => {
+		const client = createClient();
+		const executor = new GitHubActionExecutor({
+			clientProvider: async () => client,
+			repositoryResolver: async () => "owner/repo",
+			logger: noopLogger,
+		});
+
+		const params: GitHubActionParams = {
+			operation: "merge-pr",
+			prNumber: 42,
+			mergeMethod: "squash",
+		};
+
+		const result = await executor.execute(params, templateContext);
+
+		expect(result.success).toBe(true);
+		expect(client.mergePullRequest).toHaveBeenCalledWith({
+			repository: "owner/repo",
+			prNumber: 42,
+			mergeMethod: "squash",
+		});
+	});
+
+	it("requires prNumber for merge-pr", async () => {
+		const client = createClient();
+		const executor = new GitHubActionExecutor({
+			clientProvider: async () => client,
+			repositoryResolver: async () => "owner/repo",
+			logger: noopLogger,
+		});
+
+		const params: GitHubActionParams = {
+			operation: "merge-pr",
+		};
+
+		const result = await executor.execute(params, templateContext);
+
+		expect(result.success).toBe(false);
+		expect(result.error?.message).toContain("PR number");
+		expect(client.mergePullRequest).not.toHaveBeenCalled();
+	});
+
+	it("closes a pull request by prNumber", async () => {
+		const client = createClient();
+		const executor = new GitHubActionExecutor({
+			clientProvider: async () => client,
+			repositoryResolver: async () => "owner/repo",
+			logger: noopLogger,
+		});
+
+		const params: GitHubActionParams = {
+			operation: "close-pr",
+			prNumber: 7,
+		};
+
+		const result = await executor.execute(params, templateContext);
+
+		expect(result.success).toBe(true);
+		expect(client.closePullRequest).toHaveBeenCalledWith({
+			repository: "owner/repo",
+			prNumber: 7,
+		});
+	});
+
+	it("adds labels to an issue", async () => {
+		const client = createClient();
+		const executor = new GitHubActionExecutor({
+			clientProvider: async () => client,
+			repositoryResolver: async () => "owner/repo",
+			logger: noopLogger,
+		});
+
+		const params: GitHubActionParams = {
+			operation: "add-label",
+			issueNumber: 10,
+			labels: ["bug", "priority:high"],
+		};
+
+		const result = await executor.execute(params, templateContext);
+
+		expect(result.success).toBe(true);
+		expect(client.addLabel).toHaveBeenCalledWith({
+			repository: "owner/repo",
+			issueNumber: 10,
+			labels: ["bug", "priority:high"],
+		});
+	});
+
+	it("removes a label from an issue", async () => {
+		const client = createClient();
+		const executor = new GitHubActionExecutor({
+			clientProvider: async () => client,
+			repositoryResolver: async () => "owner/repo",
+			logger: noopLogger,
+		});
+
+		const params: GitHubActionParams = {
+			operation: "remove-label",
+			issueNumber: 10,
+			labelName: "wip",
+		};
+
+		const result = await executor.execute(params, templateContext);
+
+		expect(result.success).toBe(true);
+		expect(client.removeLabel).toHaveBeenCalledWith({
+			repository: "owner/repo",
+			issueNumber: 10,
+			labelName: "wip",
+		});
+	});
+
+	it("requests a review on a pull request", async () => {
+		const client = createClient();
+		const executor = new GitHubActionExecutor({
+			clientProvider: async () => client,
+			repositoryResolver: async () => "owner/repo",
+			logger: noopLogger,
+		});
+
+		const params: GitHubActionParams = {
+			operation: "request-review",
+			prNumber: 5,
+			reviewers: ["alice", "bob"],
+		};
+
+		const result = await executor.execute(params, templateContext);
+
+		expect(result.success).toBe(true);
+		expect(client.requestReview).toHaveBeenCalledWith({
+			repository: "owner/repo",
+			prNumber: 5,
+			reviewers: ["alice", "bob"],
+		});
+	});
+
+	it("assigns an issue to users", async () => {
+		const client = createClient();
+		const executor = new GitHubActionExecutor({
+			clientProvider: async () => client,
+			repositoryResolver: async () => "owner/repo",
+			logger: noopLogger,
+		});
+
+		const params: GitHubActionParams = {
+			operation: "assign-issue",
+			issueNumber: 20,
+			assignees: ["carol"],
+		};
+
+		const result = await executor.execute(params, templateContext);
+
+		expect(result.success).toBe(true);
+		expect(client.assignIssue).toHaveBeenCalledWith({
+			repository: "owner/repo",
+			issueNumber: 20,
+			assignees: ["carol"],
+		});
+	});
+
+	it("creates a release with template-expanded fields", async () => {
+		const client = createClient();
+		const executor = new GitHubActionExecutor({
+			clientProvider: async () => client,
+			repositoryResolver: async () => "owner/repo",
+			logger: noopLogger,
+		});
+
+		const params: GitHubActionParams = {
+			operation: "create-release",
+			tagName: "v1.0.0",
+			releaseName: "Release $feature",
+			releaseBody: "Branch: $branch",
+			draft: false,
+			prerelease: false,
+		};
+
+		const result = await executor.execute(params, templateContext);
+
+		expect(result.success).toBe(true);
+		expect(client.createRelease).toHaveBeenCalledWith({
+			repository: "owner/repo",
+			tagName: "v1.0.0",
+			releaseName: "Release hooks-module",
+			releaseBody: "Branch: 001-hooks-module",
+			draft: false,
+			prerelease: false,
+		});
+	});
+
+	it("requires tagName for create-release", async () => {
+		const client = createClient();
+		const executor = new GitHubActionExecutor({
+			clientProvider: async () => client,
+			repositoryResolver: async () => "owner/repo",
+			logger: noopLogger,
+		});
+
+		const params: GitHubActionParams = {
+			operation: "create-release",
+		};
+
+		const result = await executor.execute(params, templateContext);
+
+		expect(result.success).toBe(false);
+		expect(result.error?.message).toContain("Tag name");
+		expect(client.createRelease).not.toHaveBeenCalled();
 	});
 });
