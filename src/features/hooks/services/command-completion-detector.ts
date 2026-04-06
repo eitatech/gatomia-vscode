@@ -157,8 +157,22 @@ export class CommandCompletionDetector {
 				`[CommandCompletionDetector] Detected completion: ${key} (file: ${uri.fsPath})`
 			);
 
-			// Fire the trigger
-			this.triggerRegistry.fireTrigger("speckit", operation);
+			// Read file content for output capture
+			let outputContent = "";
+			try {
+				const { promises: fs } = await import("node:fs");
+				outputContent = await fs.readFile(uri.fsPath, "utf-8");
+			} catch (error) {
+				this.outputChannel.appendLine(
+					`[CommandCompletionDetector] Warning: Failed to read output file: ${error}`
+				);
+			}
+
+			// Fire the trigger with output data
+			this.triggerRegistry.fireTrigger("speckit", operation, "after", {
+				outputPath: uri.fsPath,
+				outputContent,
+			});
 
 			// Record trigger time
 			this.lastTriggered.set(key, Date.now());
@@ -258,7 +272,8 @@ export class CommandCompletionDetector {
 		this.outputChannel.appendLine(
 			`[CommandCompletionDetector] Manual trigger: speckit.${operation}`
 		);
-		this.triggerRegistry.fireTrigger("speckit", operation);
+		// Manual triggers don't have output capture
+		this.triggerRegistry.fireTrigger("speckit", operation, "after");
 		this.lastTriggered.set(`speckit.${operation}`, Date.now());
 	}
 

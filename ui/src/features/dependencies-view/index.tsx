@@ -7,6 +7,9 @@ import type {
 	DependenciesWebviewMessage,
 } from "./types";
 
+const GATOMIA_COPILOT_CONFIG_COMMAND =
+	"gatomia config set --llm-provider copilot --main-model gpt-4";
+
 export const DependenciesView = () => {
 	const [dependencies, setDependencies] = useState<DependencyStatus[]>([]);
 	const [steps, setSteps] = useState<InstallationStep[]>([]);
@@ -151,6 +154,9 @@ export const DependenciesView = () => {
 	);
 
 	const allInstalled = dependencies.every((dep) => dep.installed);
+	const gatomiaCliInstalled = dependencies.some(
+		(dep) => dep.name === "GatomIA CLI" && dep.installed
+	);
 
 	return (
 		<div className="flex h-full w-full flex-col gap-6 px-4 py-4">
@@ -246,6 +252,56 @@ export const DependenciesView = () => {
 					))}
 				</div>
 			</section>
+
+			{gatomiaCliInstalled && (
+				<section className="flex flex-col gap-3">
+					<h2 className="font-medium text-[color:var(--vscode-foreground)] text-base">
+						Configure GatomIA CLI with GitHub Copilot
+					</h2>
+					<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.65))] text-sm">
+						Run the command below to set GitHub Copilot as the default provider
+						for GatomIA CLI.
+					</p>
+					<div className="mt-1 overflow-x-auto rounded border border-[color:color-mix(in_srgb,var(--vscode-foreground)_20%,transparent)] bg-[color:var(--vscode-textCodeBlock-background)] px-3 py-2 font-mono text-sm">
+						<code className="text-[color:var(--vscode-foreground)]">
+							{GATOMIA_COPILOT_CONFIG_COMMAND}
+						</code>
+					</div>
+					<div className="flex items-center gap-2">
+						<button
+							className="flex items-center gap-1.5 rounded border border-transparent bg-[color:var(--vscode-button-secondaryBackground)] px-2 py-1 text-[color:var(--vscode-button-secondaryForeground)] text-xs transition-colors hover:bg-[color:var(--vscode-button-secondaryHoverBackground)]"
+							onClick={() => handleCopy(GATOMIA_COPILOT_CONFIG_COMMAND)}
+							title="Copy to clipboard"
+							type="button"
+						>
+							<i className="codicon codicon-copy" />
+							Copy
+						</button>
+						<button
+							className="flex items-center gap-1.5 rounded border border-transparent bg-[color:var(--vscode-button-secondaryBackground)] px-2 py-1 text-[color:var(--vscode-button-secondaryForeground)] text-xs transition-colors hover:bg-[color:var(--vscode-button-secondaryHoverBackground)]"
+							onClick={() => handlePaste(GATOMIA_COPILOT_CONFIG_COMMAND)}
+							title="Paste to terminal"
+							type="button"
+						>
+							<i className="codicon codicon-terminal" />
+							Paste
+						</button>
+						<button
+							className="flex items-center gap-1.5 rounded border border-transparent bg-[color:var(--vscode-button-background)] px-2 py-1 text-[color:var(--vscode-button-foreground)] text-xs transition-colors hover:bg-[color:var(--vscode-button-hoverBackground)]"
+							onClick={() => handleExecute(GATOMIA_COPILOT_CONFIG_COMMAND)}
+							title="Execute in terminal"
+							type="button"
+						>
+							<i className="codicon codicon-play" />
+							Run
+						</button>
+					</div>
+					<p className="text-[color:var(--vscode-descriptionForeground,rgba(255,255,255,0.65))] text-xs">
+						If your environment uses the <code>mia</code> command alias, run the
+						same configuration command with <code>mia config set ...</code>.
+					</p>
+				</section>
+			)}
 		</div>
 	);
 };

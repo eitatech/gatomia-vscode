@@ -26,7 +26,7 @@ export const FeaturesSection = ({
 		{} as Record<string, FeatureAction[]>
 	);
 
-	const featureAreas = ["Specs", "Prompts", "Hooks", "Steering"] as const;
+	const featureAreas = ["Specs", "Actions", "Hooks", "Steering"] as const;
 
 	return (
 		<div className="welcome-section">
@@ -162,7 +162,7 @@ function getAreaIconClass(area: string): string {
 	switch (area) {
 		case "Specs":
 			return "codicon-file-text";
-		case "Prompts":
+		case "Actions":
 			return "codicon-comment-discussion";
 		case "Hooks":
 			return "codicon-extensions";

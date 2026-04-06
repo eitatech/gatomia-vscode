@@ -37,7 +37,7 @@ describe("HooksExplorerProvider", () => {
 		changeEmitter.fire();
 
 		const rootItems = await provider.getChildren();
-		expect(rootItems).toHaveLength(4);
+		expect(rootItems).toHaveLength(5); // 5 groups: terminal, copilot, github, copilot-agent, mcp (Custom Tools)
 		expect(rootItems.every((item) => item.contextValue === "hook-group")).toBe(
 			true
 		);

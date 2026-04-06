@@ -27,6 +27,7 @@ export interface LoadDocumentOptions {
 
 const LINE_SPLIT_PATTERN = /\r?\n/;
 const HEADING_PATTERN = /^##\s+(.+)/;
+const FALLBACK_HEADING_PATTERN = /^#+\s+(.+)/;
 
 export class DocumentPreviewService {
 	private readonly changeEmitter = new EventEmitter<Uri>();
@@ -280,12 +281,16 @@ export class DocumentPreviewService {
 	private extractSections(content: string): PreviewSection[] {
 		const lines = content.split(LINE_SPLIT_PATTERN);
 		const sections: PreviewSection[] = [];
-		let currentTitle = "Overview";
-		let currentId = "overview";
+		let currentTitle: string | undefined;
+		let currentId: string | undefined;
 		let currentBody: string[] = [];
+		let preSectionBody: string[] = [];
 		const slugCounts = new Map<string, number>();
 
 		const commit = () => {
+			if (!(currentTitle && currentId)) {
+				return;
+			}
 			const body = currentBody.join("\n").trim();
 			sections.push({
 				id: this.uniqueSlug(currentId, slugCounts),
@@ -297,22 +302,62 @@ export class DocumentPreviewService {
 		for (const line of lines) {
 			const match = line.match(HEADING_PATTERN);
 			if (match) {
-				if (currentBody.length > 0 || sections.length === 0) {
+				if (currentTitle) {
 					commit();
 				}
+
 				currentTitle = match[1].trim();
 				currentId = this.slugify(currentTitle);
-				currentBody = [];
+				currentBody = preSectionBody.length > 0 ? [...preSectionBody] : [];
+				preSectionBody = [];
 				continue;
 			}
-			currentBody.push(line);
+
+			if (currentTitle) {
+				currentBody.push(line);
+			} else {
+				preSectionBody.push(line);
+			}
 		}
 
-		if (currentBody.length > 0 || sections.length === 0) {
+		if (currentTitle) {
 			commit();
+			return sections;
 		}
+
+		const fallbackBody = preSectionBody.join("\n").trim();
+		if (fallbackBody.length === 0) {
+			return sections;
+		}
+
+		const fallbackTitle = this.inferFallbackSectionTitle(preSectionBody);
+		const fallbackId = this.slugify(fallbackTitle);
+		sections.push({
+			id: this.uniqueSlug(fallbackId, slugCounts),
+			title: fallbackTitle,
+			body: fallbackBody,
+		});
 
 		return sections;
+	}
+
+	private inferFallbackSectionTitle(lines: string[]): string {
+		for (const line of lines) {
+			const headingMatch = FALLBACK_HEADING_PATTERN.exec(line);
+			if (headingMatch) {
+				const heading = headingMatch[1].trim();
+				if (heading.length > 0) {
+					return heading;
+				}
+			}
+
+			const text = line.trim();
+			if (text.length > 0) {
+				return text;
+			}
+		}
+
+		return "section";
 	}
 
 	private slugify(value: string): string {

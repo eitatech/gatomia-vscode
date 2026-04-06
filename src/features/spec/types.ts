@@ -1,9 +1,5 @@
 export interface CreateSpecFormData {
-	productContext: string;
-	keyScenarios: string;
-	technicalConstraints: string;
-	relatedFiles: string;
-	openQuestions: string;
+	description: string;
 }
 
 export interface CreateSpecDraftState {
@@ -39,26 +35,57 @@ export interface CreateSpecInitMessage {
 	payload: CreateSpecInitPayload;
 }
 
+export interface CreateSpecImportMarkdownResultMessage {
+	type: "create-spec/import-markdown:result";
+	payload: { content: string; warning?: string } | { error: string };
+}
+
+export interface CreateSpecAttachImagesResultMessage {
+	type: "create-spec/attach-images:result";
+	payload:
+		| {
+				images: Array<{
+					id: string;
+					uri: string;
+					name: string;
+					dataUrl: string;
+				}>;
+				capped?: boolean;
+		  }
+		| { error: string };
+}
+
 export type CreateSpecExtensionMessage =
 	| CreateSpecInitMessage
 	| CreateSpecSubmitSuccessMessage
 	| CreateSpecSubmitErrorMessage
 	| CreateSpecConfirmCloseMessage
-	| CreateSpecFocusMessage;
+	| CreateSpecFocusMessage
+	| CreateSpecImportMarkdownResultMessage
+	| CreateSpecAttachImagesResultMessage;
 
 export interface CreateSpecSubmitMessage {
 	type: "create-spec/submit";
-	payload: CreateSpecFormData;
+	payload: { description: string; imageUris: string[] };
 }
 
 export interface CreateSpecAutosaveMessage {
 	type: "create-spec/autosave";
-	payload: CreateSpecFormData;
+	payload: { description: string };
 }
 
 export interface CreateSpecCloseAttemptMessage {
 	type: "create-spec/close-attempt";
 	payload: { hasDirtyChanges: boolean };
+}
+
+export interface CreateSpecImportMarkdownRequestMessage {
+	type: "create-spec/import-markdown:request";
+}
+
+export interface CreateSpecAttachImagesRequestMessage {
+	type: "create-spec/attach-images:request";
+	payload: { currentCount: number };
 }
 
 export interface CreateSpecCancelMessage {
@@ -73,5 +100,7 @@ export type CreateSpecWebviewMessage =
 	| CreateSpecSubmitMessage
 	| CreateSpecAutosaveMessage
 	| CreateSpecCloseAttemptMessage
+	| CreateSpecImportMarkdownRequestMessage
+	| CreateSpecAttachImagesRequestMessage
 	| CreateSpecCancelMessage
 	| CreateSpecReadyMessage;

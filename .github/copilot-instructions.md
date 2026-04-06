@@ -4,12 +4,15 @@ This file provides guidance to AI agents when working with code in this reposito
 
 ## MANDATORY ACTIONS
 
+- Follow Visual Studio Code Extension Guidelines provided by Microsoft present at [https://code.visualstudio.com/api/extension-guides/overview](https://code.visualstudio.com/api/extension-guides/overview)
+- Follow Visual Studio Code UX guidelines provided by Microsoft present at [https://code.visualstudio.com/api/ux-guidelines/overview](https://code.visualstudio.com/api/ux-guidelines/overview)
+- Follow GitHub Copilot SDK guidelines provided by GitHub present at [https://github.com/github/copilot-sdk](https://github.com/github/copilot-sdk)
 - Always run `npm run check` before marking any task as complete. This ensures code quality and formatting standards are met.
 - Never use emoji in source code files (from global user instructions).
 
 ## Project Constitution (NON-NEGOTIABLE)
 
-This project follows strict principles defined in [.specify/memory/constitution.md](../../.specify/memory/constitution.md):
+This project follows strict principles defined in [.specify/memory/constitution.md](../.specify/memory/constitution.md):
 
 ### I. Kebab-Case File Naming (MANDATORY)
 
@@ -63,9 +66,8 @@ npm run build:webview  # Build React webview (Vite)
 npm test               # Run all tests (Vitest)
 npm run test:watch     # Watch mode for tests
 npm run test:coverage  # Generate coverage report
-npm run lint           # Lint with Biome
+npm run check           # Run all checks (lint + format validation) - MANDATORY
 npm run format         # Format code with Biome
-npm run check          # Run all checks (lint + format validation) - MANDATORY
 
 # Running specific tests
 npm test -- path/to/test-file.test.ts           # Run single test file
@@ -90,7 +92,7 @@ Press F5 in VS Code to launch the Extension Development Host
 - Double quotes for strings
 - Semicolons required
 - `npm run format` MUST pass before commit
-- `npm run lint` MUST pass before merge
+- `npm run check` MUST pass before merge
 
 ### Documentation
 

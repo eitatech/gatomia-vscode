@@ -1,0 +1,128 @@
+.mcp-server-options {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.mcp-server-header h4 {
+	display: flex;
+	align-items: center;
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+}
+
+.mcp-server-option-group {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.mcp-checkbox-option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.mcp-checkbox-option input[type="checkbox"] {
+	width: 16px;
+	height: 16px;
+	cursor: pointer;
+}
+
+.mcp-checkbox-option input[type="checkbox"]:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.mcp-checkbox-option label {
+	display: flex;
+	align-items: center;
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--vscode-foreground);
+	margin: 0;
+}
+
+.mcp-tools-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	gap: 8px;
+	padding: 12px;
+	background-color: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-widget-border);
+	border-radius: 3px;
+}
+
+.mcp-tool-checkbox {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.mcp-tool-checkbox input[type="checkbox"] {
+	width: 14px;
+	height: 14px;
+	cursor: pointer;
+}
+
+.mcp-tool-checkbox input[type="checkbox"]:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.mcp-tool-checkbox label {
+	cursor: pointer;
+	font-size: 12px;
+	color: var(--vscode-foreground);
+	text-transform: capitalize;
+}
+
+.mcp-toolsets-section {
+	margin-top: 12px;
+}
+
+.mcp-toolsets-section h5 {
+	display: flex;
+	align-items: center;
+	margin: 0 0 8px 0;
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--vscode-foreground);
+}
+
+.mcp-server-option {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.mcp-server-option label {
+	display: flex;
+	align-items: center;
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--vscode-foreground);
+}
+
+.mcp-server-input {
+	padding: 6px 8px;
+	background-color: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 2px;
+	font-size: 13px;
+	font-family: inherit;
+}
+
+.mcp-server-input:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.mcp-server-input:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}

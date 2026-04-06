@@ -20,7 +20,7 @@ interface StatusSectionProps {
  * Dependency item for rendering
  */
 interface DependencyItem {
-	id: "copilot-chat" | "speckit" | "openspec";
+	id: "copilot-chat" | "speckit" | "openspec" | "copilot-cli" | "gatomia-cli";
 	name: string;
 	installed: boolean;
 	version: string | null;
@@ -37,10 +37,13 @@ function getHealthStatus(
 	const hasErrors = diagnostics.some((d) => d.severity === "error");
 
 	// Check if any required dependencies are missing
+	const specSystemInstalled =
+		dependencies.speckit.installed || dependencies.openspec.installed;
 	const hasMissingDeps = !(
 		dependencies.copilotChat.installed &&
-		dependencies.speckit.installed &&
-		dependencies.openspec.installed
+		dependencies.copilotCli.installed &&
+		specSystemInstalled &&
+		dependencies.gatomiaCli.installed
 	);
 
 	if (hasErrors || hasMissingDeps) {
@@ -72,7 +75,7 @@ function getDependencyItems(dependencies: DependencyStatus): DependencyItem[] {
 			name: "SpecKit CLI",
 			installed: dependencies.speckit.installed,
 			version: dependencies.speckit.version,
-			required: true,
+			required: false,
 		},
 		{
 			id: "openspec",
@@ -80,6 +83,20 @@ function getDependencyItems(dependencies: DependencyStatus): DependencyItem[] {
 			installed: dependencies.openspec.installed,
 			version: dependencies.openspec.version,
 			required: false,
+		},
+		{
+			id: "copilot-cli",
+			name: "GitHub Copilot CLI",
+			installed: dependencies.copilotCli.installed,
+			version: dependencies.copilotCli.version,
+			required: true,
+		},
+		{
+			id: "gatomia-cli",
+			name: "GatomIA CLI",
+			installed: dependencies.gatomiaCli.installed,
+			version: dependencies.gatomiaCli.version,
+			required: true,
 		},
 	];
 }

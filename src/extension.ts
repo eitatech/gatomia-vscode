@@ -27,10 +27,11 @@ import { ActionsExplorerProvider } from "./providers/actions-explorer-provider";
 import { SpecExplorerProvider } from "./providers/spec-explorer-provider";
 import { SpecTaskCodeLensProvider } from "./providers/spec-task-code-lens-provider";
 import { SteeringExplorerProvider } from "./providers/steering-explorer-provider";
+import { WikiExplorerProvider } from "./providers/wiki-explorer-provider";
 import { PromptLoader } from "./services/prompt-loader";
 import { sendPromptToChat } from "./utils/chat-prompt-runner";
 import { ConfigManager } from "./utils/config-manager";
-import { getVSCodeUserDataPath } from "./utils/platform-utils";
+import { getMcpConfigPath } from "./utils/platform-utils";
 import { getSpecSystemAdapter } from "./utils/spec-kit-adapter";
 import { parseTasksFromFile, getTasksFilePath } from "./utils/task-parser";
 import { getChecklistStatusFromFile } from "./utils/checklist-parser";
@@ -38,8 +39,14 @@ import { SpecKitMigration } from "./utils/spec-kit-migration";
 import { TriggerRegistry } from "./features/hooks/trigger-registry";
 import { HookManager } from "./features/hooks/hook-manager";
 import { HookExecutor } from "./features/hooks/hook-executor";
+import { AgentRegistry } from "./features/hooks/agent-registry";
 import { CommandCompletionDetector } from "./features/hooks/services/command-completion-detector";
 import { MCPDiscoveryService } from "./features/hooks/services/mcp-discovery";
+import { ModelCacheService } from "./features/hooks/services/model-cache-service";
+import { AcpAgentDiscoveryService } from "./features/hooks/services/acp-agent-discovery-service";
+import { KnownAgentDetector } from "./features/hooks/services/known-agent-detector";
+import { KnownAgentPreferencesService } from "./features/hooks/services/known-agent-preferences-service";
+import { KNOWN_AGENTS } from "./features/hooks/services/known-agent-catalog";
 import { HookViewProvider } from "./providers/hook-view-provider";
 import { HooksExplorerProvider } from "./providers/hooks-explorer-provider";
 import { DependenciesViewProvider } from "./providers/dependencies-view-provider";
@@ -72,6 +79,10 @@ import {
 	shouldShowWelcomeAutomatically,
 	markWelcomeAsShown,
 } from "./utils/workspace-state";
+import {
+	isGlobalResourceAccessAllowed,
+	openGlobalResourceAccessSettings,
+} from "./features/steering/global-resource-access-consent";
 
 let copilotProvider: CopilotProvider;
 let specManager: SpecManager;
@@ -82,6 +93,7 @@ let hookManager: HookManager;
 let hookExecutor: HookExecutor;
 let commandCompletionDetector: CommandCompletionDetector;
 let mcpDiscoveryService: MCPDiscoveryService;
+let agentRegistry: AgentRegistry;
 let hookViewProvider: HookViewProvider;
 let dependenciesViewProvider: DependenciesViewProvider;
 let documentPreviewPanel: DocumentPreviewPanel;
@@ -181,15 +193,56 @@ export async function activate(context: ExtensionContext) {
 	mcpDiscoveryService = new MCPDiscoveryService();
 	outputChannel.appendLine("MCPDiscoveryService initialized");
 
-	// Initialize Hook infrastructure with MCP support
-	hookManager = new HookManager(context, outputChannel, mcpDiscoveryService);
+	// Initialize ModelCacheService for dynamic model selection (T018 / US1)
+	const modelCacheService = new ModelCacheService();
+	outputChannel.appendLine("ModelCacheService initialized");
+
+	// Initialize AcpAgentDiscoveryService for ACP agent hooks (Phase 6)
+	const knownAgentDetector = new KnownAgentDetector();
+	const knownAgentPreferencesService = new KnownAgentPreferencesService(
+		context
+	);
+	const acpAgentDiscoveryService = new AcpAgentDiscoveryService(
+		workspaceFolders?.[0]?.uri.fsPath ?? "",
+		knownAgentDetector,
+		knownAgentPreferencesService
+	);
+	outputChannel.appendLine("AcpAgentDiscoveryService initialized");
+	// Warm the agent detection cache eagerly in the background — results will be
+	// ready by the time the user opens the Hooks panel. Fire-and-forget (non-blocking).
+	knownAgentDetector
+		.preloadAll(KNOWN_AGENTS)
+		.then(() => {
+			outputChannel.appendLine("KnownAgentDetector: preload complete");
+		})
+		.catch((err: unknown) => {
+			outputChannel.appendLine(
+				`KnownAgentDetector: preload error: ${(err as Error).message}`
+			);
+		});
+
+	// Initialize AgentRegistry for custom agent hooks (Phase 2 - T010, T018)
+	// Must be initialized before HookManager to enable agent validation
+	const agentWorkspaceRoot = workspaceFolders?.[0]?.uri.fsPath || "";
+	agentRegistry = new AgentRegistry(agentWorkspaceRoot);
+	await agentRegistry.initialize();
+	outputChannel.appendLine("AgentRegistry initialized");
+
+	// Initialize Hook infrastructure with MCP support and AgentRegistry (T025)
+	hookManager = new HookManager(
+		context,
+		outputChannel,
+		mcpDiscoveryService,
+		agentRegistry
+	);
 	await hookManager.initialize();
 
 	hookExecutor = new HookExecutor(
 		hookManager,
 		triggerRegistry,
 		outputChannel,
-		mcpDiscoveryService
+		mcpDiscoveryService,
+		agentRegistry
 	);
 	hookExecutor.initialize();
 
@@ -206,7 +259,11 @@ export async function activate(context: ExtensionContext) {
 		hookManager,
 		hookExecutor,
 		mcpDiscoveryService,
+		modelCacheService,
+		acpAgentDiscoveryService,
 		outputChannel,
+		knownAgentPreferencesService,
+		knownAgentDetector,
 	});
 	hookViewProvider.initialize();
 
@@ -391,18 +448,21 @@ export async function activate(context: ExtensionContext) {
 	// Register tree data providers
 	const quickAccessExplorer = new QuickAccessExplorerProvider();
 	const specExplorer = new SpecExplorerProvider(context);
-	const steeringExplorer = new SteeringExplorerProvider(context);
+	const steeringExplorer = new SteeringExplorerProvider(context, outputChannel);
 	const actionsExplorer = new ActionsExplorerProvider(context);
 	const hooksExplorer = new HooksExplorerProvider(hookManager);
 	hooksExplorer.initialize();
+
+	// Initialize Wiki Explorer Provider
+	const wikiExplorer = new WikiExplorerProvider(context);
 
 	// Set managers
 	specExplorer.setSpecManager(specManager);
 	steeringExplorer.setSteeringManager(steeringManager);
 	initializeAutoReviewTransitions();
 	outputChannel.appendLine("[ReviewFlow] Auto review transitions initialized");
-	await syncAllSpecReviewFlowSummaries(specManager);
 
+	// Register tree providers immediately so VS Code can render initial state
 	context.subscriptions.push(
 		window.registerTreeDataProvider(
 			QuickAccessExplorerProvider.viewId,
@@ -417,12 +477,43 @@ export async function activate(context: ExtensionContext) {
 			"gatomia.views.actionsExplorer",
 			actionsExplorer
 		),
-		window.registerTreeDataProvider(HooksExplorerProvider.viewId, hooksExplorer)
+		window.registerTreeDataProvider(
+			HooksExplorerProvider.viewId,
+			hooksExplorer
+		),
+		window.registerTreeDataProvider(WikiExplorerProvider.viewId, wikiExplorer)
 	);
+
+	// Deferred refresh: gives VS Code one tick to complete internal tree setup
+	// before the first data push (guards against settled-state empty render)
+	setImmediate(() => {
+		specExplorer.refresh();
+		steeringExplorer.refresh();
+		hooksExplorer.refresh();
+		actionsExplorer.refresh();
+		outputChannel.appendLine(
+			"[TreeView] Post-registration deferred refresh fired"
+		);
+	});
+
+	// Run heavyweight sync non-blocking; refresh spec explorer when pending counts are ready
+	syncAllSpecReviewFlowSummaries(specManager)
+		.then(() => {
+			specExplorer.refresh();
+			outputChannel.appendLine(
+				"[ReviewFlow] Initial sync complete, spec explorer refreshed"
+			);
+		})
+		.catch((err: unknown) => {
+			outputChannel.appendLine(
+				`[ReviewFlow] Failed to sync initial pending summaries: ${err}`
+			);
+		});
 	context.subscriptions.push(
 		{ dispose: () => hookManager.dispose() },
 		{ dispose: () => hookExecutor.dispose() },
 		{ dispose: () => commandCompletionDetector.dispose() },
+		{ dispose: () => modelCacheService.dispose() },
 		{ dispose: () => hookViewProvider.dispose() },
 		{ dispose: () => hooksExplorer.dispose() },
 		{ dispose: () => quickAccessExplorer.dispose() },
@@ -436,7 +527,42 @@ export async function activate(context: ExtensionContext) {
 		steeringExplorer,
 		actionsExplorer,
 		hooksExplorer,
+		wikiExplorer,
 	});
+
+	// Register wiki commands
+	context.subscriptions.push(
+		commands.registerCommand(WikiExplorerProvider.refreshCommandId, () => {
+			outputChannel.appendLine("[Wiki] Refreshing wiki explorer...");
+			wikiExplorer.refresh();
+		}),
+		commands.registerCommand(
+			WikiExplorerProvider.openCommandId,
+			async (documentPath: string) => {
+				if (documentPath) {
+					const uri = Uri.file(documentPath);
+					await renderPreviewForUri(uri);
+				}
+			}
+		),
+		commands.registerCommand(
+			WikiExplorerProvider.updateCommandId,
+			async (documentPath: string) => {
+				if (documentPath) {
+					await wikiExplorer.updateDocument(documentPath);
+				}
+			}
+		),
+		commands.registerCommand(
+			WikiExplorerProvider.updateAllCommandId,
+			async () => {
+				await wikiExplorer.updateAllDocuments();
+			}
+		),
+		commands.registerCommand(WikiExplorerProvider.showTocCommandId, () => {
+			window.showInformationMessage("Table of Contents - Coming soon!");
+		})
+	);
 
 	// Set up file watchers
 	setupFileWatchers(context, specExplorer, steeringExplorer, actionsExplorer);
@@ -623,6 +749,7 @@ interface RegisterCommandsOptions {
 	steeringExplorer: SteeringExplorerProvider;
 	actionsExplorer: ActionsExplorerProvider;
 	hooksExplorer: HooksExplorerProvider;
+	wikiExplorer: WikiExplorerProvider;
 }
 
 function registerCommands({
@@ -631,6 +758,7 @@ function registerCommands({
 	steeringExplorer,
 	actionsExplorer,
 	hooksExplorer,
+	wikiExplorer,
 }: RegisterCommandsOptions) {
 	const createSpecCommand = commands.registerCommand(
 		"gatomia.spec.create",
@@ -950,27 +1078,30 @@ function registerCommands({
 				steeringExplorer.refresh();
 			}
 		}),
-
 		commands.registerCommand("gatomia.steering.createProjectRule", async () => {
 			const created = await steeringManager.createProjectInstructionRule();
 			if (created) {
 				steeringExplorer.refresh();
 			}
 		}),
-
 		commands.registerCommand(
 			"gatomia.steering.createConstitution",
 			async () => {
 				await steeringManager.createConstitutionRequest();
 			}
 		),
-
 		commands.registerCommand("gatomia.steering.refresh", () => {
 			outputChannel.appendLine(
 				"[Manual Refresh] Refreshing steering explorer..."
 			);
 			steeringExplorer.refresh();
-		})
+		}),
+		commands.registerCommand(
+			"gatomia.steering.openGlobalResourceAccessSettings",
+			async () => {
+				await openGlobalResourceAccessSettings();
+			}
+		)
 	);
 
 	// Add file save confirmation for agent files
@@ -1099,8 +1230,39 @@ function registerCommands({
 			);
 			actionsExplorer.refresh();
 		}),
-		commands.registerCommand("gatomia.actions.createInstructions", async () => {
-			await commands.executeCommand("workbench.command.new.instructions");
+		commands.registerCommand("gatomia.actions.createSkill", async () => {
+			const ws = workspace.workspaceFolders?.[0];
+			if (!ws) {
+				window.showErrorMessage("No workspace folder found");
+				return;
+			}
+
+			const name = await window.showInputBox({
+				title: "Create Skill",
+				placeHolder: "skill-name (kebab-case)",
+				prompt: "A SKILL.md file will be created under .github/skills/<name>/",
+				validateInput: (v) => (v ? undefined : "Name is required"),
+			});
+
+			if (!name) {
+				return;
+			}
+
+			const skillDir = Uri.joinPath(ws.uri, ".github", "skills", name);
+			const skillFile = Uri.joinPath(skillDir, "SKILL.md");
+
+			try {
+				await workspace.fs.createDirectory(skillDir);
+				const content = Buffer.from(
+					`# ${name}\n\n## Description\nDescribe the purpose of this skill.\n\n## Instructions\nProvide specific instructions for Copilot on how to use this skill.\n`
+				);
+				await workspace.fs.writeFile(skillFile, content);
+				const doc = await workspace.openTextDocument(skillFile);
+				await window.showTextDocument(doc);
+				actionsExplorer.refresh();
+			} catch (e) {
+				window.showErrorMessage(`Failed to create skill: ${e}`);
+			}
 		}),
 		commands.registerCommand(
 			"gatomia.actions.createCopilotPrompt",
@@ -1126,8 +1288,8 @@ function registerCommands({
 			}
 
 			const name = await window.showInputBox({
-				title: "Create Action",
-				placeHolder: "action name (kebab-case)",
+				title: "Create Prompt",
+				placeHolder: "prompt-name (kebab-case)",
 				prompt: `A markdown file will be created under ${actionsPathLabel} `,
 				validateInput: (v) => (v ? undefined : "Name is required"),
 			});
@@ -1459,11 +1621,6 @@ async function toggleViews() {
 	}
 }
 
-async function getMcpConfigPath(): Promise<string> {
-	const userDataPath = await getVSCodeUserDataPath();
-	return join(userDataPath, "mcp.json");
-}
-
 function setupFileWatchers(
 	context: ExtensionContext,
 	specExplorer: SpecExplorerProvider,
@@ -1581,20 +1738,36 @@ function setupFileWatchers(
 	context.subscriptions.push(...watchers);
 
 	// Watch for changes in copilot-instructions.md files
-	const globalHome = homedir() || process.env.USERPROFILE || "";
-	const globalCopilotMdWatcher = workspace.createFileSystemWatcher(
-		new RelativePattern(globalHome, ".github/copilot-instructions.md")
-	);
 	const projectCopilotMdWatcher = workspace.createFileSystemWatcher(
 		"**/copilot-instructions.md"
 	);
 
-	globalCopilotMdWatcher.onDidCreate(() => steeringExplorer.refresh());
-	globalCopilotMdWatcher.onDidDelete(() => steeringExplorer.refresh());
+	setupGlobalCopilotWatcher(context, steeringExplorer);
+
 	projectCopilotMdWatcher.onDidCreate(() => steeringExplorer.refresh());
 	projectCopilotMdWatcher.onDidDelete(() => steeringExplorer.refresh());
 
-	context.subscriptions.push(globalCopilotMdWatcher, projectCopilotMdWatcher);
+	context.subscriptions.push(projectCopilotMdWatcher);
+}
+
+function setupGlobalCopilotWatcher(
+	context: ExtensionContext,
+	steeringExplorer: SteeringExplorerProvider
+): void {
+	if (!isGlobalResourceAccessAllowed()) {
+		outputChannel.appendLine(
+			"[Steering Consent] Global watcher disabled (access not allowed)"
+		);
+		return;
+	}
+
+	const globalHome = homedir() || process.env.USERPROFILE || "";
+	const globalCopilotMdWatcher = workspace.createFileSystemWatcher(
+		new RelativePattern(globalHome, ".github/copilot-instructions.md")
+	);
+	globalCopilotMdWatcher.onDidCreate(() => steeringExplorer.refresh());
+	globalCopilotMdWatcher.onDidDelete(() => steeringExplorer.refresh());
+	context.subscriptions.push(globalCopilotMdWatcher);
 }
 
 function getDefaultWorkspaceFileUri(fileName: string): Uri | undefined {

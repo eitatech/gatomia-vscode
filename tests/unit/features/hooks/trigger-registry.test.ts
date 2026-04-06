@@ -41,7 +41,7 @@ describe("TriggerRegistry", () => {
 	});
 
 	describe("fireTrigger", () => {
-		it("should fire a trigger event", () => {
+		it("should fire a trigger event with default timing", () => {
 			const listener = vi.fn();
 			registry.onTrigger(listener);
 
@@ -53,15 +53,68 @@ describe("TriggerRegistry", () => {
 					agent: "speckit",
 					operation: "specify",
 					timestamp: expect.any(Number),
+					timing: "after",
 				})
 			);
 		});
 
-		it("should log trigger event", () => {
-			registry.fireTrigger("speckit", "clarify");
+		it("should fire trigger with before timing", () => {
+			const listener = vi.fn();
+			registry.onTrigger(listener);
+
+			registry.fireTrigger("speckit", "specify", "before");
+
+			expect(listener).toHaveBeenCalledWith(
+				expect.objectContaining({
+					agent: "speckit",
+					operation: "specify",
+					timing: "before",
+				})
+			);
+		});
+
+		it("should fire trigger with after timing", () => {
+			const listener = vi.fn();
+			registry.onTrigger(listener);
+
+			registry.fireTrigger("speckit", "specify", "after");
+
+			expect(listener).toHaveBeenCalledWith(
+				expect.objectContaining({
+					agent: "speckit",
+					operation: "specify",
+					timing: "after",
+				})
+			);
+		});
+
+		it("should include output data in trigger event", () => {
+			const listener = vi.fn();
+			registry.onTrigger(listener);
+
+			const outputData = {
+				outputPath: "/test/path.md",
+				outputContent: "test content",
+			};
+
+			registry.fireTrigger("speckit", "specify", "after", outputData);
+
+			expect(listener).toHaveBeenCalledWith(
+				expect.objectContaining({
+					agent: "speckit",
+					operation: "specify",
+					timing: "after",
+					outputPath: "/test/path.md",
+					outputContent: "test content",
+				})
+			);
+		});
+
+		it("should log trigger event with timing", () => {
+			registry.fireTrigger("speckit", "clarify", "before");
 
 			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
-				expect.stringContaining("Trigger fired: speckit.clarify")
+				expect.stringContaining("Trigger fired: speckit.clarify (before)")
 			);
 		});
 

@@ -13,9 +13,10 @@ vi.mock("../../src/utils/get-webview-content", () => ({
 }));
 
 vi.mock("../../src/features/hooks/actions/agent-action", () => {
-	const AgentActionExecutorMock = vi.fn(() => ({
-		execute: vi.fn().mockResolvedValue(undefined),
-	}));
+	// biome-ignore lint/complexity/useArrowFunction: vi.fn() as constructor requires function keyword for vitest 4.x
+	const AgentActionExecutorMock = vi.fn(function () {
+		return { execute: vi.fn().mockResolvedValue(undefined) };
+	});
 	return {
 		AgentActionExecutor: AgentActionExecutorMock,
 	};

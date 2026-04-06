@@ -11,6 +11,13 @@ vi.mock("os", () => ({
 	homedir: vi.fn(() => "/home/test"),
 }));
 
+vi.mock("node:os", () => ({
+	default: {
+		homedir: vi.fn(() => "/home/test"),
+	},
+	homedir: vi.fn(() => "/home/test"),
+}));
+
 vi.mock("fs", () => ({
 	default: {
 		existsSync: vi.fn(() => false),
@@ -30,6 +37,18 @@ describe("SteeringExplorerProvider - instruction rules", () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(workspace.getConfiguration).mockReturnValue({
+			get: vi.fn((key: string) => {
+				if (key === "steering.workspaceGlobalResourceAccess") {
+					return "allow";
+				}
+				if (key === "steering.globalResourceAccessDefault") {
+					return "ask";
+				}
+				return;
+			}),
+			update: vi.fn().mockResolvedValue(undefined),
+		} as any);
 		// biome-ignore lint/complexity/useLiteralKeys: accessing private test helper
 		(ConfigManager as any)["instance"] = {
 			getSettings: () => ({ specSystem: SPEC_SYSTEM_MODE.AUTO }),
@@ -41,6 +60,30 @@ describe("SteeringExplorerProvider - instruction rules", () => {
 		provider = new SteeringExplorerProvider(context);
 	});
 
+	it("shows informative item when global access is denied", async () => {
+		vi.mocked(workspace.getConfiguration).mockReturnValue({
+			get: vi.fn((key: string) => {
+				if (key === "steering.workspaceGlobalResourceAccess") {
+					return "deny";
+				}
+				if (key === "steering.globalResourceAccessDefault") {
+					return "ask";
+				}
+				return;
+			}),
+			update: vi.fn().mockResolvedValue(undefined),
+		} as any);
+
+		const rootItems = await provider.getChildren();
+		const userGroup = rootItems.find(
+			(item) => item.contextValue === "group-user"
+		);
+
+		const children = await provider.getChildren(userGroup as any);
+		expect(children).toHaveLength(1);
+		expect(children[0].contextValue).toBe("global-access-disabled");
+	});
+
 	it("shows project + user instruction rules groups at the root", async () => {
 		const rootItems = await provider.getChildren();
 		const projectGroup = rootItems.find(
@@ -50,7 +93,7 @@ describe("SteeringExplorerProvider - instruction rules", () => {
 			(item) => item.contextValue === "group-user"
 		);
 
-		expect(projectGroup?.label).toBe("Custom Instructions");
+		expect(projectGroup?.label).toBe("Rules");
 		expect(userGroup?.label).toBe("User Instructions");
 	});
 

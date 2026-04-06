@@ -18,6 +18,7 @@ export const workspace = {
 	fs: {
 		createDirectory: vi.fn(),
 		writeFile: vi.fn(),
+		readFile: vi.fn(),
 		readDirectory: vi.fn(),
 		stat: vi.fn(),
 		delete: vi.fn(),
@@ -25,6 +26,12 @@ export const workspace = {
 	},
 	openTextDocument: vi.fn(),
 	onDidChangeConfiguration: vi.fn(),
+	createFileSystemWatcher: vi.fn(() => ({
+		onDidCreate: vi.fn(() => ({ dispose: vi.fn() })),
+		onDidChange: vi.fn(() => ({ dispose: vi.fn() })),
+		onDidDelete: vi.fn(() => ({ dispose: vi.fn() })),
+		dispose: vi.fn(),
+	})),
 };
 
 export const window = {
@@ -35,6 +42,7 @@ export const window = {
 	showErrorMessage: vi.fn().mockResolvedValue(undefined),
 	showWarningMessage: vi.fn().mockResolvedValue(undefined),
 	showInformationMessage: vi.fn().mockResolvedValue(undefined),
+	showOpenDialog: vi.fn(),
 	showInputBox: vi.fn(),
 	showQuickPick: vi.fn(),
 	createTerminal: vi.fn(),
@@ -79,6 +87,8 @@ export const Uri = {
 		fsPath: str.replace("file://", ""),
 	})),
 };
+
+export const version = "1.95.0";
 
 export const ViewColumn = {
 	Active: 1,
@@ -170,6 +180,16 @@ export class EventEmitter<T> {
 	});
 }
 
+export class RelativePattern {
+	base: string;
+	pattern: string;
+
+	constructor(base: string | { uri: { fsPath: string } }, pattern: string) {
+		this.base = typeof base === "string" ? base : base.uri.fsPath;
+		this.pattern = pattern;
+	}
+}
+
 export const env = {
 	machineId: "test-machine",
 	clipboard: {
@@ -185,6 +205,15 @@ export const extensions = {
 		return;
 	}),
 	all: [] as unknown[],
+	onDidChange: vi.fn((listener: () => void) => {
+		// Store the handler for test simulation
+		(extensions as any)._onDidChangeHandler = listener;
+		return {
+			dispose: vi.fn(() => {
+				(extensions as any)._onDidChangeHandler = undefined;
+			}),
+		};
+	}),
 };
 
 export const ConfigurationTarget = {
@@ -209,3 +238,13 @@ export class ChatResponseStream {
 	reference = vi.fn();
 	push = vi.fn();
 }
+
+// Mock for vscode.lm (Language Models API, vscode 1.90+).
+// Tests can overwrite this export directly after vi.resetModules() to configure
+// what selectChatModels returns.
+export const lm:
+	| {
+			selectChatModels(filter: { vendor: string }): Promise<unknown[]>;
+			onDidChangeChatModels(listener: () => void): { dispose: () => void };
+	  }
+	| undefined = undefined;

@@ -98,7 +98,8 @@ describe("CommandCompletionDetector", () => {
 
 			expect(mockTriggerRegistry.fireTrigger).toHaveBeenCalledWith(
 				"speckit",
-				"specify"
+				"specify",
+				"after"
 			);
 			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
 				expect.stringContaining("Manual trigger: speckit.specify")
@@ -110,7 +111,8 @@ describe("CommandCompletionDetector", () => {
 
 			expect(mockTriggerRegistry.fireTrigger).toHaveBeenCalledWith(
 				"speckit",
-				"tasks"
+				"tasks",
+				"after"
 			);
 		});
 
@@ -137,7 +139,8 @@ describe("CommandCompletionDetector", () => {
 
 				expect(mockTriggerRegistry.fireTrigger).toHaveBeenCalledWith(
 					"speckit",
-					operation
+					operation,
+					"after"
 				);
 			}
 		});

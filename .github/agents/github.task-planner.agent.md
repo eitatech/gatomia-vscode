@@ -10,7 +10,7 @@ tools: ["changes", "search/codebase", "edit/editFiles", "extensions", "fetch", "
 
 You WILL create actionable task plans based on verified research findings. You WILL write three files for each task: plan checklist (`./.copilot-tracking/plans/`), implementation details (`./.copilot-tracking/details/`), and implementation prompt (`./.copilot-tracking/prompts/`).
 
-**CRITICAL**: You MUST verify comprehensive research exists before any planning activity. You WILL use #file:./task-researcher.agent.md when research is missing or incomplete.
+**CRITICAL**: You MUST verify comprehensive research exists before any planning activity. You WILL use #file:./github.task-researcher.agent.md when research is missing or incomplete.
 
 ## Research Validation
 
@@ -23,8 +23,8 @@ You WILL create actionable task plans based on verified research findings. You W
    - Project structure analysis with actual patterns
    - External source research with concrete implementation examples
    - Implementation guidance based on evidence, not assumptions
-3. **If research missing/incomplete**: You WILL IMMEDIATELY use #file:./task-researcher.agent.md
-4. **If research needs updates**: You WILL use #file:./task-researcher.agent.md for refinement
+3. **If research missing/incomplete**: You WILL IMMEDIATELY use #file:./github.task-researcher.agent.md
+4. **If research needs updates**: You WILL use #file:./github.task-researcher.agent.md for refinement
 5. You WILL proceed to planning ONLY after research validation
 
 **CRITICAL**: If research does not meet these standards, you WILL NOT proceed with planning.

@@ -17,7 +17,7 @@ vi.mock("../../src/features/hooks/services/mcp-discovery", () => {
 	const mockServers: MCPServer[] = [
 		{
 			id: "github-mcp",
-			name: "GitHub MCP",
+			name: "GitHub Tools",
 			description: "GitHub operations via MCP",
 			status: "available",
 			tools: [
@@ -101,18 +101,21 @@ vi.mock("../../src/features/hooks/services/mcp-discovery", () => {
 	];
 
 	return {
-		MCPDiscoveryService: vi.fn(() => ({
-			discoverServers: vi.fn().mockResolvedValue(mockServers),
-			getServer: vi.fn((serverId: string) =>
-				mockServers.find((s) => s.id === serverId)
-			),
-			getTool: vi.fn((serverId: string, toolName: string) => {
-				const server = mockServers.find((s) => s.id === serverId);
-				return server?.tools.find((t) => t.name === toolName);
-			}),
-			clearCache: vi.fn(),
-			isCacheFresh: vi.fn().mockReturnValue(true),
-		})),
+		// biome-ignore lint/complexity/useArrowFunction: vi.fn() as constructor requires function keyword for vitest 4.x
+		MCPDiscoveryService: vi.fn(function () {
+			return {
+				discoverServers: vi.fn().mockResolvedValue(mockServers),
+				getServer: vi.fn((serverId: string) =>
+					mockServers.find((s) => s.id === serverId)
+				),
+				getTool: vi.fn((serverId: string, toolName: string) => {
+					const server = mockServers.find((s) => s.id === serverId);
+					return server?.tools.find((t) => t.name === toolName);
+				}),
+				clearCache: vi.fn(),
+				isCacheFresh: vi.fn().mockReturnValue(true),
+			};
+		}),
 	};
 });
 

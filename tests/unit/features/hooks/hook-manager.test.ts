@@ -125,6 +125,125 @@ describe("HookManager", () => {
 			expect(hooks).toHaveLength(1);
 			expect(hooks[0].name).toBe("Existing Hook");
 		});
+
+		it("should migrate old hooks without timing field to default 'after'", async () => {
+			const { randomUUID } = await import("node:crypto");
+			// Old hook without timing field (created before timing feature)
+			const oldHook = {
+				id: randomUUID(),
+				name: "Old Hook",
+				enabled: true,
+				trigger: {
+					agent: "speckit",
+					operation: "specify",
+					// No timing field - simulates old hook
+				},
+				action: {
+					type: "agent",
+					parameters: {
+						command: "/speckit.clarify",
+					},
+				},
+				createdAt: Date.now(),
+				modifiedAt: Date.now(),
+				executionCount: 0,
+			};
+
+			await mockContext.workspaceState.update("gatomia.hooks.configurations", [
+				oldHook,
+			]);
+
+			const newManager = new HookManager(mockContext, mockOutputChannel);
+			await newManager.initialize();
+
+			const hooks = await newManager.getAllHooks();
+			expect(hooks).toHaveLength(1);
+			expect(hooks[0].trigger.timing).toBe("after");
+		});
+
+		it("should load hooks that have a stored CopilotModel string in cliOptions.modelId without error", async () => {
+			const { randomUUID } = await import("node:crypto");
+			// Simulates a hook stored when CopilotModel was an enum — value is now
+			// treated as a plain string via `type CopilotModel = string`.
+			const oldHookWithModelId = {
+				id: randomUUID(),
+				name: "Hook With Model",
+				enabled: true,
+				trigger: {
+					agent: "speckit",
+					operation: "specify",
+					timing: "after",
+				},
+				action: {
+					type: "custom",
+					parameters: {
+						agentName: "copilot",
+						prompt: "Review code",
+						cliOptions: {
+							modelId: "gpt-4o", // Old hardcoded enum value now stored as string
+						},
+					},
+				},
+				createdAt: Date.now(),
+				modifiedAt: Date.now(),
+				executionCount: 0,
+			};
+
+			await mockContext.workspaceState.update("gatomia.hooks.configurations", [
+				oldHookWithModelId,
+			]);
+
+			const newManager = new HookManager(mockContext, mockOutputChannel);
+			await newManager.initialize();
+
+			const hooks = await newManager.getAllHooks();
+			expect(hooks).toHaveLength(1);
+			const params = hooks[0].action.parameters as {
+				cliOptions?: { modelId?: string };
+			};
+			expect(params.cliOptions?.modelId).toBe("gpt-4o");
+		});
+
+		it("should load hooks that have an MCP action with old agentId field and migrate to modelId", async () => {
+			const { randomUUID } = await import("node:crypto");
+			const oldMcpHook = {
+				id: randomUUID(),
+				name: "Old MCP Hook",
+				enabled: true,
+				trigger: {
+					agent: "speckit",
+					operation: "specify",
+					timing: "after",
+				},
+				action: {
+					type: "mcp",
+					parameters: {
+						serverId: "github",
+						toolName: "some-tool",
+						agentId: "gpt-4o", // Old field — should be renamed to modelId
+					},
+				},
+				createdAt: Date.now(),
+				modifiedAt: Date.now(),
+				executionCount: 0,
+			};
+
+			await mockContext.workspaceState.update("gatomia.hooks.configurations", [
+				oldMcpHook,
+			]);
+
+			const newManager = new HookManager(mockContext, mockOutputChannel);
+			await newManager.initialize();
+
+			const hooks = await newManager.getAllHooks();
+			expect(hooks).toHaveLength(1);
+			const params = hooks[0].action.parameters as {
+				modelId?: string;
+				agentId?: string;
+			};
+			expect(params.modelId).toBe("gpt-4o");
+			expect(params.agentId).toBeUndefined();
+		});
 	});
 
 	describe("createHook", () => {
@@ -651,6 +770,118 @@ describe("HookManager", () => {
 			// Should be unique when excluding the hook's own ID
 			const unique = await manager.isHookNameUnique("Hook Name", created.id);
 			expect(unique).toBe(true);
+		});
+	});
+
+	// ============================================================================
+	// T045: Unit test for agent type override in hook configuration
+	// ============================================================================
+
+	describe("Agent Type Override (User Story 2)", () => {
+		it("should accept hook with custom agent type override", async () => {
+			const hook = createTestHook({
+				action: {
+					type: "custom",
+					parameters: {
+						agentId: "local:code-reviewer",
+						agentName: "code-reviewer",
+						agentType: "background", // Override: force background execution
+						prompt: "Review this code",
+					},
+				},
+			});
+
+			const created = await manager.createHook(hook);
+
+			expect(created).toBeDefined();
+			expect(created.action.type).toBe("custom");
+			const params = created.action.parameters as {
+				agentType?: string;
+				agentId?: string;
+			};
+			expect(params.agentType).toBe("background");
+			expect(params.agentId).toBe("local:code-reviewer");
+		});
+
+		it("should validate agent type override value", async () => {
+			const hook = createTestHook({
+				action: {
+					type: "custom",
+					parameters: {
+						agentId: "local:code-reviewer",
+						agentName: "code-reviewer",
+						agentType: "invalid-type" as any, // Invalid type (bypassing TypeScript for runtime test)
+						prompt: "Review this code",
+					},
+				},
+			});
+
+			const result = await manager.validateHook(hook);
+
+			expect(result.valid).toBe(false);
+			expect(result.errors.some((e) => e.message.includes("agent type"))).toBe(
+				true
+			);
+		});
+
+		it("should allow local agent type override", async () => {
+			const hook = createTestHook({
+				action: {
+					type: "custom",
+					parameters: {
+						agentId: "local:code-reviewer",
+						agentName: "code-reviewer",
+						agentType: "local", // Explicit local type
+						prompt: "Review this code",
+					},
+				},
+			});
+
+			const created = await manager.createHook(hook);
+
+			expect(created).toBeDefined();
+			const params = created.action.parameters as { agentType?: string };
+			expect(params.agentType).toBe("local");
+		});
+
+		it("should allow background agent type override", async () => {
+			const hook = createTestHook({
+				action: {
+					type: "custom",
+					parameters: {
+						agentId: "local:test-agent",
+						agentName: "test-agent",
+						agentType: "background", // Force background execution
+						prompt: "Run background task",
+					},
+				},
+			});
+
+			const created = await manager.createHook(hook);
+
+			expect(created).toBeDefined();
+			const params = created.action.parameters as { agentType?: string };
+			expect(params.agentType).toBe("background");
+		});
+
+		it("should work without agent type override (use default)", async () => {
+			const hook = createTestHook({
+				action: {
+					type: "custom",
+					parameters: {
+						agentId: "local:code-reviewer",
+						agentName: "code-reviewer",
+						// No agentType specified - should use agent's default type
+						prompt: "Review this code",
+					},
+				},
+			});
+
+			const created = await manager.createHook(hook);
+
+			expect(created).toBeDefined();
+			const params = created.action.parameters as { agentType?: string };
+			expect(params.agentType).toBeUndefined();
 		});
 	});
 });

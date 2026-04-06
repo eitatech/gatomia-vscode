@@ -7,9 +7,19 @@ import {
 	type OutputChannel,
 } from "vscode";
 
-// Auto-mock fs modules
-vi.mock("fs");
-vi.mock("node:fs");
+// Create mock functions via vi.hoisted() so they are available in module factories
+const { mockExistsSync } = vi.hoisted(() => ({
+	mockExistsSync: vi.fn(),
+}));
+
+vi.mock("fs", () => ({
+	default: { existsSync: mockExistsSync },
+	existsSync: mockExistsSync,
+}));
+vi.mock("node:fs", () => ({
+	default: { existsSync: mockExistsSync },
+	existsSync: mockExistsSync,
+}));
 
 // Mock os module
 vi.mock("os", () => ({

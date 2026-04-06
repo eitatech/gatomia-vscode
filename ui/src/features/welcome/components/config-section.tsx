@@ -86,11 +86,9 @@ export const ConfigSection = ({
 			{/* Read-Only Configuration Group */}
 			{configuration.otherSettings.length > 0 && (
 				<div
-					className="config-group"
+					className="config-group welcome-subsection-divider"
 					style={{
-						marginTop: "32px",
-						borderTop: "1px solid var(--vscode-panel-border)",
-						paddingTop: "24px",
+						marginTop: "8px",
 					}}
 				>
 					<h3 className="config-group-title">
