@@ -188,6 +188,68 @@
       },
       "registered_skills": [],
       "installed_at": "2026-03-31T10:59:29.134339+00:00"
+    },
+    "critique": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:0b63a1835415df730cbd487c90c1252b294980176c10c14a3fa9c31a7cb882e0",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "copilot": [
+          "speckit.critique.run"
+        ],
+        "gemini": [
+          "speckit.critique.run"
+        ],
+        "opencode": [
+          "speckit.critique.run"
+        ],
+        "qodercli": [
+          "speckit.critique.run"
+        ],
+        "windsurf": [
+          "speckit.critique.run"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-04-07T17:16:02.088196+00:00"
+    },
+    "security-review": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:3431963b6157086101f8586c111d9b3ca80f1b630e2dc5aa015732c661b07590",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "copilot": [
+          "speckit.security-review.audit",
+          "speckit.security-review.staged",
+          "speckit.security-review.branch"
+        ],
+        "gemini": [
+          "speckit.security-review.audit",
+          "speckit.security-review.staged",
+          "speckit.security-review.branch"
+        ],
+        "opencode": [
+          "speckit.security-review.audit",
+          "speckit.security-review.staged",
+          "speckit.security-review.branch"
+        ],
+        "qodercli": [
+          "speckit.security-review.audit",
+          "speckit.security-review.staged",
+          "speckit.security-review.branch"
+        ],
+        "windsurf": [
+          "speckit.security-review.audit",
+          "speckit.security-review.staged",
+          "speckit.security-review.branch"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-04-07T17:20:32.408954+00:00"
     }
   }
 }

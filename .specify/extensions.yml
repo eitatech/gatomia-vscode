@@ -33,3 +33,11 @@ hooks:
     description: Offer a retrospective after implementation without modifying spec
       unless approved.
     condition: null
+  after_plan:
+  - extension: critique
+    command: speckit.critique.run
+    enabled: true
+    optional: true
+    prompt: Run spec critique before proceeding to tasks?
+    description: Challenges the spec and plan through product and engineering lenses
+    condition: null
