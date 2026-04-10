@@ -1900,7 +1900,7 @@ function setupFileWatchers(
 			if (normalized === ".copilot" || normalized.startsWith(".copilot/")) {
 				continue;
 			}
-			extraPatterns.add(`${normalized}/**/* `);
+			extraPatterns.add(`${normalized}/**/*`);
 		}
 
 		for (const pattern of extraPatterns) {
