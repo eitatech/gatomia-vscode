@@ -17,6 +17,20 @@ hooks:
     prompt: Run ralph loop to implement tasks?
     description: Start autonomous implementation after task generation
     condition: null
+  - extension: fleet
+    command: speckit.fleet.review
+    enabled: true
+    optional: true
+    prompt: Run cross-model review to evaluate plan and tasks before implementation?
+    description: Pre-implementation review gate
+    condition: null
+  - extension: diagram
+    command: speckit.diagram.dependencies
+    enabled: true
+    optional: true
+    prompt: Generate task dependency diagram after task breakdown?
+    description: Auto-generate dependency DAG after tasks are created
+    condition: null
   after_implement:
   - extension: cleanup
     command: speckit.cleanup.run
@@ -33,6 +47,13 @@ hooks:
     description: Offer a retrospective after implementation without modifying spec
       unless approved.
     condition: null
+  - extension: bugfix
+    command: speckit.bugfix.verify
+    enabled: true
+    optional: true
+    prompt: Run bugfix consistency check after implementation?
+    description: Verify spec artifact consistency after implementation completes
+    condition: null
   after_plan:
   - extension: critique
     command: speckit.critique.run
@@ -40,4 +61,33 @@ hooks:
     optional: true
     prompt: Run spec critique before proceeding to tasks?
     description: Challenges the spec and plan through product and engineering lenses
+    condition: null
+  - extension: speckit-utils
+    command: speckit.speckit-utils.validate
+    enabled: true
+    optional: true
+    prompt: Validate spec-to-task traceability?
+    description: Verify requirements map to planned tasks after planning
+    condition: null
+  - extension: refine
+    command: speckit.refine.status
+    enabled: true
+    optional: true
+    prompt: Check artifact sync status after planning?
+    description: Show sync status after plan generation
+    condition: null
+  after_specify:
+  - extension: speckit-utils
+    command: speckit.speckit-utils.doctor
+    enabled: true
+    optional: true
+    prompt: Run project health check?
+    description: Validate project health after specification generation
+    condition: null
+  - extension: refine
+    command: speckit.refine.status
+    enabled: true
+    optional: true
+    prompt: Check artifact sync status after specification?
+    description: Show sync status after spec generation
     condition: null

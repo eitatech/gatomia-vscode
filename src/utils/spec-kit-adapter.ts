@@ -17,6 +17,25 @@ import {
 import { ConfigManager } from "./config-manager";
 
 /**
+ * Known spec files that have dedicated rendering in the Spec Explorer tree.
+ * Any .md file in a spec directory NOT in this set is treated as an extension-generated document.
+ */
+const KNOWN_SPEC_FILES = new Set([
+	"spec.md",
+	"plan.md",
+	"research.md",
+	"data-model.md",
+	"quickstart.md",
+	"tasks.md",
+]);
+
+/**
+ * Known spec folders that have specialized rendering in the Spec Explorer tree.
+ * Any subdirectory in a spec directory NOT in this set is treated as an extension folder.
+ */
+const KNOWN_SPEC_FOLDERS = new Set(["checklists", "contracts"]);
+
+/**
  * Spec System Adapter
  * Provides a unified interface for working with both OpenSpec and SpecKit
  * Automatically detects which system is active and adapts accordingly
@@ -333,7 +352,70 @@ export class SpecSystemAdapter {
 			files.tasks = tasksPath;
 		}
 
+		// Discover extra files (extension-generated documents)
+		this.collectExtraFiles(featurePath, files);
+
 		return files;
+	}
+
+	/**
+	 * Scans a feature directory for extra markdown files and unknown subfolders.
+	 */
+	private collectExtraFiles(
+		featurePath: string,
+		files: Record<string, string>
+	): void {
+		try {
+			const entries = readdirSync(featurePath);
+			for (const entry of entries) {
+				const entryPath = join(featurePath, entry);
+				const entryStat = statSync(entryPath);
+
+				if (
+					entryStat.isFile() &&
+					entry.endsWith(".md") &&
+					!KNOWN_SPEC_FILES.has(entry)
+				) {
+					files[`extra:${entry}`] = entryPath;
+				} else if (
+					entryStat.isDirectory() &&
+					!KNOWN_SPEC_FOLDERS.has(entry) &&
+					this.directoryHasMarkdown(entryPath)
+				) {
+					files[`extra-folder:${entry}`] = entryPath;
+				}
+			}
+		} catch (error) {
+			console.error(
+				`Error scanning feature directory for extra files: ${featurePath}`,
+				error
+			);
+		}
+	}
+
+	/**
+	 * Recursively checks whether a directory contains any markdown files.
+	 */
+	private directoryHasMarkdown(dirPath: string): boolean {
+		try {
+			const entries = readdirSync(dirPath);
+			for (const entry of entries) {
+				const entryPath = join(dirPath, entry);
+				const entryStat = statSync(entryPath);
+				if (entryStat.isFile() && entry.endsWith(".md")) {
+					return true;
+				}
+				if (entryStat.isDirectory() && this.directoryHasMarkdown(entryPath)) {
+					return true;
+				}
+			}
+		} catch (error) {
+			console.error(
+				`Error checking directory for markdown files: ${dirPath}`,
+				error
+			);
+		}
+		return false;
 	}
 
 	/**

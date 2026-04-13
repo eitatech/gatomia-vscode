@@ -17,6 +17,8 @@
       "!ui/src/app.css",
       "!ui/node_modules/**/*",
       "!.tmp/**/*",
+      "!.beads/**/*",
+      "!.claude/**/*",
       "!.codex/**/*",
       "!.vscode/**/*",
       "!.agent_work/**/*",
