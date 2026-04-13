@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "gatomia_vscode",
+  "project_id": "4044f110-6be8-43eb-b551-d5e7ac031de6"
+}
