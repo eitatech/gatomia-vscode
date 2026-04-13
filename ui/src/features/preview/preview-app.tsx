@@ -6,6 +6,7 @@ import mermaid from "mermaid";
 import { vscode } from "@/bridge/vscode";
 import { renderPreviewMarkdown } from "@/lib/markdown/preview-renderer";
 import { toFriendlyName } from "@/lib/document-title-utils";
+import { CodePreview } from "@/components/preview/code-preview";
 import { DocumentOutline } from "@/components/preview/document-outline";
 import { MermaidViewer } from "@/components/preview/mermaid-viewer";
 import { PreviewFormContainer } from "@/components/forms/preview-form-container";
@@ -208,7 +209,12 @@ export const PreviewApp = () => {
 		return null;
 	}, [staleReason]);
 
+	const isCodePreview = metadata?.renderStandard === "code";
+
 	const renderedSections = useMemo(() => {
+		if (isCodePreview) {
+			return [];
+		}
 		const sections = metadata?.sections ?? [];
 		return sections.map((section) => ({
 			...section,
@@ -219,7 +225,7 @@ export const PreviewApp = () => {
 				: "",
 			html: section.body ? renderPreviewMarkdown(section.body) : "",
 		}));
-	}, [metadata?.sections]);
+	}, [metadata?.sections, isCodePreview]);
 
 	const documentType = useMemo(() => {
 		if (
@@ -434,14 +440,25 @@ export const PreviewApp = () => {
 
 			<div className="flex h-full flex-col gap-4 overflow-hidden">
 				<article className="flex flex-1 flex-col gap-6 overflow-y-auto rounded border border-[color:var(--vscode-input-border,#3c3c3c)] bg-[color:var(--vscode-editor-background)] px-5 py-4">
-					{renderedSections.length === 0 ? (
+					{isCodePreview && (
+						<CodePreview
+							content={metadata.rawContent ?? ""}
+							fileName={metadata.title}
+							language={(metadata.metadata?.language as string) ?? "plaintext"}
+						/>
+					)}
+
+					{!isCodePreview && renderedSections.length === 0 && (
 						<PreviewFallback
 							actionLabel="Open in editor"
 							description="This document does not contain any headings. Open it in the editor to review the raw Markdown."
 							onAction={openInEditor}
 							title="No sections detected"
 						/>
-					) : (
+					)}
+
+					{!isCodePreview &&
+						renderedSections.length > 0 &&
 						renderedSections.map((section) => (
 							<section
 								className="flex flex-col gap-2"
@@ -459,8 +476,7 @@ export const PreviewApp = () => {
 									dangerouslySetInnerHTML={{ __html: section.html }}
 								/>
 							</section>
-						))
-					)}
+						))}
 
 					{staleReason && (
 						<div

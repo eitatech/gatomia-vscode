@@ -50,6 +50,7 @@ export interface DocumentArtifact {
 	sections?: PreviewSectionPayload[];
 	forms?: PreviewFormField[];
 	permissions?: PreviewDocumentPermissions;
+	metadata?: Record<string, unknown>;
 }
 
 export interface PreviewDocumentPayload extends DocumentArtifact {}
