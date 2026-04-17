@@ -91,10 +91,7 @@ describe("getSpecKitFeatureFiles - extension docs discovery", () => {
 
 	it("includes extra .md files with extra: prefix key", () => {
 		writeFileSync(join(tempFeatureDir, "spec.md"), MARKDOWN_CONTENT);
-		writeFileSync(
-			join(tempFeatureDir, "retrospective.md"),
-			MARKDOWN_CONTENT
-		);
+		writeFileSync(join(tempFeatureDir, "retrospective.md"), MARKDOWN_CONTENT);
 
 		const files = adapter.getSpecFiles("001-test-feature");
 
@@ -141,18 +138,12 @@ describe("getSpecKitFeatureFiles - extension docs discovery", () => {
 
 	it("includes multiple extra .md files", () => {
 		writeFileSync(join(tempFeatureDir, "spec.md"), MARKDOWN_CONTENT);
-		writeFileSync(
-			join(tempFeatureDir, "retrospective.md"),
-			MARKDOWN_CONTENT
-		);
+		writeFileSync(join(tempFeatureDir, "retrospective.md"), MARKDOWN_CONTENT);
 		writeFileSync(
 			join(tempFeatureDir, "acceptance-test-plan.md"),
 			MARKDOWN_CONTENT
 		);
-		writeFileSync(
-			join(tempFeatureDir, "system-design.md"),
-			MARKDOWN_CONTENT
-		);
+		writeFileSync(join(tempFeatureDir, "system-design.md"), MARKDOWN_CONTENT);
 
 		const files = adapter.getSpecFiles("001-test-feature");
 
