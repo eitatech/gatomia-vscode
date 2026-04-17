@@ -119,7 +119,7 @@ describe("DocumentPreviewService", () => {
 		});
 
 		it("loads TypeScript files with renderStandard 'code' and language 'typescript'", async () => {
-			const content = 'export interface User { name: string; }';
+			const content = "export interface User { name: string; }";
 			readFileMock.mockResolvedValue(Buffer.from(content));
 
 			const service = new DocumentPreviewService({

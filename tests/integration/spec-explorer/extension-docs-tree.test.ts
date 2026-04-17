@@ -14,8 +14,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 vi.mock("vscode", async () => {
-	const actual =
-		await vi.importActual<typeof import("vscode")>("vscode");
+	const actual = await vi.importActual<typeof import("vscode")>("vscode");
 	return {
 		...actual,
 		workspace: {
