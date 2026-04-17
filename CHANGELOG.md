@@ -2,6 +2,35 @@
 
 ---
 
+## v0.36.0 2026-04-17
+
+### Added
+
+- add AIDE workflow commands for AI-driven engineering process
+- add force parameter to pollOnce for user-initiated refresh
+- add speckit.critique.run and speckit.security-review.audit commands
+
+### Fixed
+
+- npm run check violations
+- update audit files
+- remove trailing space from file watcher pattern
+
+### Changed
+
+- Change rollup package URLs to npm registry
+- chore: bump version to 0.35.1 and add spec 017 retrospective with code preview support
+- bd init: initialize beads issue tracking
+- fix
+
+### Release Info
+
+- **Source Branch**: `develop`
+- **Release Type**: minor
+
+---
+
+
 ## v0.35.0 2026-04-06
 
 ### Added
