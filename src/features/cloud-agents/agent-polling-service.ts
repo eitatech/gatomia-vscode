@@ -102,8 +102,10 @@ export class AgentPollingService {
 
 	/**
 	 * Execute a single poll cycle with retry and credential-expiry detection.
+	 * @param force - When true, poll all non-read-only sessions regardless of status or grace period.
+	 *               Use for user-initiated refresh to always query the provider.
 	 */
-	async pollOnce(): Promise<void> {
+	async pollOnce(force = false): Promise<void> {
 		const provider = this.registry.getActive();
 		if (!provider) {
 			logDebug("No active provider, skipping poll");
@@ -111,7 +113,9 @@ export class AgentPollingService {
 		}
 
 		try {
-			const sessions = await this.getSessionsToPoll();
+			const sessions = force
+				? await this.getAllPollableSessions()
+				: await this.getSessionsToPoll();
 			if (sessions.length === 0) {
 				return;
 			}
@@ -157,6 +161,11 @@ export class AgentPollingService {
 			this.intervalId = undefined;
 			logDebug("Polling stopped");
 		}
+	}
+
+	private async getAllPollableSessions(): Promise<AgentSession[]> {
+		const all = await this.sessionStorage.getAll();
+		return all.filter((s) => !s.isReadOnly);
 	}
 
 	private async getSessionsToPoll(): Promise<AgentSession[]> {
