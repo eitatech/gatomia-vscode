@@ -1,0 +1,7 @@
+install_allowed: true
+catalogs:
+- name: community
+  url: https://raw.githubusercontent.com/github/spec-kit/refs/heads/main/extensions/catalog.community.json
+  priority: 10
+  install_allowed: true
+  description: Community extensions catalog

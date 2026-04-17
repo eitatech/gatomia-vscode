@@ -36,3 +36,8 @@ test-results4.txt
 .grok/settings.json
 .opencode/bun.lockb**/CLAUDE.md
 mise.toml
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

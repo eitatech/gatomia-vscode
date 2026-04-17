@@ -525,7 +525,7 @@ async function handleDispatchFullSpec(
 async function handleRefresh(opts: CloudAgentCommandOptions): Promise<void> {
 	try {
 		if (opts.pollingService) {
-			await opts.pollingService.pollOnce();
+			await opts.pollingService.pollOnce(true);
 		}
 		opts.onRefresh?.();
 		logInfo("Cloud Agent sessions refreshed");

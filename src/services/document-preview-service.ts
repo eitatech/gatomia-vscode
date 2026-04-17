@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { basename } from "node:path";
+import { basename, extname } from "node:path";
 import matter from "gray-matter";
 import {
 	type Event,
@@ -29,6 +29,40 @@ const LINE_SPLIT_PATTERN = /\r?\n/;
 const HEADING_PATTERN = /^##\s+(.+)/;
 const FALLBACK_HEADING_PATTERN = /^#+\s+(.+)/;
 
+const CODE_FILE_EXTENSIONS: Record<string, string> = {
+	".json": "json",
+	".ts": "typescript",
+	".tsx": "typescript",
+	".js": "javascript",
+	".jsx": "javascript",
+	".yaml": "yaml",
+	".yml": "yaml",
+	".toml": "toml",
+	".xml": "xml",
+	".graphql": "graphql",
+	".gql": "graphql",
+	".proto": "protobuf",
+	".css": "css",
+	".scss": "scss",
+	".html": "html",
+	".sql": "sql",
+	".sh": "bash",
+	".bash": "bash",
+	".py": "python",
+	".go": "go",
+	".rs": "rust",
+	".java": "java",
+	".kt": "kotlin",
+	".swift": "swift",
+	".rb": "ruby",
+	".php": "php",
+	".c": "c",
+	".cpp": "cpp",
+	".h": "c",
+	".hpp": "cpp",
+};
+const MARKDOWN_EXTENSIONS = new Set([".md", ".mdx", ".markdown"]);
+
 export class DocumentPreviewService {
 	private readonly changeEmitter = new EventEmitter<Uri>();
 	readonly onDidChangeDocument: Event<Uri>;
@@ -49,6 +83,67 @@ export class DocumentPreviewService {
 	): Promise<DocumentArtifact> {
 		const bytes = await workspace.fs.readFile(uri);
 		const content = Buffer.from(bytes).toString("utf8");
+		const ext = extname(uri.fsPath).toLowerCase();
+		const isCodeFile = !MARKDOWN_EXTENSIONS.has(ext);
+
+		if (isCodeFile) {
+			return this.loadCodeDocument(uri, content, ext, options);
+		}
+
+		return this.loadMarkdownDocument(uri, content, options);
+	}
+
+	/**
+	 * Loads a non-markdown file as a code preview with syntax highlighting metadata.
+	 */
+	private loadCodeDocument(
+		uri: Uri,
+		content: string,
+		ext: string,
+		options: LoadDocumentOptions
+	): DocumentArtifact {
+		const language = CODE_FILE_EXTENSIONS[ext] ?? "plaintext";
+		const documentType =
+			options.documentType ?? this.inferTypeFromUri(uri.fsPath);
+		const workspaceRoot = workspace.workspaceFolders?.[0].uri.fsPath;
+		const filePath = getRelativePath(uri.fsPath, workspaceRoot);
+
+		const artifact: DocumentArtifact = {
+			documentId: uri.toString(),
+			documentType,
+			title: options.titleOverride || basename(uri.fsPath),
+			filePath,
+			renderStandard: "code",
+			sessionId: randomUUID(),
+			updatedAt: new Date().toISOString(),
+			sections: [
+				{
+					id: "source",
+					title: basename(uri.fsPath),
+					body: content,
+				},
+			],
+			diagrams: [],
+			forms: [],
+			rawContent: content,
+			metadata: { language },
+		};
+
+		this.outputChannel.appendLine(
+			`[DocumentPreviewService] Loaded code file (${language}) from ${uri.fsPath}`
+		);
+
+		return artifact;
+	}
+
+	/**
+	 * Loads a markdown file with frontmatter parsing, section extraction, and forms.
+	 */
+	private async loadMarkdownDocument(
+		uri: Uri,
+		content: string,
+		options: LoadDocumentOptions
+	): Promise<DocumentArtifact> {
 		const parsed = matter(content);
 
 		const documentType =

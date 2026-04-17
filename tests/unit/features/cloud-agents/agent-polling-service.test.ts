@@ -376,4 +376,72 @@ describe("AgentPollingService", () => {
 
 		expect(provider.pollSessions).not.toHaveBeenCalled();
 	});
+
+	it("should poll completed sessions with merged PRs when force is true", async () => {
+		const completedSession = createTestSession({
+			localId: "s-merged",
+			status: SessionStatus.COMPLETED,
+			completedAt: Date.now() - 60_000,
+			pullRequests: [
+				{
+					url: "https://github.com/org/repo/pull/1",
+					state: "merged",
+					branch: "main",
+					createdAt: Date.now(),
+				},
+			],
+		});
+		const provider = createMockProvider();
+		const registry = createMockRegistry(provider);
+		const sessionStorage = createMockSessionStorage([completedSession]);
+
+		const poller = new AgentPollingService(registry, sessionStorage);
+		await poller.pollOnce(true);
+
+		expect(provider.pollSessions).toHaveBeenCalledWith(
+			expect.arrayContaining([expect.objectContaining({ localId: "s-merged" })])
+		);
+	});
+
+	it("should poll sessions past the grace period when force is true", async () => {
+		const oldSession = createTestSession({
+			localId: "s-old",
+			status: SessionStatus.COMPLETED,
+			completedAt: Date.now() - 10 * 60 * 1000,
+			pullRequests: [
+				{
+					url: "https://github.com/org/repo/pull/1",
+					state: "open",
+					branch: "main",
+					createdAt: Date.now(),
+				},
+			],
+		});
+		const provider = createMockProvider();
+		const registry = createMockRegistry(provider);
+		const sessionStorage = createMockSessionStorage([oldSession]);
+
+		const poller = new AgentPollingService(registry, sessionStorage);
+		await poller.pollOnce(true);
+
+		expect(provider.pollSessions).toHaveBeenCalledWith(
+			expect.arrayContaining([expect.objectContaining({ localId: "s-old" })])
+		);
+	});
+
+	it("should still skip read-only sessions when force is true", async () => {
+		const readOnlySession = createTestSession({
+			localId: "s-readonly",
+			status: SessionStatus.RUNNING,
+			isReadOnly: true,
+		});
+		const provider = createMockProvider();
+		const registry = createMockRegistry(provider);
+		const sessionStorage = createMockSessionStorage([readOnlySession]);
+
+		const poller = new AgentPollingService(registry, sessionStorage);
+		await poller.pollOnce(true);
+
+		expect(provider.pollSessions).not.toHaveBeenCalled();
+	});
 });
