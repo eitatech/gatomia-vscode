@@ -1,0 +1,12 @@
+flow: fire
+version: 0.1.65
+installed_at: '2026-04-20T22:11:52.380Z'
+tools:
+  - claude
+  - copilot
+  - antigravity
+  - windsurf
+  - kiro
+  - gemini
+  - codex
+  - opencode

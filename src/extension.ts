@@ -13,6 +13,8 @@ import {
 	Range,
 	RelativePattern,
 	Selection,
+	StatusBarAlignment,
+	type StatusBarItem,
 	Uri,
 	window,
 	workspace,
@@ -28,8 +30,17 @@ import { SpecExplorerProvider } from "./providers/spec-explorer-provider";
 import { SpecTaskCodeLensProvider } from "./providers/spec-task-code-lens-provider";
 import { SteeringExplorerProvider } from "./providers/steering-explorer-provider";
 import { WikiExplorerProvider } from "./providers/wiki-explorer-provider";
+import { AcpProviderRegistry } from "./services/acp/acp-provider-registry";
+import { AcpSessionManager } from "./services/acp/acp-session-manager";
+import { BUILT_IN_PROVIDERS } from "./services/acp/providers/descriptors";
+import { ChatDispatcher } from "./services/chat-dispatcher";
+import { ChatRouter } from "./services/chat-router";
+import { OnboardingService } from "./services/onboarding-service";
 import { PromptLoader } from "./services/prompt-loader";
-import { sendPromptToChat } from "./utils/chat-prompt-runner";
+import {
+	sendPromptToChat,
+	setChatDispatcher,
+} from "./utils/chat-prompt-runner";
 import { ConfigManager } from "./utils/config-manager";
 import { getMcpConfigPath } from "./utils/platform-utils";
 import { getSpecSystemAdapter } from "./utils/spec-kit-adapter";
@@ -115,10 +126,18 @@ type HookCommandTarget = { hookId?: string } | string;
 const SPEC_NAME_PATTERN = /^\d{3}-/;
 
 export let outputChannel: OutputChannel;
+let acpOutputChannel: OutputChannel | null = null;
+let acpSessionManager: AcpSessionManager | null = null;
+let acpProviderRegistry: AcpProviderRegistry | null = null;
+let chatRouter: ChatRouter | null = null;
 
 export async function activate(context: ExtensionContext) {
 	// Create output channel for debugging
 	outputChannel = window.createOutputChannel("GatomIA - Debug");
+	acpOutputChannel = window.createOutputChannel("GatomIA - ACP");
+	context.subscriptions.push(acpOutputChannel);
+
+	bootstrapAcpRouter(context);
 
 	// Initialize PromptLoader
 	try {
@@ -378,7 +397,10 @@ export async function activate(context: ExtensionContext) {
 					.join("\n- ");
 
 				// Send to Copilot with all task IDs
-				const prompt = `/ speckit.implement ${groupName} \n\nTasks: \n - ${taskDescriptions} `;
+				const prompt = `/speckit.implement ${groupName}
+
+Tasks:
+- ${taskDescriptions}`;
 				await sendPromptToChat(prompt);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
@@ -669,6 +691,11 @@ export async function activate(context: ExtensionContext) {
 	// ========================================================================
 	await bootstrapCloudAgents(context);
 	context.subscriptions.push({ dispose: disposeCloudAgentsOutputChannel });
+
+	// ========================================================================
+	// ACP Commands + Status Bar
+	// ========================================================================
+	registerAcpCommands(context);
 
 	// Set up file watchers
 	setupFileWatchers(context, specExplorer, steeringExplorer, actionsExplorer);
@@ -994,7 +1021,7 @@ function registerCommands({
 				);
 
 				try {
-					await sendPromptToChat(`/ speckit.implement ${taskDescription} `);
+					await sendPromptToChat(`/speckit.implement ${taskDescription}`);
 				} catch (error) {
 					const message =
 						error instanceof Error ? error.message : String(error);
@@ -1018,7 +1045,7 @@ function registerCommands({
 				);
 
 				try {
-					await sendPromptToChat(`/ speckit.implement ${groupName} `);
+					await sendPromptToChat(`/speckit.implement ${groupName}`);
 				} catch (error) {
 					const message =
 						error instanceof Error ? error.message : String(error);
@@ -1037,7 +1064,9 @@ function registerCommands({
 				);
 
 				try {
-					await sendPromptToChat("/speckit.implement");
+					await sendPromptToChat("/speckit.implement", {
+						specId: args?.specName,
+					});
 				} catch (error) {
 					const message =
 						error instanceof Error ? error.message : String(error);
@@ -1386,7 +1415,7 @@ function registerCommands({
 					outputChannel.appendLine(
 						`[Archive Change] Archiving change: ${changeId} `
 					);
-					await sendPromptToChat(fullPrompt);
+					await sendPromptToChat(fullPrompt, { specId: changeId });
 				} catch (error) {
 					window.showErrorMessage(
 						`Failed to read archive prompt: ${error instanceof Error ? error.message : String(error)} `
@@ -2001,8 +2030,235 @@ async function handleHooksImport(): Promise<void> {
 	}
 }
 
-// biome-ignore lint/suspicious/noEmptyBlockStatements: ignore
-export function deactivate() {}
+let acpStatusBarItem: StatusBarItem | null = null;
+
+function readPermissionDefault(): "ask" | "allow" | "deny" {
+	const config = workspace.getConfiguration("gatomia");
+	const raw = config.get<string>("acp.permissionDefault", "ask");
+	if (raw === "allow" || raw === "deny") {
+		return raw;
+	}
+	return "ask";
+}
+
+function createAcpPermissionPrompter(
+	output: OutputChannel
+): (request: {
+	options: Array<{ optionId: string; name: string; kind: string }>;
+	sessionId: string;
+	toolCall?: { title?: string | null } | null;
+}) => Promise<string | null> {
+	return async (request) => {
+		if (!request.options.length) {
+			return null;
+		}
+		const title = request.toolCall?.title ?? "an action";
+		const quickPickItems = request.options.map((opt) => ({
+			label: opt.name,
+			description: opt.kind,
+			optionId: opt.optionId,
+		}));
+		try {
+			const picked = await window.showQuickPick(quickPickItems, {
+				title: `GatomIA ACP permission — ${title}`,
+				placeHolder: "Choose how to respond to the agent's request",
+				ignoreFocusOut: true,
+			});
+			return picked ? picked.optionId : null;
+		} catch (error) {
+			output.appendLine(
+				`[ACP] permission prompt failed: ${error instanceof Error ? error.message : String(error)}`
+			);
+			return null;
+		}
+	};
+}
+
+function bootstrapAcpRouter(context: ExtensionContext): void {
+	try {
+		const registry = new AcpProviderRegistry();
+		for (const descriptor of BUILT_IN_PROVIDERS) {
+			registry.register(descriptor);
+		}
+		acpProviderRegistry = registry;
+
+		const config = workspace.getConfiguration("gatomia");
+		if (config.get<boolean>("acp.registryRemoteFetch", true)) {
+			registry
+				.loadRemoteRegistry({ globalState: context.globalState })
+				.catch((err: unknown) => {
+					outputChannel.appendLine(
+						`[ACP] Remote registry fetch failed: ${err instanceof Error ? err.message : String(err)}`
+					);
+				});
+		}
+
+		const onboarding = new OnboardingService(context.globalState);
+		const output = acpOutputChannel ?? outputChannel;
+		chatRouter = new ChatRouter({ registry, onboarding, output });
+
+		const workspaceRoot =
+			workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+		const permissionDefault = readPermissionDefault();
+		acpSessionManager = new AcpSessionManager({
+			registry,
+			output,
+			cwd: workspaceRoot,
+			permissionDefault,
+			promptForPermission: createAcpPermissionPrompter(output),
+		});
+		output.appendLine(
+			`[ACP] Session manager ready (permissionDefault=${permissionDefault})`
+		);
+
+		const dispatcher = new ChatDispatcher({
+			router: chatRouter,
+			sessionManager: acpSessionManager,
+			output,
+		});
+		setChatDispatcher(dispatcher);
+
+		context.subscriptions.push({
+			dispose: () => {
+				setChatDispatcher(null);
+				acpSessionManager?.dispose();
+				acpSessionManager = null;
+			},
+		});
+
+		outputChannel.appendLine(
+			`[ACP] Router ready with ${registry.list().length} provider(s)`
+		);
+	} catch (error) {
+		outputChannel.appendLine(
+			`[ACP] Failed to initialise router: ${error instanceof Error ? error.message : String(error)}`
+		);
+	}
+}
+
+function registerAcpCommands(context: ExtensionContext): void {
+	acpStatusBarItem = window.createStatusBarItem(StatusBarAlignment.Right, 50);
+	acpStatusBarItem.command = "gatomia.acp.switchProvider";
+	context.subscriptions.push(acpStatusBarItem);
+
+	const refreshStatusBar = async (): Promise<void> => {
+		if (!acpStatusBarItem) {
+			return;
+		}
+		if (!chatRouter) {
+			acpStatusBarItem.hide();
+			return;
+		}
+		const decision = await chatRouter.resolve();
+		if (decision.target.kind === "acp") {
+			const descriptor = acpProviderRegistry?.get(decision.target.providerId);
+			acpStatusBarItem.text = `$(robot) GatomIA: ${descriptor?.displayName ?? decision.target.providerId}`;
+			acpStatusBarItem.tooltip = `Chat routed to ${descriptor?.displayName ?? decision.target.providerId} via ACP (${decision.reason}). Click to change.`;
+		} else {
+			acpStatusBarItem.text = "$(comment-discussion) GatomIA: Copilot Chat";
+			acpStatusBarItem.tooltip = `Chat routed to GitHub Copilot Chat (${decision.reason}). Click to change.`;
+		}
+		acpStatusBarItem.show();
+	};
+
+	// Initial update
+	refreshStatusBar().catch((err: unknown) => {
+		outputChannel.appendLine(
+			`[ACP] Initial status bar refresh failed: ${err instanceof Error ? err.message : String(err)}`
+		);
+	});
+
+	context.subscriptions.push(
+		commands.registerCommand("gatomia.acp.showOutput", () => {
+			acpOutputChannel?.show();
+		}),
+		commands.registerCommand("gatomia.acp.reprobeAll", async () => {
+			chatRouter?.invalidateCache();
+			await refreshStatusBar();
+			window.showInformationMessage("GatomIA: ACP providers re-probed.");
+		}),
+		commands.registerCommand("gatomia.acp.cancelActive", async () => {
+			if (!(acpSessionManager && chatRouter)) {
+				return;
+			}
+			const decision = await chatRouter.resolve();
+			if (decision.target.kind !== "acp") {
+				window.showInformationMessage(
+					"GatomIA: no active ACP session to cancel."
+				);
+				return;
+			}
+			await acpSessionManager.cancel(decision.target.providerId, {
+				mode: "workspace",
+			});
+			window.showInformationMessage(
+				`GatomIA: cancelled active ${decision.target.providerId} session.`
+			);
+		}),
+		commands.registerCommand("gatomia.acp.switchProvider", async () => {
+			interface QuickPickEntry {
+				label: string;
+				description?: string;
+				value: string;
+			}
+			const providers = acpProviderRegistry?.list() ?? [];
+			const items: QuickPickEntry[] = [
+				{
+					label: "$(sparkle) Auto",
+					description: "Select based on the current IDE",
+					value: "auto",
+				},
+				{
+					label: "$(comment-discussion) GitHub Copilot Chat",
+					description: "Always use Copilot Chat",
+					value: "copilot-chat",
+				},
+				...providers.map((p) => ({
+					label: `$(robot) ${p.displayName}`,
+					description: `ACP via ${p.spawnCommand} ${p.spawnArgs.join(" ")}`,
+					value: p.id,
+				})),
+			];
+			const picked = await window.showQuickPick(items, {
+				placeHolder: "Select the chat provider for GatomIA prompts",
+			});
+			if (!picked) {
+				return;
+			}
+			const config = workspace.getConfiguration("gatomia");
+			await config.update(
+				"chat.provider",
+				picked.value,
+				ConfigurationTarget.Global
+			);
+			chatRouter?.invalidateCache();
+			await refreshStatusBar();
+		}),
+		workspace.onDidChangeConfiguration((event) => {
+			if (
+				event.affectsConfiguration("gatomia.chat.provider") ||
+				event.affectsConfiguration("gatomia.acp.sessionMode")
+			) {
+				chatRouter?.invalidateCache();
+				refreshStatusBar().catch(() => {
+					// Status refresh failures are non-fatal.
+				});
+			}
+		})
+	);
+}
+
+export function deactivate(): void {
+	if (acpSessionManager) {
+		try {
+			acpSessionManager.dispose();
+		} catch {
+			// best-effort cleanup
+		}
+		acpSessionManager = null;
+	}
+	setChatDispatcher(null);
+}
 
 function setupDocumentPreviewWatchers(context: ExtensionContext) {
 	const watcher = workspace.createFileSystemWatcher("**/*.md");

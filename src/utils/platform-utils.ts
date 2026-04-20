@@ -39,6 +39,11 @@ function getIDEDirectoryName(): string {
 		return "windsurf";
 	}
 
+	// Google Antigravity IDE (VS Code fork)
+	if (appName.toLowerCase().includes("antigravity")) {
+		return "Antigravity";
+	}
+
 	// Positron IDE
 	if (appName.toLowerCase().includes("positron")) {
 		return "Positron";

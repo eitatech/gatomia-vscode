@@ -201,6 +201,9 @@ export class RelativePattern {
 
 export const env = {
 	machineId: "test-machine",
+	appName: "Visual Studio Code",
+	remoteName: undefined as string | undefined,
+	uriScheme: "vscode",
 	clipboard: {
 		writeText: vi.fn().mockResolvedValue(undefined),
 		readText: vi.fn().mockResolvedValue(""),

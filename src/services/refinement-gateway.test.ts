@@ -58,13 +58,16 @@ describe("RefinementGateway", () => {
 			expect(result.requestId).toBe("test-123");
 			expect(result.message).toBe("Refinement request sent to agent");
 			expect(sendPromptToChat).toHaveBeenCalledWith(
-				expect.stringContaining("/speckit.specify")
+				expect.stringContaining("/speckit.specify"),
+				expect.objectContaining({ specId: "001-feature-spec" })
 			);
 			expect(sendPromptToChat).toHaveBeenCalledWith(
-				expect.stringContaining("001-feature-spec")
+				expect.stringContaining("001-feature-spec"),
+				expect.anything()
 			);
 			expect(sendPromptToChat).toHaveBeenCalledWith(
-				expect.stringContaining("Need more details on API endpoints")
+				expect.stringContaining("Need more details on API endpoints"),
+				expect.anything()
 			);
 		});
 
@@ -81,7 +84,8 @@ describe("RefinementGateway", () => {
 			await gateway.submitRequest(payload);
 
 			expect(sendPromptToChat).toHaveBeenCalledWith(
-				expect.stringContaining("/speckit.plan")
+				expect.stringContaining("/speckit.plan"),
+				expect.objectContaining({ specId: "002-implementation-plan" })
 			);
 		});
 
@@ -98,7 +102,8 @@ describe("RefinementGateway", () => {
 			await gateway.submitRequest(payload);
 
 			expect(sendPromptToChat).toHaveBeenCalledWith(
-				expect.stringContaining("/speckit.tasks")
+				expect.stringContaining("/speckit.tasks"),
+				expect.objectContaining({ specId: "003-tasks" })
 			);
 		});
 
@@ -116,7 +121,8 @@ describe("RefinementGateway", () => {
 			await gateway.submitRequest(payload);
 
 			expect(sendPromptToChat).toHaveBeenCalledWith(
-				expect.stringContaining("Section: Architecture Overview")
+				expect.stringContaining("Section: Architecture Overview"),
+				expect.anything()
 			);
 		});
 
@@ -133,7 +139,8 @@ describe("RefinementGateway", () => {
 			await gateway.submitRequest(payload);
 
 			expect(sendPromptToChat).toHaveBeenCalledWith(
-				expect.stringContaining("Missing Detail")
+				expect.stringContaining("Missing Detail"),
+				expect.anything()
 			);
 		});
 
@@ -210,7 +217,8 @@ describe("RefinementGateway", () => {
 			await gateway.submitRequest(payload);
 
 			expect(sendPromptToChat).toHaveBeenCalledWith(
-				expect.stringContaining("/speckit.research")
+				expect.stringContaining("/speckit.research"),
+				expect.objectContaining({ specId: "research-doc" })
 			);
 		});
 
@@ -227,7 +235,8 @@ describe("RefinementGateway", () => {
 			await gateway.submitRequest(payload);
 
 			expect(sendPromptToChat).toHaveBeenCalledWith(
-				expect.stringContaining("/speckit.checklist")
+				expect.stringContaining("/speckit.checklist"),
+				expect.objectContaining({ specId: "checklist-doc" })
 			);
 		});
 	});
