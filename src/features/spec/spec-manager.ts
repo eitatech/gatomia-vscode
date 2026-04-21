@@ -382,7 +382,10 @@ This document has not been created yet.`;
 		// Append change ID
 		const finalPrompt = `${promptContent}\n\nid: ${changeId}`;
 
-		await sendPromptToChat(finalPrompt, { instructionType: "startAllTask" });
+		await sendPromptToChat(finalPrompt, {
+			instructionType: "startAllTask",
+			specId: changeId,
+		});
 	}
 
 	async getChangeSpecs(changeName: string): Promise<string[]> {

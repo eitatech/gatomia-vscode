@@ -13,7 +13,7 @@ import { window, type OutputChannel } from "vscode";
 // Constants
 // ============================================================================
 
-const CLOUD_AGENTS_CHANNEL_NAME = "Cloud Agents";
+const CLOUD_AGENTS_CHANNEL_NAME = "GatomIA - Cloud Agents";
 
 // ============================================================================
 // Logger
