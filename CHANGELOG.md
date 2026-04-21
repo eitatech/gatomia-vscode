@@ -2,6 +2,24 @@
 
 ---
 
+## v0.37.0 2026-04-21
+
+### Added
+
+- add FIRE agent workflow definitions for orchestrator, planner, and builder
+
+### Changed
+
+- Atualizar o package-lock.json
+
+### Release Info
+
+- **Source Branch**: `develop`
+- **Release Type**: minor
+
+---
+
+
 ## v0.36.0 2026-04-17
 
 ### Added
