@@ -171,6 +171,18 @@ export interface DependencyStatus {
 		installed: boolean;
 		version: string | null;
 	};
+	devinCli?: {
+		installed: boolean;
+		version: string | null;
+		authenticated: boolean;
+		acpSupported: boolean;
+	};
+	geminiCli?: {
+		installed: boolean;
+		version: string | null;
+		authenticated: boolean;
+		acpSupported: boolean;
+	};
 	lastChecked: number;
 }
 

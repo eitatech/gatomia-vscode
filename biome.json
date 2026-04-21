@@ -38,7 +38,11 @@
       "!.specify/scripts/**/*",
       "!.specify/templates/**/*",
       "!.specify/workflows/**/*",
-      "!.specify/agents/**/*"
+      "!.specify/agents/**/*",
+      "!.specsmd/**/*",
+      "!.kiro/**/*",
+      "!.qoder/**/*",
+      "!.sonarlint/**/*"
     ],
     "ignoreUnknown": false
   },

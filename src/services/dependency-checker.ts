@@ -7,6 +7,8 @@
 import { type OutputChannel, extensions } from "vscode";
 import type { DependencyStatus } from "../types/welcome";
 import { checkCLI } from "../utils/cli-detector";
+import { probeDevinCli } from "./acp/providers/devin-cli-probe";
+import { probeGeminiCli } from "./acp/providers/gemini-cli-probe";
 
 interface CLIDetectionResult {
 	installed: boolean;
@@ -56,12 +58,15 @@ export class DependencyChecker {
 		);
 
 		const copilotChat = this.checkCopilotChat();
-		const [speckit, openspec, copilotCli, gatomiaCli] = await Promise.all([
-			this.checkSpecKitCLI(),
-			this.checkOpenSpecCLI(),
-			this.checkCopilotCLI(),
-			this.checkGatomiaCLI(),
-		]);
+		const [speckit, openspec, copilotCli, gatomiaCli, devinProbe, geminiProbe] =
+			await Promise.all([
+				this.checkSpecKitCLI(),
+				this.checkOpenSpecCLI(),
+				this.checkCopilotCLI(),
+				this.checkGatomiaCLI(),
+				probeDevinCli(DependencyChecker.CLI_TIMEOUT_MS),
+				probeGeminiCli(DependencyChecker.CLI_TIMEOUT_MS),
+			]);
 
 		const result: DependencyStatus = {
 			copilotChat,
@@ -69,6 +74,18 @@ export class DependencyChecker {
 			openspec,
 			copilotCli,
 			gatomiaCli,
+			devinCli: {
+				installed: devinProbe.installed,
+				version: devinProbe.version,
+				authenticated: devinProbe.authenticated,
+				acpSupported: devinProbe.acpSupported,
+			},
+			geminiCli: {
+				installed: geminiProbe.installed,
+				version: geminiProbe.version,
+				authenticated: geminiProbe.authenticated,
+				acpSupported: geminiProbe.acpSupported,
+			},
 			lastChecked: Date.now(),
 		};
 
@@ -79,7 +96,7 @@ export class DependencyChecker {
 		};
 
 		this.outputChannel.appendLine(
-			`[DependencyChecker] Check complete: Copilot=${copilotChat.installed}, SpecKit=${speckit.installed}, OpenSpec=${openspec.installed}, CopilotCLI=${copilotCli.installed}, GatomIA=${gatomiaCli.installed}`
+			`[DependencyChecker] Check complete: Copilot=${copilotChat.installed}, SpecKit=${speckit.installed}, OpenSpec=${openspec.installed}, CopilotCLI=${copilotCli.installed}, GatomIA=${gatomiaCli.installed}, Devin=${devinProbe.installed}(auth=${devinProbe.authenticated}), Gemini=${geminiProbe.installed}(auth=${geminiProbe.authenticated})`
 		);
 
 		return result;

@@ -123,7 +123,7 @@ Please update the document accordingly.`;
 				`[RefinementGateway] Prompt: ${prompt.substring(0, 200)}...`
 			);
 
-			await sendPromptToChat(prompt);
+			await sendPromptToChat(prompt, { specId: payload.documentId });
 
 			this.outputChannel.appendLine(
 				`[RefinementGateway] Successfully sent refinement request ${requestId} to chat`

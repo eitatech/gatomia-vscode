@@ -239,6 +239,63 @@
           ],
           "description": "Log level for agent operations (debug, info, warn, error).",
           "order": 14
+        },
+        "gatomia.chat.provider": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "copilot-chat",
+            "devin",
+            "gemini"
+          ],
+          "markdownEnumDescriptions": [
+            "Auto-select based on the IDE: Windsurf → Devin CLI (ACP), Antigravity → Gemini CLI (ACP), others → GitHub Copilot Chat.",
+            "Always route prompts to GitHub Copilot Chat, regardless of host.",
+            "Always route prompts to the Devin CLI via Agent Client Protocol (falls back to Copilot Chat if unavailable).",
+            "Always route prompts to the Gemini CLI via Agent Client Protocol (falls back to Copilot Chat if unavailable)."
+          ],
+          "markdownDescription": "Which agent receives prompts issued from GatomIA commands. `auto` selects the best match for the current IDE.",
+          "order": 50
+        },
+        "gatomia.acp.sessionMode": {
+          "type": "string",
+          "default": "workspace",
+          "enum": [
+            "workspace",
+            "per-spec",
+            "per-prompt"
+          ],
+          "markdownEnumDescriptions": [
+            "Single ACP session shared across the workspace (faster, context accumulates).",
+            "One ACP session per spec id (ideal when working on several specs in parallel).",
+            "Fresh ACP session for every prompt (slowest, no cross-prompt contamination)."
+          ],
+          "description": "How GatomIA groups prompts into ACP sessions when routing via Devin/Gemini CLIs.",
+          "order": 51
+        },
+        "gatomia.acp.permissionDefault": {
+          "type": "string",
+          "default": "ask",
+          "enum": [
+            "ask",
+            "allow",
+            "deny"
+          ],
+          "description": "Default answer when an ACP agent requests permission to run a tool call.",
+          "order": 52
+        },
+        "gatomia.acp.verboseLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Write ACP protocol details, thoughts, and tool-call updates to the GatomIA ACP output channel.",
+          "order": 53
+        },
+        "gatomia.acp.registryRemoteFetch": {
+          "type": "boolean",
+          "default": true,
+          "description": "Consult the public ACP Registry to suggest additional providers. Built-in providers (Devin, Gemini) do not depend on this.",
+          "order": 54
         }
       }
     },
@@ -770,6 +827,30 @@
         "title": "Refresh Cloud Agent Sessions",
         "category": "GatomIA",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "gatomia.acp.showOutput",
+        "title": "Show ACP Output",
+        "category": "GatomIA",
+        "icon": "$(output)"
+      },
+      {
+        "command": "gatomia.acp.switchProvider",
+        "title": "Switch Chat Provider",
+        "category": "GatomIA",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "gatomia.acp.reprobeAll",
+        "title": "Re-probe ACP Providers",
+        "category": "GatomIA",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gatomia.acp.cancelActive",
+        "title": "Cancel Active ACP Session",
+        "category": "GatomIA",
+        "icon": "$(debug-stop)"
       }
     ],
     "menus": {

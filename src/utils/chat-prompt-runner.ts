@@ -1,11 +1,28 @@
 import { commands, type Uri, version as vscodeVersion } from "vscode";
+import type { ChatDispatcher } from "../services/chat-dispatcher";
 import { ConfigManager } from "./config-manager";
 
 export interface ChatContext {
 	instructionType?: "createSpec" | "startAllTask" | "runPrompt";
+	/**
+	 * Optional spec identifier. When provided and ACP session mode is
+	 * `per-spec`, prompts belonging to the same spec share an ACP session.
+	 */
+	specId?: string;
 }
 
 const MINIMUM_FILES_SUPPORT_VERSION = "1.95.0";
+
+let injectedDispatcher: ChatDispatcher | null = null;
+
+/**
+ * Wires an ACP-aware dispatcher into `sendPromptToChat`. Called from
+ * `extension.activate()`. When no dispatcher is injected (for example in
+ * older test setups), prompts fall through to the legacy direct chat path.
+ */
+export const setChatDispatcher = (dispatcher: ChatDispatcher | null): void => {
+	injectedDispatcher = dispatcher;
+};
 
 const supportsFilesParam = (): boolean => {
 	const parts = vscodeVersion.split(".").map(Number);
@@ -21,11 +38,15 @@ const supportsFilesParam = (): boolean => {
 	return true;
 };
 
-export const sendPromptToChat = async (
+/**
+ * Applies GatomIA's prompt decorations (language + custom instructions) to the
+ * user-provided prompt. Exposed for tests and for callers that need the final
+ * string prior to dispatch.
+ */
+export const buildFinalPrompt = (
 	prompt: string,
-	context?: ChatContext,
-	files?: Uri[]
-): Promise<void> => {
+	context?: ChatContext
+): string => {
 	const configManager = ConfigManager.getInstance();
 	const settings = configManager.getSettings();
 	const language = settings.chatLanguage;
@@ -33,12 +54,10 @@ export const sendPromptToChat = async (
 
 	let finalPrompt = prompt;
 
-	// Append global custom instruction
 	if (customInstructions.global) {
 		finalPrompt += `\n\n${customInstructions.global}`;
 	}
 
-	// Append specific custom instruction
 	if (context?.instructionType) {
 		const specificInstruction = customInstructions[context.instructionType];
 		if (specificInstruction) {
@@ -46,9 +65,27 @@ export const sendPromptToChat = async (
 		}
 	}
 
-	// Append language instruction
 	if (language !== "English") {
 		finalPrompt += `\n\n(Please respond in ${language}.)`;
+	}
+
+	return finalPrompt;
+};
+
+export const sendPromptToChat = async (
+	prompt: string,
+	context?: ChatContext,
+	files?: Uri[]
+): Promise<void> => {
+	const finalPrompt = buildFinalPrompt(prompt, context);
+
+	if (injectedDispatcher) {
+		await injectedDispatcher.dispatch(
+			finalPrompt,
+			{ specId: context?.specId },
+			files
+		);
+		return;
 	}
 
 	const hasFiles = files && files.length > 0;
