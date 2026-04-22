@@ -2188,9 +2188,9 @@ function registerAcpCommands(context: ExtensionContext): void {
 				);
 				return;
 			}
-			await acpSessionManager.cancel(decision.target.providerId, {
-				mode: "workspace",
-			});
+			// cancelAll covers every tracked session key regardless of the
+			// configured session mode (workspace / per-spec / per-prompt).
+			await acpSessionManager.cancelAll(decision.target.providerId);
 			window.showInformationMessage(
 				`GatomIA: cancelled active ${decision.target.providerId} session.`
 			);

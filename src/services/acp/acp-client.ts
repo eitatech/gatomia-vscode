@@ -37,10 +37,17 @@ export interface AcpClientOptions {
 	 * tool-call permission. When omitted, every request is cancelled.
 	 */
 	promptForPermission?: PermissionPrompter;
+	/**
+	 * Maximum time (ms) to wait for `initialize` before giving up and killing
+	 * the child process. Defaults to 15 s.
+	 */
+	initializeTimeoutMs?: number;
 }
 
 const ALLOW_KINDS = new Set(["allow_once", "allow_always"]);
 const REJECT_KINDS = new Set(["reject_once", "reject_always"]);
+const DEFAULT_INITIALIZE_TIMEOUT_MS = 15_000;
+const ONCE_SESSION_KEY_PREFIX = "once:";
 
 interface SessionEntry {
 	sessionId: string;
@@ -60,10 +67,13 @@ export class AcpClient {
 	private readonly output: OutputChannel;
 	private readonly permissionDefault: PermissionMode;
 	private readonly promptForPermission: PermissionPrompter | undefined;
+	private readonly initializeTimeoutMs: number;
 	private connection: ClientSideConnection | null = null;
 	private process: ChildProcess | null = null;
 	private readonly sessions = new Map<string, SessionEntry>();
+	private readonly pendingWaiters = new Set<(reason: Error) => void>();
 	private startingPromise: Promise<void> | null = null;
+	private lastSessionKey: string | null = null;
 
 	constructor(options: AcpClientOptions) {
 		this.descriptor = options.descriptor;
@@ -71,6 +81,18 @@ export class AcpClient {
 		this.output = options.output;
 		this.permissionDefault = options.permissionDefault ?? "ask";
 		this.promptForPermission = options.promptForPermission;
+		this.initializeTimeoutMs =
+			options.initializeTimeoutMs ?? DEFAULT_INITIALIZE_TIMEOUT_MS;
+	}
+
+	/** Returns the most recently used session key, or null when no prompt has run. */
+	getLastSessionKey(): string | null {
+		return this.lastSessionKey;
+	}
+
+	/** Returns a snapshot of the currently tracked session keys. */
+	getSessionKeys(): string[] {
+		return [...this.sessions.keys()];
 	}
 
 	/**
@@ -110,17 +132,27 @@ export class AcpClient {
 			? existing.sessionId
 			: await this.createSession(sessionKey);
 
+		this.lastSessionKey = sessionKey;
+
 		this.output.appendLine(
 			`[ACP][${this.descriptor.id}] session=${sessionId} prompt=${prompt.length}chars`
 		);
 
-		const result = await this.connection.prompt({
-			sessionId,
-			prompt: [{ type: "text", text: prompt }],
-		});
-		this.output.appendLine(
-			`[ACP][${this.descriptor.id}] turn finished (stopReason=${result.stopReason})`
-		);
+		try {
+			const result = await this.connection.prompt({
+				sessionId,
+				prompt: [{ type: "text", text: prompt }],
+			});
+			this.output.appendLine(
+				`[ACP][${this.descriptor.id}] turn finished (stopReason=${result.stopReason})`
+			);
+		} finally {
+			// Single-shot sessions should not accumulate: the next prompt with the
+			// same key would be a new one-off anyway.
+			if (sessionKey.startsWith(ONCE_SESSION_KEY_PREFIX)) {
+				this.sessions.delete(sessionKey);
+			}
+		}
 	}
 
 	/**
@@ -143,6 +175,27 @@ export class AcpClient {
 			this.output.appendLine(
 				`[ACP][${this.descriptor.id}] cancel failed: ${toMessage(error)}`
 			);
+		} finally {
+			// Drop single-shot sessions regardless of cancel outcome so subsequent
+			// cancelAll() calls do not target them.
+			if (sessionKey.startsWith(ONCE_SESSION_KEY_PREFIX)) {
+				this.sessions.delete(sessionKey);
+			}
+			if (this.lastSessionKey === sessionKey) {
+				this.lastSessionKey = null;
+			}
+		}
+	}
+
+	/**
+	 * Cancels every currently tracked session. Useful when the caller doesn't
+	 * know the specific session key (e.g. the UI-level "Cancel active ACP
+	 * session" command under per-prompt or per-spec routing).
+	 */
+	async cancelAll(): Promise<void> {
+		const keys = [...this.sessions.keys()];
+		for (const key of keys) {
+			await this.cancel(key);
 		}
 	}
 
@@ -162,6 +215,10 @@ export class AcpClient {
 		this.process = null;
 		this.connection = null;
 		this.sessions.clear();
+		this.lastSessionKey = null;
+		this.rejectPendingWaiters(
+			new Error(`[ACP][${this.descriptor.id}] client disposed`)
+		);
 	}
 
 	private async start(): Promise<void> {
@@ -191,6 +248,21 @@ export class AcpClient {
 			this.process = null;
 			this.connection = null;
 			this.sessions.clear();
+			this.lastSessionKey = null;
+			this.rejectPendingWaiters(
+				new Error(
+					`[ACP][${this.descriptor.id}] child process exited (code=${code} signal=${signal})`
+				)
+			);
+		});
+
+		child.on("error", (error) => {
+			this.output.appendLine(
+				`[ACP][${this.descriptor.id}] spawn error: ${toMessage(error)}`
+			);
+			this.rejectPendingWaiters(
+				error instanceof Error ? error : new Error(String(error))
+			);
 		});
 
 		child.stderr?.on("data", (chunk: Buffer) => {
@@ -218,15 +290,86 @@ export class AcpClient {
 		const clientHandler = this.buildClientHandler();
 		this.connection = new ClientSideConnection(() => clientHandler, stream);
 
-		await this.connection.initialize({
-			protocolVersion: PROTOCOL_VERSION,
-			clientCapabilities: {
-				fs: { readTextFile: true, writeTextFile: true },
-			},
-		});
+		try {
+			await this.withStartupTimeout(
+				this.connection.initialize({
+					protocolVersion: PROTOCOL_VERSION,
+					clientCapabilities: {
+						fs: { readTextFile: true, writeTextFile: true },
+					},
+				}),
+				"initialize"
+			);
+		} catch (error) {
+			// Best-effort cleanup so the next ensureStarted() call retries cleanly.
+			this.output.appendLine(
+				`[ACP][${this.descriptor.id}] initialize failed: ${toMessage(error)}`
+			);
+			this.connection = null;
+			if (this.process && !this.process.killed) {
+				try {
+					this.process.kill();
+				} catch {
+					// swallow — exit handler will clean up state.
+				}
+			}
+			throw error;
+		}
+
 		this.output.appendLine(
 			`[ACP][${this.descriptor.id}] initialised (protocolVersion=${PROTOCOL_VERSION})`
 		);
+	}
+
+	private withStartupTimeout<T>(
+		promise: Promise<T>,
+		label: string
+	): Promise<T> {
+		const timeoutMs = this.initializeTimeoutMs;
+		if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+			return promise;
+		}
+		return new Promise<T>((resolve, reject) => {
+			const rejectWaiter = (reason: Error) => reject(reason);
+			this.pendingWaiters.add(rejectWaiter);
+
+			const timer = setTimeout(() => {
+				this.pendingWaiters.delete(rejectWaiter);
+				reject(
+					new Error(
+						`[ACP][${this.descriptor.id}] ${label} timed out after ${timeoutMs}ms`
+					)
+				);
+			}, timeoutMs);
+
+			promise.then(
+				(value) => {
+					clearTimeout(timer);
+					this.pendingWaiters.delete(rejectWaiter);
+					resolve(value);
+				},
+				(error: unknown) => {
+					clearTimeout(timer);
+					this.pendingWaiters.delete(rejectWaiter);
+					reject(error instanceof Error ? error : new Error(String(error)));
+				}
+			);
+		});
+	}
+
+	private rejectPendingWaiters(reason: Error): void {
+		if (this.pendingWaiters.size === 0) {
+			return;
+		}
+		const waiters = [...this.pendingWaiters];
+		this.pendingWaiters.clear();
+		for (const waiter of waiters) {
+			try {
+				waiter(reason);
+			} catch {
+				// Ignore — waiters are just reject callbacks.
+			}
+		}
 	}
 
 	private async createSession(sessionKey: string): Promise<string> {

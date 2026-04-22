@@ -64,8 +64,32 @@ export class AcpSessionManager {
 		if (!client) {
 			return;
 		}
+		// per-prompt keys are fresh UUIDs, so deriving a new key here would never
+		// match any tracked session. Fall back to the client's last-used key
+		// (which is what the user most recently interacted with).
+		if (context.mode === "per-prompt") {
+			const lastKey = client.getLastSessionKey();
+			if (!lastKey) {
+				return;
+			}
+			await client.cancel(lastKey);
+			return;
+		}
 		const sessionKey = resolveSessionKey(context);
 		await client.cancel(sessionKey);
+	}
+
+	/**
+	 * Cancels every active session for the provider. Useful for a UI-level
+	 * "cancel active ACP session" action where the exact session key is not
+	 * known (e.g. per-prompt or per-spec modes).
+	 */
+	async cancelAll(providerId: string): Promise<void> {
+		const client = this.clients.get(providerId);
+		if (!client) {
+			return;
+		}
+		await client.cancelAll();
 	}
 
 	dispose(): void {

@@ -9,14 +9,21 @@ const ONCE_PREFIX_REGEX = /^once:/;
 const ONCE_UUID_REGEX = /^once:[0-9a-f-]+$/i;
 const UNKNOWN_REGEX = /unknown/i;
 
-const { AcpClientCtor, sendPromptMock, disposeMock, cancelMock } = vi.hoisted(
-	() => ({
-		sendPromptMock: vi.fn(),
-		disposeMock: vi.fn(),
-		cancelMock: vi.fn(),
-		AcpClientCtor: vi.fn(),
-	})
-);
+const {
+	AcpClientCtor,
+	sendPromptMock,
+	disposeMock,
+	cancelMock,
+	cancelAllMock,
+	getLastSessionKeyMock,
+} = vi.hoisted(() => ({
+	sendPromptMock: vi.fn(),
+	disposeMock: vi.fn(),
+	cancelMock: vi.fn(),
+	cancelAllMock: vi.fn(),
+	getLastSessionKeyMock: vi.fn<() => string | null>(() => null),
+	AcpClientCtor: vi.fn(),
+}));
 
 vi.mock("./acp-client", () => {
 	class AcpClient {
@@ -25,7 +32,9 @@ vi.mock("./acp-client", () => {
 		}
 		sendPrompt = sendPromptMock;
 		cancel = cancelMock;
+		cancelAll = cancelAllMock;
 		dispose = disposeMock;
+		getLastSessionKey = getLastSessionKeyMock;
 	}
 	return { AcpClient };
 });
@@ -188,5 +197,43 @@ describe("AcpSessionManager", () => {
 		expect([...seen][0]).toMatch(ONCE_UUID_REGEX);
 		// keep reference to randomUUID to avoid unused import
 		expect(typeof randomUUID).toBe("function");
+	});
+
+	it("cancel in per-prompt mode falls back to the client's last session key (H3)", async () => {
+		sendPromptMock.mockResolvedValue(undefined);
+		getLastSessionKeyMock.mockReturnValue("once:last-uuid");
+		await manager.send("devin", "p", { mode: "per-prompt" });
+
+		await manager.cancel("devin", { mode: "per-prompt" });
+
+		expect(cancelMock).toHaveBeenCalledWith("once:last-uuid");
+	});
+
+	it("cancel in per-prompt mode is a no-op when no prompt has been sent yet (H3)", async () => {
+		sendPromptMock.mockResolvedValue(undefined);
+		getLastSessionKeyMock.mockReturnValue(null);
+		// Ensure the client exists for this provider without sending a prompt.
+		await manager.send("devin", "seed", { mode: "workspace" });
+		cancelMock.mockClear();
+		getLastSessionKeyMock.mockReturnValue(null);
+
+		await manager.cancel("devin", { mode: "per-prompt" });
+
+		expect(cancelMock).not.toHaveBeenCalled();
+	});
+
+	it("cancelAll delegates to AcpClient.cancelAll (H3)", async () => {
+		sendPromptMock.mockResolvedValue(undefined);
+		cancelAllMock.mockResolvedValue(undefined);
+		await manager.send("devin", "hi", { mode: "workspace" });
+
+		await manager.cancelAll("devin");
+
+		expect(cancelAllMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("cancelAll is a no-op when no client exists for the provider (H3)", async () => {
+		await manager.cancelAll("devin");
+		expect(cancelAllMock).not.toHaveBeenCalled();
 	});
 });

@@ -8,6 +8,12 @@ import { AcpClient } from "./acp-client";
 import type { AcpProviderDescriptor } from "./types";
 
 const AUTH_REQUIRED_REGEX = /auth_required/;
+const TIMED_OUT_REGEX = /timed out/i;
+const CHILD_EXITED_REGEX = /child process exited/;
+const NEVER_RESOLVES = <T>(): Promise<T> =>
+	new Promise<T>(() => {
+		/* intentionally never settles — used to simulate a hung RPC */
+	});
 
 vi.mock("node:child_process", () => {
 	const spawnMock = vi.fn();
@@ -210,6 +216,86 @@ describe("AcpClient", () => {
 		client.dispose();
 
 		expect(fakeProcess.kill).toHaveBeenCalled();
+	});
+
+	it("rejects with a timeout when initialize never resolves (H1)", async () => {
+		// Make initialize hang forever.
+		initializeMock.mockImplementationOnce(() => NEVER_RESOLVES());
+		const client = new AcpClient({
+			descriptor,
+			cwd: "/tmp/workspace",
+			output: makeOutputChannel(),
+			initializeTimeoutMs: 20,
+		});
+
+		await expect(client.ensureStarted()).rejects.toThrow(TIMED_OUT_REGEX);
+		// The stuck process must be killed so the next retry starts clean.
+		expect(fakeProcess.kill).toHaveBeenCalled();
+	});
+
+	it("rejects pending waiters when the child process exits unexpectedly (H1)", async () => {
+		initializeMock.mockImplementationOnce(() => NEVER_RESOLVES());
+		const client = new AcpClient({
+			descriptor,
+			cwd: "/tmp/workspace",
+			output: makeOutputChannel(),
+			initializeTimeoutMs: 10_000,
+		});
+
+		const pending = client.ensureStarted();
+		// Simulate the child process crashing while initialize is pending.
+		setImmediate(() => fakeProcess.emit("exit", 137, "SIGKILL"));
+
+		await expect(pending).rejects.toThrow(CHILD_EXITED_REGEX);
+	});
+
+	it("removes a per-prompt (once:) session entry after the turn completes (H4)", async () => {
+		newSessionMock.mockResolvedValueOnce({ sessionId: "session-once" });
+		const client = new AcpClient({
+			descriptor,
+			cwd: "/tmp/workspace",
+			output: makeOutputChannel(),
+		});
+
+		await client.sendPrompt("once:abc-123", "one-shot");
+
+		expect(client.getSessionKeys()).not.toContain("once:abc-123");
+	});
+
+	it("keeps workspace / per-spec session entries across prompts (H4)", async () => {
+		newSessionMock.mockResolvedValueOnce({ sessionId: "session-ws" });
+		const client = new AcpClient({
+			descriptor,
+			cwd: "/tmp/workspace",
+			output: makeOutputChannel(),
+		});
+
+		await client.sendPrompt("_ws_", "first");
+		await client.sendPrompt("_ws_", "second");
+
+		expect(client.getSessionKeys()).toContain("_ws_");
+		// newSession must only have been called once — the second prompt reuses it.
+		expect(newSessionMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("cancelAll cancels every tracked session regardless of mode (H3)", async () => {
+		newSessionMock
+			.mockResolvedValueOnce({ sessionId: "session-ws" })
+			.mockResolvedValueOnce({ sessionId: "session-spec" });
+		cancelMock.mockResolvedValue(undefined);
+		const client = new AcpClient({
+			descriptor,
+			cwd: "/tmp/workspace",
+			output: makeOutputChannel(),
+		});
+
+		await client.sendPrompt("_ws_", "a");
+		await client.sendPrompt("spec:001", "b");
+		await client.cancelAll();
+
+		expect(cancelMock).toHaveBeenCalledTimes(2);
+		expect(cancelMock).toHaveBeenCalledWith({ sessionId: "session-ws" });
+		expect(cancelMock).toHaveBeenCalledWith({ sessionId: "session-spec" });
 	});
 
 	it("throws a descriptive error when the session cannot be established", async () => {
