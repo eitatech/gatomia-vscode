@@ -1,6 +1,6 @@
 /**
  * Unit tests for CLI detector utility
- * Validates shared CLI detection logic used by DependencyChecker and DependenciesViewProvider
+ * Validates shared CLI detection logic used by DependencyChecker and the Welcome Screen provider
  */
 
 import { describe, it, expect } from "vitest";

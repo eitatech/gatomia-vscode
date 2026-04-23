@@ -28,6 +28,7 @@
 import {
 	type ExtensionContext,
 	type OutputChannel,
+	type Terminal,
 	version,
 	workspace,
 	ConfigurationTarget,
@@ -39,12 +40,15 @@ import {
 import type {
 	WelcomeScreenState,
 	ConfigurationState,
+	DependencyStatus,
 	FeatureAction,
 	LearningResource,
 	WelcomeErrorCodeType,
 	InstallableDependency,
+	SystemPrerequisiteKey,
 } from "../types/welcome";
 import { WelcomeErrorCode } from "../types/welcome";
+import type { IdeHost } from "../utils/ide-host-detector";
 import { DependencyChecker } from "../services/dependency-checker";
 import { SystemDiagnostics } from "../services/system-diagnostics";
 import { LearningResources } from "../services/learning-resources";
@@ -52,6 +56,13 @@ import {
 	hasShownWelcomeBefore,
 	getDontShowOnStartup,
 } from "../utils/workspace-state";
+import {
+	getPrerequisiteInstallStep,
+	resolveMissingWithPrereqs,
+	type InstallStep,
+	type Platform,
+} from "../services/welcome/install-commands";
+import { detectIdeHost } from "../utils/ide-host-detector";
 import type { WelcomeScreenPanel } from "../panels/welcome-screen-panel";
 
 /**
@@ -66,12 +77,51 @@ const EDITABLE_CONFIG_KEYS = [
 	"gatomia.prompts.path",
 ] as const;
 
+const INSTALL_TERMINAL_NAME = "GatomIA - Setup";
+const POST_INSTALL_REPROBE_DELAY_MS = 5000;
+
+const GATOMIA_CLI_PREREQ_MESSAGES: Record<IdeHost, string> = {
+	windsurf:
+		"Install Devin CLI and at least one spec system (SpecKit or OpenSpec) before installing GatomIA CLI.",
+	antigravity:
+		"Install Gemini CLI and at least one spec system (SpecKit or OpenSpec) before installing GatomIA CLI.",
+	cursor:
+		"Install GitHub Copilot Chat, Copilot CLI, and at least one spec system (SpecKit or OpenSpec) before installing GatomIA CLI.",
+	vscode:
+		"Install GitHub Copilot Chat, Copilot CLI, and at least one spec system (SpecKit or OpenSpec) before installing GatomIA CLI.",
+	"vscode-insiders":
+		"Install GitHub Copilot Chat, Copilot CLI, and at least one spec system (SpecKit or OpenSpec) before installing GatomIA CLI.",
+	vscodium:
+		"Install GitHub Copilot Chat, Copilot CLI, and at least one spec system (SpecKit or OpenSpec) before installing GatomIA CLI.",
+	positron:
+		"Install GitHub Copilot Chat, Copilot CLI, and at least one spec system (SpecKit or OpenSpec) before installing GatomIA CLI.",
+	unknown:
+		"Install GitHub Copilot Chat, Copilot CLI, and at least one spec system (SpecKit or OpenSpec) before installing GatomIA CLI.",
+};
+
+const getGatomiaCliPrereqMessage = (ideHost: IdeHost): string =>
+	GATOMIA_CLI_PREREQ_MESSAGES[ideHost];
+
+const isProviderInstalled = (
+	ideHost: IdeHost,
+	deps: DependencyStatus
+): boolean => {
+	if (ideHost === "windsurf") {
+		return deps.devinCli?.installed ?? false;
+	}
+	if (ideHost === "antigravity") {
+		return deps.geminiCli?.installed ?? false;
+	}
+	return deps.copilotChat.installed && deps.copilotCli.installed;
+};
+
 export class WelcomeScreenProvider {
 	private readonly context: ExtensionContext;
 	private readonly outputChannel: OutputChannel;
 	private readonly dependencyChecker: DependencyChecker;
 	private readonly systemDiagnostics: SystemDiagnostics;
 	private readonly learningResources: LearningResources;
+	private installTerminal: Terminal | undefined;
 
 	constructor(context: ExtensionContext, outputChannel: OutputChannel) {
 		this.context = context;
@@ -122,6 +172,7 @@ export class WelcomeScreenProvider {
 			hasShownBefore: hasShownWelcomeBefore(this.context),
 			dontShowOnStartup: getDontShowOnStartup(this.context),
 			currentView: "setup",
+			ideHost: detectIdeHost(),
 			extensionVersion,
 			vscodeVersion: version,
 			dependencies,
@@ -302,15 +353,14 @@ export class WelcomeScreenProvider {
 
 			case "gatomia-cli": {
 				const dependencies = await this.dependencyChecker.checkAll();
+				const ideHost = detectIdeHost();
+				const providerInstalled = isProviderInstalled(ideHost, dependencies);
 				const prerequisitesMet =
-					dependencies.copilotChat.installed &&
-					dependencies.copilotCli.installed &&
+					providerInstalled &&
 					(dependencies.speckit.installed || dependencies.openspec.installed);
 
 				if (!prerequisitesMet) {
-					window.showWarningMessage(
-						"Install GitHub Copilot Chat, Copilot CLI, and at least one spec system (SpecKit or OpenSpec) before installing GatomIA CLI."
-					);
+					window.showWarningMessage(getGatomiaCliPrereqMessage(ideHost));
 					return;
 				}
 
@@ -329,12 +379,225 @@ export class WelcomeScreenProvider {
 					});
 				break;
 			}
+			case "devin-cli":
+				await env.clipboard.writeText(
+					"curl -fsSL https://install.devin.ai/install.sh | sh"
+				);
+				window
+					.showInformationMessage(
+						"Devin CLI install command copied to clipboard. Paste and run in your terminal.",
+						"Open Terminal",
+						"Open Docs"
+					)
+					.then((selection) => {
+						if (selection === "Open Terminal") {
+							commands.executeCommand("workbench.action.terminal.new");
+						} else if (selection === "Open Docs") {
+							env.openExternal(
+								Uri.parse("https://cli.devin.ai/docs/installation")
+							);
+						}
+					});
+				break;
+
+			case "gemini-cli":
+				await env.clipboard.writeText("npm install -g @google/gemini-cli");
+				window
+					.showInformationMessage(
+						"Gemini CLI install command copied to clipboard. Paste and run in your terminal.",
+						"Open Terminal"
+					)
+					.then((selection) => {
+						if (selection === "Open Terminal") {
+							commands.executeCommand("workbench.action.terminal.new");
+						}
+					});
+				break;
+
 			default:
 				// Should never reach here due to TypeScript type checking
 				this.outputChannel.appendLine(
 					`[WelcomeScreenProvider] Unknown dependency: ${dependency}`
 				);
 		}
+	}
+
+	/**
+	 * Install all missing dependencies automatically.
+	 *
+	 * Resolves the ordered install queue (including transitive prereqs such as
+	 * UV or Node.js), then dispatches each step:
+	 *
+	 * - `terminal` steps are sent to a dedicated `GatomIA - Setup` terminal.
+	 * - `vscode-command` steps invoke the VS Code command API directly
+	 *   (used today for the Copilot Chat extension).
+	 * - `open-url` steps open the upstream install page (fallback when no
+	 *   canonical shell command is available, e.g. Devin CLI on Windows).
+	 *
+	 * Progress is reported to the webview via `welcome/install-progress`
+	 * messages. After all steps are dispatched a delayed dependency re-probe
+	 * refreshes the UI.
+	 */
+	async installMissingDependencies(
+		dependencies: InstallableDependency[],
+		panel: WelcomeScreenPanel
+	): Promise<void> {
+		if (dependencies.length === 0) {
+			return;
+		}
+
+		const platform = process.platform as Platform;
+		const queue = resolveMissingWithPrereqs(dependencies, platform);
+
+		this.outputChannel.appendLine(
+			`[WelcomeScreenProvider] Installing ${dependencies.length} dependencies (${queue.length} steps) on ${platform}: ${dependencies.join(", ")}`
+		);
+
+		await this.runInstallSteps(queue, panel, "install-missing");
+	}
+
+	/**
+	 * Install a single system prerequisite (Node.js, Python, or uv).
+	 *
+	 * Shares the same progress-reporting and terminal-dispatch flow as
+	 * {@link installMissingDependencies}, but runs exactly one step so the
+	 * user can trigger a targeted install from the System Prerequisites card.
+	 */
+	async installPrerequisite(
+		prerequisite: SystemPrerequisiteKey,
+		panel: WelcomeScreenPanel
+	): Promise<void> {
+		const platform = process.platform as Platform;
+		const step = getPrerequisiteInstallStep(prerequisite, platform);
+
+		this.outputChannel.appendLine(
+			`[WelcomeScreenProvider] Installing prerequisite ${prerequisite} on ${platform}`
+		);
+
+		await this.runInstallSteps([step], panel, "install-prerequisite");
+	}
+
+	/**
+	 * Dispatches a queue of install steps through the GatomIA setup terminal
+	 * (or vscode-command/open-url equivalents), reports progress back to the
+	 * webview, and triggers a delayed dependency re-probe once the queue is
+	 * flushed. Each failure is surfaced via `welcome/install-progress` with
+	 * `status: "error"` and aggregated into the final
+	 * `welcome/install-all-finished` message.
+	 *
+	 * @param queue ordered install steps to execute
+	 * @param panel target webview panel for progress messages
+	 * @param source diagnostic source label (e.g. `install-missing`)
+	 */
+	private async runInstallSteps(
+		queue: InstallStep[],
+		panel: WelcomeScreenPanel,
+		source: string
+	): Promise<void> {
+		let errored = false;
+		for (const step of queue) {
+			try {
+				await panel.postMessage({
+					type: "welcome/install-progress",
+					stepId: step.id,
+					status: "started",
+					message: step.label,
+				});
+
+				await this.runInstallStep(step);
+
+				await panel.postMessage({
+					type: "welcome/install-progress",
+					stepId: step.id,
+					status: "finished",
+				});
+			} catch (error) {
+				errored = true;
+				const message = error instanceof Error ? error.message : String(error);
+				this.outputChannel.appendLine(
+					`[WelcomeScreenProvider] Install step ${step.id} failed: ${message}`
+				);
+				this.systemDiagnostics.recordError(
+					"error",
+					`Failed to install step ${step.id}: ${message}`,
+					source,
+					"Check the output channel and try running the install command manually."
+				);
+				await panel.postMessage({
+					type: "welcome/install-progress",
+					stepId: step.id,
+					status: "error",
+					message,
+				});
+			}
+		}
+
+		await panel.postMessage({
+			type: "welcome/install-all-finished",
+			errored,
+		});
+
+		// Schedule a delayed re-probe so the UI reflects newly installed tools
+		// once terminal commands have had a chance to finish.
+		setTimeout(() => {
+			this.refreshDependencies(panel).catch((error: unknown) => {
+				const message = error instanceof Error ? error.message : String(error);
+				this.outputChannel.appendLine(
+					`[WelcomeScreenProvider] Post-install reprobe failed: ${message}`
+				);
+			});
+		}, POST_INSTALL_REPROBE_DELAY_MS);
+	}
+
+	private async runInstallStep(step: InstallStep): Promise<void> {
+		switch (step.kind) {
+			case "vscode-command": {
+				if (!step.vscodeCommand) {
+					throw new Error(
+						`Install step ${step.id} has kind=vscode-command but no vscodeCommand`
+					);
+				}
+				await commands.executeCommand(
+					step.vscodeCommand,
+					...(step.vscodeArgs ?? [])
+				);
+				return;
+			}
+			case "open-url": {
+				if (!step.url) {
+					throw new Error(
+						`Install step ${step.id} has kind=open-url but no url`
+					);
+				}
+				await env.openExternal(Uri.parse(step.url));
+				return;
+			}
+			case "terminal": {
+				if (!step.command) {
+					throw new Error(
+						`Install step ${step.id} has kind=terminal but no command`
+					);
+				}
+				const terminal = this.getOrCreateInstallTerminal();
+				terminal.show(true);
+				terminal.sendText(step.command, true);
+				return;
+			}
+			default: {
+				const _exhaustive: never = step.kind;
+				return _exhaustive;
+			}
+		}
+	}
+
+	private getOrCreateInstallTerminal(): Terminal {
+		if (this.installTerminal && !this.installTerminal.exitStatus) {
+			return this.installTerminal;
+		}
+		this.installTerminal = window.createTerminal({
+			name: INSTALL_TERMINAL_NAME,
+		});
+		return this.installTerminal;
 	}
 
 	/**
@@ -704,6 +967,20 @@ export class WelcomeScreenProvider {
 					`[WelcomeScreenProvider] Search resources: ${query}`
 				);
 				// Placeholder for future search implementation
+			},
+			// Handle welcome/install-prerequisite message
+			onInstallPrerequisite: async (prerequisite: SystemPrerequisiteKey) => {
+				this.outputChannel.appendLine(
+					`[WelcomeScreenProvider] Install prerequisite: ${prerequisite}`
+				);
+				await this.installPrerequisite(prerequisite, getPanel());
+			},
+			// Handle welcome/install-missing-dependencies message
+			onInstallMissingDependencies: async (deps: InstallableDependency[]) => {
+				this.outputChannel.appendLine(
+					`[WelcomeScreenProvider] Install missing dependencies: ${deps.join(", ")}`
+				);
+				await this.installMissingDependencies(deps, getPanel());
 			},
 			// Setter for panel reference (called by extension.ts after panel creation)
 			setPanel: (panel: WelcomeScreenPanel) => {

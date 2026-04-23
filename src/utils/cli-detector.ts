@@ -1,7 +1,7 @@
 /**
  * CLI Detector Utility
  * Shared dependency detection logic with extended PATH support
- * Used by both DependenciesViewProvider and DependencyChecker
+ * Used by DependencyChecker and the Welcome Screen provider
  */
 
 import { exec } from "node:child_process";

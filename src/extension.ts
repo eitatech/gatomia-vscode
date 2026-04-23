@@ -60,7 +60,6 @@ import { KnownAgentPreferencesService } from "./features/hooks/services/known-ag
 import { KNOWN_AGENTS } from "./features/hooks/services/known-agent-catalog";
 import { HookViewProvider } from "./providers/hook-view-provider";
 import { HooksExplorerProvider } from "./providers/hooks-explorer-provider";
-import { DependenciesViewProvider } from "./providers/dependencies-view-provider";
 import { DocumentPreviewPanel } from "./panels/document-preview-panel";
 import { DocumentPreviewService } from "./services/document-preview-service";
 import { RefinementGateway } from "./services/refinement-gateway";
@@ -113,7 +112,6 @@ let commandCompletionDetector: CommandCompletionDetector;
 let mcpDiscoveryService: MCPDiscoveryService;
 let agentRegistry: AgentRegistry;
 let hookViewProvider: HookViewProvider;
-let dependenciesViewProvider: DependenciesViewProvider;
 let documentPreviewPanel: DocumentPreviewPanel;
 let documentPreviewService: DocumentPreviewService;
 let refinementGateway: RefinementGateway;
@@ -292,12 +290,6 @@ export async function activate(context: ExtensionContext) {
 		knownAgentDetector,
 	});
 	hookViewProvider.initialize();
-
-	// Initialize Dependencies View Provider
-	dependenciesViewProvider = new DependenciesViewProvider(
-		context,
-		outputChannel
-	);
 
 	documentPreviewService = new DocumentPreviewService(outputChannel, context);
 	refinementGateway = new RefinementGateway(outputChannel);
@@ -545,8 +537,7 @@ Tasks:
 		{ dispose: () => modelCacheService.dispose() },
 		{ dispose: () => hookViewProvider.dispose() },
 		{ dispose: () => hooksExplorer.dispose() },
-		{ dispose: () => quickAccessExplorer.dispose() },
-		{ dispose: () => dependenciesViewProvider.dispose() }
+		{ dispose: () => quickAccessExplorer.dispose() }
 	);
 
 	// Register commands
@@ -1683,9 +1674,33 @@ function registerCommands({
 			env.openExternal(Uri.parse(installUrl));
 		}),
 
-		commands.registerCommand("gatomia.dependencies.check", async () => {
-			outputChannel.appendLine("Opening dependencies checker...");
-			await dependenciesViewProvider.show();
+		commands.registerCommand("gatomia.dependencies.check", () => {
+			outputChannel.appendLine(
+				"Opening Welcome Screen (Setup) via Install Dependencies command..."
+			);
+			try {
+				const welcomeProvider = new WelcomeScreenProvider(
+					context,
+					outputChannel
+				);
+				const callbacks = welcomeProvider.getCallbacks();
+				const panel = WelcomeScreenPanel.show(
+					context,
+					outputChannel,
+					callbacks
+				);
+				if (callbacks.setPanel) {
+					callbacks.setPanel(panel);
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				outputChannel.appendLine(
+					`[Welcome] Failed to open from gatomia.dependencies.check: ${message}`
+				);
+				window.showErrorMessage(
+					`Failed to open Install Dependencies: ${message}`
+				);
+			}
 		}),
 
 		commands.registerCommand("gatomia.showWelcome", () => {

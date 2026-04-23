@@ -7,12 +7,36 @@
 // Core State Types
 // ============================================================================
 
+export type IdeHost =
+	| "windsurf"
+	| "antigravity"
+	| "cursor"
+	| "vscode"
+	| "vscode-insiders"
+	| "vscodium"
+	| "positron"
+	| "unknown";
+
 export type ViewSection =
 	| "setup"
 	| "features"
 	| "configuration"
 	| "status"
 	| "learning";
+
+export interface AcpCliStatus {
+	installed: boolean;
+	version: string | null;
+	authenticated?: boolean;
+	acpSupported?: boolean;
+}
+
+export type SystemPrerequisiteKey = "node" | "python" | "uv";
+
+export interface SystemPrerequisiteStatus {
+	installed: boolean;
+	version: string | null;
+}
 
 export interface DependencyStatus {
 	copilotChat: {
@@ -36,6 +60,13 @@ export interface DependencyStatus {
 		installed: boolean;
 		version: string | null;
 	};
+	devinCli?: AcpCliStatus;
+	geminiCli?: AcpCliStatus;
+	/**
+	 * System-level prerequisites (Node.js, Python, uv) required for most
+	 * tool installs. Optional so older fixtures remain valid.
+	 */
+	prerequisites?: Record<SystemPrerequisiteKey, SystemPrerequisiteStatus>;
 	lastChecked: number;
 }
 
@@ -44,7 +75,17 @@ export type InstallableDependency =
 	| "speckit"
 	| "openspec"
 	| "copilot-cli"
-	| "gatomia-cli";
+	| "gatomia-cli"
+	| "devin-cli"
+	| "gemini-cli";
+
+export type InstallStatus = "started" | "running" | "finished" | "error";
+
+export interface InstallProgressData {
+	stepId: string;
+	status: InstallStatus;
+	message?: string;
+}
 
 export interface ConfigurationItem {
 	key: string;
@@ -108,11 +149,14 @@ export interface WelcomeScreenState {
 	hasShownBefore: boolean;
 	dontShowOnStartup: boolean;
 	currentView: ViewSection;
+	ideHost: IdeHost;
 	dependencies: DependencyStatus;
 	configuration: ConfigurationState;
 	diagnostics: SystemDiagnostic[];
 	learningResources: LearningResource[];
 	featureActions: FeatureAction[];
+	extensionVersion?: string;
+	vscodeVersion?: string;
 }
 
 // ============================================================================
@@ -152,9 +196,14 @@ export interface WelcomeErrorData {
 
 export interface SetupSectionProps {
 	dependencies: DependencyStatus;
+	ideHost: IdeHost;
+	isInstallingAll?: boolean;
 	onInstallDependency: (dependency: InstallableDependency) => void;
+	onInstallMissing: (dependencies: InstallableDependency[]) => void;
+	onInstallPrerequisite: (prerequisite: SystemPrerequisiteKey) => void;
 	onRefreshDependencies: () => void;
 	onNavigateNext: () => void;
+	isRefreshing?: boolean;
 }
 
 export interface FeaturesSectionProps {
@@ -171,9 +220,12 @@ export interface ConfigSectionProps {
 export interface StatusSectionProps {
 	extensionVersion: string;
 	vscodeVersion: string;
+	ideHost: IdeHost;
 	dependencies: DependencyStatus;
 	diagnostics: SystemDiagnostic[];
 	onInstallDependency: (dependency: InstallableDependency) => void;
+	onInstallPrerequisite?: (prerequisite: SystemPrerequisiteKey) => void;
+	onOpenExternal?: (url: string) => void;
 }
 
 export interface LearningSectionProps {

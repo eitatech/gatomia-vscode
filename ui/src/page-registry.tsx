@@ -23,11 +23,6 @@ const SimpleView = lazy(() =>
 const HooksView = lazy(() =>
 	import("./features/hooks-view").then((m) => ({ default: m.HooksView }))
 );
-const DependenciesView = lazy(() =>
-	import("./features/dependencies-view").then((m) => ({
-		default: m.DependenciesView,
-	}))
-);
 const PreviewApp = lazy(() =>
 	import("./features/preview/preview-app").then((m) => ({
 		default: m.PreviewApp,
@@ -45,7 +40,6 @@ export type SupportedPage =
 	| "create-spec"
 	| "create-steering"
 	| "hooks"
-	| "dependencies"
 	| "document-preview"
 	| "welcome-screen";
 
@@ -79,7 +73,6 @@ const pageRenderers = {
 	"create-spec": () => withSuspense(CreateSpecView),
 	"create-steering": () => withSuspense(CreateSteeringView),
 	hooks: () => withSuspense(HooksView),
-	dependencies: () => withSuspense(DependenciesView),
 	"document-preview": () => withSuspense(PreviewApp),
 	"welcome-screen": () => (
 		<Suspense fallback={<LoadingFallback />}>
