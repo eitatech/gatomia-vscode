@@ -133,7 +133,25 @@ export interface LearningResource {
 	estimatedMinutes: number | null;
 }
 
-export type FeatureArea = "Specs" | "Prompts" | "Hooks" | "Steering";
+/**
+ * High-level grouping for quick-action cards rendered in the Welcome Screen
+ * "Features" tab. Must stay in sync with the extension-side `FeatureArea`
+ * union in `src/types/welcome.ts`.
+ *
+ * @remarks
+ * `Chat Provider` is only emitted by the provider on ACP-capable IDE hosts
+ * (Windsurf / Antigravity); the UI simply renders whatever areas it receives.
+ */
+export type FeatureArea =
+	| "Specs"
+	| "SpecKit Workflow"
+	| "Actions"
+	| "Hooks"
+	| "Steering"
+	| "Cloud Agents"
+	| "Chat Provider"
+	| "Documentation"
+	| "Configuration";
 
 export interface FeatureAction {
 	id: string;

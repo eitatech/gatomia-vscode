@@ -160,6 +160,7 @@ export class WelcomeScreenProvider {
 	async getWelcomeState(): Promise<WelcomeScreenState> {
 		const dependencies = await this.dependencyChecker.checkAll();
 		const configuration = this.getConfiguration();
+		const ideHost = detectIdeHost();
 
 		// Lazily load learning resources
 		this.learningResources.loadResources(this.context.extensionPath);
@@ -172,14 +173,14 @@ export class WelcomeScreenProvider {
 			hasShownBefore: hasShownWelcomeBefore(this.context),
 			dontShowOnStartup: getDontShowOnStartup(this.context),
 			currentView: "setup",
-			ideHost: detectIdeHost(),
+			ideHost,
 			extensionVersion,
 			vscodeVersion: version,
 			dependencies,
 			configuration,
 			diagnostics: this.systemDiagnostics.getRecentDiagnostics(),
 			learningResources: this.learningResources.getAll(),
-			featureActions: this.getFeatureActions(),
+			featureActions: this.getFeatureActions(ideHost),
 		};
 	}
 
@@ -727,11 +728,26 @@ export class WelcomeScreenProvider {
 	}
 
 	/**
-	 * Get feature actions for welcome screen
+	 * Get feature actions for welcome screen.
+	 *
+	 * Returns a comprehensive set of quick-action cards mirroring every
+	 * top-level command contributed by the extension's `package.json`. Actions
+	 * are grouped by `FeatureArea` and the UI renders them in a stable order
+	 * defined by `FEATURE_AREA_ORDER` on the webview side.
+	 *
+	 * IDE-awareness:
+	 * - `Chat Provider` actions (ACP routing) are emitted only on Windsurf /
+	 *   Antigravity hosts where GatomIA forwards prompts through the Agent
+	 *   Client Protocol rather than the built-in Copilot Chat window.
+	 *
+	 * @param ideHost Detected IDE host; drives conditional inclusion of the
+	 *                `Chat Provider` area.
 	 */
-	private getFeatureActions(): FeatureAction[] {
-		return [
-			// Specs (T046)
+	private getFeatureActions(ideHost: IdeHost): FeatureAction[] {
+		const acpHost = ideHost === "windsurf" || ideHost === "antigravity";
+
+		const actions: FeatureAction[] = [
+			// Specs — spec lifecycle entrypoints
 			{
 				id: "create-spec",
 				featureArea: "Specs",
@@ -742,15 +758,145 @@ export class WelcomeScreenProvider {
 				icon: "codicon-file-add",
 			},
 			{
-				id: "view-specs",
+				id: "refresh-specs",
 				featureArea: "Specs",
 				label: "Refresh Specs",
-				description: "Reload specification list",
+				description: "Reload the Specs tree view from disk",
 				commandId: "gatomia.spec.refresh",
 				enabled: true,
 				icon: "codicon-refresh",
 			},
-			// Actions (T047)
+
+			// SpecKit Workflow — ordered by the canonical SDD pipeline
+			{
+				id: "speckit-constitution",
+				featureArea: "SpecKit Workflow",
+				label: "Create Constitution",
+				description:
+					"Draft the project constitution (principles and non-negotiables)",
+				commandId: "gatomia.speckit.constitution",
+				enabled: true,
+				icon: "codicon-book",
+			},
+			{
+				id: "speckit-specify",
+				featureArea: "SpecKit Workflow",
+				label: "Specify Feature",
+				description: "Describe a feature and generate its specification",
+				commandId: "gatomia.speckit.specify",
+				enabled: true,
+				icon: "codicon-note",
+			},
+			{
+				id: "speckit-clarify",
+				featureArea: "SpecKit Workflow",
+				label: "Clarify Requirements",
+				description: "Resolve ambiguities by asking targeted questions",
+				commandId: "gatomia.speckit.clarify",
+				enabled: true,
+				icon: "codicon-comment-discussion",
+			},
+			{
+				id: "speckit-plan",
+				featureArea: "SpecKit Workflow",
+				label: "Plan Feature",
+				description: "Generate the implementation plan and design artifacts",
+				commandId: "gatomia.speckit.plan",
+				enabled: true,
+				icon: "codicon-list-tree",
+			},
+			{
+				id: "speckit-research",
+				featureArea: "SpecKit Workflow",
+				label: "Research Feature",
+				description: "Gather external context and prior art for the spec",
+				commandId: "gatomia.speckit.research",
+				enabled: true,
+				icon: "codicon-search",
+			},
+			{
+				id: "speckit-datamodel",
+				featureArea: "SpecKit Workflow",
+				label: "Define Data Model",
+				description: "Design entities, fields, and relationships",
+				commandId: "gatomia.speckit.datamodel",
+				enabled: true,
+				icon: "codicon-symbol-array",
+			},
+			{
+				id: "speckit-design",
+				featureArea: "SpecKit Workflow",
+				label: "Create Design",
+				description: "Define architecture and module boundaries",
+				commandId: "gatomia.speckit.design",
+				enabled: true,
+				icon: "codicon-symbol-structure",
+			},
+			{
+				id: "speckit-tasks",
+				featureArea: "SpecKit Workflow",
+				label: "Generate Tasks",
+				description: "Break the plan into an ordered task list",
+				commandId: "gatomia.speckit.tasks",
+				enabled: true,
+				icon: "codicon-tasklist",
+			},
+			{
+				id: "speckit-analyze",
+				featureArea: "SpecKit Workflow",
+				label: "Analyze Spec Quality",
+				description: "Cross-check spec, plan, and tasks for consistency",
+				commandId: "gatomia.speckit.analyze",
+				enabled: true,
+				icon: "codicon-graph",
+			},
+			{
+				id: "speckit-checklist",
+				featureArea: "SpecKit Workflow",
+				label: "Run Checklist",
+				description: "Apply a quality-gate checklist to the current feature",
+				commandId: "gatomia.speckit.checklist",
+				enabled: true,
+				icon: "codicon-checklist",
+			},
+			{
+				id: "speckit-taskstoissues",
+				featureArea: "SpecKit Workflow",
+				label: "Convert Tasks to Issues",
+				description: "Promote tasks into trackable GitHub issues",
+				commandId: "gatomia.speckit.taskstoissues",
+				enabled: true,
+				icon: "codicon-git-pull-request",
+			},
+			{
+				id: "speckit-implementation",
+				featureArea: "SpecKit Workflow",
+				label: "Implement Feature",
+				description: "Execute the task list to implement the feature",
+				commandId: "gatomia.speckit.implementation",
+				enabled: true,
+				icon: "codicon-play",
+			},
+			{
+				id: "speckit-unit-test",
+				featureArea: "SpecKit Workflow",
+				label: "Create Unit Tests",
+				description: "Generate unit tests covering the current module",
+				commandId: "gatomia.speckit.unit-test",
+				enabled: true,
+				icon: "codicon-beaker",
+			},
+			{
+				id: "speckit-integration-test",
+				featureArea: "SpecKit Workflow",
+				label: "Create Integration Tests",
+				description: "Generate integration tests for end-to-end flows",
+				commandId: "gatomia.speckit.integration-test",
+				enabled: true,
+				icon: "codicon-beaker-stop",
+			},
+
+			// Actions — prompts, agents, skills
 			{
 				id: "create-prompt",
 				featureArea: "Actions",
@@ -759,6 +905,15 @@ export class WelcomeScreenProvider {
 				commandId: "gatomia.actions.create",
 				enabled: true,
 				icon: "codicon-add",
+			},
+			{
+				id: "create-copilot-prompt",
+				featureArea: "Actions",
+				label: "Create Prompt (Built-in)",
+				description: "Create a Copilot built-in prompt file",
+				commandId: "gatomia.actions.createCopilotPrompt",
+				enabled: true,
+				icon: "codicon-sparkle",
 			},
 			{
 				id: "create-agent",
@@ -782,12 +937,13 @@ export class WelcomeScreenProvider {
 				id: "refresh-actions",
 				featureArea: "Actions",
 				label: "Refresh Actions",
-				description: "Reload actions from workspace",
+				description: "Reload actions from the workspace",
 				commandId: "gatomia.actions.refresh",
 				enabled: true,
 				icon: "codicon-refresh",
 			},
-			// Hooks (T048)
+
+			// Hooks — automation
 			{
 				id: "add-hook",
 				featureArea: "Hooks",
@@ -801,31 +957,257 @@ export class WelcomeScreenProvider {
 				id: "view-hook-logs",
 				featureArea: "Hooks",
 				label: "View Hook Logs",
-				description: "Check hook execution history",
+				description: "Inspect hook execution history",
 				commandId: "gatomia.hooks.viewLogs",
 				enabled: true,
 				icon: "codicon-output",
 			},
-			// Steering (T049)
+			{
+				id: "refresh-hooks",
+				featureArea: "Hooks",
+				label: "Refresh Hooks",
+				description: "Reload hooks from workspace state",
+				commandId: "gatomia.hooks.refresh",
+				enabled: true,
+				icon: "codicon-refresh",
+			},
+			{
+				id: "export-hooks",
+				featureArea: "Hooks",
+				label: "Export Hooks",
+				description: "Export hook configurations to a JSON file",
+				commandId: "gatomia.hooks.export",
+				enabled: true,
+				icon: "codicon-cloud-upload",
+			},
+			{
+				id: "import-hooks",
+				featureArea: "Hooks",
+				label: "Import Hooks",
+				description: "Import hook configurations from a JSON file",
+				commandId: "gatomia.hooks.import",
+				enabled: true,
+				icon: "codicon-cloud-download",
+			},
+
+			// Steering — rules and constitution
 			{
 				id: "create-project-rule",
 				featureArea: "Steering",
 				label: "Create Project Rule",
-				description: "Define project-level steering rules",
+				description: "Define workspace-scoped steering rules",
 				commandId: "gatomia.steering.createProjectRule",
 				enabled: true,
-				icon: "codicon-folder",
+				icon: "codicon-root-folder",
 			},
 			{
 				id: "create-user-rule",
 				featureArea: "Steering",
 				label: "Create User Rule",
-				description: "Define user-level steering rules",
+				description: "Define user-scoped steering rules",
 				commandId: "gatomia.steering.createUserRule",
 				enabled: true,
 				icon: "codicon-person",
 			},
+			{
+				id: "create-constitution",
+				featureArea: "Steering",
+				label: "Create Constitution",
+				description: "Draft the project constitution from steering inputs",
+				commandId: "gatomia.steering.createConstitution",
+				enabled: true,
+				icon: "codicon-book",
+			},
+			{
+				id: "steering-global-access",
+				featureArea: "Steering",
+				label: "Global Access Settings",
+				description: "Manage global resource access for agents",
+				commandId: "gatomia.steering.openGlobalResourceAccessSettings",
+				enabled: true,
+				icon: "codicon-shield",
+			},
+			{
+				id: "refresh-steering",
+				featureArea: "Steering",
+				label: "Refresh Steering",
+				description: "Reload steering rules from disk",
+				commandId: "gatomia.steering.refresh",
+				enabled: true,
+				icon: "codicon-refresh",
+			},
+
+			// Cloud Agents — remote execution providers
+			{
+				id: "cloud-select-provider",
+				featureArea: "Cloud Agents",
+				label: "Select Provider",
+				description: "Choose a cloud agent provider (Devin, Copilot, ...)",
+				commandId: "gatomia.selectProvider",
+				enabled: true,
+				icon: "codicon-cloud",
+			},
+			{
+				id: "cloud-change-provider",
+				featureArea: "Cloud Agents",
+				label: "Change Provider",
+				description: "Switch between configured cloud agent providers",
+				commandId: "gatomia.changeProvider",
+				enabled: true,
+				icon: "codicon-arrow-swap",
+			},
+			{
+				id: "cloud-configure-provider",
+				featureArea: "Cloud Agents",
+				label: "Configure Credentials",
+				description: "Set API keys and credentials for the active provider",
+				commandId: "gatomia.configureProvider",
+				enabled: true,
+				icon: "codicon-key",
+			},
+			{
+				id: "cloud-refresh-sessions",
+				featureArea: "Cloud Agents",
+				label: "Refresh Sessions",
+				description: "Reload the list of cloud agent sessions",
+				commandId: "gatomia.refreshCloudAgents",
+				enabled: true,
+				icon: "codicon-refresh",
+			},
 		];
+
+		// Chat Provider — ACP routing (Windsurf / Antigravity only)
+		if (acpHost) {
+			actions.push(
+				{
+					id: "acp-switch-provider",
+					featureArea: "Chat Provider",
+					label: "Switch Chat Provider",
+					description: "Route prompts through a different ACP backend",
+					commandId: "gatomia.acp.switchProvider",
+					enabled: true,
+					icon: "codicon-arrow-swap",
+				},
+				{
+					id: "acp-reprobe",
+					featureArea: "Chat Provider",
+					label: "Re-probe Providers",
+					description: "Re-detect Devin / Gemini CLI availability",
+					commandId: "gatomia.acp.reprobeAll",
+					enabled: true,
+					icon: "codicon-refresh",
+				},
+				{
+					id: "acp-show-output",
+					featureArea: "Chat Provider",
+					label: "Show ACP Output",
+					description: "Open the Agent Client Protocol output channel",
+					commandId: "gatomia.acp.showOutput",
+					enabled: true,
+					icon: "codicon-output",
+				},
+				{
+					id: "acp-cancel-active",
+					featureArea: "Chat Provider",
+					label: "Cancel Active Session",
+					description: "Stop the currently running ACP chat session",
+					commandId: "gatomia.acp.cancelActive",
+					enabled: true,
+					icon: "codicon-debug-stop",
+				}
+			);
+		}
+
+		// Documentation — repo wiki and help
+		actions.push(
+			{
+				id: "wiki-show-toc",
+				featureArea: "Documentation",
+				label: "Show Table of Contents",
+				description: "Browse the repository wiki index",
+				commandId: "gatomia.wiki.showToc",
+				enabled: true,
+				icon: "codicon-list-unordered",
+			},
+			{
+				id: "wiki-update-all",
+				featureArea: "Documentation",
+				label: "Sync All Documents",
+				description: "Regenerate all wiki documents from sources",
+				commandId: "gatomia.wiki.updateAll",
+				enabled: true,
+				icon: "codicon-sync",
+			},
+			{
+				id: "wiki-refresh",
+				featureArea: "Documentation",
+				label: "Refresh Wiki",
+				description: "Reload the repo wiki tree view",
+				commandId: "gatomia.wiki.refresh",
+				enabled: true,
+				icon: "codicon-refresh",
+			},
+			{
+				id: "help-open",
+				featureArea: "Documentation",
+				label: "Open Help",
+				description: "Read the GatomIA documentation and user guide",
+				commandId: "gatomia.help.open",
+				enabled: true,
+				icon: "codicon-question",
+			}
+		);
+
+		// Configuration — settings and environment
+		actions.push(
+			{
+				id: "settings-open",
+				featureArea: "Configuration",
+				label: "Open Settings",
+				description: "Open the GatomIA settings page",
+				commandId: "gatomia.settings.open",
+				enabled: true,
+				icon: "codicon-gear",
+			},
+			{
+				id: "settings-select-spec-system",
+				featureArea: "Configuration",
+				label: "Select Spec System",
+				description: "Pick between SpecKit, OpenSpec, or auto-detect",
+				commandId: "gatomia.settings.selectSpecSystem",
+				enabled: true,
+				icon: "codicon-settings-gear",
+			},
+			{
+				id: "settings-open-mcp-config",
+				featureArea: "Configuration",
+				label: "Open MCP Config",
+				description: "Edit the mcp.json configuration file",
+				commandId: "gatomia.settings.openGlobalConfig",
+				enabled: true,
+				icon: "codicon-json",
+			},
+			{
+				id: "dependencies-check",
+				featureArea: "Configuration",
+				label: "Install Dependencies",
+				description: "Review and install missing tooling dependencies",
+				commandId: "gatomia.dependencies.check",
+				enabled: true,
+				icon: "codicon-desktop-download",
+			},
+			{
+				id: "show-welcome",
+				featureArea: "Configuration",
+				label: "Reopen Welcome Screen",
+				description: "Show the GatomIA welcome screen from scratch",
+				commandId: "gatomia.showWelcome",
+				enabled: true,
+				icon: "codicon-home",
+			}
+		);
+
+		return actions;
 	}
 
 	/**

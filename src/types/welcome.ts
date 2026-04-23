@@ -274,9 +274,31 @@ export interface LearningResource {
 	estimatedMinutes: number | null;
 }
 
+/**
+ * High-level grouping for quick-action cards rendered in the Welcome Screen
+ * "Features" tab. The order of this union is not guaranteed to match render
+ * order; the UI keeps its own `FEATURE_AREA_ORDER` list to ensure a stable
+ * presentation regardless of how the provider emits actions.
+ *
+ * @remarks
+ * `Chat Provider` is only populated on ACP-capable IDE hosts (Windsurf /
+ * Antigravity) where GatomIA routes prompts through the companion CLI via the
+ * Agent Client Protocol.
+ */
+export type FeatureArea =
+	| "Specs"
+	| "SpecKit Workflow"
+	| "Actions"
+	| "Hooks"
+	| "Steering"
+	| "Cloud Agents"
+	| "Chat Provider"
+	| "Documentation"
+	| "Configuration";
+
 export interface FeatureAction {
 	id: string;
-	featureArea: "Specs" | "Actions" | "Hooks" | "Steering";
+	featureArea: FeatureArea;
 	label: string;
 	description: string;
 	commandId: string;
