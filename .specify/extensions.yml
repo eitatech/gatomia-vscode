@@ -98,3 +98,11 @@ hooks:
     prompt: Check artifact sync status after specification?
     description: Show sync status after spec generation
     condition: null
+  before_specify:
+  - extension: tinyspec
+    command: speckit.tinyspec.classify
+    enabled: true
+    optional: true
+    prompt: Check if this task is small enough for the lightweight tinyspec workflow?
+    description: Auto-classify task complexity before starting the full SDD workflow
+    condition: null
