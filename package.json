@@ -103,6 +103,14 @@
           "default": true,
           "description": "Controls visibility of the Repo Wiki view in the activity bar."
         },
+        "gatomia.agentChat.maxConcurrentAcpSessions": {
+          "type": "integer",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Maximum number of concurrent ACP Agent Chat sessions. When reached, starting a new chat surfaces a QuickPick that lets you cancel an idle session or abort the start.",
+          "order": 50
+        },
         "gatomia.copilot.specsPath": {
           "type": "string",
           "default": "speckit",
@@ -875,6 +883,12 @@
         "title": "Open ACP Log Channel",
         "category": "GatomIA",
         "icon": "$(output)"
+      },
+      {
+        "command": "gatomia.agentChat.cleanupOrphanedWorktree",
+        "title": "Clean Up Orphaned Worktree",
+        "category": "GatomIA",
+        "icon": "$(trash)"
       }
     ],
     "menus": {
@@ -1110,6 +1124,11 @@
           "command": "gatomia.agentChat.openLogChannel",
           "when": "view == gatomia.views.runningAgents && (viewItem == agent-chat-session || viewItem == agent-chat-session-worktree || viewItem == agent-chat-group-active || viewItem == agent-chat-group-recent)",
           "group": "navigation@1"
+        },
+        {
+          "command": "gatomia.agentChat.cleanupOrphanedWorktree",
+          "when": "view == gatomia.views.runningAgents && viewItem == agent-chat-orphan-worktree",
+          "group": "inline@1"
         }
       ],
       "commandPalette": [

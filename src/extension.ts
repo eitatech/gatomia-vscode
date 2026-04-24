@@ -2620,6 +2620,9 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 		const { registerAgentChatCommands } = await import(
 			"./commands/agent-chat-commands"
 		);
+		const { promptForCapWarning } = await import(
+			"./features/agent-chat/cap-warning-prompt"
+		);
 
 		const archive = createVscodeArchiveWriter(context.globalStorageUri);
 		const store = new AgentChatSessionStore({
@@ -2634,6 +2637,15 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 		agentChatStore = store;
 		agentChatRegistry = registry;
 		context.subscriptions.push({ dispose: () => registry.dispose() });
+
+		// T073/T073a/T076: read the concurrency cap from settings and bridge
+		// the prompt helper + telemetry sink into the command deps.
+		const readConcurrentCap = () => {
+			const raw = workspace
+				.getConfiguration("gatomia.agentChat")
+				.get<number>("maxConcurrentAcpSessions");
+			return typeof raw === "number" && raw > 0 ? raw : 5;
+		};
 
 		const commandDisposables = registerAgentChatCommands({
 			registry,
@@ -2659,6 +2671,22 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 				// see this error surfaced in the command palette feedback.
 				throw new Error(
 					"agent-chat: startNew is not wired to a provider yet — open an existing session via openForSession"
+				);
+			},
+			get concurrentCap() {
+				return readConcurrentCap();
+			},
+			promptForCap: (opts) =>
+				promptForCapWarning({
+					...opts,
+					window: {
+						showQuickPick: window.showQuickPick.bind(window) as never,
+						showWarningMessage: window.showWarningMessage.bind(window) as never,
+					},
+				}),
+			emitTelemetry: (event, payload) => {
+				outputChannel.appendLine(
+					`[AgentChat][telemetry] ${event} ${JSON.stringify(payload)}`
 				);
 			},
 		});

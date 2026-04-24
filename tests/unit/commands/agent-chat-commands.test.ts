@@ -14,6 +14,7 @@ import {
 	handleOpenForSession,
 	handleStartNew,
 } from "../../../src/commands/agent-chat-commands";
+import type { CapWarningDecision } from "../../../src/features/agent-chat/cap-warning-prompt";
 import type { AgentChatSession } from "../../../src/features/agent-chat/types";
 
 // ---------------------------------------------------------------------------
@@ -135,6 +136,167 @@ describe("agent-chat-commands (T038)", () => {
 			expect(panelFactory).toHaveBeenCalledTimes(1);
 			expect(registry.attachPanel).toHaveBeenCalledTimes(1);
 			expect(panel.reveal).toHaveBeenCalledTimes(1);
+		});
+
+		// ----- T073/T073a/T076: concurrent-cap enforcement -----
+
+		it("short-circuits without starting when the user aborts at the cap prompt", async () => {
+			const { deps, startAcpSession, registry, panelFactory } = makeDeps();
+			const idle = makeSession({
+				id: "idle-1",
+				lifecycleState: "waiting-for-input",
+			});
+			const checkCapacity = vi.fn(() => ({
+				ok: false as const,
+				idleSessions: [idle],
+				cap: 5,
+			}));
+			const promptForCap = vi.fn(() =>
+				Promise.resolve<CapWarningDecision>({ kind: "abort" })
+			);
+			const emitTelemetry = vi.fn();
+
+			await handleStartNew(
+				{
+					...deps,
+					registry: {
+						...deps.registry,
+						checkCapacity,
+					} as unknown as AgentChatCommandsDeps["registry"],
+					concurrentCap: 5,
+					promptForCap,
+					emitTelemetry,
+				},
+				{
+					agentId: "claude-code",
+					agentDisplayName: "Claude Code",
+					agentCommand: "claude --acp",
+				}
+			);
+
+			expect(checkCapacity).toHaveBeenCalledWith("acp", 5);
+			expect(promptForCap).toHaveBeenCalledTimes(1);
+			expect(startAcpSession).not.toHaveBeenCalled();
+			expect(registry.registerSession).not.toHaveBeenCalled();
+			expect(panelFactory).not.toHaveBeenCalled();
+			expect(emitTelemetry).toHaveBeenCalledWith(
+				"agent-chat.concurrent-cap.hit",
+				expect.objectContaining({
+					decision: "abort",
+					cap: 5,
+					liveCount: 1,
+				})
+			);
+		});
+
+		it("cancels the chosen session and starts a new one when the user picks cancel-and-start", async () => {
+			const { deps, startAcpSession, runner, registry } = makeDeps();
+			const idle = makeSession({
+				id: "idle-1",
+				lifecycleState: "waiting-for-input",
+			});
+			const checkCapacity = vi
+				.fn()
+				// First call: cap reached.
+				.mockReturnValueOnce({
+					ok: false as const,
+					idleSessions: [idle],
+					cap: 5,
+				})
+				// Second call after cancel: cap available.
+				.mockReturnValueOnce({ ok: true as const });
+			const getRunner = vi.fn((id: string) =>
+				id === "idle-1" ? runner : undefined
+			);
+			const promptForCap = vi.fn(() =>
+				Promise.resolve<CapWarningDecision>({
+					kind: "cancel-and-start",
+					sessionIdToCancel: "idle-1",
+				})
+			);
+			const emitTelemetry = vi.fn();
+
+			await handleStartNew(
+				{
+					...deps,
+					registry: {
+						...deps.registry,
+						checkCapacity,
+						getRunner,
+					} as unknown as AgentChatCommandsDeps["registry"],
+					concurrentCap: 5,
+					promptForCap,
+					emitTelemetry,
+				},
+				{
+					agentId: "claude-code",
+					agentDisplayName: "Claude Code",
+					agentCommand: "claude --acp",
+				}
+			);
+
+			expect(runner.cancel).toHaveBeenCalledTimes(1);
+			expect(startAcpSession).toHaveBeenCalledTimes(1);
+			expect(registry.registerSession).toHaveBeenCalledTimes(1);
+			expect(emitTelemetry).toHaveBeenCalledWith(
+				"agent-chat.concurrent-cap.hit",
+				expect.objectContaining({
+					decision: "cancel-and-start",
+					sessionIdToCancel: "idle-1",
+				})
+			);
+		});
+
+		it("cancels the chosen session and does NOT start a new one when the user picks cancel-only", async () => {
+			const { deps, startAcpSession, runner } = makeDeps();
+			const idle = makeSession({
+				id: "idle-1",
+				lifecycleState: "waiting-for-input",
+			});
+			const checkCapacity = vi.fn(() => ({
+				ok: false as const,
+				idleSessions: [idle],
+				cap: 5,
+			}));
+			const getRunner = vi.fn((id: string) =>
+				id === "idle-1" ? runner : undefined
+			);
+			const promptForCap = vi.fn(() =>
+				Promise.resolve<CapWarningDecision>({
+					kind: "cancel-only",
+					sessionIdToCancel: "idle-1",
+				})
+			);
+			const emitTelemetry = vi.fn();
+
+			await handleStartNew(
+				{
+					...deps,
+					registry: {
+						...deps.registry,
+						checkCapacity,
+						getRunner,
+					} as unknown as AgentChatCommandsDeps["registry"],
+					concurrentCap: 5,
+					promptForCap,
+					emitTelemetry,
+				},
+				{
+					agentId: "claude-code",
+					agentDisplayName: "Claude Code",
+					agentCommand: "claude --acp",
+				}
+			);
+
+			expect(runner.cancel).toHaveBeenCalledTimes(1);
+			expect(startAcpSession).not.toHaveBeenCalled();
+			expect(emitTelemetry).toHaveBeenCalledWith(
+				"agent-chat.concurrent-cap.hit",
+				expect.objectContaining({
+					decision: "cancel-only",
+					sessionIdToCancel: "idle-1",
+				})
+			);
 		});
 	});
 

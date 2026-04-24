@@ -34,6 +34,7 @@ const MODE_RE = /code/;
 const TARGET_RE = /local/;
 const STATUS_RE = /waiting-for-input/;
 const PATH_RE = /tmp\/worktree-1/;
+const BLOCKED_RE = /\(blocked\)/;
 
 // ---------------------------------------------------------------------------
 // Fakes
@@ -274,6 +275,54 @@ describe("RunningAgentsTreeProvider (T042)", () => {
 			expect(orphanChildren).toHaveLength(1);
 			expect(orphanChildren[0].contextValue).toBe("agent-chat-orphan-worktree");
 			expect(orphanChildren[0].description).toMatch(PATH_RE);
+		});
+	});
+
+	// ----- T071 (spec 018 US4) -----
+	describe("blocked flag for waiting-for-input sessions", () => {
+		it("suffixes '(blocked)' on the description when the session is waiting-for-input", async () => {
+			store.active = [
+				makeSession({
+					id: "s-blocked",
+					lifecycleState: "waiting-for-input",
+					selectedModeId: "code",
+				}),
+			];
+
+			const [activeGroup] = await provider.getChildren();
+			const [leaf] = await provider.getChildren(activeGroup);
+
+			expect(leaf.description).toMatch(BLOCKED_RE);
+		});
+
+		it("does NOT suffix '(blocked)' on non-waiting sessions", async () => {
+			store.active = [
+				makeSession({
+					id: "s-running",
+					lifecycleState: "running",
+					selectedModeId: "code",
+				}),
+			];
+
+			const [activeGroup] = await provider.getChildren();
+			const [leaf] = await provider.getChildren(activeGroup);
+
+			expect(String(leaf.description ?? "")).not.toMatch(BLOCKED_RE);
+		});
+
+		it("uses the 'bell' codicon for waiting-for-input sessions", async () => {
+			store.active = [
+				makeSession({
+					id: "s-blocked-icon",
+					lifecycleState: "waiting-for-input",
+				}),
+			];
+
+			const [activeGroup] = await provider.getChildren();
+			const [leaf] = await provider.getChildren(activeGroup);
+
+			// ThemeIcon stores its id on the `id` property.
+			expect((leaf.iconPath as { id: string }).id).toBe("bell");
 		});
 	});
 

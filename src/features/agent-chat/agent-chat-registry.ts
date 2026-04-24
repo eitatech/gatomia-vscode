@@ -24,6 +24,44 @@ import {
 } from "./types";
 
 // ============================================================================
+// T073 — concurrent-cap enforcement
+// ============================================================================
+
+/**
+ * Result of {@link AgentChatRegistry.checkCapacity}. `ok: true` means the
+ * caller may proceed to spawn a new session. `ok: false` carries the idle
+ * session list so the UX layer (T073a) can build a QuickPick.
+ */
+export type CapacityCheck =
+	| { readonly ok: true }
+	| {
+			readonly ok: false;
+			readonly idleSessions: readonly AgentChatSession[];
+			readonly cap: number;
+	  };
+
+/**
+ * Thrown by call-sites that prefer `try`/`throw` over the
+ * discriminated-union return of `checkCapacity`.
+ */
+export class ConcurrentCapExceededError extends Error {
+	readonly idleSessions: readonly AgentChatSession[];
+	readonly cap: number;
+
+	constructor(payload: {
+		idleSessions: readonly AgentChatSession[];
+		cap: number;
+	}) {
+		super(
+			`Concurrent ACP session cap of ${payload.cap} reached. Cancel one of the ${payload.idleSessions.length} idle session(s) and try again.`
+		);
+		this.name = "ConcurrentCapExceededError";
+		this.idleSessions = payload.idleSessions;
+		this.cap = payload.cap;
+	}
+}
+
+// ============================================================================
 // Panel abstraction
 // ============================================================================
 
@@ -166,6 +204,47 @@ export class AgentChatRegistry {
 	}
 
 	// ------------------------------------------------------------------
+	// T073 — concurrent-cap enforcement
+	// ------------------------------------------------------------------
+
+	/**
+	 * Decide whether a new session of the given `source` may be started given
+	 * `cap`. Only ACP sessions count against the cap — cloud sessions run on
+	 * a provider and never spawn a local subprocess (FR-003, research R5).
+	 *
+	 * When the cap would be exceeded, the returned `idleSessions` list is:
+	 *   - filtered to non-terminal ACP sessions (candidates that could be
+	 *     cancelled to free a slot),
+	 *   - sorted so sessions currently in `waiting-for-input` appear first
+	 *     (they are the best cancellation candidates), and within each bucket
+	 *     sorted by `updatedAt` ascending (longest-idle first).
+	 *
+	 * The caller (T073a) uses this to build the QuickPick UX.
+	 */
+	checkCapacity(
+		source: AgentChatSession["source"],
+		cap: number
+	): CapacityCheck {
+		if (source !== "acp") {
+			return { ok: true };
+		}
+		const liveAcp: AgentChatSession[] = [];
+		for (const session of this.sessionsById.values()) {
+			if (
+				session.source === "acp" &&
+				!TERMINAL_STATES.has(session.lifecycleState)
+			) {
+				liveAcp.push(session);
+			}
+		}
+		if (liveAcp.length < cap) {
+			return { ok: true };
+		}
+		const idleSessions = liveAcp.slice().sort(idleFirstThenOldest);
+		return { ok: false, idleSessions, cap };
+	}
+
+	// ------------------------------------------------------------------
 	// Shutdown flush
 	// ------------------------------------------------------------------
 
@@ -227,4 +306,13 @@ export class AgentChatRegistry {
 		this.sessionsById.clear();
 		this._onDidChange.dispose();
 	}
+}
+
+function idleFirstThenOldest(a: AgentChatSession, b: AgentChatSession): number {
+	const aIdle = a.lifecycleState === "waiting-for-input";
+	const bIdle = b.lifecycleState === "waiting-for-input";
+	if (aIdle !== bIdle) {
+		return aIdle ? -1 : 1;
+	}
+	return a.updatedAt - b.updatedAt;
 }

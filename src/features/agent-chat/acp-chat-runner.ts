@@ -176,6 +176,29 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 	async start(initialPrompt: string): Promise<void> {
 		this.subscribeEvents();
 		await this.transitionLifecycle("running");
+		// T068: surface the worktree choice in the transcript so users can
+		// verify the session is targeting the expected path/branch. This is
+		// additive to the explicit `worktree-created` message the caller may
+		// emit when the directory was first created.
+		if (
+			this.session.worktree &&
+			this.session.executionTarget.kind === "worktree"
+		) {
+			const ts = this.now();
+			const sequence = this.nextSequence;
+			this.nextSequence += 1;
+			await this.store.appendMessages(this.sessionId, [
+				{
+					id: randomUUID(),
+					sessionId: this.sessionId,
+					timestamp: ts,
+					sequence,
+					role: "system",
+					kind: "worktree-created",
+					content: `Using worktree at ${this.session.worktree.absolutePath} on branch ${this.session.worktree.branchName}.`,
+				},
+			]);
+		}
 		await this.appendUserMessage(initialPrompt, {
 			isInitial: true,
 			deliveryStatus: "delivered",
@@ -621,6 +644,70 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 			category,
 			retryable: true,
 		});
+	}
+
+	// ------------------------------------------------------------------
+	// T067 — mode/model change records
+	// ------------------------------------------------------------------
+
+	/**
+	 * Append a `SystemChatMessage { kind: "mode-changed" }` to the transcript
+	 * and notify event listeners. No-op when the new mode equals the session's
+	 * current mode. Mode changes take effect on the *next* turn
+	 * (data-model §5 invariant 6); this method only records the user's
+	 * selection for auditability and UI feedback.
+	 */
+	async recordModeChange(modeId: string): Promise<void> {
+		if (this.disposed) {
+			return;
+		}
+		if (this.session.selectedModeId === modeId) {
+			return;
+		}
+		const ts = this.now();
+		const sequence = this.nextSequence;
+		this.nextSequence += 1;
+		await this.store.appendMessages(this.sessionId, [
+			{
+				id: randomUUID(),
+				sessionId: this.sessionId,
+				timestamp: ts,
+				sequence,
+				role: "system",
+				kind: "mode-changed",
+				content: `Mode changed to ${modeId}.`,
+			},
+		]);
+	}
+
+	/**
+	 * Append a `SystemChatMessage { kind: "model-changed" }` to the transcript.
+	 * Applies on the next turn for `initial-prompt`-invocation models; for
+	 * `cli-flag` models the UI MUST offer to start a new session (§4.2 of the
+	 * capabilities contract). The runner does not decide which — it only
+	 * records the selection.
+	 */
+	async recordModelChange(modelId: string): Promise<void> {
+		if (this.disposed) {
+			return;
+		}
+		if (this.session.selectedModelId === modelId) {
+			return;
+		}
+		const ts = this.now();
+		const sequence = this.nextSequence;
+		this.nextSequence += 1;
+		await this.store.appendMessages(this.sessionId, [
+			{
+				id: randomUUID(),
+				sessionId: this.sessionId,
+				timestamp: ts,
+				sequence,
+				role: "system",
+				kind: "model-changed",
+				content: `Model changed to ${modelId}.`,
+			},
+		]);
 	}
 
 	private classifyError(error: unknown): ErrorChatMessageCategory {

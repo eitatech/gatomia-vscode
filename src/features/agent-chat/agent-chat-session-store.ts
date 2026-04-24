@@ -425,6 +425,26 @@ export class AgentChatSessionStore {
 		return Promise.resolve(this.readOrphanedList().orphans);
 	}
 
+	/**
+	 * Drop an orphaned-worktree entry from `workspaceState`.
+	 *
+	 * Used by the `gatomia.agentChat.cleanupOrphanedWorktree` command (T074)
+	 * after the worktree service has cleaned the on-disk directory. Silently
+	 * succeeds if the `sessionId` is not present — the UI may double-fire the
+	 * command (e.g. after a tree refresh race) and we don't want to throw.
+	 */
+	async removeOrphanedWorktree(sessionId: string): Promise<void> {
+		const list = this.readOrphanedList();
+		const next = list.orphans.filter((o) => o.sessionId !== sessionId);
+		if (next.length === list.orphans.length) {
+			return;
+		}
+		await this.workspaceState.update(
+			AGENT_CHAT_STORAGE_KEYS.ORPHANED_WORKTREES,
+			{ schemaVersion: SCHEMA_VERSION, orphans: next }
+		);
+	}
+
 	getSettings(): Promise<AgentChatSettings> {
 		const raw = this.workspaceState.get<AgentChatSettings>(
 			AGENT_CHAT_STORAGE_KEYS.SETTINGS

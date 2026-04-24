@@ -46,6 +46,10 @@ export type RunningAgentsTreeItem = TreeItem & {
 	sessionId?: string;
 	/** Present on orphan leaves; absent otherwise. */
 	orphanId?: string;
+	/** Present on orphan leaves so the right-click handler can build a cleanup payload. */
+	orphanAbsolutePath?: string;
+	/** Present on orphan leaves. */
+	orphanBranchName?: string;
 	/** Discriminator for getChildren dispatch. */
 	nodeKind:
 		| "group-active"
@@ -237,6 +241,8 @@ export class RunningAgentsTreeProvider
 			TreeItemCollapsibleState.None
 		) as RunningAgentsTreeItem;
 		item.orphanId = entry.sessionId;
+		item.orphanAbsolutePath = entry.absolutePath;
+		item.orphanBranchName = entry.branchName;
 		item.nodeKind = "orphan";
 		item.description = entry.absolutePath;
 		item.tooltip = `Orphaned worktree at ${entry.absolutePath} (branch ${entry.branchName})`;
@@ -265,6 +271,11 @@ function describeSession(session: AgentChatSession): string {
 	}
 	parts.push(session.executionTarget.kind);
 	parts.push(session.lifecycleState);
+	// T071 — surface the "blocked" flag for sessions waiting on the user so
+	// they don't get lost among Active entries.
+	if (session.lifecycleState === "waiting-for-input") {
+		parts.push("(blocked)");
+	}
 	return parts.join(" · ");
 }
 
