@@ -414,6 +414,17 @@ export class AgentChatSessionStore {
 		return Promise.resolve(out);
 	}
 
+	/**
+	 * Return every recorded orphaned-worktree entry from `workspaceState`.
+	 *
+	 * Entries are populated during retention eviction (see §2.4 of
+	 * `agent-chat-session-storage.md`). The `RunningAgentsTreeProvider`
+	 * (T044) calls this to render the "Orphaned worktrees" group.
+	 */
+	listOrphanedWorktrees(): Promise<OrphanedWorktreeEntry[]> {
+		return Promise.resolve(this.readOrphanedList().orphans);
+	}
+
 	getSettings(): Promise<AgentChatSettings> {
 		const raw = this.workspaceState.get<AgentChatSettings>(
 			AGENT_CHAT_STORAGE_KEYS.SETTINGS

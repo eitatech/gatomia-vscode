@@ -347,6 +347,12 @@
           "when": "!(workbenchState == empty || workspaceFolderCount == 0)"
         },
         {
+          "id": "gatomia.views.runningAgents",
+          "name": "Running Agents",
+          "icon": "pulse",
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0)"
+        },
+        {
           "id": "gatomia.views.overview",
           "name": "Quick Access",
           "icon": "zap",
@@ -851,6 +857,24 @@
         "title": "Cancel Active ACP Session",
         "category": "GatomIA",
         "icon": "$(debug-stop)"
+      },
+      {
+        "command": "gatomia.agentChat.openForSession",
+        "title": "Open Agent Chat",
+        "category": "GatomIA",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "gatomia.agentChat.cancel",
+        "title": "Cancel Agent Chat Session",
+        "category": "GatomIA",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "gatomia.agentChat.openLogChannel",
+        "title": "Open ACP Log Channel",
+        "category": "GatomIA",
+        "icon": "$(output)"
       }
     ],
     "menus": {
@@ -1076,6 +1100,16 @@
           "command": "gatomia.hooks.viewLogs",
           "when": "view == gatomia.views.hooksExplorer && (viewItem == hook-enabled || viewItem == hook-disabled)",
           "group": "7_modification@2"
+        },
+        {
+          "command": "gatomia.agentChat.cancel",
+          "when": "view == gatomia.views.runningAgents && (viewItem == agent-chat-session || viewItem == agent-chat-session-worktree)",
+          "group": "inline@1"
+        },
+        {
+          "command": "gatomia.agentChat.openLogChannel",
+          "when": "view == gatomia.views.runningAgents && (viewItem == agent-chat-session || viewItem == agent-chat-session-worktree || viewItem == agent-chat-group-active || viewItem == agent-chat-group-recent)",
+          "group": "navigation@1"
         }
       ],
       "commandPalette": [

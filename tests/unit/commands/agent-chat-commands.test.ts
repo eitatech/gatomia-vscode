@@ -160,14 +160,27 @@ describe("agent-chat-commands (T038)", () => {
 			expect(panel.reveal).toHaveBeenCalledTimes(1);
 		});
 
-		it("does nothing if the session id is unknown", async () => {
-			const { deps, registry, panelFactory } = makeDeps();
+		it("does nothing if the session id is unknown to both the registry and the store", async () => {
+			const { deps, registry, store, panelFactory } = makeDeps();
 			registry.getSession.mockReturnValueOnce(undefined as never);
+			store.getSession.mockReturnValueOnce(undefined as never);
 
 			await handleOpenForSession(deps, "missing");
 
 			expect(panelFactory).not.toHaveBeenCalled();
 			expect(registry.focusPanel).not.toHaveBeenCalled();
+		});
+
+		it("falls back to the store when the registry has no session (restart-restore case, T047)", async () => {
+			const { deps, registry, store, panelFactory } = makeDeps();
+			registry.getSession.mockReturnValueOnce(undefined as never);
+			registry.focusPanel.mockReturnValue(false);
+
+			await handleOpenForSession(deps, "restored-session");
+
+			expect(store.getSession).toHaveBeenCalledWith("restored-session");
+			expect(registry.registerSession).toHaveBeenCalledTimes(1);
+			expect(panelFactory).toHaveBeenCalledTimes(1);
 		});
 	});
 

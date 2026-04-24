@@ -120,13 +120,24 @@ export async function handleOpenForSession(
 	deps: AgentChatCommandsDeps,
 	sessionId: string
 ): Promise<void> {
-	const { registry, createPanel } = deps;
+	const { registry, store, createPanel } = deps;
 
-	const session = registry.getSession(sessionId);
+	// Happy path: session already tracked in the in-memory registry.
+	let session = registry.getSession(sessionId);
+
+	// Restart fallback (T047): after VS Code reloads, the store has the
+	// persisted session but the registry is empty until the first tree
+	// interaction. Hydrate the registry lazily so tree clicks on Recent
+	// entries still open a panel.
 	if (!session) {
-		return;
+		session = await store.getSession(sessionId);
+		if (!session) {
+			return;
+		}
+		registry.registerSession(session);
 	}
 
+	// Honour the one-panel-per-session invariant (FR-008) via focusPanel.
 	if (registry.focusPanel(sessionId)) {
 		return;
 	}

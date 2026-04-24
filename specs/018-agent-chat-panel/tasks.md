@@ -112,16 +112,16 @@
 
 ### Tests for User Story 2 (TDD, must fail first) ⚠️
 
-- [ ] T042 [P] [US2] Tests `tests/unit/providers/running-agents-tree-provider.test.ts`: tree emits one group per lifecycle bucket ("Active", "Recent", "Orphaned worktrees"), leaves carry `agent display · mode · target · status`, click invokes `gatomia.agentChat.openForSession`, right-click for worktree-backed sessions exposes "Clean up worktree", the provider refreshes on `AgentChatSessionStore.onDidChangeManifest`
-- [ ] T043 [P] [US2] Integration test `tests/integration/agent-chat/click-running-item-opens-panel.test.ts`: given two sessions, clicking each opens the correct panel exactly once; clicking an already-open session focuses (does not duplicate)
+- [x] T042 [P] [US2] Tests `tests/unit/providers/running-agents-tree-provider.test.ts`: tree emits one group per lifecycle bucket ("Active", "Recent", "Orphaned worktrees"), leaves carry `agent display · mode · target · status`, click invokes `gatomia.agentChat.openForSession`, right-click for worktree-backed sessions exposes "Clean up worktree", the provider refreshes on `AgentChatSessionStore.onDidChangeManifest`
+- [x] T043 [P] [US2] Integration test `tests/integration/agent-chat/click-running-item-opens-panel.test.ts`: given two sessions, clicking each opens the correct panel exactly once; clicking an already-open session focuses (does not duplicate)
 
 ### Implementation for User Story 2
 
-- [ ] T044 [US2] Implement `src/providers/running-agents-tree-provider.ts` subscribing to `AgentChatSessionStore.onDidChangeManifest`. Tests (T042) must pass
-- [ ] T045 [US2] Register the tree view `gatomia.runningAgents` in `package.json` under the existing `gatomia` activity bar container (siblings of `gatomia.specExplorer`, `gatomia.hooksExplorer`, `gatomia.promptsExplorer`)
-- [ ] T046 [US2] Register `RunningAgentsTreeProvider` in `src/extension.ts` with `vscode.window.createTreeView("gatomia.runningAgents", { treeDataProvider })`. Ensure the tree reflects state restored by T039
-- [ ] T047 [US2] Ensure `AgentChatRegistry.openPanelFor(sessionId)` honors the "one panel per session" invariant (FR-008) — focus existing if present, create new otherwise. Integration test (T043) must pass
-- [ ] T048 [US2] Add a command `gatomia.agentChat.openLogChannel` (exposed in the tree view's context menu) that reveals the existing ACP `OutputChannel` so users retain a one-click path to the raw log surface (FR-022)
+- [x] T044 [US2] Implement `src/providers/running-agents-tree-provider.ts` subscribing to `AgentChatSessionStore.onDidChangeManifest`. Tests (T042) must pass
+- [x] T045 [US2] Register the tree view `gatomia.runningAgents` in `package.json` under the existing `gatomia` activity bar container (siblings of `gatomia.specExplorer`, `gatomia.hooksExplorer`, `gatomia.promptsExplorer`) — view id is `gatomia.views.runningAgents` to match the existing naming convention
+- [x] T046 [US2] Register `RunningAgentsTreeProvider` in `src/extension.ts` with `vscode.window.createTreeView("gatomia.runningAgents", { treeDataProvider })`. Ensure the tree reflects state restored by T039
+- [x] T047 [US2] Ensure `AgentChatRegistry.openPanelFor(sessionId)` honors the "one panel per session" invariant (FR-008) — focus existing if present, create new otherwise. Integration test (T043) must pass — implemented via `handleOpenForSession` with registry.focusPanel + store fallback for restart-restored sessions
+- [x] T048 [US2] Add a command `gatomia.agentChat.openLogChannel` (exposed in the tree view's context menu) that reveals the existing ACP `OutputChannel` so users retain a one-click path to the raw log surface (FR-022)
 
 **Checkpoint**: Users can discover and re-open any running or recent ACP or Cloud chat session from the Running Agents tree.
 

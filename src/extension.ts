@@ -2664,8 +2664,35 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 		});
 		context.subscriptions.push(...commandDisposables);
 
+		// T046: Running Agents tree view. Subscribes to the same store/registry
+		// singletons so clicks dispatch `gatomia.agentChat.openForSession`
+		// (registered above) and the restart-restore pass in T039 is visible.
+		const { RunningAgentsTreeProvider } = await import(
+			"./providers/running-agents-tree-provider"
+		);
+		const runningAgentsProvider = new RunningAgentsTreeProvider({
+			store,
+			registry,
+			storeChangeEvent: store.onDidChangeManifest,
+		});
+		context.subscriptions.push(
+			window.createTreeView(RunningAgentsTreeProvider.viewId, {
+				treeDataProvider: runningAgentsProvider,
+				showCollapseAll: true,
+			}),
+			{ dispose: () => runningAgentsProvider.dispose() }
+		);
+
+		// T048: reveal the ACP `OutputChannel` from the tree's context menu so
+		// users retain a one-click path to raw logs (FR-022).
+		context.subscriptions.push(
+			commands.registerCommand("gatomia.agentChat.openLogChannel", () => {
+				acpOutputChannel?.show(true);
+			})
+		);
+
 		outputChannel.appendLine(
-			"[AgentChat] Session store initialised; commands registered"
+			"[AgentChat] Session store + running-agents tree initialised; commands registered"
 		);
 	} catch (error) {
 		outputChannel.appendLine(
