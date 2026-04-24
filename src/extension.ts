@@ -30,6 +30,8 @@ import { SpecExplorerProvider } from "./providers/spec-explorer-provider";
 import { SpecTaskCodeLensProvider } from "./providers/spec-task-code-lens-provider";
 import { SteeringExplorerProvider } from "./providers/steering-explorer-provider";
 import { WikiExplorerProvider } from "./providers/wiki-explorer-provider";
+import type { AgentChatRegistry as AgentChatRegistryType } from "./features/agent-chat/agent-chat-registry";
+import type { AgentChatSessionStore as AgentChatSessionStoreType } from "./features/agent-chat/agent-chat-session-store";
 import { AcpProviderRegistry } from "./services/acp/acp-provider-registry";
 import { AcpSessionManager } from "./services/acp/acp-session-manager";
 import { BUILT_IN_PROVIDERS } from "./services/acp/providers/descriptors";
@@ -128,6 +130,10 @@ let acpOutputChannel: OutputChannel | null = null;
 let acpSessionManager: AcpSessionManager | null = null;
 let acpProviderRegistry: AcpProviderRegistry | null = null;
 let chatRouter: ChatRouter | null = null;
+
+// --- Agent Chat Panel (spec 018) singletons for deactivation flush ---------
+let agentChatStore: AgentChatSessionStoreType | null = null;
+let agentChatRegistry: AgentChatRegistryType | null = null;
 
 export async function activate(context: ExtensionContext) {
 	// Create output channel for debugging
@@ -687,6 +693,11 @@ Tasks:
 	// ACP Commands + Status Bar
 	// ========================================================================
 	registerAcpCommands(context);
+
+	// ========================================================================
+	// Agent Chat Panel (spec 018) — T038/T039 bootstrap
+	// ========================================================================
+	await bootstrapAgentChat(context);
 
 	// Set up file watchers
 	setupFileWatchers(context, specExplorer, steeringExplorer, actionsExplorer);
@@ -2263,7 +2274,39 @@ function registerAcpCommands(context: ExtensionContext): void {
 	);
 }
 
-export function deactivate(): void {
+export async function deactivate(): Promise<void> {
+	// Clear the ACP chat router (T037) so any in-flight executor falls back to
+	// the legacy path during shutdown.
+	try {
+		const { setAcpActionChatRouter } = await import(
+			"./features/hooks/actions/acp-action"
+		);
+		setAcpActionChatRouter(undefined);
+	} catch {
+		// Best-effort; continue with the rest of deactivation.
+	}
+
+	// T040: flush the Agent Chat Panel session store BEFORE tearing down the
+	// underlying AcpSessionManager so `ended-by-shutdown` stamping and
+	// persistence happen while the ACP subprocesses are still reachable.
+	if (agentChatStore) {
+		try {
+			await agentChatStore.flushForDeactivation();
+		} catch {
+			// best-effort
+		}
+		agentChatStore = null;
+	}
+
+	if (agentChatRegistry) {
+		try {
+			agentChatRegistry.dispose();
+		} catch {
+			// best-effort
+		}
+		agentChatRegistry = null;
+	}
+
 	if (acpSessionManager) {
 		try {
 			acpSessionManager.dispose();
@@ -2540,5 +2583,93 @@ async function bootstrapCloudAgents(context: ExtensionContext): Promise<void> {
 		outputChannel.appendLine("[CloudAgents] Module bootstrapped successfully");
 	} catch (error) {
 		outputChannel.appendLine(`[CloudAgents] Failed to bootstrap: ${error}`);
+	}
+}
+
+// ============================================================================
+// Agent Chat Panel bootstrap (spec 018, T038-T040)
+// ============================================================================
+
+/**
+ * Initialise the Agent Chat Panel runtime:
+ *   - Construct the session store (with a VS Code-backed archive writer).
+ *   - Run the restart-restore pass (T039) so any ACP sessions orphaned by a
+ *     previous shutdown are stamped `ended-by-shutdown` idempotently.
+ *   - Wire the in-memory registry.
+ *   - Register the three T038 commands (`startNew`, `openForSession`, `cancel`).
+ *
+ * The T037 `ACPActionChatRouter` is NOT wired here yet — the setter remains
+ * empty so hook executions continue to run the legacy inline path. A later
+ * phase will attach a real router once the provider-id bridge between
+ * `ACPActionParams.agentCommand` and `AcpProviderRegistry` is designed.
+ */
+async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
+	try {
+		const { AgentChatSessionStore } = await import(
+			"./features/agent-chat/agent-chat-session-store"
+		);
+		const { AgentChatRegistry } = await import(
+			"./features/agent-chat/agent-chat-registry"
+		);
+		const { createVscodeArchiveWriter } = await import(
+			"./features/agent-chat/vscode-archive-writer"
+		);
+		const { createDefaultAgentChatPanelHost, AgentChatPanel } = await import(
+			"./panels/agent-chat-panel"
+		);
+		const { registerAgentChatCommands } = await import(
+			"./commands/agent-chat-commands"
+		);
+
+		const archive = createVscodeArchiveWriter(context.globalStorageUri);
+		const store = new AgentChatSessionStore({
+			workspaceState: context.workspaceState,
+			archive,
+		});
+		await store.initialize(); // T039 restart-restore
+
+		const registry = new AgentChatRegistry();
+		const panelHost = createDefaultAgentChatPanelHost(context);
+
+		agentChatStore = store;
+		agentChatRegistry = registry;
+		context.subscriptions.push({ dispose: () => registry.dispose() });
+
+		const commandDisposables = registerAgentChatCommands({
+			registry,
+			store,
+			createPanel: (session) => {
+				const panel = new AgentChatPanel({
+					session,
+					store,
+					registry,
+					host: panelHost,
+				});
+				panel.open();
+				return {
+					sessionId: session.id,
+					reveal: () => panel.open(),
+					dispose: () => panel.dispose(),
+				};
+			},
+			startAcpSession: () => {
+				// Placeholder: a concrete `AcpChatRunner` wire-up requires mapping
+				// `agentCommand` → `AcpProviderRegistry.providerId`, which is the
+				// subject of a follow-up task. Users invoking `startNew` today will
+				// see this error surfaced in the command palette feedback.
+				throw new Error(
+					"agent-chat: startNew is not wired to a provider yet — open an existing session via openForSession"
+				);
+			},
+		});
+		context.subscriptions.push(...commandDisposables);
+
+		outputChannel.appendLine(
+			"[AgentChat] Session store initialised; commands registered"
+		);
+	} catch (error) {
+		outputChannel.appendLine(
+			`[AgentChat] Failed to bootstrap: ${error instanceof Error ? error.message : String(error)}`
+		);
 	}
 }

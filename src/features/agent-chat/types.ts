@@ -368,7 +368,10 @@ export type AgentChatEvent =
  * during Phase 2 before the concrete `AcpChatRunner` (T027) and
  * `CloudChatAdapter` (T060) classes exist.
  *
- * Both concrete runners MUST implement this shape.
+ * Both concrete runners MUST implement the required fields (`sessionId`,
+ * `cancel`, `dispose`). `submit` and `retry` are optional because cloud
+ * sessions are read-only (FR-003) and reject follow-up input; ACP runners
+ * populate both.
  */
 export interface AgentChatRunnerHandle {
 	readonly sessionId: string;
@@ -376,6 +379,18 @@ export interface AgentChatRunnerHandle {
 	cancel(): Promise<void>;
 	/** Release subprocess / subscription resources. Idempotent. */
 	dispose(): void;
+	/**
+	 * Submit a follow-up message. Absent on read-only cloud sessions.
+	 * Rejects with `{ message: /queued|already/i }` when a queued follow-up
+	 * already exists (contract §4.2).
+	 */
+	submit?(content: string): Promise<void>;
+	/**
+	 * Restart the session. Returns the new session id (mode/model/target
+	 * preserved). Absent on cloud sessions (they reuse their external
+	 * provider's dispatch path instead).
+	 */
+	retry?(): Promise<string>;
 }
 
 // ============================================================================

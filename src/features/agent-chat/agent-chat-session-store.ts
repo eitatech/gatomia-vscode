@@ -594,10 +594,9 @@ export class AgentChatSessionStore {
 		entry.updatedAt = this.now();
 		manifest.updatedAt = this.now();
 		// Persist immediately; callers are already inside the write chain.
-		await this.workspaceState.update(
-			AGENT_CHAT_STORAGE_KEYS.MANIFEST,
-			manifest
-		);
+		// Use persistManifest so `onDidChangeManifest` fires — the panel relies
+		// on this signal to push `messages/appended` deltas to the webview.
+		await this.persistManifest(manifest);
 	}
 
 	private async markSessionArchived(sessionId: string): Promise<void> {
@@ -608,10 +607,7 @@ export class AgentChatSessionStore {
 		}
 		entry.transcriptArchived = true;
 		manifest.updatedAt = this.now();
-		await this.workspaceState.update(
-			AGENT_CHAT_STORAGE_KEYS.MANIFEST,
-			manifest
-		);
+		await this.persistManifest(manifest);
 	}
 
 	private async archiveOldest(file: TranscriptFile): Promise<void> {
