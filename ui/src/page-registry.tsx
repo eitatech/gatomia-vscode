@@ -33,6 +33,11 @@ const WelcomeScreen = lazy(() =>
 		default: m.WelcomeScreen,
 	}))
 );
+const AgentChatFeature = lazy(() =>
+	import("./features/agent-chat").then((m) => ({
+		default: m.AgentChatFeature,
+	}))
+);
 
 export type SupportedPage =
 	| "simple"
@@ -41,7 +46,8 @@ export type SupportedPage =
 	| "create-steering"
 	| "hooks"
 	| "document-preview"
-	| "welcome-screen";
+	| "welcome-screen"
+	| "agent-chat";
 
 function LoadingFallback() {
 	return (
@@ -81,6 +87,7 @@ const pageRenderers = {
 			</WelcomeErrorBoundary>
 		</Suspense>
 	),
+	"agent-chat": () => withSuspense(AgentChatFeature),
 } satisfies Record<SupportedPage, () => JSX.Element>;
 
 export const getPageRenderer = (pageName: string) => {
