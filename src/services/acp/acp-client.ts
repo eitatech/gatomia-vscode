@@ -7,7 +7,7 @@ import {
 	ndJsonStream,
 	type Client,
 } from "@agentclientprotocol/sdk";
-import type { OutputChannel } from "vscode";
+import type { Disposable, OutputChannel } from "vscode";
 import { getExtendedPath } from "../../utils/cli-detector";
 import type { AcpProviderDescriptor } from "./types";
 
@@ -25,6 +25,33 @@ export type PermissionPrompter = (
 ) => Promise<string | null>;
 
 export type PermissionMode = "ask" | "allow" | "deny";
+
+/**
+ * Structured per-session events fanned out by {@link AcpClient.subscribeSession}.
+ *
+ * Shape is authoritative per
+ * specs/018-agent-chat-panel/research.md §R2 — do not rename kinds without
+ * updating the research doc and every downstream consumer.
+ */
+export type AcpSessionEvent =
+	| { kind: "agent-message-chunk"; text: string; at: number }
+	| {
+			kind: "tool-call";
+			toolCallId: string;
+			title?: string;
+			status?: string;
+			at: number;
+	  }
+	| {
+			kind: "tool-call-update";
+			toolCallId: string;
+			status?: string;
+			at: number;
+	  }
+	| { kind: "turn-finished"; stopReason: string; at: number }
+	| { kind: "error"; message: string; at: number };
+
+export type AcpSessionEventListener = (event: AcpSessionEvent) => void;
 
 export interface AcpClientOptions {
 	descriptor: AcpProviderDescriptor;
@@ -75,6 +102,17 @@ export class AcpClient {
 	private startingPromise: Promise<void> | null = null;
 	private lastSessionKey: string | null = null;
 
+	/**
+	 * Per-session event bus (T013). Each session id maps to a set of listeners
+	 * that receive structured {@link AcpSessionEvent} payloads. Additive to the
+	 * existing {@link OutputChannel} writes — FR-022 requires the log stream to
+	 * remain unchanged.
+	 */
+	private readonly sessionListeners = new Map<
+		string,
+		Set<AcpSessionEventListener>
+	>();
+
 	constructor(options: AcpClientOptions) {
 		this.descriptor = options.descriptor;
 		this.cwd = options.cwd;
@@ -93,6 +131,55 @@ export class AcpClient {
 	/** Returns a snapshot of the currently tracked session keys. */
 	getSessionKeys(): string[] {
 		return [...this.sessions.keys()];
+	}
+
+	/**
+	 * Subscribe to structured events for a specific ACP `sessionId`. The returned
+	 * {@link Disposable} removes the listener without disturbing other subscribers.
+	 *
+	 * Event delivery is synchronous and best-effort: a throwing listener does
+	 * not affect other listeners or the ACP protocol handler. All events are
+	 *in addition to* the existing {@link OutputChannel} writes preserved for
+	 * FR-022 backwards compatibility.
+	 */
+	subscribeSession(
+		sessionId: string,
+		listener: AcpSessionEventListener
+	): Disposable {
+		let bucket = this.sessionListeners.get(sessionId);
+		if (!bucket) {
+			bucket = new Set();
+			this.sessionListeners.set(sessionId, bucket);
+		}
+		bucket.add(listener);
+		return {
+			dispose: () => {
+				const current = this.sessionListeners.get(sessionId);
+				if (!current) {
+					return;
+				}
+				current.delete(listener);
+				if (current.size === 0) {
+					this.sessionListeners.delete(sessionId);
+				}
+			},
+		};
+	}
+
+	/** Fan out an event to every subscriber for a session. Best-effort. */
+	private emitSessionEvent(sessionId: string, event: AcpSessionEvent): void {
+		const bucket = this.sessionListeners.get(sessionId);
+		if (!bucket || bucket.size === 0) {
+			return;
+		}
+		// Snapshot to tolerate listeners that dispose themselves during delivery.
+		for (const listener of [...bucket]) {
+			try {
+				listener(event);
+			} catch {
+				// Best-effort fanout; never let a misbehaving listener break ACP.
+			}
+		}
 	}
 
 	/**
@@ -394,25 +481,49 @@ export class AcpClient {
 		const providerId = this.descriptor.id;
 		const permissionDefault = this.permissionDefault;
 		const promptForPermission = this.promptForPermission;
+		// Bind the bus emitter so the handler object (not the AcpClient
+		// instance) can still fan out events without losing `this`.
+		const emit = (sessionId: string, event: AcpSessionEvent): void =>
+			this.emitSessionEvent(sessionId, event);
 
 		return {
 			sessionUpdate(params) {
 				const update = params.update;
+				const sessionId = params.sessionId;
+				const at = Date.now();
 				switch (update.sessionUpdate) {
 					case "agent_message_chunk":
 						if (update.content.type === "text") {
 							output.append(update.content.text);
+							emit(sessionId, {
+								kind: "agent-message-chunk",
+								text: update.content.text,
+								at,
+							});
 						}
 						break;
 					case "tool_call":
 						output.appendLine(
 							`\n[ACP][${providerId}] tool_call: ${update.title ?? ""} (${update.status ?? "pending"})`
 						);
+						emit(sessionId, {
+							kind: "tool-call",
+							toolCallId: update.toolCallId,
+							title: update.title ?? undefined,
+							status: update.status ?? undefined,
+							at,
+						});
 						break;
 					case "tool_call_update":
 						output.appendLine(
 							`[ACP][${providerId}] tool_call_update: ${update.toolCallId} -> ${update.status ?? "unknown"}`
 						);
+						emit(sessionId, {
+							kind: "tool-call-update",
+							toolCallId: update.toolCallId,
+							status: update.status ?? undefined,
+							at,
+						});
 						break;
 					default:
 						break;

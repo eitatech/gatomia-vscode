@@ -416,6 +416,162 @@ describe("AcpClient", () => {
 		});
 	});
 
+	describe("per-session event bus (T012)", () => {
+		const invokeSessionUpdate = (params: unknown): Promise<unknown> =>
+			(
+				handlerRef.current as {
+					sessionUpdate: (p: unknown) => Promise<unknown>;
+				}
+			).sessionUpdate(params);
+
+		it("subscribeSession fans out agent_message_chunk events to the listener AND still writes to the OutputChannel (FR-022)", async () => {
+			const output = makeOutputChannel();
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output,
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "agent_message_chunk",
+					content: { type: "text", text: "hello world" },
+				},
+			});
+
+			// OutputChannel still receives the content (FR-022 regression).
+			expect(output.append).toHaveBeenCalledWith("hello world");
+
+			// Event bus listener receives the structured event.
+			expect(listener).toHaveBeenCalledTimes(1);
+			const event = listener.mock.calls[0][0] as {
+				kind: string;
+				text: string;
+				at: number;
+			};
+			expect(event.kind).toBe("agent-message-chunk");
+			expect(event.text).toBe("hello world");
+			expect(typeof event.at).toBe("number");
+		});
+
+		it("fans out tool_call and tool_call_update events with structured payloads", async () => {
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "tool_call",
+					toolCallId: "tc-1",
+					title: "Run tests",
+					status: "pending",
+				},
+			});
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "tool_call_update",
+					toolCallId: "tc-1",
+					status: "succeeded",
+				},
+			});
+
+			expect(listener).toHaveBeenCalledTimes(2);
+			const [first, second] = listener.mock.calls.map(
+				(c) => c[0] as { kind: string }
+			);
+			expect(first.kind).toBe("tool-call");
+			expect(second.kind).toBe("tool-call-update");
+		});
+
+		it("only notifies subscribers for the matching sessionId", async () => {
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listenerA = vi.fn();
+			const listenerB = vi.fn();
+			client.subscribeSession("session-A", listenerA);
+			client.subscribeSession("session-B", listenerB);
+
+			await invokeSessionUpdate({
+				sessionId: "session-A",
+				update: {
+					sessionUpdate: "agent_message_chunk",
+					content: { type: "text", text: "for A" },
+				},
+			});
+
+			expect(listenerA).toHaveBeenCalledTimes(1);
+			expect(listenerB).not.toHaveBeenCalled();
+		});
+
+		it("supports multiple subscribers per sessionId", async () => {
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const first = vi.fn();
+			const second = vi.fn();
+			client.subscribeSession("session-1", first);
+			client.subscribeSession("session-1", second);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "agent_message_chunk",
+					content: { type: "text", text: "x" },
+				},
+			});
+
+			expect(first).toHaveBeenCalledTimes(1);
+			expect(second).toHaveBeenCalledTimes(1);
+		});
+
+		it("returns a Disposable that stops further event delivery", async () => {
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			const subscription = client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "agent_message_chunk",
+					content: { type: "text", text: "one" },
+				},
+			});
+			subscription.dispose();
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "agent_message_chunk",
+					content: { type: "text", text: "two" },
+				},
+			});
+
+			expect(listener).toHaveBeenCalledTimes(1);
+		});
+	});
+
 	describe("filesystem handlers", () => {
 		it("readTextFile returns full file content via fs/promises", async () => {
 			readFileMock.mockResolvedValueOnce("line1\nline2\nline3\n");

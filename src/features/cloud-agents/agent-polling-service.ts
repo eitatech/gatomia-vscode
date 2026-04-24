@@ -8,6 +8,7 @@
  * @see specs/016-multi-provider-agents/contracts/provider-interface.md
  */
 
+import type { Disposable } from "vscode";
 import type { AgentSessionStorage } from "./agent-session-storage";
 import { logDebug, logError, logWarn } from "./logging";
 import type { ProviderRegistry } from "./provider-registry";
@@ -20,6 +21,27 @@ import {
 	type AgentTask,
 	type SessionUpdate,
 } from "./types";
+
+// ============================================================================
+// Event types (T017 — spec 018 bridge)
+// ============================================================================
+
+/**
+ * Payload fanned out by {@link AgentPollingService.onSessionUpdated} whenever
+ * a poll cycle commits a change to a stored {@link AgentSession}.
+ *
+ * Subscribers receive this event for every mutated session — downstream
+ * consumers (e.g. spec 018's cloud-chat-adapter) use it to drive chat-panel
+ * updates without duplicating the polling loop.
+ */
+export interface AgentSessionUpdatedEvent {
+	readonly localId: string;
+	readonly session: AgentSession;
+}
+
+export type AgentSessionUpdatedListener = (
+	event: AgentSessionUpdatedEvent
+) => void;
 
 // ============================================================================
 // Constants
@@ -54,6 +76,14 @@ export class AgentPollingService {
 		onError: undefined as ((message: string) => void) | undefined,
 		onUpdated: undefined as (() => void) | undefined,
 	};
+
+	/**
+	 * Subscribers for per-session update events (T017, spec 018 bridge).
+	 * Additive to the existing single-callback `onUpdated` hook — both fire on
+	 * the same commit path.
+	 */
+	private readonly sessionUpdatedListeners =
+		new Set<AgentSessionUpdatedListener>();
 
 	/**
 	 * Whether interval-based polling is currently running.
@@ -98,6 +128,22 @@ export class AgentPollingService {
 		handler: (localId: string, specPath: string) => void
 	): void {
 		this.callbacks.onSessionCompleted = handler;
+	}
+
+	/**
+	 * Subscribe to per-session update events (T017, spec 018 bridge). Fires
+	 * once per mutated session after each poll cycle commits.
+	 *
+	 * Returns a {@link Disposable} that removes the subscription without
+	 * affecting other listeners.
+	 */
+	onSessionUpdated(listener: AgentSessionUpdatedListener): Disposable {
+		this.sessionUpdatedListeners.add(listener);
+		return {
+			dispose: () => {
+				this.sessionUpdatedListeners.delete(listener);
+			},
+		};
 	}
 
 	/**
@@ -227,10 +273,32 @@ export class AgentPollingService {
 			...(isTerminal ? { completedAt: Date.now() } : {}),
 		});
 
+		// Fan out to spec 018 subscribers AFTER the commit so readers see the
+		// new state. Non-terminal updates also fire so the chat panel can
+		// reflect incremental status/blocked transitions.
+		if (this.sessionUpdatedListeners.size > 0) {
+			const snapshot = await this.sessionStorage.getById(localId);
+			if (snapshot) {
+				this.fireSessionUpdated({ localId, session: snapshot });
+			}
+		}
+
 		if (isTerminal && update.status === SessionStatus.COMPLETED) {
 			const session = await this.sessionStorage.getById(localId);
 			if (session) {
 				this.callbacks.onSessionCompleted?.(localId, session.specPath);
+			}
+		}
+	}
+
+	private fireSessionUpdated(event: AgentSessionUpdatedEvent): void {
+		// Snapshot so listeners that dispose during delivery don't mutate the
+		// iteration.
+		for (const listener of [...this.sessionUpdatedListeners]) {
+			try {
+				listener(event);
+			} catch (error) {
+				logError("onSessionUpdated listener threw", error);
 			}
 		}
 	}

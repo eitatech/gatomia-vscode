@@ -236,4 +236,93 @@ describe("AcpSessionManager", () => {
 		await manager.cancelAll("devin");
 		expect(cancelAllMock).not.toHaveBeenCalled();
 	});
+
+	// --------------------------------------------------------------------
+	// T014 — Per-(providerId, cwd) client keying for worktree sessions.
+	// --------------------------------------------------------------------
+
+	describe("per-(providerId, cwd) client keying (T014, F1 remediation)", () => {
+		it("returns distinct AcpClient instances for two different cwd values with the same providerId", async () => {
+			sendPromptMock.mockResolvedValue(undefined);
+
+			await manager.send("devin", "a", {
+				mode: "workspace",
+				cwd: "/tmp/ws/worktree-1",
+			});
+			await manager.send("devin", "b", {
+				mode: "workspace",
+				cwd: "/tmp/ws/worktree-2",
+			});
+
+			// One client per distinct (providerId, cwd) pair.
+			expect(AcpClientCtor).toHaveBeenCalledTimes(2);
+			const cwds = AcpClientCtor.mock.calls.map(
+				(c) => (c[0] as { cwd: string }).cwd
+			);
+			expect(cwds.sort()).toEqual(["/tmp/ws/worktree-1", "/tmp/ws/worktree-2"]);
+		});
+
+		it("returns the cached instance for the same (providerId, cwd) pair", async () => {
+			sendPromptMock.mockResolvedValue(undefined);
+
+			await manager.send("devin", "a", {
+				mode: "workspace",
+				cwd: "/tmp/ws/worktree-1",
+			});
+			await manager.send("devin", "b", {
+				mode: "workspace",
+				cwd: "/tmp/ws/worktree-1",
+			});
+
+			expect(AcpClientCtor).toHaveBeenCalledTimes(1);
+		});
+
+		it("dispose tears down every cached client, including per-cwd instances", async () => {
+			sendPromptMock.mockResolvedValue(undefined);
+			await manager.send("devin", "a", {
+				mode: "workspace",
+				cwd: "/tmp/ws/a",
+			});
+			await manager.send("devin", "b", {
+				mode: "workspace",
+				cwd: "/tmp/ws/b",
+			});
+			await manager.send("gemini", "c", { mode: "workspace" });
+
+			manager.dispose();
+
+			// Three distinct clients: devin@/a, devin@/b, gemini@default.
+			expect(disposeMock).toHaveBeenCalledTimes(3);
+		});
+
+		it("defaults cwd to the manager's constructor cwd when the call omits it (backward compatible)", async () => {
+			sendPromptMock.mockResolvedValue(undefined);
+
+			await manager.send("devin", "hello", { mode: "workspace" });
+
+			const [args] = AcpClientCtor.mock.calls[0] as [{ cwd: string }];
+			expect(args.cwd).toBe("/tmp/ws");
+		});
+
+		it("cancel honours the (providerId, cwd) pair so worktree sessions cancel independently", async () => {
+			sendPromptMock.mockResolvedValue(undefined);
+			await manager.send("devin", "a", {
+				mode: "workspace",
+				cwd: "/tmp/ws/worktree-1",
+			});
+			await manager.send("devin", "b", {
+				mode: "workspace",
+				cwd: "/tmp/ws/worktree-2",
+			});
+			cancelMock.mockClear();
+
+			await manager.cancel("devin", {
+				mode: "workspace",
+				cwd: "/tmp/ws/worktree-1",
+			});
+
+			// Exactly one client was asked to cancel — the one bound to wt-1.
+			expect(cancelMock).toHaveBeenCalledTimes(1);
+		});
+	});
 });
