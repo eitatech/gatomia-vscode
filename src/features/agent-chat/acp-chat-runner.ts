@@ -455,6 +455,15 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 			]);
 		}
 
+		// T078 — coalesce per-turn stream telemetry: one event per completed
+		// turn (not per chunk) with the coalesced character count so we can
+		// trend output volume without fanning out high-frequency events.
+		logTelemetry(AGENT_CHAT_TELEMETRY_EVENTS.SESSION_STREAMED, {
+			sessionId: this.sessionId,
+			chars: this.turnBuffer.length,
+			stopReason,
+		});
+
 		const finishedTurnId = this.currentTurnId ?? randomUUID();
 		this.fireEvent({
 			type: "message/agent-turn-finished",

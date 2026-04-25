@@ -130,26 +130,46 @@ describe("RunningAgentsTreeProvider (T042)", () => {
 	});
 
 	describe("root groups", () => {
-		it("emits three groups: Active, Recent, Orphaned worktrees", async () => {
+		it("emits the New session leaf followed by three groups: Active, Recent, Orphaned worktrees", async () => {
 			const children = await provider.getChildren();
 			expect(children.map((c: RunningAgentsTreeItem) => c.label)).toEqual([
+				"+ New agent session…",
+				"Active",
+				"Recent",
+				"Orphaned worktrees",
+			]);
+		});
+
+		it("the New session leaf has a click command targeting gatomia.agentChat.newSession", async () => {
+			const children = await provider.getChildren();
+			const leaf = children[0];
+			expect(leaf.nodeKind).toBe("new-session-leaf");
+			expect(leaf.command).toMatchObject({
+				command: "gatomia.agentChat.newSession",
+			});
+		});
+
+		it("legacy: groups still match their original shape (label/contextValue/state)", async () => {
+			const children = await provider.getChildren();
+			const [, ...groups] = children;
+			expect(groups.map((c: RunningAgentsTreeItem) => c.label)).toEqual([
 				"Active",
 				"Recent",
 				"Orphaned worktrees",
 			]);
 
 			const active = assertGroupShape(
-				children[0],
+				children[1],
 				"Active",
 				"agent-chat-group-active"
 			);
 			const recent = assertGroupShape(
-				children[1],
+				children[2],
 				"Recent",
 				"agent-chat-group-recent"
 			);
 			const orphans = assertGroupShape(
-				children[2],
+				children[3],
 				"Orphaned worktrees",
 				"agent-chat-group-orphans"
 			);
@@ -185,7 +205,7 @@ describe("RunningAgentsTreeProvider (T042)", () => {
 			store.active = [running];
 			store.recent = [done];
 
-			const [activeGroup, recentGroup] = await provider.getChildren();
+			const [, activeGroup, recentGroup] = await provider.getChildren();
 			const activeChildren = await provider.getChildren(activeGroup);
 			const recentChildren = await provider.getChildren(recentGroup);
 
@@ -206,7 +226,7 @@ describe("RunningAgentsTreeProvider (T042)", () => {
 			});
 			store.active = [s];
 
-			const [activeGroup] = await provider.getChildren();
+			const [, activeGroup] = await provider.getChildren();
 			const [leaf] = await provider.getChildren(activeGroup);
 
 			// Label is the agent display name; description carries the metadata.
@@ -220,7 +240,7 @@ describe("RunningAgentsTreeProvider (T042)", () => {
 			const s = makeSession({ id: "s-cmd" });
 			store.active = [s];
 
-			const [activeGroup] = await provider.getChildren();
+			const [, activeGroup] = await provider.getChildren();
 			const [leaf] = await provider.getChildren(activeGroup);
 
 			expect(leaf.command).toMatchObject({
@@ -244,7 +264,7 @@ describe("RunningAgentsTreeProvider (T042)", () => {
 			});
 			store.active = [worktreeSession];
 
-			const [activeGroup] = await provider.getChildren();
+			const [, activeGroup] = await provider.getChildren();
 			const [leaf] = await provider.getChildren(activeGroup);
 
 			expect(leaf.contextValue).toBe("agent-chat-session-worktree");
@@ -252,7 +272,7 @@ describe("RunningAgentsTreeProvider (T042)", () => {
 
 		it("uses the plain session contextValue for local sessions", async () => {
 			store.active = [makeSession({ id: "s-local" })];
-			const [activeGroup] = await provider.getChildren();
+			const [, activeGroup] = await provider.getChildren();
 			const [leaf] = await provider.getChildren(activeGroup);
 			expect(leaf.contextValue).toBe("agent-chat-session");
 		});
@@ -269,7 +289,7 @@ describe("RunningAgentsTreeProvider (T042)", () => {
 				},
 			];
 			const children = await provider.getChildren();
-			const [, , orphanGroup] = children;
+			const [, , , orphanGroup] = children;
 			const orphanChildren = await provider.getChildren(orphanGroup);
 
 			expect(orphanChildren).toHaveLength(1);
@@ -289,7 +309,7 @@ describe("RunningAgentsTreeProvider (T042)", () => {
 				}),
 			];
 
-			const [activeGroup] = await provider.getChildren();
+			const [, activeGroup] = await provider.getChildren();
 			const [leaf] = await provider.getChildren(activeGroup);
 
 			expect(leaf.description).toMatch(BLOCKED_RE);
@@ -304,7 +324,7 @@ describe("RunningAgentsTreeProvider (T042)", () => {
 				}),
 			];
 
-			const [activeGroup] = await provider.getChildren();
+			const [, activeGroup] = await provider.getChildren();
 			const [leaf] = await provider.getChildren(activeGroup);
 
 			expect(String(leaf.description ?? "")).not.toMatch(BLOCKED_RE);
@@ -318,7 +338,7 @@ describe("RunningAgentsTreeProvider (T042)", () => {
 				}),
 			];
 
-			const [activeGroup] = await provider.getChildren();
+			const [, activeGroup] = await provider.getChildren();
 			const [leaf] = await provider.getChildren(activeGroup);
 
 			// ThemeIcon stores its id on the `id` property.

@@ -498,5 +498,34 @@ describe("AgentChatPanel (T018 contract)", () => {
 			panel.dispose();
 			expect(fakePanel.dispose).toHaveBeenCalled();
 		});
+
+		// Regression: spec 018 shipped a double-attach where
+		// `AgentChatPanel.open()` registered the inner WebviewPanel with
+		// the registry *and* the command handler attached its wrapper.
+		// The second attach threw "session ... already has a panel" and
+		// silently aborted new-session initialization. The panel must
+		// NOT touch the registry's panel map directly — the command
+		// handler is the sole owner of that mapping.
+		it("does not call registry.attachPanel on open (handler owns attachment)", async () => {
+			const attachSpy = vi.spyOn(registry, "attachPanel");
+			const { panel } = await createPanelForSession();
+			panel.open();
+			expect(attachSpy).not.toHaveBeenCalled();
+		});
+
+		// Regression: the host wrapper exposed to the registry needs an
+		// `onDidDispose` event so the registry can drop the
+		// `panelsBySessionId` entry when the user closes the webview.
+		// `AgentChatPanel.dispose()` must fire that event exactly once.
+		it("fires onDidDispose when dispose() is called", async () => {
+			const { panel } = await createPanelForSession();
+			panel.open();
+			let fired = 0;
+			panel.onDidDispose(() => {
+				fired += 1;
+			});
+			panel.dispose();
+			expect(fired).toBe(1);
+		});
 	});
 });

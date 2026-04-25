@@ -7,7 +7,7 @@ import {
 	type PermissionPrompter,
 } from "./acp-client";
 import type { AcpProviderRegistry } from "./acp-provider-registry";
-import type { SessionMode } from "./types";
+import type { AcpProviderDescriptor, SessionMode } from "./types";
 
 export interface AcpSessionContext {
 	mode: SessionMode;
@@ -22,6 +22,16 @@ export interface AcpSessionContext {
 	cwd?: string;
 }
 
+/**
+ * Resolver invoked the first time a descriptor whose `spawnCommand === "npx"`
+ * is about to spawn a fresh subprocess. Returning `false` aborts the spawn and
+ * causes `send()` to reject. The result is cached per `(providerId, cwd)`.
+ */
+export type BeforeSpawnHook = (
+	descriptor: AcpProviderDescriptor,
+	context: { cwd: string }
+) => Promise<boolean>;
+
 export interface AcpSessionManagerOptions {
 	registry: AcpProviderRegistry;
 	output: OutputChannel;
@@ -30,6 +40,11 @@ export interface AcpSessionManagerOptions {
 	permissionDefault?: PermissionMode;
 	/** Interactive resolver used when `permissionDefault` is `"ask"`. */
 	promptForPermission?: PermissionPrompter;
+	/**
+	 * Optional consent hook used to gate `npx -y <package>` spawns. The hook
+	 * is only invoked for descriptors whose `spawnCommand` is `"npx"`.
+	 */
+	beforeSpawn?: BeforeSpawnHook;
 }
 
 /**
@@ -48,12 +63,18 @@ export class AcpSessionManager {
 	private readonly cwd: string;
 	private readonly permissionDefault: PermissionMode | undefined;
 	private readonly promptForPermission: PermissionPrompter | undefined;
+	private readonly beforeSpawn: BeforeSpawnHook | undefined;
 	/**
 	 * Cached clients keyed by `${providerId}::${cwd}` (F1 remediation) so two
 	 * concurrent worktree sessions for the same provider never share a
 	 * subprocess.
 	 */
 	private readonly clients = new Map<string, AcpClient>();
+	/**
+	 * Set of `(providerId, cwd)` keys for which the user has already accepted
+	 * an `npx -y` spawn. Prevents re-prompting on every call.
+	 */
+	private readonly consentedSpawns = new Set<string>();
 
 	constructor(options: AcpSessionManagerOptions) {
 		this.registry = options.registry;
@@ -61,6 +82,7 @@ export class AcpSessionManager {
 		this.cwd = options.cwd;
 		this.permissionDefault = options.permissionDefault;
 		this.promptForPermission = options.promptForPermission;
+		this.beforeSpawn = options.beforeSpawn;
 	}
 
 	async send(
@@ -68,9 +90,70 @@ export class AcpSessionManager {
 		prompt: string,
 		context: AcpSessionContext
 	): Promise<void> {
-		const client = this.ensureClient(providerId, this.resolveCwd(context));
+		const cwd = this.resolveCwd(context);
+		await this.ensureSpawnConsent(providerId, cwd);
+		const client = this.ensureClient(providerId, cwd);
 		const sessionKey = resolveSessionKey(context);
 		await client.sendPrompt(sessionKey, prompt);
+	}
+
+	/**
+	 * Variant of {@link send} that takes a caller-supplied session id directly,
+	 * skipping the {@link SessionMode} → key mapping. Used by `AcpChatRunner`
+	 * which mints its own ids via {@link deriveAcpSessionId}.
+	 */
+	async sendPromptDirect(
+		providerId: string,
+		cwd: string | undefined,
+		sessionId: string,
+		prompt: string
+	): Promise<void> {
+		const resolvedCwd = cwd ?? this.cwd;
+		await this.ensureSpawnConsent(providerId, resolvedCwd);
+		const client = this.ensureClient(providerId, resolvedCwd);
+		await client.sendPrompt(sessionId, prompt);
+	}
+
+	/**
+	 * Variant of {@link cancel} that targets a caller-supplied session id
+	 * directly. Pair with {@link sendPromptDirect}.
+	 */
+	async cancelDirect(
+		providerId: string,
+		cwd: string | undefined,
+		sessionId: string
+	): Promise<void> {
+		const client = this.findClient(providerId, cwd ?? this.cwd);
+		if (!client) {
+			return;
+		}
+		await client.cancel(sessionId);
+	}
+
+	private async ensureSpawnConsent(
+		providerId: string,
+		cwd: string
+	): Promise<void> {
+		if (!this.beforeSpawn) {
+			return;
+		}
+		const key = this.clientKey(providerId, cwd);
+		// A pre-existing client means we already spawned (or are spawning) the
+		// process for this key — no consent prompt needed.
+		if (this.clients.has(key) || this.consentedSpawns.has(key)) {
+			return;
+		}
+		const descriptor = this.registry.get(providerId);
+		if (!descriptor || descriptor.spawnCommand !== "npx") {
+			return;
+		}
+		const consented = await this.beforeSpawn(descriptor, { cwd });
+		if (!consented) {
+			throw new Error(
+				`[ACP] user declined npx spawn for provider '${providerId}'`
+			);
+		}
+		this.consentedSpawns.add(key);
 	}
 
 	async cancel(providerId: string, context: AcpSessionContext): Promise<void> {

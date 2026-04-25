@@ -170,7 +170,7 @@ export class QuickAccessExplorerProvider
 }
 
 export class QuickAccessTreeItem extends TreeItem {
-	readonly groupId?: string;
+	groupId?: string;
 
 	private constructor(
 		label: string,

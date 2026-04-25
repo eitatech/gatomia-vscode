@@ -70,7 +70,7 @@ export class MCPClientService implements IMCPClientService {
 			}
 
 			// Validate parameters
-			const validation = this.validateParameters(
+			const validation = await this.validateParameters(
 				serverId,
 				toolName,
 				parameters
@@ -151,16 +151,16 @@ export class MCPClientService implements IMCPClientService {
 	 * @param parameters - Parameters to validate
 	 * @returns Validation result with errors if invalid
 	 */
-	validateParameters(
+	async validateParameters(
 		serverId: string,
 		toolName: string,
 		parameters: Record<string, unknown>
-	): ParameterValidationResult {
+	): Promise<ParameterValidationResult> {
 		const errors: ParameterValidationError[] = [];
 
 		try {
 			// Get tool schema
-			const tool = this.discoveryService.getTool(serverId, toolName);
+			const tool = await this.discoveryService.getTool(serverId, toolName);
 			if (!tool) {
 				errors.push({
 					parameter: "_tool",

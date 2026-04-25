@@ -23,6 +23,7 @@
 import { randomUUID } from "node:crypto";
 import {
 	type Disposable,
+	EventEmitter,
 	type ExtensionContext,
 	ViewColumn,
 	type WebviewPanel,
@@ -165,6 +166,15 @@ export class AgentChatPanel {
 	private opened = false;
 	private lastLifecycleState: SessionLifecycleState;
 
+	/**
+	 * Fired exactly once when this `AgentChatPanel` is disposed. Used by
+	 * the host wrapper exposed to the registry so the registry can clean
+	 * up its `panelsBySessionId` entry without coupling to the inner
+	 * `WebviewPanel`.
+	 */
+	private readonly _onDidDispose = new EventEmitter<void>();
+	readonly onDidDispose = this._onDidDispose.event;
+
 	constructor(options: AgentChatPanelOptions) {
 		this.session = options.session;
 		this.store = options.store;
@@ -190,7 +200,16 @@ export class AgentChatPanel {
 		this.panel = this.host.createPanel({ session: this.session });
 		this.opened = true;
 
-		this.registry.attachPanel(this.session.id, this.panel);
+		// NOTE: We intentionally do NOT call `this.registry.attachPanel(...)`
+		// here. The owning command handler (`handleStartNew` /
+		// `handleOpenForSession`) is the single source of truth for panel
+		// registration — it attaches a wrapper that exposes our
+		// `onDidDispose` event so the registry can clean up. Calling
+		// `attachPanel` again from this site would violate the registry's
+		// "one panel per session" invariant and cause initialization to
+		// fail (regression seen in spec 018: "session ... already has a
+		// panel" thrown right after the user submitted the new-session
+		// prompt).
 
 		this.disposables.push(
 			this.panel.webview.onDidReceiveMessage((msg) => {
@@ -266,6 +285,12 @@ export class AgentChatPanel {
 			}
 			this.panel = undefined;
 		}
+		try {
+			this._onDidDispose.fire();
+		} catch {
+			// best-effort: never let listener errors mask a disposal.
+		}
+		this._onDidDispose.dispose();
 	}
 
 	// ------------------------------------------------------------------

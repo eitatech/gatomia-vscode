@@ -8,7 +8,15 @@
  * - Refinement request submission tracking
  */
 
-import type { DocumentType } from "../types/spec-kit-types";
+/**
+ * Local type alias kept independent from the preview-specific
+ * `PreviewDocumentType` union so the telemetry surface can evolve without
+ * pulling preview internals into a metrics module.
+ *
+ * Intentionally `string` so callers can label new document kinds as the
+ * product evolves; the telemetry pipeline does not enumerate them.
+ */
+type DocumentType = string;
 
 // ==================== Interfaces ====================
 

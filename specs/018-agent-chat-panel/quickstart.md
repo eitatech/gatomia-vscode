@@ -117,6 +117,12 @@ TDD is mandatory (Constitution III). New implementation code must be preceded by
 
 | Symptom | Likely culprit | Diagnostic |
 |---------|----------------|------------|
+| `+ New agent session…` leaf missing from the Running Agents tree | `RunningAgentsTreeProvider.getChildren()` was called before activation completed | Confirm `bootstrapAgentChat` finished without an exception; the leaf is the first root child |
+| New Session QuickPick shows zero providers | `acpProviderRegistry` is `null` (extension still activating) | Wait a moment and re-run `gatomia.agentChat.newSession`; check `[ACP] Router ready with N provider(s)` in the GatomIA output channel |
+| New Session QuickPick missing JetBrains Junie / OpenCode / Codex / Auggie | `KNOWN_AGENTS` entry not bridged or remote registry fetch silently disabled | Verify `gatomia.acp.registryRemoteFetch` is `true`; tail the channel for `[ACP] Remote registry merged: now N provider(s)` |
+| Provider grouped under "Install required" but you have it installed | The local catalog `installChecks` did not detect the binary on PATH | Run `which <agent>` in the same terminal VS Code spawned from; on macOS GUI launches restart VS Code via the dock so the login shell is sourced |
+| `npx -y` warning fires every prompt instead of once per session | Consent cache was bypassed because the descriptor's `(providerId, cwd)` key changed | Inspect `AcpSessionManager.consentedSpawns`; the key is built from `providerId::cwd`, so worktree switches re-prompt by design |
+| Open Panel command opens a blank webview that never lists agents | The webview hasn't been bundled / `extensionUri` is not allowed in `localResourceRoots` | Confirm `panel.webview.html` was set; check `gatomia.agentChat.openPanel` is firing without an exception in the channel |
 | Panel does not open on session start | `AgentChatRegistry` did not register the session, or `autoOpenPanelOnNewSession = false` | Check `gatomia.agentChat.settings`; open the `GatomIA` output channel for errors |
 | Agent output visible in log but not in panel | `AcpClient.subscribeSession()` not wired; panel listener not firing | Breakpoint in `acp-chat-runner.ts`; check webview `use-session-bridge.ts` receives `agent-chat/messages/appended` |
 | Mode selector missing for a known agent | Capability discovery returned `source: "none"` | Inspect `agent-capabilities-service.ts` resolve result; verify catalog entry exists |
@@ -125,6 +131,12 @@ TDD is mandatory (Constitution III). New implementation code must be preceded by
 | After restart, ACP session still shows `running` | `extension.deactivate` did not flush manifest | Ensure `flushForDeactivation()` is awaited by `deactivate`'s return value; check `workspaceState.update` settled |
 | Cloud session doesn't re-attach on launch | `cloud-chat-adapter.attach` not called during activation | Check `AgentChatSessionStore.listNonTerminal()` output and the for-loop in activation |
 | Tree view empty after restart | Manifest key missing or corrupted | `workspaceState.get("gatomia.agentChat.sessions.index")`; recover by deleting the key (lose history) |
+| "6th ACP session" fails silently | No `promptForCap` helper wired in bootstrap | Check `bootstrapAgentChat` passes `promptForCap: promptForCapWarning` in the command deps; expect `agent-chat.concurrent-cap.hit` telemetry with `reason: "no-prompt-helper"` when the fail-closed branch fires |
+| Concurrent-cap QuickPick opens but nothing happens after selecting "Cancel and start new" | `AgentChatRegistry.getRunner` returned undefined for the chosen session | Verify the session is still live in the registry; idle terminal sessions are valid choices (we cancel only when a runner exists) |
+| Orphan worktree entry stuck in "Orphaned worktrees" after clicking Clean Up | `removeOrphanedWorktree` not awaited or `WorktreeCleanupWarningRequired` not surfaced to the user | Watch the `agent-chat.worktree.cleaned` vs `agent-chat.worktree.abandoned` telemetry; re-click after confirming the destructive prompt |
+| `(blocked)` flag missing on a session stuck waiting for user input | Lifecycle never transitioned to `waiting-for-input` | Inspect `AgentChatSession.lifecycleState` in the session store; the tree uses `describeSession` in `running-agents-tree-provider.ts` which only appends the suffix for this state |
+| Duplicate `ended-by-shutdown` transcript markers after reopening | `initialize()` appended a second marker instead of detecting the existing tail | Check `hasTailShutdownMarker`: the transcript's last message must be a `system` entry with `kind: "ended-by-shutdown"`; re-initialization is idempotent only when that invariant holds |
+| Missing `agent-chat.session.streamed` telemetry for a completed turn | `handleTurnFinished` short-circuited before logging | Ensure the runner is transitioning from `running` to `waiting-for-input`/terminal through `handleTurnFinished`; the event fires once per completed turn with the coalesced character count |
 
 ---
 
@@ -133,10 +145,14 @@ TDD is mandatory (Constitution III). New implementation code must be preceded by
 The feature emits events via the existing telemetry pipeline. During the dev host session, tail the GatomIA output channel for:
 
 - `agent-chat.session.started` — new session dispatched
-- `agent-chat.session.ended-by-shutdown` — on reactivation for previously running ACP sessions
-- `agent-chat.worktree.created` / `.cleaned` / `.failed`
+- `agent-chat.session.streamed` — one event per completed turn with coalesced char count
+- `agent-chat.session.follow-up-sent` — user submitted a follow-up message mid/after a turn
+- `agent-chat.session.cancelled` — user cancelled an in-flight turn
+- `agent-chat.session.ended-by-shutdown` — emitted by `flushForDeactivation` for every live ACP session the shutdown stamped
+- `agent-chat.worktree.created` / `.cleaned` / `.failed` / `.abandoned`
 - `agent-chat.capabilities.resolved` — with `source: "agent" | "catalog" | "none"`
 - `agent-chat.panel.opened` / `.reopened`
+- `agent-chat.concurrent-cap.hit` — cap-warning QuickPick shown (or fail-closed), payload carries `decision`, `cap`, `liveCount`, optional `sessionIdToCancel`, optional `reason`
 - `agent-chat.error` — any failure
 
 No PII is emitted (paths are anonymized; user-provided model ids are excluded).

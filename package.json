@@ -889,10 +889,32 @@
         "title": "Clean Up Orphaned Worktree",
         "category": "GatomIA",
         "icon": "$(trash)"
+      },
+      {
+        "command": "gatomia.agentChat.newSession",
+        "title": "New Agent Chat Session…",
+        "category": "GatomIA",
+        "icon": "$(add)"
+      },
+      {
+        "command": "gatomia.agentChat.openPanel",
+        "title": "Open Agent Chat Panel",
+        "category": "GatomIA",
+        "icon": "$(comment-discussion)"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "gatomia.agentChat.newSession",
+          "when": "view == gatomia.views.runningAgents",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gatomia.agentChat.openPanel",
+          "when": "view == gatomia.views.runningAgents",
+          "group": "navigation@2"
+        },
         {
           "command": "gatomia.refreshCloudAgents",
           "when": "view == gatomia.views.cloudAgents && gatomia.cloudAgent.hasProvider",

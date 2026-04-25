@@ -146,7 +146,7 @@ describe("multi-session concurrent monitoring (T072)", () => {
 			lifecycleState: "waiting-for-input",
 		});
 
-		const [activeGroup] = await provider.getChildren();
+		const [, activeGroup] = await provider.getChildren();
 		const leaves = await provider.getChildren(activeGroup);
 
 		const ids = leaves.map((l: RunningAgentsTreeItem) => l.sessionId).sort();
@@ -181,7 +181,7 @@ describe("multi-session concurrent monitoring (T072)", () => {
 		provider.onDidChangeTreeData(refresh);
 
 		// Before: session is Active.
-		let [activeGroup, recentGroup] = await provider.getChildren();
+		let [, activeGroup, recentGroup] = await provider.getChildren();
 		let activeLeaves = await provider.getChildren(activeGroup);
 		let recentLeaves = await provider.getChildren(recentGroup);
 		expect(activeLeaves.map((l: RunningAgentsTreeItem) => l.sessionId)).toEqual(
@@ -194,7 +194,7 @@ describe("multi-session concurrent monitoring (T072)", () => {
 
 		// After: session moved to Recent and the tree refresh fired.
 		expect(refresh).toHaveBeenCalled();
-		[activeGroup, recentGroup] = await provider.getChildren();
+		[, activeGroup, recentGroup] = await provider.getChildren();
 		activeLeaves = await provider.getChildren(activeGroup);
 		recentLeaves = await provider.getChildren(recentGroup);
 		expect(activeLeaves).toHaveLength(0);

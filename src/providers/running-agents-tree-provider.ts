@@ -52,6 +52,7 @@ export type RunningAgentsTreeItem = TreeItem & {
 	orphanBranchName?: string;
 	/** Discriminator for getChildren dispatch. */
 	nodeKind:
+		| "new-session-leaf"
 		| "group-active"
 		| "group-recent"
 		| "group-orphans"
@@ -75,6 +76,8 @@ export interface RunningAgentsTreeProviderOptions {
 // ---------------------------------------------------------------------------
 
 const OPEN_FOR_SESSION_COMMAND_ID = "gatomia.agentChat.openForSession";
+const NEW_SESSION_COMMAND_ID = "gatomia.agentChat.newSession";
+const NEW_SESSION_LABEL = "+ New agent session…";
 
 const GROUP_LABELS = {
 	active: "Active",
@@ -153,6 +156,7 @@ export class RunningAgentsTreeProvider
 	): Promise<RunningAgentsTreeItem[]> {
 		if (!element) {
 			return Promise.resolve([
+				this.newSessionLeaf(),
 				this.groupItem("active"),
 				this.groupItem("recent"),
 				this.groupItem("orphans"),
@@ -169,6 +173,22 @@ export class RunningAgentsTreeProvider
 			default:
 				return Promise.resolve([]);
 		}
+	}
+
+	private newSessionLeaf(): RunningAgentsTreeItem {
+		const item = new TreeItem(
+			NEW_SESSION_LABEL,
+			TreeItemCollapsibleState.None
+		) as RunningAgentsTreeItem;
+		item.nodeKind = "new-session-leaf";
+		item.contextValue = "agent-chat-new-session";
+		item.iconPath = new ThemeIcon("add");
+		item.command = {
+			command: NEW_SESSION_COMMAND_ID,
+			title: NEW_SESSION_LABEL,
+		};
+		item.tooltip = "Start a new agent chat session";
+		return item;
 	}
 
 	// ------------------------------------------------------------------

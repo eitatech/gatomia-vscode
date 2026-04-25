@@ -69,6 +69,31 @@ export class MCPActionValidationError extends Error {
  * 6. Handle timeout and errors
  * 7. Return execution result
  */
+/**
+ * Resolves the (serverId, toolName) pair from an MCP action's params.
+ * Prefers the legacy flat fields when present (existing hook configurations
+ * still use these), and falls back to the first entry in `selectedTools`.
+ *
+ * Throws when neither path produces a valid pair — this should be unreachable
+ * if `isValidMCPParams` returned `true`, but the assertion makes the
+ * downstream `string` types honest.
+ */
+function resolveTargetTool(params: MCPActionParams): {
+	serverId: string;
+	toolName: string;
+} {
+	if (params.serverId && params.toolName) {
+		return { serverId: params.serverId, toolName: params.toolName };
+	}
+	const first = params.selectedTools?.[0];
+	if (first?.serverId && first?.toolName) {
+		return { serverId: first.serverId, toolName: first.toolName };
+	}
+	throw new MCPActionValidationError(
+		"MCP action requires either (serverId, toolName) or a non-empty selectedTools entry"
+	);
+}
+
 export class MCPActionExecutor {
 	private readonly discoveryService: IMCPDiscoveryService;
 	private readonly clientService: IMCPClientService;
@@ -105,30 +130,31 @@ export class MCPActionExecutor {
 			// T059: Validate action parameters
 			this.validateActionParameters(params);
 
+			// Resolve the server/tool identifiers from either the legacy
+			// flat fields or the modern `selectedTools` array. `isValidMCPParams`
+			// guarantees one of the two paths is populated.
+			const { serverId, toolName } = resolveTargetTool(params);
+
 			// T081-T082: Check server availability with graceful degradation
-			await this.checkServerAvailability(params.serverId);
+			await this.checkServerAvailability(serverId);
 
 			// T060: Resolve parameter mappings from context
 			const resolvedParams = this.resolveParameters(params, templateContext);
 
 			// T090: Detailed logging for parameter resolution
 			this.logger.log?.(
-				`[MCPActionExecutor] Resolved parameters for ${params.toolName}:`,
+				`[MCPActionExecutor] Resolved parameters for ${toolName}:`,
 				JSON.stringify(resolvedParams)
 			);
 
 			// T061: Validate resolved parameters against tool schema
-			await this.validateResolvedParameters(
-				params.serverId,
-				params.toolName,
-				resolvedParams
-			);
+			await this.validateResolvedParameters(serverId, toolName, resolvedParams);
 
 			// T062 + T063: Execute tool with concurrency control
 			const timeout = params.timeout ?? MCP_DEFAULT_TIMEOUT;
 			const result = await this.executeToolWithPool(
-				params.serverId,
-				params.toolName,
+				serverId,
+				toolName,
 				resolvedParams,
 				timeout
 			);
@@ -230,7 +256,7 @@ export class MCPActionExecutor {
 		templateContext: TemplateContext
 	): Record<string, unknown> {
 		return this.parameterResolver.resolve(
-			params.parameterMappings,
+			params.parameterMappings ?? [],
 			templateContext
 		);
 	}

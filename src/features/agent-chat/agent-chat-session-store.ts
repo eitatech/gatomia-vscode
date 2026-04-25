@@ -16,6 +16,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { EventEmitter } from "vscode";
+import { AGENT_CHAT_TELEMETRY_EVENTS, logTelemetry } from "./telemetry";
 import {
 	AGENT_CHAT_STORAGE_KEYS,
 	type AgentChatSession,
@@ -472,6 +473,7 @@ export class AgentChatSessionStore {
 	async flushForDeactivation(): Promise<void> {
 		const manifest = this.readManifest();
 		const at = this.now();
+		const stampedIds: string[] = [];
 
 		for (const entry of manifest.sessions) {
 			if (
@@ -481,6 +483,7 @@ export class AgentChatSessionStore {
 				entry.lifecycleState = "ended-by-shutdown";
 				entry.endedAt = at;
 				entry.updatedAt = at;
+				stampedIds.push(entry.id);
 				const cached = this.sessions.get(entry.id);
 				if (cached) {
 					cached.lifecycleState = "ended-by-shutdown";
@@ -497,6 +500,16 @@ export class AgentChatSessionStore {
 			manifest
 		);
 		this._onDidChangeManifest.fire(manifest);
+
+		// T078 — one telemetry event per stamped session so analytics can
+		// distinguish a normal close (all ACP in terminal states) from a
+		// forced shutdown of live sessions. Emitted AFTER the manifest is
+		// durable so we never report a shutdown that didn't persist.
+		for (const sessionId of stampedIds) {
+			logTelemetry(AGENT_CHAT_TELEMETRY_EVENTS.SESSION_ENDED_BY_SHUTDOWN, {
+				sessionId,
+			});
+		}
 	}
 
 	// ------------------------------------------------------------------

@@ -34,6 +34,11 @@ import type { AgentChatRegistry as AgentChatRegistryType } from "./features/agen
 import type { AgentChatSessionStore as AgentChatSessionStoreType } from "./features/agent-chat/agent-chat-session-store";
 import { AcpProviderRegistry } from "./services/acp/acp-provider-registry";
 import { AcpSessionManager } from "./services/acp/acp-session-manager";
+import {
+	createDescriptorFromKnownAgent,
+	createDescriptorFromRemoteEntry,
+	detectHostPlatform,
+} from "./services/acp/provider-bridge";
 import { BUILT_IN_PROVIDERS } from "./services/acp/providers/descriptors";
 import { ChatDispatcher } from "./services/chat-dispatcher";
 import { ChatRouter } from "./services/chat-router";
@@ -2100,23 +2105,73 @@ function createAcpPermissionPrompter(
 	};
 }
 
+/**
+ * Returns a `BeforeSpawnHook` that asks the user before spawning a remote
+ * provider via `npx -y <package>`. The hook short-circuits to `true` for
+ * descriptors that are not npx-based; `AcpSessionManager` already filters
+ * those out, but we keep a defensive guard.
+ */
+function createAcpNpxConsentPrompter(
+	output: OutputChannel
+): (
+	descriptor: { id: string; displayName: string; spawnArgs: string[] },
+	context: { cwd: string }
+) => Promise<boolean> {
+	return async (descriptor) => {
+		try {
+			// spawnArgs for npx descriptors is `["-y", "<package>", ...rest]`.
+			const npxPackage =
+				descriptor.spawnArgs[0] === "-y"
+					? descriptor.spawnArgs[1]
+					: descriptor.spawnArgs[0];
+			const choice = await window.showWarningMessage(
+				`Run ${descriptor.displayName} via \`npx -y ${npxPackage ?? descriptor.id}\`? This will download and execute a third-party package.`,
+				{ modal: true },
+				"Continue",
+				"Cancel"
+			);
+			return choice === "Continue";
+		} catch (error) {
+			output.appendLine(
+				`[ACP] npx consent prompt failed: ${error instanceof Error ? error.message : String(error)}`
+			);
+			return false;
+		}
+	};
+}
+
 function bootstrapAcpRouter(context: ExtensionContext): void {
 	try {
 		const registry = new AcpProviderRegistry();
+
+		// Source 1 (highest priority): built-in descriptors. These ship with
+		// hand-crafted probes (devin, gemini-cli) and never get replaced by
+		// catalog/remote entries.
 		for (const descriptor of BUILT_IN_PROVIDERS) {
 			registry.register(descriptor);
 		}
+
+		// Source 2: known-agent catalog. Each entry becomes a runnable
+		// descriptor whose probe delegates to KnownAgentDetector.
+		const detector = new KnownAgentDetector();
+		for (const entry of KNOWN_AGENTS) {
+			if (registry.get(entry.id)) {
+				continue; // Built-in already wins.
+			}
+			try {
+				registry.register(createDescriptorFromKnownAgent(entry, detector));
+			} catch (err) {
+				outputChannel.appendLine(
+					`[ACP] Failed to bridge known agent '${entry.id}': ${err instanceof Error ? err.message : String(err)}`
+				);
+			}
+		}
+
 		acpProviderRegistry = registry;
 
 		const config = workspace.getConfiguration("gatomia");
 		if (config.get<boolean>("acp.registryRemoteFetch", true)) {
-			registry
-				.loadRemoteRegistry({ globalState: context.globalState })
-				.catch((err: unknown) => {
-					outputChannel.appendLine(
-						`[ACP] Remote registry fetch failed: ${err instanceof Error ? err.message : String(err)}`
-					);
-				});
+			scheduleRemoteRegistryMerge(registry, context);
 		}
 
 		const onboarding = new OnboardingService(context.globalState);
@@ -2132,6 +2187,7 @@ function bootstrapAcpRouter(context: ExtensionContext): void {
 			cwd: workspaceRoot,
 			permissionDefault,
 			promptForPermission: createAcpPermissionPrompter(output),
+			beforeSpawn: createAcpNpxConsentPrompter(output),
 		});
 		output.appendLine(
 			`[ACP] Session manager ready (permissionDefault=${permissionDefault})`
@@ -2160,6 +2216,52 @@ function bootstrapAcpRouter(context: ExtensionContext): void {
 			`[ACP] Failed to initialise router: ${error instanceof Error ? error.message : String(error)}`
 		);
 	}
+}
+
+function scheduleRemoteRegistryMerge(
+	registry: AcpProviderRegistry,
+	context: ExtensionContext
+): void {
+	const hostPlatform = detectHostPlatform();
+	registry
+		.loadRemoteRegistry({ globalState: context.globalState })
+		.then((entries) => mergeRemoteEntries(registry, entries, hostPlatform))
+		.catch((err: unknown) => {
+			outputChannel.appendLine(
+				`[ACP] Remote registry fetch failed: ${err instanceof Error ? err.message : String(err)}`
+			);
+		});
+}
+
+function mergeRemoteEntries(
+	registry: AcpProviderRegistry,
+	entries: readonly { id: string }[],
+	hostPlatform: ReturnType<typeof detectHostPlatform>
+): void {
+	if (!hostPlatform) {
+		return;
+	}
+	for (const entry of entries) {
+		const existing = registry.get(entry.id);
+		if (existing && existing.source === "built-in") {
+			continue;
+		}
+		try {
+			registry.register(
+				createDescriptorFromRemoteEntry(
+					entry as Parameters<typeof createDescriptorFromRemoteEntry>[0],
+					{ platform: hostPlatform }
+				)
+			);
+		} catch (err) {
+			outputChannel.appendLine(
+				`[ACP] Failed to bridge remote entry '${entry.id}': ${err instanceof Error ? err.message : String(err)}`
+			);
+		}
+	}
+	outputChannel.appendLine(
+		`[ACP] Remote registry merged: now ${registry.list().length} provider(s)`
+	);
 }
 
 function registerAcpCommands(context: ExtensionContext): void {
@@ -2657,21 +2759,97 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 					registry,
 					host: panelHost,
 				});
-				panel.open();
+				// Return a wrapper that satisfies BOTH `ChatPanelLike`
+				// (used by the command handler) AND `AgentChatPanelLike`
+				// (used by the registry). We deliberately defer
+				// `panel.open()` to the handler's `panel.reveal()` call
+				// so the registry attaches the wrapper FIRST and the
+				// inner webview is opened exactly once afterward —
+				// avoiding the double-attach that previously crashed
+				// session initialization.
 				return {
 					sessionId: session.id,
+					viewType: AgentChatPanel.viewType,
 					reveal: () => panel.open(),
 					dispose: () => panel.dispose(),
+					onDidDispose: (cb: () => void) => {
+						const sub = panel.onDidDispose(cb);
+						return { dispose: () => sub.dispose() };
+					},
 				};
 			},
-			startAcpSession: () => {
-				// Placeholder: a concrete `AcpChatRunner` wire-up requires mapping
-				// `agentCommand` → `AcpProviderRegistry.providerId`, which is the
-				// subject of a follow-up task. Users invoking `startNew` today will
-				// see this error surfaced in the command palette feedback.
-				throw new Error(
-					"agent-chat: startNew is not wired to a provider yet — open an existing session via openForSession"
+			startAcpSession: async (params) => {
+				const sessionManager = acpSessionManager;
+				if (!sessionManager) {
+					throw new Error(
+						"agent-chat: ACP session manager not initialised yet — try again after activation completes"
+					);
+				}
+
+				const workspaceRoot =
+					workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+				const cwd = params.cwd ?? workspaceRoot;
+				const workspaceUri =
+					workspace.workspaceFolders?.[0]?.uri.toString() ?? "";
+
+				const session = await store.createSession({
+					source: "acp",
+					agentId: params.agentId,
+					agentDisplayName: params.agentDisplayName,
+					capabilities: { source: "none" },
+					selectedModeId: params.mode,
+					executionTarget: { kind: "local" },
+					trigger: { kind: "user" },
+					worktree: null,
+					cloud: null,
+					workspaceUri,
+				});
+
+				const { AcpChatRunner, deriveAcpSessionId } = await import(
+					"./features/agent-chat/acp-chat-runner"
 				);
+				const acpSessionId = deriveAcpSessionId(session);
+				const runner = new AcpChatRunner({
+					session,
+					store,
+					registry,
+					manager: {
+						sendPrompt: (providerId, runnerCwd, sessionId, prompt) =>
+							sessionManager.sendPromptDirect(
+								providerId,
+								runnerCwd ?? cwd,
+								sessionId,
+								prompt
+							),
+						cancel: (providerId, runnerCwd, sessionId) =>
+							sessionManager.cancelDirect(
+								providerId,
+								runnerCwd ?? cwd,
+								sessionId
+							),
+						subscribe: (providerId, runnerCwd, sessionId, listener) =>
+							sessionManager.subscribe(
+								providerId,
+								runnerCwd ?? cwd,
+								sessionId,
+								listener
+							),
+					},
+					acpSessionId,
+				});
+
+				if (params.taskInstruction) {
+					// Fire-and-forget: the runner persists its own state and
+					// surfaces failures via transcript error messages, so we
+					// don't await here to keep the command responsive.
+					runner.start(params.taskInstruction).catch((err: unknown) => {
+						outputChannel.appendLine(
+							`[AgentChat] runner.start failed: ${err instanceof Error ? err.message : String(err)}`
+						);
+					});
+				}
+
+				return { session, runner };
 			},
 			get concurrentCap() {
 				return readConcurrentCap();
@@ -2719,6 +2897,87 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 			})
 		);
 
+		// Spec 018 Phase 4: New session entry-points.
+		const { handleNewSession } = await import(
+			"./commands/agent-chat-new-session"
+		);
+		const { NewSessionPanel } = await import("./panels/new-session-panel");
+
+		const startSessionFromUi = async (params: {
+			agentId: string;
+			agentDisplayName: string;
+			taskInstruction: string;
+		}): Promise<void> => {
+			await commands.executeCommand("gatomia.agentChat.startNew", {
+				agentId: params.agentId,
+				agentDisplayName: params.agentDisplayName,
+				agentCommand: "",
+				taskInstruction: params.taskInstruction,
+			});
+		};
+
+		context.subscriptions.push(
+			commands.registerCommand("gatomia.agentChat.newSession", async () => {
+				try {
+					await handleNewSession({
+						listProviders: () =>
+							buildNewSessionProviderItems(acpProviderRegistry),
+						startNew: startSessionFromUi,
+						window: {
+							showQuickPick: window.showQuickPick.bind(window) as never,
+							showInputBox: window.showInputBox.bind(window) as never,
+							showWarningMessage: window.showWarningMessage.bind(
+								window
+							) as never,
+						},
+						env: { openExternal: env.openExternal.bind(env) },
+						parseUri: (value: string) => Uri.parse(value),
+					});
+				} catch (err) {
+					outputChannel.appendLine(
+						`[AgentChat] newSession failed: ${err instanceof Error ? err.message : String(err)}`
+					);
+				}
+			})
+		);
+
+		let openPanelInstance: InstanceType<typeof NewSessionPanel> | undefined;
+		context.subscriptions.push(
+			commands.registerCommand("gatomia.agentChat.openPanel", () => {
+				try {
+					if (!acpProviderRegistry) {
+						window.showWarningMessage(
+							"Agent Chat is still initialising — try again in a moment."
+						);
+						return;
+					}
+					if (openPanelInstance) {
+						openPanelInstance.reveal();
+						return;
+					}
+					const panel = new NewSessionPanel({
+						listProviders: () =>
+							buildNewSessionProviderItems(acpProviderRegistry),
+						onStart: startSessionFromUi,
+						registryUpdateEvent: acpProviderRegistry.onDidUpdate,
+						extensionUri: context.extensionUri,
+						window: {
+							createWebviewPanel: window.createWebviewPanel.bind(
+								window
+							) as never,
+						},
+						env: { openExternal: env.openExternal.bind(env) },
+					});
+					openPanelInstance = panel;
+					panel.open();
+				} catch (err) {
+					outputChannel.appendLine(
+						`[AgentChat] openPanel failed: ${err instanceof Error ? err.message : String(err)}`
+					);
+				}
+			})
+		);
+
 		outputChannel.appendLine(
 			"[AgentChat] Session store + running-agents tree initialised; commands registered"
 		);
@@ -2727,4 +2986,45 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 			`[AgentChat] Failed to bootstrap: ${error instanceof Error ? error.message : String(error)}`
 		);
 	}
+}
+
+/**
+ * Snapshot the current ACP provider registry into the shape the New Session
+ * QuickPick / panel expects. We classify each descriptor into one of three
+ * tiers using its `spawnCommand` and built-in `source`:
+ *   - `installed`        — built-in or local descriptor (probe will confirm).
+ *   - `available-via-npx` — remote descriptor whose spawn is `npx -y …`.
+ *   - `install-required`  — remote descriptor with neither npx nor a probed
+ *                           binary; surfaces the install URL.
+ */
+function buildNewSessionProviderItems(
+	registry: AcpProviderRegistry | null | undefined
+): import("./commands/agent-chat-new-session").NewSessionProviderItem[] {
+	if (!registry) {
+		return [];
+	}
+	return registry.list().map((descriptor) => {
+		const source = descriptor.source ?? "built-in";
+		let availability: "installed" | "available-via-npx" | "install-required";
+		if (source === "built-in" || source === "local") {
+			availability = "installed";
+		} else if (descriptor.spawnCommand === "npx") {
+			availability = "available-via-npx";
+		} else {
+			availability = "install-required";
+		}
+		const npxPackage =
+			descriptor.spawnCommand === "npx" && descriptor.spawnArgs[0] === "-y"
+				? descriptor.spawnArgs[1]
+				: undefined;
+		return {
+			id: descriptor.id,
+			displayName: descriptor.displayName,
+			description: descriptor.description,
+			source,
+			availability,
+			npxPackage,
+			installUrl: descriptor.installUrl || undefined,
+		};
+	});
 }

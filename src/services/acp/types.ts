@@ -12,6 +12,10 @@ import type { IdeHost } from "../../utils/ide-host-detector";
  *   flag. When `false`, ACP routing is disabled for this provider.
  * - `executablePath`: absolute path when resolvable (used for spawning).
  * - `authHint`: short, actionable message shown in onboarding notifications.
+ * - `canRunViaNpx`: true when the descriptor declares an npx fallback; the UI
+ *   uses this to add the consent warning before spawning.
+ * - `npxPackage`: the package name passed to `npx -y <package>` when the
+ *   provider runs through the npx fallback.
  */
 export interface AcpProviderProbe {
 	installed: boolean;
@@ -21,9 +25,18 @@ export interface AcpProviderProbe {
 	executablePath: string | null;
 	authHint?: string;
 	error?: string;
+	canRunViaNpx?: boolean;
+	npxPackage?: string;
 }
 
 export type SessionMode = "workspace" | "per-spec" | "per-prompt";
+
+/**
+ * Where this descriptor came from. Used by `bootstrapAcpRouter` to apply
+ * collision rules (built-in beats remote beats local) and by the picker
+ * to badge entries with their origin.
+ */
+export type AcpProviderSource = "built-in" | "local" | "remote";
 
 /**
  * Descriptor for an ACP-capable provider. Lives in the provider registry and
@@ -48,6 +61,15 @@ export interface AcpProviderDescriptor {
 	authCommand: string;
 	/** Minimal CLI version that supports ACP (semver string, optional). */
 	minVersion?: string;
+	/**
+	 * Origin of this descriptor (defaults to "built-in" when omitted, for
+	 * backwards compatibility with the original Devin/Gemini providers).
+	 */
+	source?: AcpProviderSource;
+	/** Optional human-readable description used by the New Session picker. */
+	description?: string;
+	/** Optional icon URL surfaced by remote registry entries. */
+	iconUrl?: string;
 	/** Probe implementation. Must never throw; returns probe info. */
 	probe(timeoutMs?: number): Promise<AcpProviderProbe>;
 }

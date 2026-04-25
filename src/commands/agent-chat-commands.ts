@@ -24,6 +24,10 @@ import type {
 	CapWarningDecision,
 	CapWarningPromptOptions,
 } from "../features/agent-chat/cap-warning-prompt";
+import {
+	AGENT_CHAT_TELEMETRY_EVENTS,
+	logTelemetry,
+} from "../features/agent-chat/telemetry";
 import type {
 	AgentChatRunnerHandle,
 	AgentChatSession,
@@ -230,7 +234,7 @@ async function enforceConcurrentCap(
 	};
 	if (!deps.promptForCap) {
 		// Without a prompt helper we have no UX path — fail closed.
-		deps.emitTelemetry?.("agent-chat.concurrent-cap.hit", {
+		deps.emitTelemetry?.(AGENT_CHAT_TELEMETRY_EVENTS.CONCURRENT_CAP_HIT, {
 			...telemetryBase,
 			decision: "abort",
 			reason: "no-prompt-helper",
@@ -242,7 +246,7 @@ async function enforceConcurrentCap(
 		cap: capacity.cap,
 	});
 	if (decision.kind === "abort") {
-		deps.emitTelemetry?.("agent-chat.concurrent-cap.hit", {
+		deps.emitTelemetry?.(AGENT_CHAT_TELEMETRY_EVENTS.CONCURRENT_CAP_HIT, {
 			...telemetryBase,
 			decision: decision.kind,
 		});
@@ -252,7 +256,7 @@ async function enforceConcurrentCap(
 	if (runnerToCancel) {
 		await runnerToCancel.cancel();
 	}
-	deps.emitTelemetry?.("agent-chat.concurrent-cap.hit", {
+	deps.emitTelemetry?.(AGENT_CHAT_TELEMETRY_EVENTS.CONCURRENT_CAP_HIT, {
 		...telemetryBase,
 		decision: decision.kind,
 		sessionIdToCancel: decision.sessionIdToCancel,
@@ -283,6 +287,11 @@ export async function handleOpenForSession(
 
 	// Honour the one-panel-per-session invariant (FR-008) via focusPanel.
 	if (registry.focusPanel(sessionId)) {
+		// T078 — we reused an existing panel instead of creating a new one.
+		logTelemetry(AGENT_CHAT_TELEMETRY_EVENTS.PANEL_REOPENED, {
+			sessionId,
+			agentId: session.agentId,
+		});
 		return;
 	}
 
