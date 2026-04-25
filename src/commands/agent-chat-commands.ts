@@ -566,7 +566,11 @@ export function registerAgentChatCommands(
 		),
 		commands.registerCommand(
 			AGENT_CHAT_COMMANDS.CANCEL,
-			async (sessionId: string) => {
+			async (arg: string | SessionTreeItemLike | undefined) => {
+				const sessionId = coerceSessionIdArg(arg);
+				if (!sessionId) {
+					return;
+				}
 				await handleCancel(deps, sessionId);
 			}
 		),
@@ -613,6 +617,42 @@ interface OrphanTreeItemLike {
 	readonly orphanId?: string;
 	readonly orphanAbsolutePath?: string;
 	readonly orphanBranchName?: string;
+}
+
+/**
+ * Tree-item shape for session leaves in the Running Agents view.
+ *
+ * VS Code dispatches inline view-context buttons (`view/item/context`) by
+ * passing the *entire* tree item to the command — NOT the `arguments` array
+ * defined on the leaf's primary `command`. Since the menu binding for
+ * `gatomia.agentChat.cancel` does not specify arguments, we must accept the
+ * tree-item shape and pull `sessionId` ourselves.
+ *
+ * Kept structurally minimal so unit tests can pass plain objects without
+ * importing `RunningAgentsTreeItem` (which would drag in `vscode`).
+ */
+export interface SessionTreeItemLike {
+	readonly sessionId?: string;
+}
+
+/**
+ * Resolve a session id from either a raw string (command palette / programmatic
+ * dispatch) or a Running Agents tree leaf (inline action button). Returns
+ * `undefined` when no usable session id is present so the command handler can
+ * no-op silently rather than throw.
+ *
+ * Exported for unit tests — see `agent-chat-commands.test.ts`.
+ */
+export function coerceSessionIdArg(
+	arg: string | SessionTreeItemLike | undefined
+): string | undefined {
+	if (typeof arg === "string") {
+		return arg.length > 0 ? arg : undefined;
+	}
+	if (arg && typeof arg.sessionId === "string" && arg.sessionId.length > 0) {
+		return arg.sessionId;
+	}
+	return;
 }
 
 function isCleanupOrphanedWorktreePayload(

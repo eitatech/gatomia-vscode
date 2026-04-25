@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
 	AGENT_CHAT_COMMANDS,
 	type AgentChatCommandsDeps,
+	coerceSessionIdArg,
 	handleCancel,
 	handleOpenForSession,
 	handleStartNew,
@@ -362,6 +363,37 @@ describe("agent-chat-commands (T038)", () => {
 			await handleCancel(deps, "sess-1");
 
 			expect(runner.cancel).not.toHaveBeenCalled();
+		});
+	});
+
+	// Regression: VS Code dispatches inline view-context buttons by passing the
+	// entire tree item to the command, not the leaf's `command.arguments`.
+	// `gatomia.agentChat.cancel` is bound as a `view/item/context` action on
+	// the Running Agents tree, so the registration wrapper must coerce a
+	// `RunningAgentsTreeItem`-shaped argument into a string `sessionId`
+	// before delegating to `handleCancel`. Previously the wrapper accepted
+	// `(sessionId: string)` directly and the cancel button silently no-op'd
+	// because `registry.getRunner(treeItem)` returned `undefined`.
+	describe("coerceSessionIdArg", () => {
+		it("returns a non-empty string argument unchanged", () => {
+			expect(coerceSessionIdArg("sess-42")).toBe("sess-42");
+		});
+
+		it("extracts `sessionId` from a tree-item-shaped argument", () => {
+			expect(coerceSessionIdArg({ sessionId: "sess-7" })).toBe("sess-7");
+		});
+
+		it("returns undefined for empty strings", () => {
+			expect(coerceSessionIdArg("")).toBeUndefined();
+		});
+
+		it("returns undefined for objects without a usable sessionId", () => {
+			expect(coerceSessionIdArg({})).toBeUndefined();
+			expect(coerceSessionIdArg({ sessionId: "" })).toBeUndefined();
+		});
+
+		it("returns undefined for `undefined`", () => {
+			expect(coerceSessionIdArg(undefined)).toBeUndefined();
 		});
 	});
 });
