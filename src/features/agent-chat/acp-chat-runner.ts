@@ -45,6 +45,7 @@ import {
 	type ChatMessage,
 	type ErrorChatMessage,
 	type ErrorChatMessageCategory,
+	type ModelDescriptor,
 	type SessionLifecycleState,
 	TERMINAL_STATES,
 	type ToolCallChatMessage,
@@ -464,9 +465,60 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 			case "error":
 				await this.handleRuntimeError(event.message);
 				break;
+			case "session-models-changed":
+				await this.handleSessionModelsChanged(
+					event.availableModels,
+					event.currentModelId,
+					event.at
+				);
+				break;
 			default:
 				break;
 		}
+	}
+
+	/**
+	 * Persist the agent-reported model state on the session and fan
+	 * out a runner-level event so the host can rebroadcast the new
+	 * `availableModels` / `currentModelId` to the webview without a
+	 * full session reload.
+	 */
+	private async handleSessionModelsChanged(
+		availableModels: ReadonlyArray<{
+			modelId: string;
+			name: string;
+			description?: string | null;
+		}>,
+		currentModelId: string,
+		at: number
+	): Promise<void> {
+		const projected: ModelDescriptor[] = availableModels.map((m) => ({
+			id: m.modelId,
+			displayName: m.name,
+			invocation: "initial-prompt",
+		}));
+		const patch: Partial<AgentChatSession> = {
+			availableModels: projected,
+			currentModelId,
+			selectedModelId: currentModelId,
+		};
+		try {
+			await this.store.updateSession(this.sessionId, patch);
+			this.registry.updateSession(this.sessionId, patch);
+		} catch (error) {
+			logTelemetry(AGENT_CHAT_TELEMETRY_EVENTS.ERROR, {
+				sessionId: this.sessionId,
+				stage: "models-changed-persist",
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
+		this.fireEvent({
+			type: "session/models-changed",
+			sessionId: this.sessionId,
+			availableModels: projected,
+			currentModelId,
+			at,
+		});
 	}
 
 	private async handleAgentChunk(

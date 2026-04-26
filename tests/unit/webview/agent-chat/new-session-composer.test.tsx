@@ -2,9 +2,9 @@
  * NewSessionComposer tests.
  *
  * Validates that the empty-state composer integrates the
- * {@link PermissionToggle} and forwards user picks back to the bridge,
- * plus the existing submit/start path keeps working with the new
- * required props in place.
+ * {@link PermissionChip} (Copilot-style integrated toolbar) and forwards
+ * user picks back to the bridge, plus the existing submit/start path
+ * keeps working with the new required props in place.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -15,7 +15,14 @@ import type {
 	NewSessionRequest,
 } from "@/features/agent-chat/types";
 
-const ALLOW_BUTTON_RE = /^Auto-approve$/;
+// Each ChipDropdown toggle button exposes its current selection via the
+// accessible name `<Prefix>: <Label>`. Menu options carry their own
+// short label as accessible name.
+const PERMISSION_CHIP_RE = /^Permission:/i;
+const AGENT_CHIP_RE = /^Agent:/i;
+const AGENT_FILE_CHIP_RE = /^Agent file:/i;
+const MODEL_CHIP_RE = /^Model:/i;
+const ALLOW_OPTION_RE = /^Auto-approve$/;
 const START_CHAT_RE = /Start chat/i;
 const PROMPT_PLACEHOLDER_RE = /Describe the task/i;
 
@@ -41,7 +48,7 @@ const PROVIDERS: readonly AgentChatProviderOption[] = [
 ];
 
 describe("NewSessionComposer", () => {
-	it("renders the permission toggle alongside the picker", () => {
+	it("renders the permission chip in the integrated toolbar", () => {
 		render(
 			<NewSessionComposer
 				agentFiles={[]}
@@ -52,14 +59,15 @@ describe("NewSessionComposer", () => {
 			/>
 		);
 
-		// PermissionToggle is rendered with its three-options segmented
-		// control. The "Auto-approve" option is the easiest to assert
-		// against because the regex doesn't collide with anything else
-		// in the composer chrome.
-		expect(screen.getByRole("button", { name: ALLOW_BUTTON_RE })).toBeDefined();
+		// The chip toggle button exposes the current mode via its
+		// accessible name (`Permission: Ask`). The dropdown options are
+		// only mounted lazily once the toggle is opened.
+		expect(
+			screen.getByRole("button", { name: PERMISSION_CHIP_RE })
+		).toBeDefined();
 	});
 
-	it("forwards toggle picks to onChangePermissionDefault", () => {
+	it("forwards permission picks made through the chip menu", () => {
 		const onChangePermissionDefault = vi.fn();
 		render(
 			<NewSessionComposer
@@ -71,7 +79,8 @@ describe("NewSessionComposer", () => {
 			/>
 		);
 
-		fireEvent.click(screen.getByRole("button", { name: ALLOW_BUTTON_RE }));
+		fireEvent.click(screen.getByRole("button", { name: PERMISSION_CHIP_RE }));
+		fireEvent.click(screen.getByRole("menuitem", { name: ALLOW_OPTION_RE }));
 
 		expect(onChangePermissionDefault).toHaveBeenCalledWith("allow");
 	});
@@ -115,5 +124,48 @@ describe("NewSessionComposer", () => {
 			name: START_CHAT_RE,
 		}) as HTMLButtonElement;
 		expect(submit.disabled).toBe(true);
+	});
+
+	it("renders Agent / Agent file / Model as chip dropdowns matching the permission chip", () => {
+		// Agent chip + Agent file chip render unconditionally; Model chip
+		// only renders when the active provider has at least one model
+		// (Claude in this fixture surfaces `claude-sonnet-4.6`).
+		render(
+			<NewSessionComposer
+				agentFiles={[]}
+				onChangePermissionDefault={vi.fn()}
+				onStart={vi.fn()}
+				permissionDefault="ask"
+				providers={PROVIDERS}
+			/>
+		);
+
+		expect(screen.getByRole("button", { name: AGENT_CHIP_RE })).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: AGENT_FILE_CHIP_RE })
+		).toBeDefined();
+		expect(screen.getByRole("button", { name: MODEL_CHIP_RE })).toBeDefined();
+	});
+
+	it("hides the Model chip when the active provider exposes no models", () => {
+		const noModelProviders: readonly AgentChatProviderOption[] = [
+			{
+				...PROVIDERS[0],
+				id: "no-models",
+				displayName: "No models",
+				models: [],
+			},
+		];
+		render(
+			<NewSessionComposer
+				agentFiles={[]}
+				onChangePermissionDefault={vi.fn()}
+				onStart={vi.fn()}
+				permissionDefault="ask"
+				providers={noModelProviders}
+			/>
+		);
+
+		expect(screen.queryByRole("button", { name: MODEL_CHIP_RE })).toBeNull();
 	});
 });

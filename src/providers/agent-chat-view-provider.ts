@@ -44,13 +44,19 @@ import {
 import type { PendingWriteSnapshot } from "../features/agent-chat/acp-chat-runner";
 import type { AgentChatRegistry } from "../features/agent-chat/agent-chat-registry";
 import type { AgentChatSessionStore } from "../features/agent-chat/agent-chat-session-store";
+import type {
+	DiscoveredModels,
+	ModelDiscoveryService,
+} from "../features/agent-chat/model-discovery-service";
 import {
 	AGENT_CHAT_TELEMETRY_EVENTS,
 	logTelemetry,
 } from "../features/agent-chat/telemetry";
 import {
+	type AgentChatEvent,
 	type AgentChatSession,
 	type ChatMessage,
+	type ModelDescriptor,
 	type SessionLifecycleState,
 	TERMINAL_STATES,
 	transcriptKeyFor,
@@ -60,6 +66,7 @@ import {
 	type AgentChatCatalog,
 	buildAgentChatCatalog,
 	type AgentChatCatalogSources,
+	type AgentChatProviderOption,
 } from "../features/agent-chat/agent-chat-catalog";
 import { getWebviewContent } from "../utils/get-webview-content";
 
@@ -72,6 +79,12 @@ export interface AgentChatViewProviderOptions {
 	readonly store: AgentChatSessionStore;
 	readonly registry: AgentChatRegistry;
 	readonly catalogSources: AgentChatCatalogSources;
+	/**
+	 * Optional discovery service used to overlay dynamic per-provider
+	 * model lists onto the static catalog. When omitted (e.g. in unit
+	 * tests) the provider falls back to the catalog-only behaviour.
+	 */
+	readonly modelDiscovery?: ModelDiscoveryService;
 	/**
 	 * Fired when the catalog needs to be rebroadcast (e.g. when a remote
 	 * registry fetch lands or workspace agent files change). The provider
@@ -135,6 +148,9 @@ export class AgentChatViewProvider
 	private readonly probeCache: Map<string, { installed: boolean }> = new Map();
 	private probeRefreshInFlight: Promise<void> | undefined;
 
+	/** Per-provider in-flight probe markers, surfaced to the webview via `catalog/loaded`. */
+	private readonly modelsLoading = new Map<string, boolean>();
+
 	constructor(options: AgentChatViewProviderOptions) {
 		this.options = options;
 
@@ -169,6 +185,19 @@ export class AgentChatViewProvider
 				}
 			})
 		);
+
+		// Whenever a provider's dynamic model list lands (or refreshes),
+		// rebroadcast the catalog so the picker `<select>` switches from
+		// the loading placeholder to the real list. Also clear the
+		// in-flight marker for that provider.
+		if (options.modelDiscovery) {
+			this.disposables.push(
+				options.modelDiscovery.onDidChange((evt) => {
+					this.modelsLoading.delete(evt.providerId);
+					this.pushCatalog();
+				})
+			);
+		}
 	}
 
 	// ------------------------------------------------------------------
@@ -278,12 +307,30 @@ export class AgentChatViewProvider
 		const catalog = this.snapshotCatalog();
 		this.postMessage({
 			type: "agent-chat/catalog/loaded",
-			payload: { catalog },
+			payload: {
+				catalog,
+				modelsLoading: this.snapshotModelsLoading(),
+			},
 		}).catch(noop);
 		// Kick off (or piggy-back on) an async probe refresh so the next
 		// rebroadcast can replace the optimistic source-based heuristic
 		// with the real `descriptor.probe()` result.
 		this.scheduleProbeRefresh();
+	}
+
+	/**
+	 * Build the per-provider `modelsLoading` map shipped with every
+	 * `agent-chat/catalog/loaded` payload so the webview can render a
+	 * loading placeholder while a probe is in flight.
+	 */
+	private snapshotModelsLoading(): Record<string, boolean> {
+		const out: Record<string, boolean> = {};
+		for (const [providerId, loading] of this.modelsLoading) {
+			if (loading) {
+				out[providerId] = true;
+			}
+		}
+		return out;
 	}
 
 	pushSessionList(): void {
@@ -366,12 +413,61 @@ export class AgentChatViewProvider
 				);
 				return;
 			}
+			case "agent-chat/control/probe-models": {
+				const providerId = (msg.payload as { providerId?: string } | undefined)
+					?.providerId;
+				if (providerId) {
+					this.triggerModelProbe(providerId, { invalidate: true });
+				}
+				return;
+			}
 			default:
 				if (this.binding) {
 					await this.binding.handleWebviewMessage(msg);
 				}
 				return;
 		}
+	}
+
+	/**
+	 * Kick off a {@link ModelDiscoveryService.getModels} probe for a
+	 * provider, marking the per-provider loading state and rebroadcasting
+	 * the catalog so the webview can render the placeholder while the
+	 * probe is in flight. When `invalidate` is true the cached entry is
+	 * discarded first so the user-facing refresh button always re-queries
+	 * the agent.
+	 */
+	private triggerModelProbe(
+		providerId: string,
+		opts: { invalidate?: boolean } = {}
+	): void {
+		const discovery = this.options.modelDiscovery;
+		if (!discovery) {
+			return;
+		}
+		if (opts.invalidate) {
+			discovery.invalidate(providerId);
+		}
+		this.modelsLoading.set(providerId, true);
+		this.pushCatalog();
+		discovery
+			.getModels(providerId)
+			.catch((err: unknown) => {
+				this.options.outputChannel?.appendLine(
+					`[AgentChatView] model probe failed for ${providerId}: ${
+						err instanceof Error ? err.message : String(err)
+					}`
+				);
+			})
+			.finally(() => {
+				this.modelsLoading.delete(providerId);
+				// `onDidChange` already rebroadcasts the catalog on success;
+				// we only force a push here to clear the loading marker
+				// when the probe rejects without firing a change event.
+				if (this.view) {
+					this.pushCatalog();
+				}
+			});
 	}
 
 	/**
@@ -511,10 +607,44 @@ export class AgentChatViewProvider
 	}
 
 	private snapshotCatalog(): AgentChatCatalog {
-		return buildAgentChatCatalog({
+		const baseCatalog = buildAgentChatCatalog({
 			...this.options.catalogSources,
 			probeCache: this.probeCache,
 		});
+		const discovery = this.options.modelDiscovery;
+		if (!discovery) {
+			return baseCatalog;
+		}
+		const projectedProviders = baseCatalog.providers.map((provider) =>
+			this.applyDiscoveredModels(provider, discovery.peek(provider.id))
+		);
+		return { ...baseCatalog, providers: projectedProviders };
+	}
+
+	/**
+	 * Overlay a {@link DiscoveredModels} cache hit on top of a static
+	 * catalog projection. When the source is `"vscode-lm"` or
+	 * `"agent"` we replace the static models entirely; `"catalog"` and
+	 * `"none"` defer to the catalog snapshot the picker already had.
+	 */
+	private applyDiscoveredModels(
+		provider: AgentChatProviderOption,
+		discovered: DiscoveredModels | undefined
+	): AgentChatProviderOption {
+		if (!discovered) {
+			return provider;
+		}
+		if (discovered.source === "vscode-lm" || discovered.source === "agent") {
+			return { ...provider, models: discovered.models as ModelDescriptor[] };
+		}
+		if (discovered.source === "none") {
+			// Honour the redesign: when no source has any models, the
+			// picker hides the `<select>` entirely. We pass an empty
+			// list so the webview can detect the empty state.
+			return { ...provider, models: [] };
+		}
+		// `catalog` — keep the static list the base projector already used.
+		return provider;
 	}
 
 	/**
@@ -681,6 +811,8 @@ class SidebarSessionBinding {
 	private readonly subscriptions: Disposable[] = [];
 	private readonly knownMessageIds = new Set<string>();
 	private lastLifecycleState: SessionLifecycleState;
+	private lastAvailableModelIds: string[] = [];
+	private lastCurrentModelId: string | undefined;
 	private disposed = false;
 
 	constructor(options: SidebarSessionBindingOptions) {
@@ -691,6 +823,11 @@ class SidebarSessionBinding {
 		this.postMessage = options.postMessage;
 		this.outputChannel = options.outputChannel;
 		this.lastLifecycleState = options.session.lifecycleState;
+		this.lastAvailableModelIds = (options.session.availableModels ?? []).map(
+			(m) => m.id
+		);
+		this.lastCurrentModelId =
+			options.session.currentModelId ?? options.session.selectedModelId;
 
 		this.subscriptions.push(
 			this.store.onDidChangeManifest(() => {
@@ -710,6 +847,7 @@ class SidebarSessionBinding {
 					onPendingWritesChanged?: (
 						listener: (writes: readonly PendingWriteSnapshot[]) => void
 					) => Disposable;
+					onEvent?: (listener: (event: AgentChatEvent) => void) => Disposable;
 			  }
 			| undefined;
 		const subscribe = runner?.onPendingWritesChanged;
@@ -724,6 +862,32 @@ class SidebarSessionBinding {
 				})
 			);
 		}
+	}
+
+	/**
+	 * Forward an `AgentChatEvent` to the webview. Currently scoped to
+	 * the `session/models-changed` variant — the runner emits this when
+	 * the agent surfaces a new {@link AcpSessionModelState}, which the
+	 * webview consumes to refresh the model chip without a full
+	 * `session/loaded` round-trip.
+	 */
+	async sendModelsChanged(event: {
+		availableModels: ReadonlyArray<{
+			id: string;
+			displayName: string;
+			invocation: "initial-prompt" | "cli-flag";
+			invocationTemplate?: string;
+		}>;
+		currentModelId: string;
+	}): Promise<void> {
+		await this.postMessage({
+			type: "agent-chat/session/models-changed",
+			payload: {
+				sessionId: this.sessionId,
+				availableModels: event.availableModels,
+				currentModelId: event.currentModelId,
+			},
+		});
 	}
 
 	private async sendPendingWrites(
@@ -767,15 +931,20 @@ class SidebarSessionBinding {
 			this.knownMessageIds.add(msg.id);
 		}
 		const isReadOnly = current.source === "cloud";
+		const availableModels = current.availableModels ?? [];
+		const currentModelId = current.currentModelId ?? current.selectedModelId;
 		await this.postMessage({
 			type: "agent-chat/session/loaded",
 			payload: {
 				session: {
 					id: current.id,
 					source: current.source,
+					agentId: current.agentId,
 					agentDisplayName: current.agentDisplayName,
 					selectedModeId: current.selectedModeId,
 					selectedModelId: current.selectedModelId,
+					availableModels,
+					currentModelId,
 					executionTarget: {
 						kind: current.executionTarget.kind,
 						label: executionTargetLabel(current.executionTarget.kind),
@@ -800,7 +969,7 @@ class SidebarSessionBinding {
 				},
 				messages: transcript,
 				availableModes: [],
-				availableModels: [],
+				availableModels,
 				availableTargets: [
 					{ kind: "local", label: "Local", enabled: true },
 					{ kind: "worktree", label: "Worktree", enabled: true },
@@ -993,7 +1162,35 @@ class SidebarSessionBinding {
 				},
 			});
 		}
+		await this.maybePushModelsChanged(current);
 		await this.flushTranscriptDeltas();
+	}
+
+	/**
+	 * Detect changes to the session's `availableModels` / `currentModelId`
+	 * payload and forward them to the webview via
+	 * `agent-chat/session/models-changed`. The runner persists the new
+	 * state through the store, which fires `onDidChangeManifest`; this
+	 * binding then diffs the snapshot to avoid spurious posts.
+	 */
+	private async maybePushModelsChanged(
+		current: AgentChatSession
+	): Promise<void> {
+		const nextIds = (current.availableModels ?? []).map((m) => m.id);
+		const nextCurrent = current.currentModelId ?? current.selectedModelId;
+		const idsChanged =
+			nextIds.length !== this.lastAvailableModelIds.length ||
+			nextIds.some((id, idx) => this.lastAvailableModelIds[idx] !== id);
+		const currentChanged = nextCurrent !== this.lastCurrentModelId;
+		if (!(idsChanged || currentChanged)) {
+			return;
+		}
+		this.lastAvailableModelIds = nextIds;
+		this.lastCurrentModelId = nextCurrent;
+		await this.sendModelsChanged({
+			availableModels: current.availableModels ?? [],
+			currentModelId: nextCurrent ?? "",
+		});
 	}
 
 	private async flushTranscriptDeltas(): Promise<void> {

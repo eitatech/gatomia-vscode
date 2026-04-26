@@ -310,6 +310,21 @@ export interface AgentChatSession {
 	selectedModeId?: string;
 	/** Current model id (undefined when no model selector is shown). */
 	selectedModelId?: string;
+	/**
+	 * Models reported by the agent for this specific session via the
+	 * ACP `NewSessionResponse.models.availableModels` payload. Empty
+	 * array (or undefined for legacy sessions) means the agent did not
+	 * surface dynamic models — the picker falls back to the static
+	 * catalogue from `agent-capabilities-catalog.ts`.
+	 */
+	availableModels?: ModelDescriptor[];
+	/**
+	 * Currently selected model as last reported by the agent (via
+	 * `NewSessionResponse.models.currentModelId` or after a successful
+	 * `session/set_model` round-trip). `undefined` for sessions whose
+	 * agent does not implement the experimental capability.
+	 */
+	currentModelId?: string;
 	executionTarget: ExecutionTarget;
 	lifecycleState: SessionLifecycleState;
 	trigger: SessionTrigger;
@@ -382,6 +397,13 @@ export type AgentChatEvent =
 			type: "pending-writes/changed";
 			sessionId: string;
 			writes: readonly PendingWriteSummary[];
+			at: number;
+	  }
+	| {
+			type: "session/models-changed";
+			sessionId: string;
+			availableModels: readonly ModelDescriptor[];
+			currentModelId: string;
 			at: number;
 	  };
 
@@ -516,6 +538,8 @@ export interface CreateSessionInput {
 	capabilities: ResolvedCapabilities;
 	selectedModeId?: string;
 	selectedModelId?: string;
+	availableModels?: ModelDescriptor[];
+	currentModelId?: string;
 	executionTarget: ExecutionTarget;
 	trigger: SessionTrigger;
 	worktree: WorktreeHandle | null;

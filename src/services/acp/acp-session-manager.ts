@@ -12,7 +12,11 @@ import {
 	type PermissionPrompter,
 } from "./acp-client";
 import type { AcpProviderRegistry } from "./acp-provider-registry";
-import type { AcpProviderDescriptor, SessionMode } from "./types";
+import type {
+	AcpProviderDescriptor,
+	AcpSessionModelState,
+	SessionMode,
+} from "./types";
 
 export interface AcpSessionContext {
 	mode: SessionMode;
@@ -271,6 +275,65 @@ export class AcpSessionManager {
 	): Disposable {
 		const client = this.ensureClient(providerId, cwd ?? this.cwd);
 		return client.subscribeSession(sessionId, listener);
+	}
+
+	/**
+	 * Returns the latest {@link AcpSessionModelState} captured for an
+	 * ACP session, or `undefined` when the agent did not surface any
+	 * model information. Used by the host to initialise the model chip
+	 * shown in the panel toolbar without having to subscribe to events.
+	 */
+	getSessionModels(
+		providerId: string,
+		cwd: string | undefined,
+		sessionId: string
+	): AcpSessionModelState | undefined {
+		const client = this.findClient(providerId, cwd ?? this.cwd);
+		if (!client) {
+			return;
+		}
+		const sessionKey = client.findSessionKeyByAcpId(sessionId) ?? sessionId;
+		return client.getSessionModels(sessionKey);
+	}
+
+	/**
+	 * Forward a `session/set_model` request to the underlying client.
+	 * Throws an `Error` containing `ACP_NOT_SUPPORTED` when the provider
+	 * does not implement the experimental method — the caller is
+	 * expected to fall back to the legacy "record model change" flow.
+	 */
+	async setSessionModel(
+		providerId: string,
+		cwd: string | undefined,
+		sessionId: string,
+		modelId: string
+	): Promise<void> {
+		const client = this.ensureClient(providerId, cwd ?? this.cwd);
+		const sessionKey = client.findSessionKeyByAcpId(sessionId) ?? sessionId;
+		await client.setSessionModel(sessionKey, modelId);
+	}
+
+	/**
+	 * Spawn the provider's CLI (if not already running) and read its
+	 * model catalogue via a probe `newSession` call. Reuses the cached
+	 * `AcpClient` so subsequent prompts to the same `(providerId, cwd)`
+	 * tuple do not double-spawn.
+	 *
+	 * Honours the same `npx` consent gate as {@link send} so the user
+	 * still sees the consent dialog before the discovery flow downloads
+	 * a remote provider.
+	 *
+	 * Returns `undefined` when the agent does not surface a `models`
+	 * payload — callers fall back to the static catalog.
+	 */
+	async probeProviderModels(
+		providerId: string,
+		cwd?: string
+	): Promise<AcpSessionModelState | undefined> {
+		const resolvedCwd = cwd ?? this.cwd;
+		await this.ensureSpawnConsent(providerId, resolvedCwd);
+		const client = this.ensureClient(providerId, resolvedCwd);
+		return client.probeAvailableModels();
 	}
 
 	dispose(): void {

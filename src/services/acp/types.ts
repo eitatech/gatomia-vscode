@@ -1,6 +1,43 @@
 import type { IdeHost } from "../../utils/ide-host-detector";
 
 /**
+ * Mirror of the experimental `ModelInfo` shape exposed by
+ * `@agentclientprotocol/sdk` for {@link SessionModelState.availableModels}.
+ *
+ * Kept as a local re-declaration so the rest of the extension code does
+ * not have to import the SDK's `schema` namespace directly. The fields
+ * match the wire format 1:1 — see
+ * `node_modules/@agentclientprotocol/sdk/dist/schema/types.gen.d.ts`.
+ */
+export interface AcpModelInfo {
+	/** Stable identifier reported by the agent (e.g. `"claude-sonnet-4-5"`). */
+	modelId: string;
+	/** Human-readable label the agent surfaces in pickers. */
+	name: string;
+	/** Optional long-form description (markdown / plain text). */
+	description?: string | null;
+}
+
+/**
+ * Mirror of the experimental `SessionModelState` payload shipped on
+ * `NewSessionResponse.models`, `LoadSessionResponse.models`, etc.
+ */
+export interface AcpSessionModelState {
+	availableModels: AcpModelInfo[];
+	currentModelId: string;
+}
+
+/**
+ * Sentinel error code thrown by {@link AcpClient.setSessionModel} when
+ * the provider's `ClientSideConnection` does not implement the
+ * experimental `setSessionModel` method (older CLIs / providers that
+ * only support `--model` at spawn time). Callers catch this to fall
+ * back to the legacy "record model change" flow which applies on the
+ * next turn.
+ */
+export const ACP_NOT_SUPPORTED = "ACP_NOT_SUPPORTED";
+
+/**
  * Result returned by provider-specific CLI probes.
  *
  * - `installed`: the CLI binary is reachable on PATH (or via `locateCLIExecutable`).

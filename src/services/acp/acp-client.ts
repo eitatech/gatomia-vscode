@@ -16,7 +16,12 @@ import {
 	PendingWritesStore,
 } from "../../features/agent-chat/pending-writes-store";
 import { getExtendedPath } from "../../utils/cli-detector";
-import type { AcpProviderDescriptor } from "./types";
+import {
+	ACP_NOT_SUPPORTED,
+	type AcpModelInfo,
+	type AcpProviderDescriptor,
+	type AcpSessionModelState,
+} from "./types";
 
 /**
  * Resolves a permission decision interactively. Return the `optionId` to
@@ -101,7 +106,20 @@ export type AcpSessionEvent =
 			at: number;
 	  }
 	| { kind: "turn-finished"; stopReason: string; at: number }
-	| { kind: "error"; message: string; at: number };
+	| { kind: "error"; message: string; at: number }
+	| {
+			/**
+			 * Fired when the agent surfaces a new {@link AcpSessionModelState}
+			 * (e.g. via the `NewSessionResponse.models` payload, a successful
+			 * `session/set_model` call, or a server-pushed update). The runner
+			 * uses this to refresh the model chip without re-loading the
+			 * whole session.
+			 */
+			kind: "session-models-changed";
+			availableModels: AcpModelInfo[];
+			currentModelId: string;
+			at: number;
+	  };
 
 export type AcpSessionEventListener = (event: AcpSessionEvent) => void;
 
@@ -136,8 +154,72 @@ const REJECT_KINDS = new Set(["reject_once", "reject_always"]);
 const DEFAULT_INITIALIZE_TIMEOUT_MS = 15_000;
 const ONCE_SESSION_KEY_PREFIX = "once:";
 
+/**
+ * Detects "method not found" / "not supported" error messages bubbled
+ * up by ACP servers that never implemented the experimental
+ * `session/set_model` method. Pre-compiled at module load to avoid
+ * re-creating the regex on every {@link AcpClient.setSessionModel} call.
+ */
+const SET_MODEL_NOT_SUPPORTED_PATTERN = /method not found|not supported/i;
+
+/**
+ * Coerces the SDK's experimental `SessionModelState` shape (which uses
+ * `null` for missing values and may be absent entirely) into our internal
+ * {@link AcpSessionModelState} type. Returns `undefined` when the
+ * payload is missing, malformed, or carries no `currentModelId` — the
+ * downstream code treats "no model state" as "agent did not surface
+ * dynamic models".
+ */
+function normaliseSessionModelState(
+	raw: unknown
+): AcpSessionModelState | undefined {
+	if (!raw || typeof raw !== "object") {
+		return;
+	}
+	const candidate = raw as {
+		availableModels?: unknown;
+		currentModelId?: unknown;
+	};
+	if (typeof candidate.currentModelId !== "string") {
+		return;
+	}
+	const availableRaw = Array.isArray(candidate.availableModels)
+		? candidate.availableModels
+		: [];
+	const availableModels: AcpModelInfo[] = [];
+	for (const entry of availableRaw) {
+		if (!entry || typeof entry !== "object") {
+			continue;
+		}
+		const e = entry as {
+			modelId?: unknown;
+			name?: unknown;
+			description?: unknown;
+		};
+		if (typeof e.modelId !== "string") {
+			continue;
+		}
+		availableModels.push({
+			modelId: e.modelId,
+			name: typeof e.name === "string" ? e.name : e.modelId,
+			description: typeof e.description === "string" ? e.description : null,
+		});
+	}
+	return {
+		availableModels,
+		currentModelId: candidate.currentModelId,
+	};
+}
+
 interface SessionEntry {
 	sessionId: string;
+	/**
+	 * Latest {@link AcpSessionModelState} as reported by the agent. Populated
+	 * from `NewSessionResponse.models` when the session is created, refreshed
+	 * after each successful `setSessionModel`, and consulted by the host when
+	 * the panel asks for the session's model chip.
+	 */
+	modelState?: AcpSessionModelState;
 }
 
 /**
@@ -580,11 +662,157 @@ export class AcpClient {
 			cwd: this.cwd,
 			mcpServers: [],
 		});
-		this.sessions.set(sessionKey, { sessionId: response.sessionId });
+		const modelState = normaliseSessionModelState(response.models);
+		this.sessions.set(sessionKey, {
+			sessionId: response.sessionId,
+			modelState,
+		});
 		this.output.appendLine(
-			`[ACP][${this.descriptor.id}] session created key=${sessionKey} id=${response.sessionId}`
+			`[ACP][${this.descriptor.id}] session created key=${sessionKey} id=${response.sessionId}` +
+				(modelState
+					? ` models=${modelState.availableModels.length} current=${modelState.currentModelId}`
+					: "")
 		);
+		if (modelState) {
+			this.emitSessionEvent(response.sessionId, {
+				kind: "session-models-changed",
+				availableModels: modelState.availableModels,
+				currentModelId: modelState.currentModelId,
+				at: Date.now(),
+			});
+		}
 		return response.sessionId;
+	}
+
+	/**
+	 * Returns the latest {@link AcpSessionModelState} captured for
+	 * `sessionKey`, or `undefined` when the agent did not report one.
+	 *
+	 * Lookup is by *session key* (the host-minted id used for
+	 * `sendPrompt`), not the underlying ACP `sessionId`. Callers that
+	 * already have the ACP id should resolve the key first via
+	 * {@link findSessionKeyByAcpId}.
+	 */
+	getSessionModels(sessionKey: string): AcpSessionModelState | undefined {
+		return this.sessions.get(sessionKey)?.modelState;
+	}
+
+	/**
+	 * Locate the host-side `sessionKey` whose ACP `sessionId` matches the
+	 * argument. Returns `undefined` when no entry matches.
+	 */
+	findSessionKeyByAcpId(acpSessionId: string): string | undefined {
+		for (const [key, entry] of this.sessions) {
+			if (entry.sessionId === acpSessionId) {
+				return key;
+			}
+		}
+		return;
+	}
+
+	/**
+	 * Probe the underlying agent for its model catalogue without keeping
+	 * a long-lived session around. Spawns the child process if necessary,
+	 * issues a `newSession` RPC, reads `response.models`, and returns the
+	 * captured {@link AcpSessionModelState}.
+	 *
+	 * The probe session is intentionally NOT stored in {@link sessions}
+	 * — it exists only to read the model list. The agent process keeps
+	 * the session reference internally until the connection closes;
+	 * that's acceptable for v1 because subsequent `sendPrompt` calls go
+	 * through fresh keys.
+	 *
+	 * Returns `undefined` when the agent does not surface a `models`
+	 * payload (older / non-spec providers).
+	 */
+	async probeAvailableModels(): Promise<AcpSessionModelState | undefined> {
+		await this.ensureStarted();
+		if (!this.connection) {
+			throw new Error(
+				`[ACP][${this.descriptor.id}] connection failed to initialise during probe`
+			);
+		}
+		const response = await this.connection.newSession({
+			cwd: this.cwd,
+			mcpServers: [],
+		});
+		const modelState = normaliseSessionModelState(response.models);
+		this.output.appendLine(
+			`[ACP][${this.descriptor.id}] probe session=${response.sessionId} ` +
+				(modelState
+					? `models=${modelState.availableModels.length} current=${modelState.currentModelId}`
+					: "no-models")
+		);
+		return modelState;
+	}
+
+	/**
+	 * Sets the agent-side model for `sessionKey`. Throws an `Error` whose
+	 * `message` contains {@link ACP_NOT_SUPPORTED} when the connection
+	 * does not implement the experimental `setSessionModel` method, so
+	 * callers can downgrade to the legacy "record model change" flow.
+	 */
+	async setSessionModel(sessionKey: string, modelId: string): Promise<void> {
+		const entry = this.sessions.get(sessionKey);
+		if (!entry) {
+			throw new Error(
+				`[ACP][${this.descriptor.id}] cannot set model: session ${sessionKey} not tracked`
+			);
+		}
+		if (!this.connection) {
+			throw new Error(
+				`[ACP][${this.descriptor.id}] connection not ready when setting model for ${sessionKey}`
+			);
+		}
+		const setter = (
+			this.connection as unknown as {
+				unstable_setSessionModel?: (params: {
+					sessionId: string;
+					modelId: string;
+				}) => Promise<unknown>;
+			}
+		).unstable_setSessionModel;
+		if (typeof setter !== "function") {
+			throw new Error(
+				`[ACP][${this.descriptor.id}] ${ACP_NOT_SUPPORTED}: provider does not implement session/set_model`
+			);
+		}
+		try {
+			await setter.call(this.connection, {
+				sessionId: entry.sessionId,
+				modelId,
+			});
+		} catch (error) {
+			const message = toMessage(error);
+			// Best-effort detection of "method not found" responses from
+			// agents that registered the connection but never implemented
+			// the experimental method.
+			if (SET_MODEL_NOT_SUPPORTED_PATTERN.test(message)) {
+				throw new Error(
+					`[ACP][${this.descriptor.id}] ${ACP_NOT_SUPPORTED}: ${message}`
+				);
+			}
+			throw error;
+		}
+		// Update the cached state and notify subscribers so the UI can
+		// re-render the model chip without waiting for the next session
+		// reload.
+		const previous = entry.modelState;
+		const availableModels = previous?.availableModels ?? [];
+		const nextState: AcpSessionModelState = {
+			availableModels,
+			currentModelId: modelId,
+		};
+		entry.modelState = nextState;
+		this.output.appendLine(
+			`[ACP][${this.descriptor.id}] session/set_model sessionKey=${sessionKey} modelId=${modelId}`
+		);
+		this.emitSessionEvent(entry.sessionId, {
+			kind: "session-models-changed",
+			availableModels: nextState.availableModels,
+			currentModelId: nextState.currentModelId,
+			at: Date.now(),
+		});
 	}
 
 	/**

@@ -61,6 +61,13 @@ export interface AgentChatBridgeState {
 	 * `"ask"` is treated as the implicit default by consumers.
 	 */
 	readonly permissionDefault: PermissionDefaultMode | undefined;
+	/**
+	 * Per-provider in-flight model probe markers — `true` while the
+	 * extension is fetching the model catalogue, cleared when the
+	 * catalog rebroadcast lands. Used by the composer / chip to render
+	 * a loading placeholder.
+	 */
+	readonly modelsLoading: Readonly<Record<string, boolean>>;
 }
 
 export interface AgentChatBridge {
@@ -88,6 +95,13 @@ export interface AgentChatBridge {
 	 * which keeps this bridge state authoritative.
 	 */
 	changePermissionDefault(mode: PermissionDefaultMode): void;
+	/**
+	 * Ask the host to (re-)probe `providerId` for its model catalogue.
+	 * The composer triggers this when the user picks a provider; the
+	 * input bar's "refresh" button forces a re-probe of the active
+	 * session's provider.
+	 */
+	probeModels(providerId: string): void;
 }
 
 // ============================================================================
@@ -107,6 +121,7 @@ const INITIAL_STATE: AgentChatBridgeState = {
 	clearedReason: undefined,
 	pendingWrites: [],
 	permissionDefault: undefined,
+	modelsLoading: {},
 };
 
 type BridgeAction =
@@ -141,7 +156,17 @@ type BridgeAction =
 	  }
 	| {
 			type: "catalog/loaded";
-			payload: { catalog: AgentChatCatalog };
+			payload: {
+				catalog: AgentChatCatalog;
+				modelsLoading?: Record<string, boolean>;
+			};
+	  }
+	| {
+			type: "session/models-changed";
+			payload: {
+				availableModels: ModelDescriptor[];
+				currentModelId: string;
+			};
 	  }
 	| {
 			type: "sessions/list-changed";
@@ -219,7 +244,26 @@ function reducer(
 				clearedReason: action.payload.reason,
 			};
 		case "catalog/loaded":
-			return { ...state, catalog: action.payload.catalog };
+			return {
+				...state,
+				catalog: action.payload.catalog,
+				modelsLoading: action.payload.modelsLoading ?? {},
+			};
+		case "session/models-changed": {
+			if (!state.session) {
+				return state;
+			}
+			return {
+				...state,
+				session: {
+					...state.session,
+					availableModels: action.payload.availableModels,
+					currentModelId: action.payload.currentModelId,
+					selectedModelId: action.payload.currentModelId,
+				},
+				availableModels: action.payload.availableModels,
+			};
+		}
 		case "sessions/list-changed":
 			return { ...state, sessions: action.payload.sessions };
 		case "pending-writes/changed":
@@ -330,8 +374,28 @@ const INCOMING_HANDLERS: Record<
 	}),
 	"agent-chat/catalog/loaded": (ctx) => ({
 		type: "catalog/loaded",
-		payload: ctx.payload as { catalog: AgentChatCatalog },
+		payload: ctx.payload as {
+			catalog: AgentChatCatalog;
+			modelsLoading?: Record<string, boolean>;
+		},
 	}),
+	"agent-chat/session/models-changed": (ctx) => {
+		const payload = ctx.payload as {
+			sessionId: string;
+			availableModels: ModelDescriptor[];
+			currentModelId: string;
+		};
+		if (ctx.activeSessionId && payload.sessionId !== ctx.activeSessionId) {
+			return;
+		}
+		return {
+			type: "session/models-changed",
+			payload: {
+				availableModels: payload.availableModels,
+				currentModelId: payload.currentModelId,
+			},
+		};
+	},
 	"agent-chat/sessions/list-changed": (ctx) => ({
 		type: "sessions/list-changed",
 		payload: ctx.payload as { sessions: SidebarSessionListItem[] },
@@ -563,6 +627,16 @@ export function useSessionBridge(initialSessionId?: string): AgentChatBridge {
 		});
 	}, []);
 
+	const probeModels = useCallback((providerId: string) => {
+		if (!providerId) {
+			return;
+		}
+		vscode.postMessage({
+			type: "agent-chat/control/probe-models",
+			payload: { providerId },
+		});
+	}, []);
+
 	return useMemo<AgentChatBridge>(
 		() => ({
 			state,
@@ -580,6 +654,7 @@ export function useSessionBridge(initialSessionId?: string): AgentChatBridge {
 			acceptPendingWrite,
 			rejectPendingWrite,
 			changePermissionDefault,
+			probeModels,
 		}),
 		[
 			state,
@@ -597,6 +672,7 @@ export function useSessionBridge(initialSessionId?: string): AgentChatBridge {
 			acceptPendingWrite,
 			rejectPendingWrite,
 			changePermissionDefault,
+			probeModels,
 		]
 	);
 }

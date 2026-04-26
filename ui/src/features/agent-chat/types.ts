@@ -222,9 +222,32 @@ export type ChatMessage =
 export interface AgentChatSessionView {
 	id: string;
 	source: "acp" | "cloud";
+	/**
+	 * Provider id of the underlying agent. For ACP sessions this is the
+	 * `AcpProviderDescriptor.id` (e.g. `"github-copilot"`); for cloud
+	 * sessions it mirrors the `cloud.providerId`. Used by the webview
+	 * to dispatch `probe-models` against the correct provider when the
+	 * user clicks the refresh button on the model chip.
+	 */
+	agentId: string;
 	agentDisplayName: string;
 	selectedModeId?: string;
 	selectedModelId?: string;
+	/**
+	 * Models the agent surfaced for this specific session via the ACP
+	 * `NewSessionResponse.models.availableModels` payload (or any
+	 * subsequent `setSessionModel` round-trip). The webview renders the
+	 * dynamic model chip from this list and falls back to the catalog
+	 * entry only when the array is empty/undefined.
+	 */
+	availableModels?: ModelDescriptor[];
+	/**
+	 * Mirrors `selectedModelId` for sessions whose agent reported the
+	 * value over the wire. Kept as a separate field so the chip can
+	 * tell the difference between "user chose this in the composer"
+	 * and "agent confirmed this via session/set_model".
+	 */
+	currentModelId?: string;
 	executionTarget: ExecutionTargetView;
 	lifecycleState: SessionLifecycleState;
 	acceptsFollowUp: boolean;

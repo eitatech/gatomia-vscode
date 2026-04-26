@@ -715,7 +715,7 @@ Tasks:
 	// ========================================================================
 	// Agent Chat Panel (spec 018) — T038/T039 bootstrap
 	// ========================================================================
-	await bootstrapAgentChat(context);
+	await bootstrapAgentChat(context, modelCacheService);
 
 	// Set up file watchers
 	setupFileWatchers(context, specExplorer, steeringExplorer, actionsExplorer);
@@ -2762,7 +2762,10 @@ async function bootstrapCloudAgents(context: ExtensionContext): Promise<void> {
  * phase will attach a real router once the provider-id bridge between
  * `ACPActionParams.agentCommand` and `AcpProviderRegistry` is designed.
  */
-async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
+async function bootstrapAgentChat(
+	context: ExtensionContext,
+	modelCacheService: ModelCacheService
+): Promise<void> {
 	try {
 		const { AgentChatSessionStore } = await import(
 			"./features/agent-chat/agent-chat-session-store"
@@ -2800,6 +2803,32 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 		agentChatRegistry = registry;
 		context.subscriptions.push({ dispose: () => registry.dispose() });
 
+		// Per-provider model discovery (Copilot LM cache + ACP probe +
+		// catalog fallback). Wired into both the view provider (so the
+		// catalog rebroadcast carries dynamic model lists) and the
+		// command deps (so `handleChangeModel` can call
+		// `session/set_model`). Lazily picks up the ACP manager when
+		// available — the bootstrap order spawns ACP before Agent Chat,
+		// so this is safe by the time the chat surface activates.
+		const { ModelDiscoveryService } = await import(
+			"./features/agent-chat/model-discovery-service"
+		);
+		const modelDiscovery = new ModelDiscoveryService({
+			modelCache: modelCacheService,
+			acpSessionManager: {
+				probeProviderModels: (providerId, cwd) => {
+					if (!acpSessionManager) {
+						return Promise.resolve(undefined);
+					}
+					return acpSessionManager.probeProviderModels(providerId, cwd);
+				},
+			},
+			resolveCwd: () =>
+				workspace.workspaceFolders?.[0]?.uri.fsPath ?? undefined,
+			log: (message) => outputChannel.appendLine(message),
+		});
+		context.subscriptions.push({ dispose: () => modelDiscovery.dispose() });
+
 		// Sidebar webview view (canonical chat surface, spec follow-up to 018).
 		// Plumb the ACP registry's onDidUpdate so the picker rebroadcasts when
 		// the remote registry merge lands; the workspace `AgentRegistry`
@@ -2816,6 +2845,7 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 					return agentRegistry ?? null;
 				},
 			},
+			modelDiscovery,
 			onCatalogChanged: (cb) => {
 				const sub = acpProviderRegistry?.onDidUpdate(() => cb());
 				return {
@@ -2846,6 +2876,26 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 		const commandDisposables = registerAgentChatCommands({
 			registry,
 			store,
+			// Bridge to the (lazy) ACP manager so `handleChangeModel`
+			// can hot-swap the agent-side model via `session/set_model`.
+			// Falls back to `recordModelChange` when the manager is not
+			// yet bootstrapped or the provider rejects with
+			// `ACP_NOT_SUPPORTED`.
+			acpSessionManager: {
+				setSessionModel: (providerId, cwd, sessionId, modelId) => {
+					if (!acpSessionManager) {
+						return Promise.reject(
+							new Error("ACP_NOT_SUPPORTED: manager not initialised")
+						);
+					}
+					return acpSessionManager.setSessionModel(
+						providerId,
+						cwd,
+						sessionId,
+						modelId
+					);
+				},
+			},
 			createPanel: (session) => {
 				// The sidebar webview is the canonical chat surface — every
 				// session binds to the singleton `AgentChatViewProvider`

@@ -251,6 +251,8 @@ export class AgentChatSessionStore {
 				capabilities: input.capabilities,
 				selectedModeId: input.selectedModeId,
 				selectedModelId: input.selectedModelId,
+				availableModels: input.availableModels,
+				currentModelId: input.currentModelId,
 				executionTarget: input.executionTarget,
 				lifecycleState: "initializing",
 				trigger: input.trigger,

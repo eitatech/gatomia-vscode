@@ -33,6 +33,7 @@ import type {
 	AgentChatSession,
 	ExecutionTarget,
 } from "../features/agent-chat/types";
+import { ACP_NOT_SUPPORTED } from "../services/acp/types";
 
 // ============================================================================
 // Command IDs (keep package.json contribution points in sync)
@@ -152,6 +153,22 @@ export interface AgentChatCommandsDeps {
 		event: string,
 		payload: Record<string, unknown>
 	) => void;
+	/**
+	 * Optional ACP manager hook used by {@link handleChangeModel} to call
+	 * the experimental `session/set_model` RPC. Declared structurally so
+	 * tests can stub it without spinning up the real
+	 * `AcpSessionManager`. Sessions whose runner does not surface the
+	 * method (older CLIs, non-ACP cloud) fall back to the legacy
+	 * `recordModelChange` flow.
+	 */
+	readonly acpSessionManager?: {
+		setSessionModel(
+			providerId: string,
+			cwd: string | undefined,
+			sessionId: string,
+			modelId: string
+		): Promise<void>;
+	};
 }
 
 // ============================================================================
@@ -480,6 +497,11 @@ export async function handleChangeModel(
 	if (session.selectedModelId === payload.modelId) {
 		return;
 	}
+
+	if (await tryAcpSetModel(deps, session, payload.modelId)) {
+		return;
+	}
+
 	const runner = deps.registry.getRunner(payload.sessionId);
 	if (runner && hasRecordModelChange(runner)) {
 		await runner.recordModelChange(payload.modelId);
@@ -487,6 +509,46 @@ export async function handleChangeModel(
 	await deps.store.updateSession(session.id, {
 		selectedModelId: payload.modelId,
 	});
+}
+
+/**
+ * Attempt to hot-swap the agent-side model via the experimental
+ * `session/set_model` RPC. Returns `true` when the RPC succeeded (the
+ * manager will fire `session-models-changed` and the runner persists
+ * the new state, so the caller does NOT need to update the store).
+ *
+ * Returns `false` to instruct the caller to fall back to the legacy
+ * `recordModelChange` flow — happens for non-ACP sessions, when the
+ * deps did not provide a manager, or when the provider's connection
+ * does not implement the experimental RPC (`ACP_NOT_SUPPORTED`).
+ *
+ * Re-throws unexpected errors so the caller's error boundary surfaces
+ * them to the user.
+ */
+async function tryAcpSetModel(
+	deps: AgentChatCommandsDeps,
+	session: AgentChatSession,
+	modelId: string
+): Promise<boolean> {
+	const manager = deps.acpSessionManager;
+	if (session.source !== "acp" || !manager) {
+		return false;
+	}
+	try {
+		await manager.setSessionModel(
+			session.agentId,
+			session.worktree?.absolutePath ?? undefined,
+			session.id,
+			modelId
+		);
+		return true;
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		if (message.includes(ACP_NOT_SUPPORTED)) {
+			return false;
+		}
+		throw error;
+	}
 }
 
 // Structural checks so the commands stay agnostic of the concrete

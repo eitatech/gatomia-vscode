@@ -269,6 +269,129 @@ describe("mode / model / target selection (T055)", () => {
 		expect(after?.executionTarget.kind).toBe("worktree");
 	});
 
+	it("changeModel calls setSessionModel via ACP when the manager is wired and skips the legacy system message", async () => {
+		const session = await seedSession(store);
+		registry.registerSession(session);
+		const runner = new AcpChatRunner({
+			session,
+			store,
+			registry,
+			manager: createQuietManager(),
+			acpSessionId: deriveAcpSessionId(session),
+		});
+		registry.attachRunner(session.id, runner);
+
+		const setSessionModel = vi.fn(
+			(
+				_providerId: string,
+				_cwd: string | undefined,
+				_sessionId: string,
+				_modelId: string
+			): Promise<void> => Promise.resolve()
+		);
+
+		await handleChangeModel(
+			{
+				registry,
+				store,
+				createPanel: () => {
+					throw new Error("unused");
+				},
+				startAcpSession: () => {
+					throw new Error("unused");
+				},
+				acpSessionManager: {
+					setSessionModel,
+				} as unknown as Parameters<
+					typeof handleChangeModel
+				>[0]["acpSessionManager"],
+			},
+			{ sessionId: session.id, modelId: "opus" }
+		);
+
+		// `setSessionModel(providerId, cwd, sessionId, modelId)` — verify
+		// the provider id and modelId arguments match the session.
+		expect(setSessionModel).toHaveBeenCalledOnce();
+		const callArgs = setSessionModel.mock.calls[0];
+		expect(callArgs?.[0]).toBe("opencode");
+		expect(callArgs?.[3]).toBe("opus");
+
+		// The success path delegates the store write to the runner's
+		// `session-models-changed` listener (fired by the real ACP
+		// client). With the quiet manager that event never lands, so
+		// the store keeps the prior selection — proving `handleChangeModel`
+		// did NOT call the legacy `store.updateSession` fallback.
+		const after = await store.getSession(session.id);
+		expect(after?.selectedModelId).toBe("sonnet");
+
+		// The ACP success path skips the legacy `recordModelChange`
+		// system message — the agent itself echoes the change via
+		// `session/models-changed`.
+		const transcript = readTranscriptFromMemento(memento, session.id);
+		const systemMessages = transcript.filter(
+			(m): m is SystemChatMessage => m.role === "system"
+		);
+		expect(systemMessages.some((m) => m.kind === "model-changed")).toBe(false);
+	});
+
+	it("changeModel falls back to the legacy path when ACP returns ACP_NOT_SUPPORTED", async () => {
+		const session = await seedSession(store);
+		registry.registerSession(session);
+		const runner = new AcpChatRunner({
+			session,
+			store,
+			registry,
+			manager: createQuietManager(),
+			acpSessionId: deriveAcpSessionId(session),
+		});
+		registry.attachRunner(session.id, runner);
+
+		// `tryAcpSetModel` matches via `error.message.includes("ACP_NOT_SUPPORTED")`,
+		// so the message itself must carry the sentinel.
+		const notSupported = new Error(
+			"ACP_NOT_SUPPORTED: provider lacks set_model"
+		);
+		const setSessionModel = vi.fn(
+			(
+				_providerId: string,
+				_cwd: string | undefined,
+				_sessionId: string,
+				_modelId: string
+			): Promise<void> => Promise.reject(notSupported)
+		);
+
+		await handleChangeModel(
+			{
+				registry,
+				store,
+				createPanel: () => {
+					throw new Error("unused");
+				},
+				startAcpSession: () => {
+					throw new Error("unused");
+				},
+				acpSessionManager: {
+					setSessionModel,
+				} as unknown as Parameters<
+					typeof handleChangeModel
+				>[0]["acpSessionManager"],
+			},
+			{ sessionId: session.id, modelId: "opus" }
+		);
+
+		expect(setSessionModel).toHaveBeenCalledOnce();
+
+		const after = await store.getSession(session.id);
+		expect(after?.selectedModelId).toBe("opus");
+
+		// Legacy path runs: a `model-changed` system message is appended.
+		const transcript = readTranscriptFromMemento(memento, session.id);
+		const systemMessages = transcript.filter(
+			(m): m is SystemChatMessage => m.role === "system"
+		);
+		expect(systemMessages.some((m) => m.kind === "model-changed")).toBe(true);
+	});
+
 	it("changeExecutionTarget refuses to mutate a session already in 'running' lifecycle", async () => {
 		const session = await seedSession(store);
 		registry.registerSession(session);

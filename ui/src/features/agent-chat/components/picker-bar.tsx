@@ -28,6 +28,12 @@ interface PickerBarProps {
 	readonly selection: PickerBarSelection;
 	readonly onChange: (next: PickerBarSelection) => void;
 	readonly disabled?: boolean;
+	/**
+	 * Per-provider in-flight probe markers — when
+	 * `modelsLoading[providerId]` is `true`, the model `<select>`
+	 * renders a "Loading models…" placeholder and is disabled.
+	 */
+	readonly modelsLoading?: Readonly<Record<string, boolean>>;
 }
 
 export function PickerBar({
@@ -36,6 +42,7 @@ export function PickerBar({
 	selection,
 	onChange,
 	disabled,
+	modelsLoading,
 }: PickerBarProps): JSX.Element {
 	const selectedProvider = useMemo(
 		() => providers.find((p) => p.id === selection.providerId),
@@ -43,6 +50,9 @@ export function PickerBar({
 	);
 
 	const models = selectedProvider?.models ?? [];
+	const isLoadingModels = Boolean(
+		selection.providerId && modelsLoading?.[selection.providerId]
+	);
 
 	const handleProvider = useCallback(
 		(providerId: string) => {
@@ -106,24 +116,13 @@ export function PickerBar({
 				</select>
 			</label>
 
-			<label className="agent-chat-picker__field">
-				<span className="agent-chat-picker__label">Model</span>
-				<select
-					className="agent-chat-picker__select"
-					disabled={disabled || models.length === 0}
-					onChange={(e) => handleModel(e.target.value)}
-					value={selection.modelId ?? ""}
-				>
-					<option disabled value="">
-						{models.length === 0 ? "Default" : "Select a model"}
-					</option>
-					{models.map((model: ModelDescriptor) => (
-						<option key={model.id} value={model.id}>
-							{model.displayName}
-						</option>
-					))}
-				</select>
-			</label>
+			{renderModelField({
+				disabled,
+				isLoadingModels,
+				models,
+				selection,
+				onChange: handleModel,
+			})}
 
 			<label className="agent-chat-picker__field">
 				<span className="agent-chat-picker__label">Agent file</span>
@@ -156,4 +155,51 @@ function providerLabel(provider: AgentChatProviderOption): string {
 		default:
 			return provider.displayName;
 	}
+}
+
+interface ModelFieldProps {
+	readonly disabled: boolean | undefined;
+	readonly isLoadingModels: boolean;
+	readonly models: readonly ModelDescriptor[];
+	readonly selection: PickerBarSelection;
+	readonly onChange: (modelId: string) => void;
+}
+
+/**
+ * Render the model `<select>`. When the active provider has no
+ * surfaced models AND no probe is in flight, the field is hidden
+ * entirely so the picker degrades gracefully (per the redesign:
+ * "no models => no select"). The loading branch keeps the field
+ * visible with a placeholder so the user has visual feedback.
+ */
+function renderModelField({
+	disabled,
+	isLoadingModels,
+	models,
+	selection,
+	onChange,
+}: ModelFieldProps): JSX.Element | null {
+	if (!isLoadingModels && models.length === 0) {
+		return null;
+	}
+	return (
+		<label className="agent-chat-picker__field">
+			<span className="agent-chat-picker__label">Model</span>
+			<select
+				className="agent-chat-picker__select"
+				disabled={disabled || isLoadingModels || models.length === 0}
+				onChange={(e) => onChange(e.target.value)}
+				value={selection.modelId ?? ""}
+			>
+				<option disabled value="">
+					{isLoadingModels ? "Loading models…" : "Select a model"}
+				</option>
+				{models.map((model) => (
+					<option key={model.id} value={model.id}>
+						{model.displayName}
+					</option>
+				))}
+			</select>
+		</label>
+	);
 }

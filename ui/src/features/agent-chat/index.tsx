@@ -50,6 +50,8 @@ export function AgentChatFeature(): JSX.Element {
 		acceptPendingWrite,
 		rejectPendingWrite,
 		changePermissionDefault,
+		changeModel,
+		probeModels,
 	} = bridge;
 
 	const latestRetryableError = useMemo(
@@ -67,24 +69,27 @@ export function AgentChatFeature(): JSX.Element {
 
 	const session = state.session;
 
-	// Sidebar empty state — no session bound. Show the SessionsList at
-	// the top (Copilot Chat-style "SESSIONS" header) and the composer
-	// underneath so the user can either resume a recent chat or spawn
-	// a fresh session.
+	// Sidebar empty state — no session bound. The recent SessionsList
+	// fills the upper area (so users can resume) while the
+	// NewSessionComposer is anchored to the bottom of the viewport, just
+	// like the on-session InputBar. The redundant "Agent Chat" topbar
+	// was removed — the view title in the sidebar header already conveys
+	// that context.
 	if (!session && surface === "sidebar") {
 		return (
 			<div className="agent-chat-feature agent-chat-feature--empty">
-				<div className="agent-chat-feature__topbar">
-					<div className="agent-chat-feature__title">Agent Chat</div>
+				<div className="agent-chat-feature__empty-main">
+					<SessionsList
+						activeSessionId={undefined}
+						onPick={switchSession}
+						sessions={state.sessions}
+					/>
 				</div>
-				<SessionsList
-					activeSessionId={undefined}
-					onPick={switchSession}
-					sessions={state.sessions}
-				/>
 				<NewSessionComposer
 					agentFiles={state.catalog.agentFiles}
+					modelsLoading={state.modelsLoading}
 					onChangePermissionDefault={changePermissionDefault}
+					onProbeProviderModels={probeModels}
 					onStart={startNewSession}
 					permissionDefault={state.permissionDefault}
 					providers={state.catalog.providers}
@@ -147,10 +152,17 @@ export function AgentChatFeature(): JSX.Element {
 			/>
 			<InputBar
 				acceptsFollowUp={session.acceptsFollowUp}
+				availableModels={session.availableModels ?? state.availableModels}
 				busy={isBusyState(session.lifecycleState)}
+				currentModelId={session.currentModelId ?? session.selectedModelId}
 				modelLabel={session.selectedModelId ?? session.agentDisplayName}
+				modelsLoading={Boolean(
+					state.modelsLoading?.[deriveProviderIdForSession(session)]
+				)}
 				onCancel={cancel}
+				onChangeModel={changeModel}
 				onChangePermissionDefault={changePermissionDefault}
+				onRefreshModels={() => probeModels(deriveProviderIdForSession(session))}
 				onSubmit={submit}
 				permissionDefault={state.permissionDefault}
 				readOnly={session.isReadOnly}
@@ -209,6 +221,21 @@ function isBusyState(
 	>["lifecycleState"]
 ): boolean {
 	return state === "running" || state === "initializing";
+}
+
+/**
+ * Resolve the provider id used for `probe-models` lookups from a
+ * session view. Cloud sessions surface the provider on `cloud`; ACP
+ * sessions stamp the descriptor id on `agentId`. Falls back to the
+ * empty string so the caller can short-circuit gracefully.
+ */
+function deriveProviderIdForSession(
+	session: NonNullable<ReturnType<typeof useSessionBridge>["state"]["session"]>
+): string {
+	if (session.cloud?.providerId) {
+		return session.cloud.providerId;
+	}
+	return session.agentId ?? "";
 }
 
 function findLatestRetryableError(

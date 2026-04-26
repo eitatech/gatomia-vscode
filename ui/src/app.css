@@ -562,10 +562,27 @@ b {
 }
 
 .agent-chat-feature--loading,
-.agent-chat-feature--error,
-.agent-chat-feature--empty {
+.agent-chat-feature--error {
 	padding: 12px;
 	color: var(--vscode-foreground);
+}
+
+/*
+ * Empty-state layout: SessionsList grows to fill the upper area while
+ * the NewSessionComposer is anchored to the bottom — mirrors the active
+ * session layout where the InputBar sits at the bottom of the panel.
+ */
+.agent-chat-feature--empty {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	color: var(--vscode-foreground);
+}
+
+.agent-chat-feature__empty-main {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
 }
 
 .agent-chat-feature__topbar {
@@ -694,58 +711,103 @@ b {
 	opacity: 0.75;
 }
 
+/* --- New-session composer (Copilot-style integrated box) ----------- */
+
 .agent-chat-new-session {
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
 	padding: 12px;
 }
 
-.agent-chat-new-session__title {
-	font-size: 13px;
-	font-weight: 600;
-	margin: 0;
+/*
+ * Single rounded container that holds the pickers row, the textarea and
+ * the toolbar — visually mirrors the on-session InputBar (`.agent-chat-input`).
+ * Children render with no individual borders so the box feels unified.
+ */
+.agent-chat-new-session__box {
+	display: flex;
+	flex-direction: column;
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
+	border-radius: 6px;
+	/*
+	 * NOTE: never set `overflow: hidden` here — the chip dropdowns
+	 * (`.agent-chat-chip__menu`) anchor with `position: absolute` and
+	 * grow upward past the box edge, mirroring the VS Code/Cursor
+	 * model picker. Clipping the overflow truncates the menu mid-line.
+	 */
 }
 
-.agent-chat-new-session__hint {
-	font-size: 11px;
-	opacity: 0.75;
-	margin: 4px 0 0 0;
-	line-height: 1.5;
+.agent-chat-new-session__box:focus-within {
+	border-color: var(--vscode-focusBorder, #007fd4);
 }
 
 .agent-chat-new-session__textarea {
 	width: 100%;
-	resize: vertical;
-	background: var(--vscode-input-background);
+	resize: none;
+	background: transparent;
 	color: var(--vscode-input-foreground);
-	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
-	border-radius: 4px;
-	padding: 8px;
+	border: none;
+	padding: 8px 10px;
 	font-family: inherit;
-	font-size: 12px;
+	font-size: 13px;
+	line-height: 1.45;
+	min-height: 72px;
+	box-sizing: border-box;
 }
 
-.agent-chat-new-session__actions {
+.agent-chat-new-session__textarea:focus {
+	outline: none;
+}
+
+.agent-chat-new-session__toolbar {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 8px;
+	padding: 6px 8px;
+	border-top: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.25));
 }
 
-.agent-chat-new-session__hint-secondary {
-	font-size: 10px;
-	opacity: 0.7;
+.agent-chat-new-session__toolbar-left {
+	display: flex;
+	align-items: center;
+	flex: 1 1 auto;
+	min-width: 0;
+	/*
+	 * NEVER set `overflow: hidden` here — the chip dropdown menus
+	 * (`.agent-chat-chip__menu`) anchor above the chip with
+	 * `position: absolute` and would be clipped. The ChipOverflowBar
+	 * already hides off-bounds chips via `display: none`, so a visual
+	 * clip would be redundant and harmful.
+	 */
 }
 
+.agent-chat-new-session__toolbar-right {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	flex-shrink: 0;
+}
+
+/*
+ * Circular icon-only submit — the user explicitly asked for an arrow-up
+ * icon and no text label. Matches the VS Code chat panel send button.
+ */
 .agent-chat-new-session__submit {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
 	background: var(--vscode-button-background);
 	color: var(--vscode-button-foreground);
 	border: none;
-	border-radius: 4px;
-	padding: 6px 12px;
-	font-size: 12px;
+	border-radius: 50%;
+	font-size: 13px;
 	cursor: pointer;
+	flex-shrink: 0;
 }
 
 .agent-chat-new-session__submit:disabled {
@@ -757,67 +819,106 @@ b {
 	background: var(--vscode-button-hoverBackground);
 }
 
+/*
+ * Picker bar — compact inline row (Copilot-style chip pickers). Renders
+ * Agent / Model / Agent-file as discrete dropdown chips inline, sized to
+ * the selected option, with no oversized uppercase labels above each.
+ * The visually hidden label keeps the field accessible.
+ */
 .agent-chat-picker {
 	display: flex;
-	flex-direction: column;
-	gap: 8px;
+	flex-direction: row;
+	flex-wrap: wrap;
+	gap: 6px;
+	align-items: center;
 }
 
 .agent-chat-picker__field {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
+	display: inline-flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 4px;
 }
 
 .agent-chat-picker__label {
 	font-size: 10px;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
-	opacity: 0.65;
+	opacity: 0.6;
 }
 
 .agent-chat-picker__select {
-	background: var(--vscode-dropdown-background);
-	color: var(--vscode-dropdown-foreground);
-	border: 1px solid var(--vscode-dropdown-border, rgba(128, 128, 128, 0.4));
+	background: transparent;
+	color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
+	border: 1px solid var(--vscode-dropdown-border, rgba(128, 128, 128, 0.35));
 	border-radius: 4px;
-	padding: 4px 6px;
-	font-size: 12px;
+	padding: 2px 6px;
+	font-size: 11px;
+	max-width: 180px;
 }
+
+.agent-chat-picker__select:hover:not(:disabled) {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.12));
+}
+
+/* --- Active-session input bar (Copilot-style integrated box) ------- */
 
 .agent-chat-input {
 	display: flex;
 	flex-direction: column;
-	gap: 0;
+	gap: 6px;
 	padding: 8px;
 	border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
 	background: var(--vscode-sideBar-background);
 }
 
+/*
+ * The disabled-reason renders as a thin banner ABOVE the box — never
+ * between the textarea and the toolbar (per the redesign screenshots).
+ */
+.agent-chat-input__disabled-reason {
+	font-size: 10px;
+	opacity: 0.75;
+	padding: 0 4px;
+	font-style: italic;
+}
+
+/*
+ * Single rounded container that wraps the textarea AND the toolbar so
+ * the input feels like one widget — matches the Copilot/Windsurf chat
+ * compose box. The textarea and toolbar render with no individual
+ * borders; the focus ring is applied to the wrapper.
+ */
+.agent-chat-input__box {
+	display: flex;
+	flex-direction: column;
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
+	border-radius: 6px;
+	/* See note on `.agent-chat-new-session__box` — overflow stays
+	 * visible so the PermissionChip menu can render above the toolbar. */
+}
+
+.agent-chat-input__box:focus-within {
+	border-color: var(--vscode-focusBorder, #007fd4);
+}
+
 .agent-chat-input__textarea {
 	width: 100%;
-	resize: vertical;
-	background: var(--vscode-input-background);
+	resize: none;
+	background: transparent;
 	color: var(--vscode-input-foreground);
-	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
-	border-bottom: none;
-	border-radius: 6px 6px 0 0;
+	border: none;
 	padding: 8px 10px;
 	font-family: inherit;
 	font-size: 13px;
 	line-height: 1.45;
 	min-height: 56px;
+	box-sizing: border-box;
 }
 
 .agent-chat-input__textarea:focus {
-	outline: 1px solid var(--vscode-focusBorder, #007fd4);
-	outline-offset: -1px;
-}
-
-.agent-chat-input__disabled-reason {
-	font-size: 10px;
-	opacity: 0.7;
-	padding: 4px 6px 0;
+	outline: none;
 }
 
 .agent-chat-input__toolbar {
@@ -826,10 +927,8 @@ b {
 	justify-content: space-between;
 	gap: 8px;
 	padding: 6px 8px;
-	background: var(--vscode-input-background);
-	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
-	border-top: none;
-	border-radius: 0 0 6px 6px;
+	background: transparent;
+	border-top: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.25));
 }
 
 .agent-chat-input__toolbar-left,
@@ -1604,36 +1703,58 @@ b {
 	cursor: not-allowed;
 }
 
-/* --- Permission chip (compact dropdown on the input toolbar) -------- */
+/*
+ * Generic chip dropdown — shared by Agent / Agent file / Model /
+ * Permission selectors on the empty-state composer and the active
+ * session input bar. All four widgets render identical chrome so the
+ * UI feels consistent.
+ */
 
-.agent-chat-permission-chip {
+.agent-chat-chip {
 	position: relative;
 	display: inline-flex;
 }
 
-.agent-chat-permission-chip__toggle {
+.agent-chat-chip__toggle {
 	display: inline-flex;
 	align-items: center;
-	gap: 4px;
+	gap: 3px;
 	background: transparent;
 	color: var(--vscode-foreground);
 	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
 	border-radius: 999px;
-	padding: 2px 8px;
-	font-size: 11px;
+	padding: 2px 7px;
+	font-size: 10px;
+	line-height: 1.4;
 	cursor: pointer;
 	white-space: nowrap;
+	max-width: 180px;
 }
 
-.agent-chat-permission-chip__toggle:hover {
+.agent-chat-chip__toggle:hover:not(:disabled) {
 	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
 }
 
-.agent-chat-permission-chip__menu {
+.agent-chat-chip__toggle:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.agent-chat-chip__label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 130px;
+}
+
+.agent-chat-chip__menu {
 	position: absolute;
 	bottom: calc(100% + 4px);
 	left: 0;
 	min-width: 220px;
+	max-width: 320px;
+	max-height: 320px;
+	overflow-y: auto;
 	background: var(--vscode-editorWidget-background);
 	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.4));
 	border-radius: 6px;
@@ -1645,7 +1766,16 @@ b {
 	gap: 1px;
 }
 
-.agent-chat-permission-chip__item {
+.agent-chat-chip__menu-header {
+	font-size: 10px;
+	opacity: 0.75;
+	padding: 4px 8px;
+	border-bottom: 1px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
+	margin-bottom: 2px;
+}
+
+.agent-chat-chip__item {
 	display: flex;
 	align-items: flex-start;
 	gap: 6px;
@@ -1655,30 +1785,141 @@ b {
 	padding: 6px 8px;
 	border-radius: 4px;
 	cursor: pointer;
-	font-size: 11px;
+	font-size: 10px;
 	text-align: left;
 }
 
-.agent-chat-permission-chip__item:hover {
+.agent-chat-chip__item:hover:not(:disabled) {
 	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
 }
 
-.agent-chat-permission-chip__item--active {
+.agent-chat-chip__item:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.agent-chat-chip__item--active {
 	background: var(--vscode-list-activeSelectionBackground);
 	color: var(--vscode-list-activeSelectionForeground);
 }
 
-.agent-chat-permission-chip__item-text {
+.agent-chat-chip__item-text {
 	display: flex;
 	flex-direction: column;
 	gap: 1px;
+	min-width: 0;
 }
 
-.agent-chat-permission-chip__item-label {
+.agent-chat-chip__item-label {
 	font-weight: 600;
 }
 
-.agent-chat-permission-chip__item-desc {
-	font-size: 10px;
+.agent-chat-chip__item-desc {
+	font-size: 9px;
 	opacity: 0.75;
+	white-space: normal;
+}
+
+/*
+ * Chip overflow bar — keeps chips on a single row when the chat panel
+ * is narrow and tucks the rest behind a "…" button (VS Code style).
+ *
+ * The container clips horizontal overflow; the JS controller uses a
+ * ResizeObserver to flag chips that would not fit so they can be hidden
+ * via `--hidden` and reappear inside the popover.
+ */
+
+.agent-chat-chip-overflow {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	min-width: 0;
+	flex: 1 1 auto;
+	/*
+	 * No `overflow: hidden` here — the layout algorithm in
+	 * `chip-overflow-bar.tsx` measures every chip and applies
+	 * `display: none` to the ones that do not fit (plus the visible
+	 * ones definitionally fit), so we never need a visual clip. A
+	 * clip would in fact break the dropdown menus that anchor above
+	 * each chip via `position: absolute`.
+	 */
+}
+
+.agent-chat-chip-overflow__item {
+	display: inline-flex;
+	flex-shrink: 0;
+}
+
+.agent-chat-chip-overflow__item--hidden {
+	display: none;
+}
+
+.agent-chat-chip-overflow__more {
+	position: relative;
+	display: inline-flex;
+	flex-shrink: 0;
+	margin-left: 3px;
+}
+
+.agent-chat-chip-overflow__more--hidden {
+	display: none;
+}
+
+.agent-chat-chip-overflow__more-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
+	border-radius: 999px;
+	cursor: pointer;
+	font-size: 12px;
+	line-height: 1;
+}
+
+.agent-chat-chip-overflow__more-button:hover {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+}
+
+.agent-chat-chip-overflow__menu {
+	position: absolute;
+	bottom: calc(100% + 4px);
+	right: 0;
+	min-width: 200px;
+	max-width: 320px;
+	max-height: 320px;
+	overflow-y: auto;
+	background: var(--vscode-editorWidget-background);
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.4));
+	border-radius: 6px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+	padding: 6px;
+	z-index: 60;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.agent-chat-chip-overflow__menu-item {
+	display: flex;
+	align-items: center;
+}
+
+/*
+ * Inside the overflow popover the chips render full-width so each one
+ * is comfortably tappable as a discrete row, similar to the VS Code
+ * editor toolbar overflow menu.
+ */
+.agent-chat-chip-overflow__menu-item .agent-chat-chip {
+	width: 100%;
+}
+
+.agent-chat-chip-overflow__menu-item .agent-chat-chip__toggle {
+	width: 100%;
+	max-width: none;
+	justify-content: flex-start;
 }
