@@ -313,10 +313,24 @@
           "id": "gatomia",
           "title": "GatomIA",
           "icon": "./assets/icons/gatomia.svg"
+        },
+        {
+          "id": "gatomia-chat",
+          "title": "GatomIA Chat",
+          "icon": "./assets/icons/gatomia.svg"
         }
       ]
     },
     "views": {
+      "gatomia-chat": [
+        {
+          "id": "gatomia.views.agentChat",
+          "name": "Agent Chat",
+          "type": "webview",
+          "icon": "comment-discussion",
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0)"
+        }
+      ],
       "gatomia": [
         {
           "id": "gatomia.views.specExplorer",
@@ -901,10 +915,32 @@
         "title": "Open Agent Chat Panel",
         "category": "GatomIA",
         "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "gatomia.agentChat.focusSidebar",
+        "title": "Focus Agent Chat Sidebar",
+        "category": "GatomIA",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "gatomia.agentChat.toggleHistory",
+        "title": "Show Agent Chat History",
+        "category": "GatomIA",
+        "icon": "$(history)"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "gatomia.agentChat.newSession",
+          "when": "view == gatomia.views.agentChat",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gatomia.agentChat.toggleHistory",
+          "when": "view == gatomia.views.agentChat",
+          "group": "navigation@2"
+        },
         {
           "command": "gatomia.agentChat.newSession",
           "when": "view == gatomia.views.runningAgents",

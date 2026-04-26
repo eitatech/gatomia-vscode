@@ -16,18 +16,26 @@
 import { useCallback, useEffect, useMemo, useReducer } from "react";
 import { vscode } from "@/bridge/vscode";
 import type {
+	AgentChatCatalog,
 	AgentChatSessionView,
 	ChatMessage,
 	ExecutionTarget,
 	ExecutionTargetOption,
 	ModeDescriptor,
 	ModelDescriptor,
+	NewSessionRequest,
+	SidebarSessionListItem,
 	UserChatMessage,
 } from "@/features/agent-chat/types";
 
 // ============================================================================
 // Public state + bridge shape
 // ============================================================================
+
+export type ClearReason =
+	| "new-session-requested"
+	| "ready-no-binding"
+	| "session-not-found";
 
 export interface AgentChatBridgeState {
 	readonly ready: boolean;
@@ -37,6 +45,12 @@ export interface AgentChatBridgeState {
 	readonly availableModels: readonly ModelDescriptor[];
 	readonly availableTargets: readonly ExecutionTargetOption[];
 	readonly hasArchivedTranscript: boolean;
+	/** Sidebar-only: catalogue of providers/models/agent-files. */
+	readonly catalog: AgentChatCatalog;
+	/** Sidebar-only: every session known to host (active + recent). */
+	readonly sessions: readonly SidebarSessionListItem[];
+	/** Last "session/cleared" reason emitted by the host (sidebar-only). */
+	readonly clearedReason: ClearReason | undefined;
 }
 
 export interface AgentChatBridge {
@@ -47,6 +61,12 @@ export interface AgentChatBridge {
 	changeMode(modeId: string): void;
 	changeModel(modelId: string): void;
 	changeTarget(target: ExecutionTarget): void;
+	/** Sidebar-only: switch the bound session via the host. */
+	switchSession(sessionId: string): void;
+	/** Sidebar-only: launch a new session from the empty composer. */
+	startNewSession(request: NewSessionRequest): void;
+	/** Sidebar-only: ask the host to unbind so the empty composer renders. */
+	requestNewChat(): void;
 }
 
 // ============================================================================
@@ -61,6 +81,9 @@ const INITIAL_STATE: AgentChatBridgeState = {
 	availableModels: [],
 	availableTargets: [],
 	hasArchivedTranscript: false,
+	catalog: { providers: [], agentFiles: [] },
+	sessions: [],
+	clearedReason: undefined,
 };
 
 type BridgeAction =
@@ -88,6 +111,18 @@ type BridgeAction =
 	| {
 			type: "session/lifecycle-changed";
 			payload: { to: AgentChatSessionView["lifecycleState"] };
+	  }
+	| {
+			type: "session/cleared";
+			payload: { reason: ClearReason };
+	  }
+	| {
+			type: "catalog/loaded";
+			payload: { catalog: AgentChatCatalog };
+	  }
+	| {
+			type: "sessions/list-changed";
+			payload: { sessions: SidebarSessionListItem[] };
 	  };
 
 function reducer(
@@ -97,6 +132,7 @@ function reducer(
 	switch (action.type) {
 		case "session/loaded":
 			return {
+				...state,
 				ready: true,
 				session: action.payload.session,
 				messages: [...action.payload.messages],
@@ -104,6 +140,7 @@ function reducer(
 				availableModels: [...action.payload.availableModels],
 				availableTargets: [...action.payload.availableTargets],
 				hasArchivedTranscript: action.payload.hasArchivedTranscript,
+				clearedReason: undefined,
 			};
 		case "messages/appended": {
 			const seen = new Set(state.messages.map((m) => m.id));
@@ -139,6 +176,21 @@ function reducer(
 				},
 			};
 		}
+		case "session/cleared":
+			return {
+				...state,
+				ready: true,
+				session: undefined,
+				messages: [],
+				availableModes: [],
+				availableModels: [],
+				hasArchivedTranscript: false,
+				clearedReason: action.payload.reason,
+			};
+		case "catalog/loaded":
+			return { ...state, catalog: action.payload.catalog };
+		case "sessions/list-changed":
+			return { ...state, sessions: action.payload.sessions };
 		default:
 			return state;
 	}
@@ -153,7 +205,8 @@ function reducer(
  * cognitive-complexity ceiling (biome lint/complexity/noExcessiveCognitiveComplexity).
  */
 function translateIncoming(
-	sessionId: string,
+	activeSessionId: string | undefined,
+	initialSessionId: string | undefined,
 	data: unknown
 ): BridgeAction | undefined {
 	const typed = data as { type?: string; payload?: unknown } | undefined;
@@ -170,7 +223,11 @@ function translateIncoming(
 				availableTargets: ExecutionTargetOption[];
 				hasArchivedTranscript: boolean;
 			};
-			if (payload.session.id !== sessionId) {
+			// Panel mode binds to a fixed `initialSessionId` and must drop
+			// `session/loaded` messages addressed to other sessions. The
+			// sidebar surface omits `initialSessionId` and adopts whatever
+			// the host has bound, including switches between sessions.
+			if (initialSessionId && payload.session.id !== initialSessionId) {
 				return;
 			}
 			return { type: "session/loaded", payload };
@@ -180,7 +237,7 @@ function translateIncoming(
 				sessionId: string;
 				messages: ChatMessage[];
 			};
-			if (payload.sessionId !== sessionId) {
+			if (activeSessionId && payload.sessionId !== activeSessionId) {
 				return;
 			}
 			return {
@@ -193,7 +250,7 @@ function translateIncoming(
 				sessionId: string;
 				updates: Array<{ id: string; patch: Partial<ChatMessage> }>;
 			};
-			if (payload.sessionId !== sessionId) {
+			if (activeSessionId && payload.sessionId !== activeSessionId) {
 				return;
 			}
 			return {
@@ -206,13 +263,27 @@ function translateIncoming(
 				sessionId: string;
 				to: AgentChatSessionView["lifecycleState"];
 			};
-			if (payload.sessionId !== sessionId) {
+			if (activeSessionId && payload.sessionId !== activeSessionId) {
 				return;
 			}
 			return {
 				type: "session/lifecycle-changed",
 				payload: { to: payload.to },
 			};
+		}
+		case "agent-chat/session/cleared": {
+			const payload = typed.payload as { reason: ClearReason };
+			return { type: "session/cleared", payload };
+		}
+		case "agent-chat/catalog/loaded": {
+			const payload = typed.payload as { catalog: AgentChatCatalog };
+			return { type: "catalog/loaded", payload };
+		}
+		case "agent-chat/sessions/list-changed": {
+			const payload = typed.payload as {
+				sessions: SidebarSessionListItem[];
+			};
+			return { type: "sessions/list-changed", payload };
 		}
 		default:
 			return;
@@ -250,18 +321,30 @@ function applyPatch(
 // Hook
 // ============================================================================
 
-export function useSessionBridge(sessionId: string): AgentChatBridge {
+/**
+ * @param initialSessionId Optional pre-bound session id (used by the legacy
+ *                         editor-area panel which knows its session at
+ *                         render time). The sidebar surface omits it and
+ *                         relies on `agent-chat/session/loaded` /
+ *                         `session/cleared` to drive `state.session`.
+ */
+export function useSessionBridge(initialSessionId?: string): AgentChatBridge {
 	const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
+	const activeSessionId = state.session?.id ?? initialSessionId;
 
 	// Send ready + subscribe to incoming messages on mount.
 	useEffect(() => {
 		vscode.postMessage({
 			type: "agent-chat/ready",
-			payload: { sessionId },
+			payload: initialSessionId ? { sessionId: initialSessionId } : {},
 		});
 
 		const handler = (event: MessageEvent): void => {
-			const action = translateIncoming(sessionId, event.data);
+			const action = translateIncoming(
+				activeSessionId,
+				initialSessionId,
+				event.data
+			);
 			if (action) {
 				dispatch(action);
 			}
@@ -271,65 +354,104 @@ export function useSessionBridge(sessionId: string): AgentChatBridge {
 		return () => {
 			window.removeEventListener("message", handler);
 		};
-	}, [sessionId]);
+	}, [initialSessionId, activeSessionId]);
 
 	const submit = useCallback(
 		(content: string, clientMessageId?: string) => {
+			if (!activeSessionId) {
+				return;
+			}
 			vscode.postMessage({
 				type: "agent-chat/input/submit",
 				payload: {
-					sessionId,
+					sessionId: activeSessionId,
 					content,
 					clientMessageId,
 				},
 			});
 		},
-		[sessionId]
+		[activeSessionId]
 	);
 
 	const cancel = useCallback(() => {
+		if (!activeSessionId) {
+			return;
+		}
 		vscode.postMessage({
 			type: "agent-chat/control/cancel",
-			payload: { sessionId },
+			payload: { sessionId: activeSessionId },
 		});
-	}, [sessionId]);
+	}, [activeSessionId]);
 
 	const retry = useCallback(() => {
+		if (!activeSessionId) {
+			return;
+		}
 		vscode.postMessage({
 			type: "agent-chat/control/retry",
-			payload: { sessionId },
+			payload: { sessionId: activeSessionId },
 		});
-	}, [sessionId]);
+	}, [activeSessionId]);
 
 	const changeMode = useCallback(
 		(modeId: string) => {
+			if (!activeSessionId) {
+				return;
+			}
 			vscode.postMessage({
 				type: "agent-chat/control/change-mode",
-				payload: { sessionId, modeId },
+				payload: { sessionId: activeSessionId, modeId },
 			});
 		},
-		[sessionId]
+		[activeSessionId]
 	);
 
 	const changeModel = useCallback(
 		(modelId: string) => {
+			if (!activeSessionId) {
+				return;
+			}
 			vscode.postMessage({
 				type: "agent-chat/control/change-model",
-				payload: { sessionId, modelId },
+				payload: { sessionId: activeSessionId, modelId },
 			});
 		},
-		[sessionId]
+		[activeSessionId]
 	);
 
 	const changeTarget = useCallback(
 		(target: ExecutionTarget) => {
+			if (!activeSessionId) {
+				return;
+			}
 			vscode.postMessage({
 				type: "agent-chat/control/change-target",
-				payload: { sessionId, target },
+				payload: { sessionId: activeSessionId, target },
 			});
 		},
-		[sessionId]
+		[activeSessionId]
 	);
+
+	const switchSession = useCallback((nextId: string) => {
+		vscode.postMessage({
+			type: "agent-chat/control/switch-session",
+			payload: { sessionId: nextId },
+		});
+	}, []);
+
+	const startNewSession = useCallback((request: NewSessionRequest) => {
+		vscode.postMessage({
+			type: "agent-chat/control/new-session",
+			payload: request,
+		});
+	}, []);
+
+	const requestNewChat = useCallback(() => {
+		vscode.postMessage({
+			type: "agent-chat/control/request-new-chat",
+			payload: {},
+		});
+	}, []);
 
 	return useMemo<AgentChatBridge>(
 		() => ({
@@ -340,7 +462,21 @@ export function useSessionBridge(sessionId: string): AgentChatBridge {
 			changeMode,
 			changeModel,
 			changeTarget,
+			switchSession,
+			startNewSession,
+			requestNewChat,
 		}),
-		[state, submit, cancel, retry, changeMode, changeModel, changeTarget]
+		[
+			state,
+			submit,
+			cancel,
+			retry,
+			changeMode,
+			changeModel,
+			changeTarget,
+			switchSession,
+			startNewSession,
+			requestNewChat,
+		]
 	);
 }

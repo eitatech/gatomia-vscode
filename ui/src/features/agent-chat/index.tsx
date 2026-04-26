@@ -1,23 +1,25 @@
 /**
- * Agent Chat Panel feature entry (T035, Phase 3 / User Story 1).
+ * Agent Chat feature entry.
  *
- * Composes the webview-side UI:
- *   - StatusHeader: agent name + lifecycle badge
- *   - ChatTranscript: virtualized message list
- *   - RetryAction: shown inside the latest retryable error (FR-020, research R9)
- *   - InputBar: follow-up composer (disabled on read-only / terminal sessions)
+ * Two surfaces share the same React tree:
+ *   - **sidebar** (canonical): no pre-bound session id; the bridge listens
+ *     for `agent-chat/session/loaded` and `session/cleared` to drive the
+ *     active session, and renders the {@link NewSessionComposer} when no
+ *     session is bound. Header exposes the {@link SessionSwitcher} so
+ *     users can swap between sessions or start a new chat.
+ *   - **panel** (legacy editor area): pre-bound to the session id encoded
+ *     in `data-session-id`. Behaves like the original Phase 3 panel.
  *
- * The `useSessionBridge` hook handles the VS Code postMessage plumbing and
- * exposes session state + action dispatchers; this component is a pure view.
- *
- * The sessionId is read from the container's `data-session-id` attribute
- * which is set by `getWebviewContent` when the extension creates the panel.
+ * The surface is selected via `data-surface` on the webview root (set by
+ * `getWebviewContent`). When absent we infer `panel` for backward compat.
  */
 
 import { useMemo } from "react";
 import { ChatTranscript } from "@/features/agent-chat/components/chat-transcript";
 import { InputBar } from "@/features/agent-chat/components/input-bar";
+import { NewSessionComposer } from "@/features/agent-chat/components/new-session-composer";
 import { RetryAction } from "@/features/agent-chat/components/retry-action";
+import { SessionSwitcher } from "@/features/agent-chat/components/session-switcher";
 import { StatusHeader } from "@/features/agent-chat/components/status-header";
 import { useSessionBridge } from "@/features/agent-chat/hooks/use-session-bridge";
 import type {
@@ -25,12 +27,23 @@ import type {
 	ErrorChatMessage,
 } from "@/features/agent-chat/types";
 
-const DEFAULT_SESSION_ID = "unknown-session";
+type Surface = "sidebar" | "panel";
 
 export function AgentChatFeature(): JSX.Element {
-	const sessionId = readSessionIdFromDom();
-	const bridge = useSessionBridge(sessionId);
-	const { state, submit, cancel, retry } = bridge;
+	const surface = readSurfaceFromDom();
+	const initialSessionId = readSessionIdFromDom();
+	const bridge = useSessionBridge(
+		surface === "panel" ? initialSessionId : undefined
+	);
+	const {
+		state,
+		submit,
+		cancel,
+		retry,
+		switchSession,
+		startNewSession,
+		requestNewChat,
+	} = bridge;
 
 	const latestRetryableError = useMemo(
 		() => findLatestRetryableError(state.messages),
@@ -46,29 +59,67 @@ export function AgentChatFeature(): JSX.Element {
 	}
 
 	const session = state.session;
+
+	// Sidebar empty state — no session bound. Show the picker + composer
+	// so the user can spawn a fresh session entirely from the webview.
+	if (!session && surface === "sidebar") {
+		return (
+			<div className="agent-chat-feature agent-chat-feature--empty">
+				<div className="agent-chat-feature__topbar">
+					<div className="agent-chat-feature__title">Agent Chat</div>
+					<SessionSwitcher
+						activeSessionId={undefined}
+						onNewChat={() => {
+							/* already in empty state */
+						}}
+						onSwitchSession={switchSession}
+						sessions={state.sessions}
+					/>
+				</div>
+				<NewSessionComposer
+					agentFiles={state.catalog.agentFiles}
+					onStart={startNewSession}
+					providers={state.catalog.providers}
+				/>
+			</div>
+		);
+	}
+
+	// Legacy / panel surface with a missing session — restored fallback.
 	if (!session) {
 		return (
 			<div className="agent-chat-feature agent-chat-feature--error">
-				<div>Session {sessionId} is not available.</div>
+				<div>Session {initialSessionId ?? ""} is not available.</div>
 			</div>
 		);
 	}
 
 	return (
 		<div className="agent-chat-feature">
-			<StatusHeader
-				agentDisplayName={session.agentDisplayName}
-				lifecycleState={session.lifecycleState}
-			/>
+			{surface === "sidebar" ? (
+				<div className="agent-chat-feature__topbar">
+					<StatusHeader
+						agentDisplayName={session.agentDisplayName}
+						lifecycleState={session.lifecycleState}
+					/>
+					<SessionSwitcher
+						activeSessionId={session.id}
+						onNewChat={requestNewChat}
+						onSwitchSession={switchSession}
+						sessions={state.sessions}
+					/>
+				</div>
+			) : (
+				<StatusHeader
+					agentDisplayName={session.agentDisplayName}
+					lifecycleState={session.lifecycleState}
+				/>
+			)}
 			<ChatTranscript messages={state.messages} />
 			{latestRetryableError ? (
 				<RetryAction
 					message={latestRetryableError}
 					onOpenExternal={() => {
-						// The extension resolves the actual URL via CloudLinkage; we
-						// emit retry() which the panel handler maps to the
-						// `agent-chat/control/retry` message. For Cloud sessions the
-						// panel will translate this into `open-external`.
 						retry();
 					}}
 					onRedispatch={retry}
@@ -88,8 +139,6 @@ export function AgentChatFeature(): JSX.Element {
 				}
 				terminal={isTerminalState(session.lifecycleState)}
 			/>
-			{/* Cancel button is exposed via the panel's header actions in a later phase;
-			    routed here for completeness so the bridge action is exercised. */}
 			<button
 				aria-label="Cancel session"
 				className="agent-chat-feature__cancel"
@@ -103,12 +152,22 @@ export function AgentChatFeature(): JSX.Element {
 	);
 }
 
-function readSessionIdFromDom(): string {
+function readSurfaceFromDom(): Surface {
 	if (typeof document === "undefined") {
-		return DEFAULT_SESSION_ID;
+		return "panel";
 	}
 	const root = document.getElementById("root");
-	return root?.dataset.sessionId ?? DEFAULT_SESSION_ID;
+	const raw = root?.dataset.surface;
+	return raw === "sidebar" ? "sidebar" : "panel";
+}
+
+function readSessionIdFromDom(): string | undefined {
+	if (typeof document === "undefined") {
+		return;
+	}
+	const root = document.getElementById("root");
+	const raw = root?.dataset.sessionId;
+	return raw && raw !== "unknown-session" ? raw : undefined;
 }
 
 function isTerminalState(

@@ -207,3 +207,59 @@ export interface AgentChatSessionView {
 		externalUrl?: string;
 	};
 }
+
+// ============================================================================
+// Sidebar catalog + session list (sidebar-only postMessage payloads)
+// ============================================================================
+
+export type ProviderAvailability =
+	| "installed"
+	| "available-via-npx"
+	| "install-required";
+
+export interface AgentChatProviderOption {
+	id: string;
+	displayName: string;
+	description?: string;
+	availability: ProviderAvailability;
+	enabled: boolean;
+	source: "built-in" | "local" | "remote";
+	npxPackage?: string;
+	installUrl?: string;
+	models: ModelDescriptor[];
+}
+
+export interface AgentChatAgentFileOption {
+	id: string;
+	displayName: string;
+	description?: string;
+	source: "file" | "extension";
+	absolutePath?: string;
+}
+
+export interface AgentChatCatalog {
+	providers: AgentChatProviderOption[];
+	agentFiles: AgentChatAgentFileOption[];
+}
+
+export interface SidebarSessionListItem {
+	id: string;
+	agentDisplayName: string;
+	lifecycleState: SessionLifecycleState;
+	updatedAt: number;
+	selectedModeId?: string;
+	selectedModelId?: string;
+	isTerminal: boolean;
+}
+
+/**
+ * Composer payload sent when the user submits the empty-state composer to
+ * spawn a fresh session. The host translates this into
+ * `gatomia.agentChat.startNew`.
+ */
+export interface NewSessionRequest {
+	providerId: string;
+	modelId?: string;
+	agentFileId?: string;
+	taskInstruction: string;
+}

@@ -6,6 +6,7 @@ import {
 	ConfigurationTarget,
 	type DocumentSelector,
 	env,
+	EventEmitter,
 	type ExtensionContext,
 	languages,
 	type OutputChannel,
@@ -139,6 +140,9 @@ let chatRouter: ChatRouter | null = null;
 // --- Agent Chat Panel (spec 018) singletons for deactivation flush ---------
 let agentChatStore: AgentChatSessionStoreType | null = null;
 let agentChatRegistry: AgentChatRegistryType | null = null;
+let agentChatSidebar:
+	| import("./providers/agent-chat-view-provider").AgentChatViewController
+	| null = null;
 
 export async function activate(context: ExtensionContext) {
 	// Create output channel for debugging
@@ -2725,6 +2729,9 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 		const { promptForCapWarning } = await import(
 			"./features/agent-chat/cap-warning-prompt"
 		);
+		const { AgentChatViewProvider } = await import(
+			"./providers/agent-chat-view-provider"
+		);
 
 		const archive = createVscodeArchiveWriter(context.globalStorageUri);
 		const store = new AgentChatSessionStore({
@@ -2740,6 +2747,40 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 		agentChatRegistry = registry;
 		context.subscriptions.push({ dispose: () => registry.dispose() });
 
+		// Sidebar webview view (canonical chat surface, spec follow-up to 018).
+		// Plumb the ACP registry's onDidUpdate so the picker rebroadcasts when
+		// the remote registry merge lands; the workspace `AgentRegistry`
+		// (hooks) feeds the agent-file picker.
+		const sidebarController = new AgentChatViewProvider({
+			context,
+			store,
+			registry,
+			catalogSources: {
+				get acpProviderRegistry() {
+					return acpProviderRegistry;
+				},
+				get agentRegistry() {
+					return agentRegistry ?? null;
+				},
+			},
+			onCatalogChanged: (cb) => {
+				const sub = acpProviderRegistry?.onDidUpdate(() => cb());
+				return {
+					dispose: () => sub?.dispose(),
+				};
+			},
+			outputChannel,
+		});
+		context.subscriptions.push(
+			window.registerWebviewViewProvider(
+				AgentChatViewProvider.viewType,
+				sidebarController,
+				{ webviewOptions: { retainContextWhenHidden: true } }
+			),
+			{ dispose: () => sidebarController.dispose() }
+		);
+		agentChatSidebar = sidebarController;
+
 		// T073/T073a/T076: read the concurrency cap from settings and bridge
 		// the prompt helper + telemetry sink into the command deps.
 		const readConcurrentCap = () => {
@@ -2753,27 +2794,38 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 			registry,
 			store,
 			createPanel: (session) => {
-				const panel = new AgentChatPanel({
-					session,
-					store,
-					registry,
-					host: panelHost,
-				});
-				// Return a wrapper that satisfies BOTH `ChatPanelLike`
-				// (used by the command handler) AND `AgentChatPanelLike`
-				// (used by the registry). We deliberately defer
-				// `panel.open()` to the handler's `panel.reveal()` call
-				// so the registry attaches the wrapper FIRST and the
-				// inner webview is opened exactly once afterward —
-				// avoiding the double-attach that previously crashed
-				// session initialization.
+				// The sidebar webview is the canonical chat surface — every
+				// session binds to the singleton `AgentChatViewProvider`
+				// instead of spawning a per-session editor panel. The
+				// returned wrapper satisfies both `ChatPanelLike` (used by
+				// the command handlers) and `AgentChatPanelLike` (the
+				// registry). `reveal()` brings the sidebar forward and
+				// re-binds it to this session; `dispose()` is a no-op
+				// because the underlying view outlives any single session.
+				const onDidDisposeEmitter = new EventEmitter<void>();
+				let revealed = false;
 				return {
 					sessionId: session.id,
 					viewType: AgentChatPanel.viewType,
-					reveal: () => panel.open(),
-					dispose: () => panel.dispose(),
+					reveal: () => {
+						revealed = true;
+						sidebarController.focusSession(session.id).catch((err) => {
+							outputChannel.appendLine(
+								`[AgentChat] sidebar focusSession failed: ${err instanceof Error ? err.message : String(err)}`
+							);
+						});
+					},
+					dispose: () => {
+						// The view is shared; we only fire onDidDispose so the
+						// registry releases its `panelsBySessionId` slot and
+						// the next openForSession can rebind cleanly.
+						if (revealed) {
+							onDidDisposeEmitter.fire();
+						}
+						onDidDisposeEmitter.dispose();
+					},
 					onDidDispose: (cb: () => void) => {
-						const sub = panel.onDidDispose(cb);
+						const sub = onDidDisposeEmitter.event(cb);
 						return { dispose: () => sub.dispose() };
 					},
 				};
@@ -2897,42 +2949,17 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 			})
 		);
 
-		// Spec 018 Phase 4: New session entry-points.
-		const { handleNewSession } = await import(
-			"./commands/agent-chat-new-session"
-		);
-		const { NewSessionPanel } = await import("./panels/new-session-panel");
-
-		const startSessionFromUi = async (params: {
-			agentId: string;
-			agentDisplayName: string;
-			taskInstruction: string;
-		}): Promise<void> => {
-			await commands.executeCommand("gatomia.agentChat.startNew", {
-				agentId: params.agentId,
-				agentDisplayName: params.agentDisplayName,
-				agentCommand: "",
-				taskInstruction: params.taskInstruction,
-			});
-		};
-
+		// Sidebar-first new-session and panel commands. The legacy QuickPick
+		// (`agent-chat-new-session.ts`) and the editor-area `NewSessionPanel`
+		// remain available as fallbacks but the canonical UX is now the
+		// dedicated activity-bar container — `newSession` simply reveals it
+		// in the empty/new-session state. The picker dropdowns inside the
+		// webview let the user choose provider, model, and agent file
+		// before submitting the initial prompt.
 		context.subscriptions.push(
 			commands.registerCommand("gatomia.agentChat.newSession", async () => {
 				try {
-					await handleNewSession({
-						listProviders: () =>
-							buildNewSessionProviderItems(acpProviderRegistry),
-						startNew: startSessionFromUi,
-						window: {
-							showQuickPick: window.showQuickPick.bind(window) as never,
-							showInputBox: window.showInputBox.bind(window) as never,
-							showWarningMessage: window.showWarningMessage.bind(
-								window
-							) as never,
-						},
-						env: { openExternal: env.openExternal.bind(env) },
-						parseUri: (value: string) => Uri.parse(value),
-					});
+					await sidebarController.startNewSessionFlow();
 				} catch (err) {
 					outputChannel.appendLine(
 						`[AgentChat] newSession failed: ${err instanceof Error ? err.message : String(err)}`
@@ -2941,35 +2968,10 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 			})
 		);
 
-		let openPanelInstance: InstanceType<typeof NewSessionPanel> | undefined;
 		context.subscriptions.push(
-			commands.registerCommand("gatomia.agentChat.openPanel", () => {
+			commands.registerCommand("gatomia.agentChat.openPanel", async () => {
 				try {
-					if (!acpProviderRegistry) {
-						window.showWarningMessage(
-							"Agent Chat is still initialising — try again in a moment."
-						);
-						return;
-					}
-					if (openPanelInstance) {
-						openPanelInstance.reveal();
-						return;
-					}
-					const panel = new NewSessionPanel({
-						listProviders: () =>
-							buildNewSessionProviderItems(acpProviderRegistry),
-						onStart: startSessionFromUi,
-						registryUpdateEvent: acpProviderRegistry.onDidUpdate,
-						extensionUri: context.extensionUri,
-						window: {
-							createWebviewPanel: window.createWebviewPanel.bind(
-								window
-							) as never,
-						},
-						env: { openExternal: env.openExternal.bind(env) },
-					});
-					openPanelInstance = panel;
-					panel.open();
+					await sidebarController.reveal();
 				} catch (err) {
 					outputChannel.appendLine(
 						`[AgentChat] openPanel failed: ${err instanceof Error ? err.message : String(err)}`
@@ -2978,8 +2980,21 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 			})
 		);
 
+		context.subscriptions.push(
+			commands.registerCommand("gatomia.agentChat.focusSidebar", async () => {
+				await sidebarController.reveal();
+			})
+		);
+
+		context.subscriptions.push(
+			commands.registerCommand("gatomia.agentChat.toggleHistory", async () => {
+				await sidebarController.reveal();
+				sidebarController.pushSessionList();
+			})
+		);
+
 		outputChannel.appendLine(
-			"[AgentChat] Session store + running-agents tree initialised; commands registered"
+			"[AgentChat] Session store + sidebar webview + running-agents tree initialised; commands registered"
 		);
 	} catch (error) {
 		outputChannel.appendLine(
