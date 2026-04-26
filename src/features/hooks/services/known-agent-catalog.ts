@@ -98,12 +98,21 @@ export const KNOWN_AGENTS: readonly KnownAgentEntry[] = [
 	{
 		id: "github-copilot",
 		displayName: "GitHub Copilot",
-		agentCommand: "npx @github/copilot-language-server --acp",
+		// As of @github/copilot >= 1.0.x the unified Copilot CLI binary
+		// (`copilot`) speaks ACP natively via `--acp`. We prefer the direct
+		// binary spawn over `npx` so users with the global install don't
+		// re-download anything. The legacy `@github/copilot-language-server`
+		// path is preserved below for backward compatibility.
+		agentCommand: "copilot --acp",
 		installChecks: [
-			// npm global install: the binary is named copilot-language-server (not github-copilot-language-server)
-			{ strategy: "npm-global", target: "@github/copilot-language-server" },
-			// Binary present in PATH — installed via npm -g, the binary is copilot-language-server
+			// New unified product (npm i -g @github/copilot) — binary is `copilot`.
+			{ strategy: "path", target: "copilot" },
+			{ strategy: "npm-global", target: "@github/copilot" },
+			// Legacy language-server distribution. Some users still have
+			// only this installed; keep recognising it so they aren't
+			// nagged to re-install.
 			{ strategy: "path", target: "copilot-language-server" },
+			{ strategy: "npm-global", target: "@github/copilot-language-server" },
 		],
 	},
 	{

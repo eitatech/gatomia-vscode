@@ -64,7 +64,7 @@ const SEVEN_AGENTS: KnownAgentStatus[] = [
 	{
 		id: "github-copilot",
 		displayName: "GitHub Copilot",
-		agentCommand: "npx @github/copilot-language-server --acp",
+		agentCommand: "copilot --acp",
 		enabled: false,
 		isDetected: false,
 		descriptor: null,

@@ -132,6 +132,22 @@ describe("KnownAgentCatalog", () => {
 			expect(agent?.agentCommand).toContain("--acp");
 		});
 
+		it("github-copilot detects both the new unified CLI and the legacy language-server", () => {
+			// Regression: bug report — the catalog only checked for the legacy
+			// `@github/copilot-language-server` distribution, so users who
+			// installed the unified `@github/copilot` CLI (npm i -g
+			// @github/copilot, binary `copilot`, ACP via `--acp`) were
+			// incorrectly told the agent was missing.
+			const agent = KNOWN_AGENTS.find((a) => a.id === "github-copilot");
+			const targets = agent?.installChecks.map((c) => c.target) ?? [];
+			// New unified product
+			expect(targets).toContain("copilot");
+			expect(targets).toContain("@github/copilot");
+			// Legacy LSP-based distribution still recognised
+			expect(targets).toContain("copilot-language-server");
+			expect(targets).toContain("@github/copilot-language-server");
+		});
+
 		it("codex-acp uses npx @zed-industries/codex-acp as agentCommand and detects via npm-global or codex-acp binary", () => {
 			const agent = KNOWN_AGENTS.find((a) => a.id === "codex-acp");
 			// agentCommand must use the Zed ACP wrapper, not 'codex --acp'
