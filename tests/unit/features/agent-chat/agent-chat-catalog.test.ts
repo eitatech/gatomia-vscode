@@ -145,6 +145,56 @@ describe("buildAgentChatCatalog", () => {
 		});
 	});
 
+	it("downgrades a local provider to install-required when the probe says missing", () => {
+		// Regression: opencode/junie were marked "installed" purely because
+		// their descriptor.source was "local" — even when their binary was
+		// absent. Now the probe cache wins.
+		const acpProviderRegistry = makeProviderRegistry([
+			{
+				id: "junie",
+				displayName: "JetBrains Junie",
+				source: "local",
+				spawnCommand: "junie",
+				spawnArgs: ["--acp=true"],
+			},
+		]);
+		const probeCache = new Map([["junie", { installed: false }]]);
+		const catalog = buildAgentChatCatalog({
+			acpProviderRegistry: acpProviderRegistry as never,
+			agentRegistry: null,
+			probeCache,
+		});
+		expect(catalog.providers[0]).toMatchObject({
+			availability: "install-required",
+			enabled: false,
+		});
+	});
+
+	it("upgrades a remote provider to installed when the probe says installed", () => {
+		// Symmetric regression: a remote-registry entry whose binary is
+		// already on the user's PATH should not be flagged as "install
+		// required" — the probe cache promotes it to "installed".
+		const acpProviderRegistry = makeProviderRegistry([
+			{
+				id: "custom-bin",
+				displayName: "Custom Binary",
+				source: "remote",
+				spawnCommand: "custom-bin",
+				spawnArgs: [],
+			},
+		]);
+		const probeCache = new Map([["custom-bin", { installed: true }]]);
+		const catalog = buildAgentChatCatalog({
+			acpProviderRegistry: acpProviderRegistry as never,
+			agentRegistry: null,
+			probeCache,
+		});
+		expect(catalog.providers[0]).toMatchObject({
+			availability: "installed",
+			enabled: true,
+		});
+	});
+
 	it("survives an agent registry that throws", () => {
 		const throwingRegistry = {
 			getAllAgents: () => {

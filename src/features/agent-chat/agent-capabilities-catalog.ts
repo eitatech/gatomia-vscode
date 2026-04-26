@@ -110,10 +110,68 @@ export const AGENT_CAPABILITIES_CATALOG: readonly AgentCatalogEntry[] = [
 		},
 	},
 	{
-		id: "copilot-language-server",
+		// Catalog id MUST match `AcpProviderDescriptor.id` so
+		// `lookupCatalogEntry` resolves. The id was previously
+		// `copilot-language-server` (the legacy LSP product) but the live
+		// known-agent catalog registers the unified Copilot CLI under
+		// `github-copilot`, so the lookup never matched and the model
+		// dropdown stayed empty.
+		id: "github-copilot",
 		capabilities: {
 			modes: [],
-			models: [],
+			// Models surfaced by `copilot --model <id>` on Copilot CLI
+			// 1.0.x. Static list — the picker will overlay agent-reported
+			// models when ACP `initialize` ever surfaces them.
+			models: [
+				{
+					id: "gpt-5.2",
+					displayName: "GPT-5.2 (default)",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "gpt-5.4",
+					displayName: "GPT-5.4",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "gpt-5.4-mini",
+					displayName: "GPT-5.4 Mini",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "gpt-5-mini",
+					displayName: "GPT-5 Mini",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "gpt-5.2-codex",
+					displayName: "GPT-5.2 Codex",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "gpt-5.3-codex",
+					displayName: "GPT-5.3 Codex",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "gpt-4.1",
+					displayName: "GPT-4.1",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "claude-sonnet-4.6",
+					displayName: "Claude Sonnet 4.6",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+			],
 			acceptsFollowUp: true,
 		},
 	},

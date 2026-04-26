@@ -135,6 +135,7 @@ export let outputChannel: OutputChannel;
 let acpOutputChannel: OutputChannel | null = null;
 let acpSessionManager: AcpSessionManager | null = null;
 let acpProviderRegistry: AcpProviderRegistry | null = null;
+let acpKnownAgentDetector: KnownAgentDetector | null = null;
 let chatRouter: ChatRouter | null = null;
 
 // --- Agent Chat Panel (spec 018) singletons for deactivation flush ---------
@@ -236,8 +237,12 @@ export async function activate(context: ExtensionContext) {
 	const modelCacheService = new ModelCacheService();
 	outputChannel.appendLine("ModelCacheService initialized");
 
-	// Initialize AcpAgentDiscoveryService for ACP agent hooks (Phase 6)
-	const knownAgentDetector = new KnownAgentDetector();
+	// Initialize AcpAgentDiscoveryService for ACP agent hooks (Phase 6).
+	// We reuse the detector instance bootstrapped by `bootstrapAcpRouter`
+	// so the in-memory cache is shared across both code paths — that way
+	// `gatomia.acp.reprobeAll` (which calls `clearCache()`) refreshes the
+	// hooks panel and the chat router in a single shot.
+	const knownAgentDetector = sharedKnownAgentDetector();
 	const knownAgentPreferencesService = new KnownAgentPreferencesService(
 		context
 	);
@@ -2144,6 +2149,18 @@ function createAcpNpxConsentPrompter(
 	};
 }
 
+/**
+ * Returns the singleton {@link KnownAgentDetector}, lazily creating one
+ * when `bootstrapAcpRouter` has not yet captured it (defensive — every
+ * activation path runs `bootstrapAcpRouter` first).
+ */
+function sharedKnownAgentDetector(): KnownAgentDetector {
+	if (!acpKnownAgentDetector) {
+		acpKnownAgentDetector = new KnownAgentDetector();
+	}
+	return acpKnownAgentDetector;
+}
+
 function bootstrapAcpRouter(context: ExtensionContext): void {
 	try {
 		const registry = new AcpProviderRegistry();
@@ -2172,6 +2189,7 @@ function bootstrapAcpRouter(context: ExtensionContext): void {
 		}
 
 		acpProviderRegistry = registry;
+		acpKnownAgentDetector = detector;
 
 		const config = workspace.getConfiguration("gatomia");
 		if (config.get<boolean>("acp.registryRemoteFetch", true)) {
@@ -2247,7 +2265,15 @@ function mergeRemoteEntries(
 	}
 	for (const entry of entries) {
 		const existing = registry.get(entry.id);
-		if (existing && existing.source === "built-in") {
+		// Never overwrite a built-in (Devin, Gemini) or a local known-agent
+		// descriptor: those carry hand-written probes that actually inspect
+		// the host system. Replacing them with a remote descriptor — which
+		// always probes as `installed: false` — would falsely flag locally
+		// installed CLIs (opencode, junie, copilot, …) as missing.
+		if (
+			existing &&
+			(existing.source === "built-in" || existing.source === "local")
+		) {
 			continue;
 		}
 		try {
@@ -2305,6 +2331,10 @@ function registerAcpCommands(context: ExtensionContext): void {
 			acpOutputChannel?.show();
 		}),
 		commands.registerCommand("gatomia.acp.reprobeAll", async () => {
+			// Clearing the detector cache forces every known-agent probe
+			// to re-run on the next router decision, picking up newly
+			// installed CLIs without requiring a window reload.
+			acpKnownAgentDetector?.clearCache();
 			chatRouter?.invalidateCache();
 			await refreshStatusBar();
 			window.showInformationMessage("GatomIA: ACP providers re-probed.");

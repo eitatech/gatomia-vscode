@@ -116,6 +116,15 @@ export class AgentChatViewProvider
 	private readonly disposables: Disposable[] = [];
 	private binding: SidebarSessionBinding | undefined;
 	private pendingFocusSessionId: string | undefined;
+	/**
+	 * Cache of the most recent {@link AcpProviderDescriptor.probe} result
+	 * per provider id. Populated asynchronously by `refreshProbes()` and
+	 * fed into {@link buildAgentChatCatalog} so the picker can mark
+	 * locally-installed providers as `installed` and locally-missing
+	 * known agents as `install-required` regardless of `descriptor.source`.
+	 */
+	private readonly probeCache: Map<string, { installed: boolean }> = new Map();
+	private probeRefreshInFlight: Promise<void> | undefined;
 
 	constructor(options: AgentChatViewProviderOptions) {
 		this.options = options;
@@ -249,6 +258,10 @@ export class AgentChatViewProvider
 			type: "agent-chat/catalog/loaded",
 			payload: { catalog },
 		}).catch(noop);
+		// Kick off (or piggy-back on) an async probe refresh so the next
+		// rebroadcast can replace the optimistic source-based heuristic
+		// with the real `descriptor.probe()` result.
+		this.scheduleProbeRefresh();
 	}
 
 	pushSessionList(): void {
@@ -432,7 +445,70 @@ export class AgentChatViewProvider
 	}
 
 	private snapshotCatalog(): AgentChatCatalog {
-		return buildAgentChatCatalog(this.options.catalogSources);
+		return buildAgentChatCatalog({
+			...this.options.catalogSources,
+			probeCache: this.probeCache,
+		});
+	}
+
+	/**
+	 * Probes every registered ACP provider in parallel and stores the
+	 * `installed` flag in {@link probeCache}. When at least one entry
+	 * changes the catalog is rebroadcast so the picker reflects reality.
+	 *
+	 * Re-entrant: concurrent calls share the same in-flight promise so
+	 * fast-firing events (registry update + tree click + new chat) do
+	 * not spawn multiple probe storms.
+	 */
+	private scheduleProbeRefresh(): void {
+		if (this.probeRefreshInFlight) {
+			return;
+		}
+		this.probeRefreshInFlight = this.refreshProbes()
+			.catch((err: unknown) => {
+				this.options.outputChannel?.appendLine(
+					`[AgentChatView] probe refresh failed: ${err instanceof Error ? err.message : String(err)}`
+				);
+			})
+			.finally(() => {
+				this.probeRefreshInFlight = undefined;
+			});
+	}
+
+	private async refreshProbes(): Promise<void> {
+		const registry = this.options.catalogSources.acpProviderRegistry;
+		if (!registry) {
+			return;
+		}
+		const descriptors = registry.list();
+		const results = await Promise.allSettled(
+			descriptors.map(async (descriptor) => {
+				const probe = await descriptor.probe();
+				return { id: descriptor.id, installed: probe.installed };
+			})
+		);
+		let mutated = false;
+		for (const outcome of results) {
+			if (outcome.status !== "fulfilled") {
+				continue;
+			}
+			const { id, installed } = outcome.value;
+			const previous = this.probeCache.get(id);
+			if (!previous || previous.installed !== installed) {
+				this.probeCache.set(id, { installed });
+				mutated = true;
+			}
+		}
+		if (mutated && this.view) {
+			const catalog = buildAgentChatCatalog({
+				...this.options.catalogSources,
+				probeCache: this.probeCache,
+			});
+			await this.postMessage({
+				type: "agent-chat/catalog/loaded",
+				payload: { catalog },
+			}).catch(noop);
+		}
 	}
 
 	private snapshotSessionList(): SidebarSessionListItem[] {

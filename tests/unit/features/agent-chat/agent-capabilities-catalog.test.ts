@@ -80,9 +80,9 @@ describe("AGENT_CAPABILITIES_CATALOG", () => {
 		expect(ids).toMatchInlineSnapshot(`
 			[
 			  "claude-code",
-			  "copilot-language-server",
 			  "devin",
 			  "gemini",
+			  "github-copilot",
 			  "opencode",
 			]
 		`);

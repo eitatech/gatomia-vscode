@@ -99,24 +99,37 @@ export class KnownAgentDetector {
 	 * Results are cached; subsequent calls with the same strategies return
 	 * immediately without spawning a subprocess.
 	 * Never throws.
+	 *
+	 * Each strategy attempt is logged at info level so users can see in
+	 * the GatomIA output channel why a probe succeeded or failed (e.g.
+	 * `path:copilot` vs `npm-global:@github/copilot-language-server`).
 	 */
 	async isInstalledAny(strategies: InstallCheckStrategy[]): Promise<boolean> {
 		const key = cacheKeyFor(strategies);
 		if (key && this.cache.has(key)) {
-			return this.cache.get(key) as boolean;
+			const cached = this.cache.get(key) as boolean;
+			console.log(
+				`${LOG_PREFIX} cache hit for ${key} -> ${cached ? "installed" : "missing"}`
+			);
+			return cached;
 		}
 
 		let result = false;
+		let winningStrategy: InstallCheckStrategy | undefined;
 		for (const strategy of strategies) {
 			try {
 				const found = await this.isInstalled(strategy);
+				console.log(
+					`${LOG_PREFIX} ${strategy.strategy}:${strategy.target} -> ${found ? "found" : "missing"}`
+				);
 				if (found) {
 					result = true;
+					winningStrategy = strategy;
 					break;
 				}
 			} catch (err) {
 				console.log(
-					`${LOG_PREFIX} Unexpected error during install check: ${(err as Error).message}`
+					`${LOG_PREFIX} ${strategy.strategy}:${strategy.target} -> error: ${(err as Error).message}`
 				);
 			}
 		}
@@ -124,7 +137,23 @@ export class KnownAgentDetector {
 		if (key) {
 			this.cache.set(key, result);
 		}
+		if (result && winningStrategy) {
+			console.log(
+				`${LOG_PREFIX} resolved via ${winningStrategy.strategy}:${winningStrategy.target}`
+			);
+		}
 		return result;
+	}
+
+	/**
+	 * Clears every cached detection result so the next call re-probes
+	 * the system. Useful after the user installs/uninstalls a binary
+	 * without reloading the extension host.
+	 */
+	clearCache(): void {
+		const size = this.cache.size;
+		this.cache.clear();
+		console.log(`${LOG_PREFIX} cache cleared (${size} entries)`);
 	}
 
 	/**

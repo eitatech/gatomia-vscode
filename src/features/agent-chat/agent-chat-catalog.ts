@@ -71,28 +71,48 @@ export interface AgentChatCatalog {
 // Builder
 // ---------------------------------------------------------------------------
 
+/**
+ * Optional cache of the most recent {@link AcpProviderDescriptor.probe}
+ * outcome per provider id. When supplied, `classifyAvailability` honours
+ * the real `installed` flag and downgrades providers whose binary is
+ * missing from "installed" to "install-required" — even though they are
+ * `source: "local"`.
+ */
+export type ProviderProbeCache = ReadonlyMap<string, { installed: boolean }>;
+
 export interface AgentChatCatalogSources {
 	readonly acpProviderRegistry: AcpProviderRegistry | null | undefined;
 	readonly agentRegistry: AgentRegistry | null | undefined;
+	/**
+	 * Optional view-provider-owned probe cache. The view provider populates
+	 * this asynchronously after registry mutations and rebroadcasts the
+	 * catalog; the first sync render falls back to the source-based
+	 * heuristic so the picker still has something to display.
+	 */
+	readonly probeCache?: ProviderProbeCache;
 }
 
 export function buildAgentChatCatalog(
 	sources: AgentChatCatalogSources
 ): AgentChatCatalog {
-	const providers = projectProviders(sources.acpProviderRegistry);
+	const providers = projectProviders(
+		sources.acpProviderRegistry,
+		sources.probeCache
+	);
 	const agentFiles = projectAgentFiles(sources.agentRegistry);
 	return { providers, agentFiles };
 }
 
 function projectProviders(
-	registry: AcpProviderRegistry | null | undefined
+	registry: AcpProviderRegistry | null | undefined,
+	probeCache: ProviderProbeCache | undefined
 ): AgentChatProviderOption[] {
 	if (!registry) {
 		return [];
 	}
 	return registry.list().map((descriptor): AgentChatProviderOption => {
 		const source = descriptor.source ?? "built-in";
-		const availability = classifyAvailability(descriptor);
+		const availability = classifyAvailability(descriptor, probeCache);
 		const npxPackage =
 			descriptor.spawnCommand === "npx" && descriptor.spawnArgs[0] === "-y"
 				? descriptor.spawnArgs[1]
@@ -112,17 +132,45 @@ function projectProviders(
 	});
 }
 
-function classifyAvailability(descriptor: {
-	source?: "built-in" | "local" | "remote";
-	spawnCommand: string;
-	spawnArgs: string[];
-}): ProviderAvailability {
+function classifyAvailability(
+	descriptor: {
+		id: string;
+		source?: "built-in" | "local" | "remote";
+		spawnCommand: string;
+		spawnArgs: string[];
+	},
+	probeCache: ProviderProbeCache | undefined
+): ProviderAvailability {
+	const probed = probeCache?.get(descriptor.id);
+	if (probed) {
+		// Real probe wins over heuristics. A locally-catalogued agent whose
+		// binary is missing must surface as "install-required" so the
+		// picker can disable it; a remote agent whose binary is on the user's
+		// PATH must surface as "installed".
+		if (probed.installed) {
+			return "installed";
+		}
+		// Probed and missing: still let npx-runnable remote agents show as
+		// such — `npx -y <pkg>` will lazily download on demand.
+		if (descriptor.spawnCommand === "npx") {
+			return "available-via-npx";
+		}
+		return "install-required";
+	}
+
+	// No probe data yet — fall back to source-based heuristic so the first
+	// render is not blank. The view provider rebroadcasts once probes
+	// complete.
 	const source = descriptor.source ?? "built-in";
-	if (source === "built-in" || source === "local") {
+	if (source === "built-in") {
 		return "installed";
 	}
 	if (descriptor.spawnCommand === "npx") {
 		return "available-via-npx";
+	}
+	if (source === "local") {
+		// Optimistic until the probe resolves: locals usually are on PATH.
+		return "installed";
 	}
 	return "install-required";
 }
