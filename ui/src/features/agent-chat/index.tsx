@@ -20,6 +20,7 @@ import { InputBar } from "@/features/agent-chat/components/input-bar";
 import { NewSessionComposer } from "@/features/agent-chat/components/new-session-composer";
 import { PendingChangesBar } from "@/features/agent-chat/components/pending-changes-bar";
 import { RetryAction } from "@/features/agent-chat/components/retry-action";
+import { SessionsList } from "@/features/agent-chat/components/sessions-list";
 import { SessionSwitcher } from "@/features/agent-chat/components/session-switcher";
 import { StatusHeader } from "@/features/agent-chat/components/status-header";
 import { useSessionBridge } from "@/features/agent-chat/hooks/use-session-bridge";
@@ -48,6 +49,7 @@ export function AgentChatFeature(): JSX.Element {
 		rejectAllPendingWrites,
 		acceptPendingWrite,
 		rejectPendingWrite,
+		changePermissionDefault,
 	} = bridge;
 
 	const latestRetryableError = useMemo(
@@ -65,25 +67,26 @@ export function AgentChatFeature(): JSX.Element {
 
 	const session = state.session;
 
-	// Sidebar empty state — no session bound. Show the picker + composer
-	// so the user can spawn a fresh session entirely from the webview.
+	// Sidebar empty state — no session bound. Show the SessionsList at
+	// the top (Copilot Chat-style "SESSIONS" header) and the composer
+	// underneath so the user can either resume a recent chat or spawn
+	// a fresh session.
 	if (!session && surface === "sidebar") {
 		return (
 			<div className="agent-chat-feature agent-chat-feature--empty">
 				<div className="agent-chat-feature__topbar">
 					<div className="agent-chat-feature__title">Agent Chat</div>
-					<SessionSwitcher
-						activeSessionId={undefined}
-						onNewChat={() => {
-							/* already in empty state */
-						}}
-						onSwitchSession={switchSession}
-						sessions={state.sessions}
-					/>
 				</div>
+				<SessionsList
+					activeSessionId={undefined}
+					onPick={switchSession}
+					sessions={state.sessions}
+				/>
 				<NewSessionComposer
 					agentFiles={state.catalog.agentFiles}
+					onChangePermissionDefault={changePermissionDefault}
 					onStart={startNewSession}
+					permissionDefault={state.permissionDefault}
 					providers={state.catalog.providers}
 				/>
 			</div>
@@ -147,7 +150,9 @@ export function AgentChatFeature(): JSX.Element {
 				busy={isBusyState(session.lifecycleState)}
 				modelLabel={session.selectedModelId ?? session.agentDisplayName}
 				onCancel={cancel}
+				onChangePermissionDefault={changePermissionDefault}
 				onSubmit={submit}
+				permissionDefault={state.permissionDefault}
 				readOnly={session.isReadOnly}
 				readOnlyReason={
 					session.isReadOnly ? "This is a read-only cloud session." : undefined

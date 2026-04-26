@@ -939,6 +939,12 @@
         "title": "Open Agent Chat in Secondary Side Bar",
         "category": "GatomIA",
         "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "gatomia.agentChat.moveChatToSecondarySidebar",
+        "title": "Move Agent Chat to Secondary Side Bar",
+        "category": "GatomIA",
+        "icon": "$(layout-sidebar-right)"
       }
     ],
     "keybindings": [
@@ -1273,6 +1279,9 @@
         },
         {
           "command": "gatomia.agentChat.openInSecondarySidebar"
+        },
+        {
+          "command": "gatomia.agentChat.moveChatToSecondarySidebar"
         }
       ]
     }

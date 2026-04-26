@@ -284,7 +284,19 @@ export interface SidebarSessionListItem {
 	selectedModeId?: string;
 	selectedModelId?: string;
 	isTerminal: boolean;
+	/**
+	 * Short human-readable label derived from the session's first user
+	 * prompt. Webview falls back to `agentDisplayName` when omitted.
+	 */
+	title?: string;
 }
+
+/**
+ * Mirrors the `gatomia.acp.permissionDefault` enum exposed by the host
+ * extension. Drives both the segmented control on the empty-state
+ * composer and the persistent chip on the active-session toolbar.
+ */
+export type PermissionDefaultMode = "ask" | "allow" | "deny";
 
 /**
  * Composer payload sent when the user submits the empty-state composer to

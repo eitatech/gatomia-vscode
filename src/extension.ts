@@ -2423,6 +2423,12 @@ function registerAcpCommands(context: ExtensionContext): void {
 					// Status refresh failures are non-fatal.
 				});
 			}
+			if (event.affectsConfiguration("gatomia.acp.permissionDefault")) {
+				// Hot-reload the permission strategy across every cached
+				// AcpClient so the chat picker / chip can mutate behaviour
+				// without forcing the user to reload the window.
+				acpSessionManager?.setPermissionDefault(readPermissionDefault());
+			}
 		})
 	);
 }

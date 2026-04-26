@@ -152,7 +152,7 @@ export class AcpClient {
 	private readonly descriptor: AcpProviderDescriptor;
 	private readonly cwd: string;
 	private readonly output: OutputChannel;
-	private readonly permissionDefault: PermissionMode;
+	private permissionDefault: PermissionMode;
 	private readonly promptForPermission: PermissionPrompter | undefined;
 	private readonly initializeTimeoutMs: number;
 	private connection: ClientSideConnection | null = null;
@@ -587,10 +587,29 @@ export class AcpClient {
 		return response.sessionId;
 	}
 
+	/**
+	 * Update the in-memory permission strategy without recycling the child
+	 * process. The next `requestPermission` call from the agent honours the
+	 * new mode.
+	 *
+	 * The handler returned by {@link buildClientHandler} reads the current
+	 * value via `() => this.permissionDefault` so we don't need to rebuild
+	 * the connection.
+	 */
+	setPermissionDefault(mode: PermissionMode): void {
+		if (this.permissionDefault === mode) {
+			return;
+		}
+		this.permissionDefault = mode;
+		this.output.appendLine(
+			`[ACP][${this.descriptor.id}] permissionDefault updated to ${mode}`
+		);
+	}
+
 	private buildClientHandler(): Client {
 		const output = this.output;
 		const providerId = this.descriptor.id;
-		const permissionDefault = this.permissionDefault;
+		const getPermissionDefault = (): PermissionMode => this.permissionDefault;
 		const promptForPermission = this.promptForPermission;
 		const rememberedDecisions = this.rememberedDecisions;
 		const pendingWritesStore = this.pendingWritesStore;
@@ -646,7 +665,7 @@ export class AcpClient {
 			requestPermission: (params) =>
 				resolvePermission({
 					params,
-					mode: permissionDefault,
+					mode: getPermissionDefault(),
 					prompter: promptForPermission,
 					output,
 					providerId,

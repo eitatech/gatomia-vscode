@@ -6,22 +6,27 @@
  * `acceptsFollowUp: false` after the first turn, or sessions in a terminal
  * state (FR-003, FR-004).
  *
- * Visual layout (image 1 / Phase 2 redesign):
- *   ┌────────────────────────────────────────────────┐
- *   │ Ask anything (⌘L)                              │  ← textarea (placeholder)
- *   │                                                │
- *   ├────────────────────────────────────────────────┤
- *   │ [+] [<>Code] modelLabel        [○] [🎤] [Send] │  ← toolbar
- *   └────────────────────────────────────────────────┘
+ * Visual layout (Windsurf-inspired redesign — codicons, no emojis):
+ *   ┌────────────────────────────────────────────────────┐
+ *   │ Ask anything (⌘L)                                  │  ← textarea
+ *   │                                                    │
+ *   ├────────────────────────────────────────────────────┤
+ *   │ [+] [</>Code] [Shield Auto▾] modelLabel  [Mic][▶]  │  ← toolbar
+ *   └────────────────────────────────────────────────────┘
  *
- * The `+`, `<>Code`, mic and pulse icons are placeholders that match the
- * mockup chrome but are not yet wired to runtime behaviour — they are
- * `disabled` so they don't trap focus or imply functionality. Replacing
- * them with real handlers is tracked separately (mode toggle, attachments
- * and dictation each need their own UX spec).
+ * Toolbar icons are codicons from `@vscode/codicons` (already loaded by the
+ * webview). The `+`, `<>` and mic buttons remain placeholders (`disabled`)
+ * until their respective specs ship — they preserve the chrome layout
+ * without implying functionality.
+ *
+ * The {@link PermissionChip} surfaces the current
+ * `gatomia.acp.permissionDefault` so the user can flip auto-approve mid
+ * conversation without re-opening the empty composer.
  */
 
 import { useCallback, useState } from "react";
+import { PermissionChip } from "./permission-chip";
+import type { PermissionDefaultMode } from "@/features/agent-chat/types";
 
 interface InputBarProps {
 	readonly onSubmit: (content: string) => void;
@@ -32,6 +37,8 @@ interface InputBarProps {
 	readonly busy?: boolean;
 	readonly modelLabel?: string;
 	readonly onCancel?: () => void;
+	readonly permissionDefault: PermissionDefaultMode | undefined;
+	readonly onChangePermissionDefault: (mode: PermissionDefaultMode) => void;
 }
 
 export function InputBar({
@@ -43,6 +50,8 @@ export function InputBar({
 	busy,
 	modelLabel,
 	onCancel,
+	permissionDefault,
+	onChangePermissionDefault,
 }: InputBarProps): JSX.Element {
 	const [value, setValue] = useState("");
 
@@ -98,18 +107,22 @@ export function InputBar({
 						title="Attachments coming soon"
 						type="button"
 					>
-						+
+						<i aria-hidden="true" className="codicon codicon-add" />
 					</button>
 					<button
-						aria-label="Code mode"
+						aria-label="Code mode (coming soon)"
 						className="agent-chat-input__chip"
 						disabled
 						title="Code mode (coming soon)"
 						type="button"
 					>
-						<span className="agent-chat-input__chip-icon">{"<>"}</span>
+						<i aria-hidden="true" className="codicon codicon-code" />
 						<span className="agent-chat-input__chip-label">Code</span>
 					</button>
+					<PermissionChip
+						onChange={onChangePermissionDefault}
+						value={permissionDefault}
+					/>
 					{modelLabel ? (
 						<span className="agent-chat-input__model-label" title={modelLabel}>
 							{modelLabel}
@@ -131,7 +144,7 @@ export function InputBar({
 						title="Dictation coming soon"
 						type="button"
 					>
-						🎤
+						<i aria-hidden="true" className="codicon codicon-mic" />
 					</button>
 					{showStop ? (
 						<button
@@ -141,7 +154,7 @@ export function InputBar({
 							title="Stop the agent"
 							type="button"
 						>
-							■
+							<i aria-hidden="true" className="codicon codicon-debug-stop" />
 						</button>
 					) : (
 						<button
@@ -151,7 +164,7 @@ export function InputBar({
 							onClick={handleSubmit}
 							type="button"
 						>
-							Send
+							<i aria-hidden="true" className="codicon codicon-send" />
 						</button>
 					)}
 				</div>

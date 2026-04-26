@@ -922,14 +922,23 @@ b {
 }
 
 .agent-chat-input__send {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
 	background: var(--vscode-button-background);
 	color: var(--vscode-button-foreground);
 	border: none;
-	border-radius: 999px;
-	padding: 4px 12px;
-	font-size: 11px;
-	font-weight: 500;
+	border-radius: 50%;
+	padding: 0;
+	font-size: 12px;
 	cursor: pointer;
+}
+
+.agent-chat-input__chip-label {
+	font-size: 11px;
+	line-height: 1;
 }
 
 .agent-chat-input__send:not(:disabled):hover {
@@ -1410,4 +1419,266 @@ b {
 
 .agent-chat-message__badge--rejected {
 	color: var(--vscode-errorForeground, #e74c3c);
+}
+
+/* --- Sessions list (empty-state history) ----------------------------- */
+
+.agent-chat-sessions-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 6px 8px 12px;
+	border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+	background: var(--vscode-sideBar-background);
+}
+
+.agent-chat-sessions-list__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 4px 4px 6px;
+}
+
+.agent-chat-sessions-list__title {
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	opacity: 0.7;
+}
+
+.agent-chat-sessions-list__items {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.agent-chat-sessions-list__item {
+	display: grid;
+	grid-template-columns: 12px 1fr auto;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	background: transparent;
+	border: none;
+	color: var(--vscode-foreground);
+	padding: 4px 6px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 12px;
+	text-align: left;
+}
+
+.agent-chat-sessions-list__item:hover {
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
+}
+
+.agent-chat-sessions-list__item--active {
+	background: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
+.agent-chat-sessions-list__status-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--vscode-foreground);
+	opacity: 0.55;
+	justify-self: center;
+}
+
+.agent-chat-sessions-list__status-dot--running,
+.agent-chat-sessions-list__status-dot--initializing,
+.agent-chat-sessions-list__status-dot--waiting-for-input {
+	background: var(--vscode-charts-blue, var(--vscode-textLink-foreground));
+	opacity: 0.95;
+}
+
+.agent-chat-sessions-list__status-dot--completed {
+	background: var(--vscode-charts-green, var(--vscode-foreground));
+	opacity: 0.7;
+}
+
+.agent-chat-sessions-list__status-dot--failed {
+	background: var(--vscode-errorForeground, #e74c3c);
+	opacity: 0.95;
+}
+
+.agent-chat-sessions-list__status-dot--cancelled,
+.agent-chat-sessions-list__status-dot--ended-by-shutdown {
+	background: var(--vscode-foreground);
+	opacity: 0.4;
+}
+
+.agent-chat-sessions-list__item-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.agent-chat-sessions-list__item-meta {
+	font-size: 10px;
+	opacity: 0.65;
+	font-variant-numeric: tabular-nums;
+}
+
+.agent-chat-sessions-list__more {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	background: transparent;
+	border: none;
+	color: var(--vscode-foreground);
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	padding: 4px 6px;
+	margin-top: 2px;
+	cursor: pointer;
+	opacity: 0.7;
+}
+
+.agent-chat-sessions-list__more:hover {
+	opacity: 1;
+}
+
+/* --- Permission toggle (segmented control on the empty composer) ----- */
+
+.agent-chat-permission-toggle {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0;
+	padding: 0;
+	margin: 0;
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
+	border-radius: 6px;
+	overflow: hidden;
+	background: var(--vscode-input-background);
+}
+
+.agent-chat-permission-toggle__legend {
+	width: 100%;
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	opacity: 0.7;
+	padding: 0 0 4px 0;
+	float: left;
+}
+
+.agent-chat-permission-toggle__option {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	flex: 1 1 auto;
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: none;
+	padding: 4px 8px;
+	font-size: 11px;
+	cursor: pointer;
+	border-right: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
+}
+
+.agent-chat-permission-toggle__option:last-of-type {
+	border-right: none;
+}
+
+.agent-chat-permission-toggle__option:hover {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+}
+
+.agent-chat-permission-toggle__option--active {
+	background: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
+.agent-chat-permission-toggle__option:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* --- Permission chip (compact dropdown on the input toolbar) -------- */
+
+.agent-chat-permission-chip {
+	position: relative;
+	display: inline-flex;
+}
+
+.agent-chat-permission-chip__toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
+	border-radius: 999px;
+	padding: 2px 8px;
+	font-size: 11px;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.agent-chat-permission-chip__toggle:hover {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+}
+
+.agent-chat-permission-chip__menu {
+	position: absolute;
+	bottom: calc(100% + 4px);
+	left: 0;
+	min-width: 220px;
+	background: var(--vscode-editorWidget-background);
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.4));
+	border-radius: 6px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+	padding: 4px;
+	z-index: 50;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.agent-chat-permission-chip__item {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: none;
+	padding: 6px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 11px;
+	text-align: left;
+}
+
+.agent-chat-permission-chip__item:hover {
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
+}
+
+.agent-chat-permission-chip__item--active {
+	background: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
+.agent-chat-permission-chip__item-text {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.agent-chat-permission-chip__item-label {
+	font-weight: 600;
+}
+
+.agent-chat-permission-chip__item-desc {
+	font-size: 10px;
+	opacity: 0.75;
 }

@@ -31,6 +31,7 @@
 import { randomUUID } from "node:crypto";
 import {
 	type CancellationToken,
+	ConfigurationTarget,
 	type Disposable,
 	type ExtensionContext,
 	type WebviewView,
@@ -38,6 +39,7 @@ import {
 	type WebviewViewResolveContext,
 	commands,
 	window,
+	workspace,
 } from "vscode";
 import type { PendingWriteSnapshot } from "../features/agent-chat/acp-chat-runner";
 import type { AgentChatRegistry } from "../features/agent-chat/agent-chat-registry";
@@ -99,6 +101,12 @@ export interface AgentChatViewController {
 	pushCatalog(): void;
 	/** Push the running session list to the webview. */
 	pushSessionList(): void;
+	/**
+	 * Push the current `gatomia.acp.permissionDefault` value to the
+	 * webview. Used both eagerly (on resolve) and reactively whenever
+	 * `onDidChangeConfiguration` fires for the key.
+	 */
+	pushPermissionDefault(): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,6 +157,18 @@ export class AgentChatViewProvider
 				})
 			);
 		}
+
+		// Re-broadcast the permission default whenever the user (or this
+		// extension itself, via the chat UI) mutates the setting. The
+		// in-process `AcpSessionManager` is updated separately in
+		// `extension.ts`; this listener only handles the webview state.
+		this.disposables.push(
+			workspace.onDidChangeConfiguration((event) => {
+				if (event.affectsConfiguration("gatomia.acp.permissionDefault")) {
+					this.pushPermissionDefault();
+				}
+			})
+		);
 	}
 
 	// ------------------------------------------------------------------
@@ -202,6 +222,7 @@ export class AgentChatViewProvider
 		// a synthetic round-trip after `agent-chat/ready`.
 		this.pushCatalog();
 		this.pushSessionList();
+		this.pushPermissionDefault();
 
 		// Re-bind any session that was queued while the view was not yet
 		// resolved (the most common case is a tree click immediately after
@@ -275,6 +296,16 @@ export class AgentChatViewProvider
 		}).catch(noop);
 	}
 
+	pushPermissionDefault(): void {
+		if (!this.view) {
+			return;
+		}
+		this.postMessage({
+			type: "agent-chat/permission-default/changed",
+			payload: { mode: readPermissionDefaultFromConfig() },
+		}).catch(noop);
+	}
+
 	dispose(): void {
 		this.binding?.dispose();
 		this.binding = undefined;
@@ -301,6 +332,7 @@ export class AgentChatViewProvider
 			case "agent-chat/ready":
 				this.pushCatalog();
 				this.pushSessionList();
+				this.pushPermissionDefault();
 				if (this.binding) {
 					await this.binding.sendSessionLoaded();
 				} else {
@@ -328,11 +360,44 @@ export class AgentChatViewProvider
 				await this.startNewSessionFlow();
 				return;
 			}
+			case "agent-chat/control/change-permission-default": {
+				await this.handleChangePermissionDefault(
+					msg.payload as { mode?: string } | undefined
+				);
+				return;
+			}
 			default:
 				if (this.binding) {
 					await this.binding.handleWebviewMessage(msg);
 				}
 				return;
+		}
+	}
+
+	/**
+	 * Persists the requested permission default to the global VS Code
+	 * configuration. The change-of-config listener registered above will
+	 * pick up the update and rebroadcast `permission-default/changed`,
+	 * keeping the webview in sync without a manual round-trip from here.
+	 *
+	 * Unknown / malformed values are ignored — the webview remains
+	 * authoritative for its own UX state.
+	 */
+	private async handleChangePermissionDefault(
+		payload: { mode?: string } | undefined
+	): Promise<void> {
+		const mode = payload?.mode;
+		if (mode !== "ask" && mode !== "allow" && mode !== "deny") {
+			return;
+		}
+		try {
+			await workspace
+				.getConfiguration("gatomia")
+				.update("acp.permissionDefault", mode, ConfigurationTarget.Global);
+		} catch (err) {
+			this.options.outputChannel?.appendLine(
+				`[AgentChatView] permissionDefault update failed: ${err instanceof Error ? err.message : String(err)}`
+			);
 		}
 	}
 
@@ -532,10 +597,52 @@ export class AgentChatViewProvider
 				selectedModeId: session.selectedModeId,
 				selectedModelId: session.selectedModelId,
 				isTerminal: TERMINAL_STATES.has(session.lifecycleState),
+				title: this.deriveSessionTitle(session.id),
 			});
 		}
 		items.sort((a, b) => b.updatedAt - a.updatedAt);
 		return items;
+	}
+
+	/**
+	 * Look up the first {@link UserChatMessage} of a session and return a
+	 * truncated label suitable for the sidebar history list. Returns
+	 * `undefined` when no user message has been recorded yet.
+	 */
+	private deriveSessionTitle(sessionId: string): string | undefined {
+		const transcript = this.readTranscriptForSession(sessionId);
+		for (const message of transcript) {
+			if (message.role === "user" && typeof message.content === "string") {
+				const text = message.content.trim().replace(/\s+/g, " ");
+				if (text.length === 0) {
+					continue;
+				}
+				return text.length > SESSION_TITLE_MAX_LENGTH
+					? `${text.slice(0, SESSION_TITLE_MAX_LENGTH - 1).trimEnd()}\u2026`
+					: text;
+			}
+		}
+		return;
+	}
+
+	/**
+	 * Read the persisted transcript for `sessionId` straight from the
+	 * store's workspaceState. Mirrors {@link SidebarSessionBinding.readTranscript}
+	 * but lives at the provider level so {@link snapshotSessionList} can
+	 * peek at sessions that are not bound to the active webview.
+	 */
+	private readTranscriptForSession(sessionId: string): ChatMessage[] {
+		const key = transcriptKeyFor(sessionId);
+		const mem = (
+			this.options.store as unknown as {
+				workspaceState?: { get<T>(k: string): T | undefined };
+			}
+		).workspaceState;
+		if (!mem) {
+			return [];
+		}
+		const raw = mem.get<{ messages: ChatMessage[] }>(key);
+		return raw?.messages ?? [];
 	}
 
 	private async postMessage(message: unknown): Promise<void> {
@@ -958,7 +1065,16 @@ interface SidebarSessionListItem {
 	readonly selectedModeId?: string;
 	readonly selectedModelId?: string;
 	readonly isTerminal: boolean;
+	/**
+	 * Short, human-readable label derived from the session's first user
+	 * prompt. Falls back to `agentDisplayName` in the webview when this
+	 * is `undefined` (no user message has been recorded yet).
+	 */
+	readonly title?: string;
 }
+
+/** Maximum length of the derived `title` field (characters). */
+const SESSION_TITLE_MAX_LENGTH = 60;
 
 function executionTargetLabel(kind: "local" | "worktree" | "cloud"): string {
 	switch (kind) {
@@ -1003,4 +1119,18 @@ function composePromptWithAgentFile(
 
 function noop(): void {
 	// best-effort fire-and-forget for postMessage failures
+}
+
+/**
+ * Mirrors `extension.ts#readPermissionDefault`. Kept local so the view
+ * provider can broadcast the value without importing extension internals.
+ */
+function readPermissionDefaultFromConfig(): "ask" | "allow" | "deny" {
+	const raw = workspace
+		.getConfiguration("gatomia")
+		.get<string>("acp.permissionDefault", "ask");
+	if (raw === "allow" || raw === "deny") {
+		return raw;
+	}
+	return "ask";
 }

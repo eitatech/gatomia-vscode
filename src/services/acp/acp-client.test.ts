@@ -415,6 +415,57 @@ describe("AcpClient", () => {
 			expect(response).toEqual({ outcome: { outcome: "cancelled" } });
 		});
 
+		describe("setPermissionDefault (hot-reload)", () => {
+			it("propagates a new mode to subsequent requestPermission calls without rebuilding the connection", async () => {
+				const client = new AcpClient({
+					descriptor,
+					cwd: "/tmp/workspace",
+					output: makeOutputChannel(),
+					permissionDefault: "ask",
+					promptForPermission: vi.fn().mockResolvedValue(null),
+				});
+				await client.ensureStarted();
+
+				// Initial mode = "ask" with a no-op prompter -> cancelled.
+				const before = await invokeRequestPermission();
+				expect(before).toEqual({ outcome: { outcome: "cancelled" } });
+
+				// Switch to allow at runtime.
+				client.setPermissionDefault("allow");
+
+				// The same handler instance must now auto-allow.
+				const after = await invokeRequestPermission();
+				expect(after).toEqual({
+					outcome: { outcome: "selected", optionId: "opt-allow" },
+				});
+			});
+
+			it("is idempotent when the new mode equals the current one", async () => {
+				const output = makeOutputChannel();
+				const client = new AcpClient({
+					descriptor,
+					cwd: "/tmp/workspace",
+					output,
+					permissionDefault: "deny",
+				});
+				await client.ensureStarted();
+
+				const appendLine = output.appendLine as unknown as ReturnType<
+					typeof vi.fn
+				>;
+				const callsForUpdate = (): number =>
+					appendLine.mock.calls.filter((args) =>
+						String(args[0]).includes("permissionDefault updated")
+					).length;
+
+				const before = callsForUpdate();
+				client.setPermissionDefault("deny");
+				const after = callsForUpdate();
+
+				expect(after).toBe(before);
+			});
+		});
+
 		describe("remembered always-decisions (per AcpClient memo)", () => {
 			const invokeWithKind = (toolKind: string): Promise<unknown> =>
 				(

@@ -13,7 +13,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { commands, EventEmitter } from "vscode";
+import { commands, ConfigurationTarget, EventEmitter, workspace } from "vscode";
 import { AgentChatViewProvider } from "../../../src/providers/agent-chat-view-provider";
 import { AgentChatRegistry } from "../../../src/features/agent-chat/agent-chat-registry";
 import {
@@ -356,5 +356,102 @@ describe("AgentChatViewProvider", () => {
 			([m]) => (m as { type: string }).type
 		);
 		expect(types).toContain("agent-chat/session/loaded");
+	});
+
+	describe("permissionDefault bridge", () => {
+		it("eagerly pushes permission-default/changed when the view resolves", () => {
+			const get = vi.fn().mockReturnValue("allow");
+			const update = vi.fn().mockResolvedValue(undefined);
+			vi.mocked(workspace.getConfiguration).mockReturnValue({
+				get,
+				update,
+			} as never);
+
+			const viewProvider = makeProvider();
+			const view = createFakeView();
+			viewProvider.resolveWebviewView(view as never, {} as never, {} as never);
+
+			const permissionCalls = view.webview.postMessage.mock.calls.filter(
+				([m]) =>
+					(m as { type: string }).type ===
+					"agent-chat/permission-default/changed"
+			);
+			expect(permissionCalls.length).toBeGreaterThan(0);
+			const latest = permissionCalls.at(-1);
+			const payload = (latest?.[0] as { payload: { mode: string } }).payload;
+			expect(payload.mode).toBe("allow");
+		});
+
+		it("normalises unknown config values to ask", () => {
+			const get = vi.fn().mockReturnValue("garbage");
+			const update = vi.fn().mockResolvedValue(undefined);
+			vi.mocked(workspace.getConfiguration).mockReturnValue({
+				get,
+				update,
+			} as never);
+
+			const viewProvider = makeProvider();
+			const view = createFakeView();
+			viewProvider.resolveWebviewView(view as never, {} as never, {} as never);
+
+			const permissionCall = view.webview.postMessage.mock.calls.find(
+				([m]) =>
+					(m as { type: string }).type ===
+					"agent-chat/permission-default/changed"
+			);
+			const payload = (permissionCall?.[0] as { payload: { mode: string } })
+				.payload;
+			expect(payload.mode).toBe("ask");
+		});
+
+		it("forwards change-permission-default to workspace.getConfiguration().update", async () => {
+			const get = vi.fn().mockReturnValue("ask");
+			const update = vi.fn().mockResolvedValue(undefined);
+			vi.mocked(workspace.getConfiguration).mockReturnValue({
+				get,
+				update,
+			} as never);
+
+			const viewProvider = makeProvider();
+			const view = createFakeView();
+			viewProvider.resolveWebviewView(view as never, {} as never, {} as never);
+
+			view.webview._inject({
+				type: "agent-chat/control/change-permission-default",
+				payload: { mode: "allow" },
+			});
+			await Promise.resolve();
+			await Promise.resolve();
+
+			expect(workspace.getConfiguration).toHaveBeenCalledWith("gatomia");
+			expect(update).toHaveBeenCalledWith(
+				"acp.permissionDefault",
+				"allow",
+				ConfigurationTarget.Global
+			);
+		});
+
+		it("ignores change-permission-default with an invalid mode", async () => {
+			const get = vi.fn().mockReturnValue("ask");
+			const update = vi.fn().mockResolvedValue(undefined);
+			vi.mocked(workspace.getConfiguration).mockReturnValue({
+				get,
+				update,
+			} as never);
+
+			const viewProvider = makeProvider();
+			const view = createFakeView();
+			viewProvider.resolveWebviewView(view as never, {} as never, {} as never);
+			update.mockClear();
+
+			view.webview._inject({
+				type: "agent-chat/control/change-permission-default",
+				payload: { mode: "wat" },
+			});
+			await Promise.resolve();
+			await Promise.resolve();
+
+			expect(update).not.toHaveBeenCalled();
+		});
 	});
 });

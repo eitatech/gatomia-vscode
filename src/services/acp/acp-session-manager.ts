@@ -72,7 +72,7 @@ export class AcpSessionManager {
 	private readonly registry: AcpProviderRegistry;
 	private readonly output: OutputChannel;
 	private readonly cwd: string;
-	private readonly permissionDefault: PermissionMode | undefined;
+	private permissionDefault: PermissionMode | undefined;
 	private readonly promptForPermission: PermissionPrompter | undefined;
 	private readonly beforeSpawn: BeforeSpawnHook | undefined;
 	private readonly bufferFileWrites: boolean;
@@ -96,6 +96,25 @@ export class AcpSessionManager {
 		this.promptForPermission = options.promptForPermission;
 		this.beforeSpawn = options.beforeSpawn;
 		this.bufferFileWrites = options.bufferFileWrites ?? false;
+	}
+
+	/**
+	 * Update the permission strategy at runtime. Propagates the new mode
+	 * to every cached {@link AcpClient} so subsequent tool-call permission
+	 * requests honour the change without requiring a child-process recycle
+	 * or extension reload.
+	 */
+	setPermissionDefault(mode: PermissionMode): void {
+		if (this.permissionDefault === mode) {
+			return;
+		}
+		this.permissionDefault = mode;
+		for (const client of this.clients.values()) {
+			client.setPermissionDefault(mode);
+		}
+		this.output.appendLine(
+			`[ACP] permissionDefault propagated to ${this.clients.size} client(s): ${mode}`
+		);
 	}
 
 	/**

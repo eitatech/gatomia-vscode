@@ -25,6 +25,7 @@ import type {
 	ModelDescriptor,
 	NewSessionRequest,
 	PendingFileWriteSummary,
+	PermissionDefaultMode,
 	SidebarSessionListItem,
 	UserChatMessage,
 } from "@/features/agent-chat/types";
@@ -54,6 +55,12 @@ export interface AgentChatBridgeState {
 	readonly clearedReason: ClearReason | undefined;
 	/** Pending file writes the agent is awaiting Accept/Reject for. */
 	readonly pendingWrites: readonly PendingFileWriteSummary[];
+	/**
+	 * Current value of `gatomia.acp.permissionDefault`. `undefined` until
+	 * the host sends the first `permission-default/changed` payload.
+	 * `"ask"` is treated as the implicit default by consumers.
+	 */
+	readonly permissionDefault: PermissionDefaultMode | undefined;
 }
 
 export interface AgentChatBridge {
@@ -75,6 +82,12 @@ export interface AgentChatBridge {
 	rejectAllPendingWrites(): void;
 	acceptPendingWrite(id: string): void;
 	rejectPendingWrite(id: string): void;
+	/**
+	 * Persist a new `gatomia.acp.permissionDefault` value via the host.
+	 * The host echoes the change back through `permission-default/changed`
+	 * which keeps this bridge state authoritative.
+	 */
+	changePermissionDefault(mode: PermissionDefaultMode): void;
 }
 
 // ============================================================================
@@ -93,6 +106,7 @@ const INITIAL_STATE: AgentChatBridgeState = {
 	sessions: [],
 	clearedReason: undefined,
 	pendingWrites: [],
+	permissionDefault: undefined,
 };
 
 type BridgeAction =
@@ -136,6 +150,10 @@ type BridgeAction =
 	| {
 			type: "pending-writes/changed";
 			payload: { writes: readonly PendingFileWriteSummary[] };
+	  }
+	| {
+			type: "permission-default/changed";
+			payload: { mode: PermissionDefaultMode };
 	  };
 
 function reducer(
@@ -206,6 +224,8 @@ function reducer(
 			return { ...state, sessions: action.payload.sessions };
 		case "pending-writes/changed":
 			return { ...state, pendingWrites: action.payload.writes };
+		case "permission-default/changed":
+			return { ...state, permissionDefault: action.payload.mode };
 		default:
 			return state;
 	}
@@ -327,6 +347,20 @@ const INCOMING_HANDLERS: Record<
 		return {
 			type: "pending-writes/changed",
 			payload: { writes: payload.writes },
+		};
+	},
+	"agent-chat/permission-default/changed": (ctx) => {
+		const payload = ctx.payload as { mode?: PermissionDefaultMode };
+		if (
+			payload.mode !== "ask" &&
+			payload.mode !== "allow" &&
+			payload.mode !== "deny"
+		) {
+			return;
+		}
+		return {
+			type: "permission-default/changed",
+			payload: { mode: payload.mode },
 		};
 	},
 };
@@ -522,6 +556,13 @@ export function useSessionBridge(initialSessionId?: string): AgentChatBridge {
 		});
 	}, []);
 
+	const changePermissionDefault = useCallback((mode: PermissionDefaultMode) => {
+		vscode.postMessage({
+			type: "agent-chat/control/change-permission-default",
+			payload: { mode },
+		});
+	}, []);
+
 	return useMemo<AgentChatBridge>(
 		() => ({
 			state,
@@ -538,6 +579,7 @@ export function useSessionBridge(initialSessionId?: string): AgentChatBridge {
 			rejectAllPendingWrites,
 			acceptPendingWrite,
 			rejectPendingWrite,
+			changePermissionDefault,
 		}),
 		[
 			state,
@@ -554,6 +596,7 @@ export function useSessionBridge(initialSessionId?: string): AgentChatBridge {
 			rejectAllPendingWrites,
 			acceptPendingWrite,
 			rejectPendingWrite,
+			changePermissionDefault,
 		]
 	);
 }

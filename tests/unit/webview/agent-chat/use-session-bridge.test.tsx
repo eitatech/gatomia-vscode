@@ -392,4 +392,52 @@ describe("useSessionBridge (T024)", () => {
 			});
 		});
 	});
+
+	describe("permissionDefault bridge", () => {
+		it("starts undefined and is hydrated by permission-default/changed", () => {
+			const { result } = renderHook(() => useSessionBridge("s-1"));
+			expect(result.current.state.permissionDefault).toBeUndefined();
+
+			act(() => {
+				postFromExtension({
+					type: "agent-chat/permission-default/changed",
+					payload: { mode: "allow" },
+				});
+			});
+
+			expect(result.current.state.permissionDefault).toBe("allow");
+		});
+
+		it("ignores unknown payloads and keeps the previous value", () => {
+			const { result } = renderHook(() => useSessionBridge("s-1"));
+			act(() => {
+				postFromExtension({
+					type: "agent-chat/permission-default/changed",
+					payload: { mode: "allow" },
+				});
+			});
+			act(() => {
+				postFromExtension({
+					type: "agent-chat/permission-default/changed",
+					payload: { mode: "garbage" },
+				});
+			});
+
+			expect(result.current.state.permissionDefault).toBe("allow");
+		});
+
+		it("changePermissionDefault posts agent-chat/control/change-permission-default", () => {
+			const { result } = renderHook(() => useSessionBridge("s-1"));
+			fakeVscode.postMessage.mockClear();
+
+			act(() => {
+				result.current.changePermissionDefault("deny");
+			});
+
+			expect(fakeVscode.postMessage).toHaveBeenCalledWith({
+				type: "agent-chat/control/change-permission-default",
+				payload: { mode: "deny" },
+			});
+		});
+	});
 });

@@ -16,12 +16,14 @@ const {
 	cancelMock,
 	cancelAllMock,
 	getLastSessionKeyMock,
+	setPermissionDefaultMock,
 } = vi.hoisted(() => ({
 	sendPromptMock: vi.fn(),
 	disposeMock: vi.fn(),
 	cancelMock: vi.fn(),
 	cancelAllMock: vi.fn(),
 	getLastSessionKeyMock: vi.fn<() => string | null>(() => null),
+	setPermissionDefaultMock: vi.fn(),
 	AcpClientCtor: vi.fn(),
 }));
 
@@ -35,6 +37,7 @@ vi.mock("./acp-client", () => {
 		cancelAll = cancelAllMock;
 		dispose = disposeMock;
 		getLastSessionKey = getLastSessionKeyMock;
+		setPermissionDefault = setPermissionDefaultMock;
 	}
 	return { AcpClient };
 });
@@ -323,6 +326,55 @@ describe("AcpSessionManager", () => {
 
 			// Exactly one client was asked to cancel — the one bound to wt-1.
 			expect(cancelMock).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	describe("setPermissionDefault", () => {
+		it("propagates the new mode to every cached client", async () => {
+			sendPromptMock.mockResolvedValue(undefined);
+			// Two distinct clients (different cwd) so we can verify fan-out.
+			await manager.send("devin", "a", {
+				mode: "workspace",
+				cwd: "/tmp/ws/worktree-1",
+			});
+			await manager.send("devin", "b", {
+				mode: "workspace",
+				cwd: "/tmp/ws/worktree-2",
+			});
+			setPermissionDefaultMock.mockClear();
+
+			manager.setPermissionDefault("allow");
+
+			expect(setPermissionDefaultMock).toHaveBeenCalledTimes(2);
+			expect(setPermissionDefaultMock).toHaveBeenNthCalledWith(1, "allow");
+			expect(setPermissionDefaultMock).toHaveBeenNthCalledWith(2, "allow");
+		});
+
+		it("is a no-op when the new mode equals the current one", () => {
+			manager.setPermissionDefault("ask");
+			setPermissionDefaultMock.mockClear();
+
+			// `permissionDefault` was undefined at construction; the first
+			// call sets it to "ask" and propagates (no clients yet, so 0
+			// calls). Repeating the same value is idempotent.
+			manager.setPermissionDefault("ask");
+
+			expect(setPermissionDefaultMock).not.toHaveBeenCalled();
+		});
+
+		it("propagates to a client created AFTER the manager-level mode changes", async () => {
+			manager.setPermissionDefault("deny");
+			AcpClientCtor.mockClear();
+			sendPromptMock.mockResolvedValue(undefined);
+
+			await manager.send("devin", "hello", { mode: "workspace" });
+
+			// New clients pick up the current mode through the constructor
+			// `permissionDefault` option, not via `setPermissionDefault`.
+			const [args] = AcpClientCtor.mock.calls[0] as [
+				{ permissionDefault?: string },
+			];
+			expect(args.permissionDefault).toBe("deny");
 		});
 	});
 });

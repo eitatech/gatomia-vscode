@@ -7,23 +7,40 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { PermissionToggle } from "./permission-toggle";
 import { PickerBar, type PickerBarSelection } from "./picker-bar";
 import type {
 	AgentChatAgentFileOption,
 	AgentChatProviderOption,
 	NewSessionRequest,
+	PermissionDefaultMode,
 } from "@/features/agent-chat/types";
 
 interface NewSessionComposerProps {
 	readonly providers: readonly AgentChatProviderOption[];
 	readonly agentFiles: readonly AgentChatAgentFileOption[];
 	readonly onStart: (request: NewSessionRequest) => void;
+	/**
+	 * Current `gatomia.acp.permissionDefault` value forwarded by the
+	 * bridge. `undefined` until the host echoes the first
+	 * `permission-default/changed` payload — the toggle treats that
+	 * state as the implicit `"ask"` default.
+	 */
+	readonly permissionDefault: PermissionDefaultMode | undefined;
+	/**
+	 * Persists the segmented-control selection through the bridge so the
+	 * setting survives a window reload and the host hot-reloads the
+	 * cached `AcpClient` permission strategy.
+	 */
+	readonly onChangePermissionDefault: (mode: PermissionDefaultMode) => void;
 }
 
 export function NewSessionComposer({
 	providers,
 	agentFiles,
 	onStart,
+	permissionDefault,
+	onChangePermissionDefault,
 }: NewSessionComposerProps): JSX.Element {
 	const defaultProviderId = useMemo(
 		() => providers.find((p) => p.enabled)?.id,
@@ -91,6 +108,10 @@ export function NewSessionComposer({
 				onChange={setSelection}
 				providers={providers}
 				selection={selection}
+			/>
+			<PermissionToggle
+				onChange={onChangePermissionDefault}
+				value={permissionDefault}
 			/>
 			<textarea
 				className="agent-chat-new-session__textarea"

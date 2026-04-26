@@ -13,6 +13,12 @@
  *      user does not have to drag it. Subsequent activations are no-ops
  *      (gated by a `globalState` flag) so the user's later position
  *      preference is respected.
+ *   4. Companion command `gatomia.agentChat.moveChatToSecondarySidebar`
+ *      that reapplies the migration on demand. The first-run helper
+ *      can fail silently when the host rejects every fallback (for
+ *      example legacy VS Code builds), and once the flag is persisted
+ *      the migration never retries automatically; the manual command
+ *      is the escape hatch.
  *
  * VS Code intentionally does not let extensions inject icons into the
  * native title bar (between the sidebar toggles). Combining the keybind
@@ -33,13 +39,51 @@ export const OPEN_IN_SECONDARY_SIDEBAR_COMMAND =
 	"gatomia.agentChat.openInSecondarySidebar";
 
 /**
+ * Companion command that re-runs the move-to-auxiliary helper without
+ * checking (or persisting) the migration flag. Useful when the first-run
+ * migration was a no-op on the user's host and the chat is stuck on the
+ * primary side bar.
+ */
+export const MOVE_CHAT_TO_SECONDARY_SIDEBAR_COMMAND =
+	"gatomia.agentChat.moveChatToSecondarySidebar";
+
+/**
  * View container id matching `package.json#contributes.viewsContainers`.
  * VS Code prefixes it with `workbench.view.extension.` when generating
  * the focus / move command ids.
  */
 const VIEW_CONTAINER_ID = "gatomia-chat";
 const VIEW_ID = "gatomia.views.agentChat";
-const MIGRATION_FLAG_KEY = "gatomia.agentChat.movedToAuxiliary";
+/**
+ * Migration flag is namespaced with a `.v2` suffix because the original
+ * v1 attempt only moved the view via `vscode.moveViews` with a single
+ * destination id and silently no-op'd on hosts that rejected it
+ * (Windsurf / Antigravity in particular). Bumping the suffix forces a
+ * re-migration for users who already ran the v1 path so they can
+ * benefit from the multi-attempt fallback chain implemented here.
+ */
+const MIGRATION_FLAG_KEY = "gatomia.agentChat.movedToAuxiliary.v2";
+
+/**
+ * Ordered fallback list of `(viewIds, destinationId)` argument tuples
+ * passed to `vscode.moveViews`. The first attempt that does not throw
+ * wins. Order rationale:
+ *   1. Move the single view to the auxiliary bar — works on stock VS
+ *      Code 1.84+ and most forks (Cursor, Insiders, VSCodium).
+ *   2. Same target, but pass the *container* id. Some forks accept the
+ *      container id and move every view it owns in one shot.
+ *   3. Legacy spelling kept as a defensive fallback for very old
+ *      Windsurf / Antigravity builds that surface the auxiliary bar
+ *      under a different internal id.
+ */
+const MOVE_ATTEMPTS: ReadonlyArray<{
+	viewIds: readonly string[];
+	destinationId: string;
+}> = [
+	{ viewIds: [VIEW_ID], destinationId: "workbench.view.auxiliary" },
+	{ viewIds: [VIEW_CONTAINER_ID], destinationId: "workbench.view.auxiliary" },
+	{ viewIds: [VIEW_ID], destinationId: "workbench.view.auxiliarybar" },
+];
 
 /**
  * Subset of the `vscode` API the entry points actually touch. Using a
@@ -81,6 +125,12 @@ export function registerAgentChatEntryPoints(
 		)
 	);
 
+	disposables.push(
+		host.registerCommand(MOVE_CHAT_TO_SECONDARY_SIDEBAR_COMMAND, () =>
+			moveChatToSecondarySidebar(host, output)
+		)
+	);
+
 	const statusItem = host.createStatusBarItem();
 	statusItem.text = "$(comment-discussion) Chat";
 	statusItem.tooltip = "Open Agent Chat (\u2318L)";
@@ -89,7 +139,8 @@ export function registerAgentChatEntryPoints(
 	disposables.push({ dispose: () => statusItem.dispose() });
 
 	// Fire-and-forget. Migration failures are non-fatal — the user can
-	// always drag the view themselves, and we only attempt this once.
+	// always drag the view themselves, or run
+	// `gatomia.agentChat.moveChatToSecondarySidebar` manually.
 	runFirstActivationMigration(host, output).catch(() => {
 		// errors are already logged inside the helper
 	});
@@ -139,22 +190,46 @@ async function runFirstActivationMigration(
 	if (host.getGlobalStateFlag(MIGRATION_FLAG_KEY)) {
 		return;
 	}
-	try {
-		await host.executeCommand("vscode.moveViews", {
-			viewIds: [VIEW_ID],
-			destinationId: "workbench.view.auxiliary",
-		});
+	const moved = await tryMoveViewsWithFallbacks(host, output);
+	if (moved) {
 		output.appendLine(
 			`[AgentChatEntry] Moved ${VIEW_CONTAINER_ID} to the secondary side bar (first activation)`
 		);
+	} else {
+		output.appendLine(
+			`[AgentChatEntry] First-run migration: every fallback failed; chat will stay on the primary side bar until the user runs ${MOVE_CHAT_TO_SECONDARY_SIDEBAR_COMMAND}`
+		);
+	}
+
+	// Always record that we attempted the migration; we don't want to
+	// retry on every activation even if every fallback rejected the
+	// command above. The manual command remains as the escape hatch.
+	try {
+		await host.setGlobalStateFlag(MIGRATION_FLAG_KEY, true);
 	} catch (error) {
 		output.appendLine(
-			`[AgentChatEntry] First-run migration skipped: ${describeError(error)}`
+			`[AgentChatEntry] Failed to persist migration flag: ${describeError(error)}`
 		);
-	} finally {
-		// Always record that we attempted the migration; we don't want
-		// to retry on every activation even if VS Code rejected the
-		// command above.
+	}
+}
+
+/**
+ * On-demand counterpart to `runFirstActivationMigration`. Skips the
+ * `globalState` flag check so the user can re-trigger the move when
+ * the first-run path silently no-op'd. The flag is updated to `true`
+ * only when at least one attempt succeeds — that way a failed manual
+ * invocation does not lock the user out of future first-run attempts
+ * after a host upgrade.
+ */
+async function moveChatToSecondarySidebar(
+	host: AgentChatEntryPointsHost,
+	output: OutputChannel
+): Promise<void> {
+	const moved = await tryMoveViewsWithFallbacks(host, output);
+	if (moved) {
+		output.appendLine(
+			`[AgentChatEntry] Moved ${VIEW_CONTAINER_ID} to the secondary side bar (manual)`
+		);
 		try {
 			await host.setGlobalStateFlag(MIGRATION_FLAG_KEY, true);
 		} catch (error) {
@@ -162,7 +237,47 @@ async function runFirstActivationMigration(
 				`[AgentChatEntry] Failed to persist migration flag: ${describeError(error)}`
 			);
 		}
+		// Bring the secondary bar into view so the user sees the result.
+		try {
+			await host.executeCommand("workbench.action.focusAuxiliaryBar");
+			await host.executeCommand(`${VIEW_ID}.focus`);
+		} catch (error) {
+			output.appendLine(
+				`[AgentChatEntry] Manual move: focus follow-up failed: ${describeError(error)}`
+			);
+		}
+	} else {
+		output.appendLine(
+			"[AgentChatEntry] Manual move failed on every fallback. The host may not expose the auxiliary bar; the user can drag the view manually."
+		);
 	}
+}
+
+/**
+ * Walks the `MOVE_ATTEMPTS` chain in order, returning `true` as soon as
+ * one tuple is accepted by `vscode.moveViews`. Each rejection is logged
+ * with the exact arguments that were tried to make it easy to diagnose
+ * why a particular host (e.g. an older Windsurf build) rejected every
+ * variant.
+ */
+async function tryMoveViewsWithFallbacks(
+	host: AgentChatEntryPointsHost,
+	output: OutputChannel
+): Promise<boolean> {
+	for (const args of MOVE_ATTEMPTS) {
+		try {
+			await host.executeCommand("vscode.moveViews", args);
+			output.appendLine(
+				`[AgentChatEntry] vscode.moveViews accepted ${JSON.stringify(args)}`
+			);
+			return true;
+		} catch (error) {
+			output.appendLine(
+				`[AgentChatEntry] vscode.moveViews rejected ${JSON.stringify(args)}: ${describeError(error)}`
+			);
+		}
+	}
+	return false;
 }
 
 function describeError(error: unknown): string {
