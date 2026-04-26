@@ -76,13 +76,16 @@ describe("AGENT_CAPABILITIES_CATALOG", () => {
 	it("exposes stable ids (snapshot)", () => {
 		// Any intentional change to the seed list requires updating this
 		// snapshot (that's the point of the test: it's a merge gate).
+		// Ids MUST match `AcpProviderDescriptor.id` from the
+		// known-agent catalog so `lookupCatalogEntry` resolves.
 		const ids = AGENT_CAPABILITIES_CATALOG.map((entry) => entry.id).sort();
 		expect(ids).toMatchInlineSnapshot(`
 			[
-			  "claude-code",
+			  "claude-acp",
 			  "devin",
 			  "gemini",
 			  "github-copilot",
+			  "junie",
 			  "opencode",
 			]
 		`);
@@ -98,6 +101,42 @@ describe("lookupCatalogEntry", () => {
 		for (const entry of AGENT_CAPABILITIES_CATALOG) {
 			expect(lookupCatalogEntry(entry.id)).toStrictEqual(entry);
 		}
+	});
+
+	it("opencode entry seeds at least one model so the picker dropdown is not empty", () => {
+		// Regression: the agent had `models: []` which made the model
+		// dropdown render as an empty select after the user picked
+		// "OpenCode" in the chat composer. The CLI accepts any
+		// `<provider>/<model>` ID; we seed the most common providers.
+		const entry = lookupCatalogEntry("opencode");
+		expect(entry).toBeDefined();
+		expect(entry?.capabilities?.models.length).toBeGreaterThan(0);
+		// Sanity-check the shape so a future refactor cannot quietly
+		// drop the provider/model prefix that OpenCode requires on the
+		// CLI flag.
+		const ids = entry?.capabilities?.models.map((m) => m.id) ?? [];
+		expect(ids.every((id) => id.includes("/"))).toBe(true);
+	});
+
+	it("claude-acp entry resolves under the same id known-agents register", () => {
+		// Regression: the catalog was keyed under `claude-code` but
+		// the runtime registry keys it under `claude-acp` (the
+		// `@zed-industries/claude-agent-acp` package). The mismatch
+		// made the lookup miss and the model dropdown stayed empty.
+		const entry = lookupCatalogEntry("claude-acp");
+		expect(entry).toBeDefined();
+		expect(entry?.capabilities?.models.length).toBeGreaterThan(0);
+		// Belt-and-suspenders: the legacy id MUST NOT be re-introduced.
+		expect(lookupCatalogEntry("claude-code")).toBeUndefined();
+	});
+
+	it("junie entry exists so the picker dropdown is populated", () => {
+		// Regression: the JetBrains Junie agent (registry id `junie`)
+		// had no entry here. After the fix the catalog seeds at least
+		// one model so the picker renders a non-empty select.
+		const entry = lookupCatalogEntry("junie");
+		expect(entry).toBeDefined();
+		expect(entry?.capabilities?.models.length).toBeGreaterThan(0);
 	});
 });
 

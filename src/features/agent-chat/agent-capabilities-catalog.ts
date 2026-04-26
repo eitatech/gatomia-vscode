@@ -48,12 +48,85 @@ export const AGENT_CAPABILITIES_CATALOG: readonly AgentCatalogEntry[] = [
 				{ id: "ask", displayName: "Ask", promptPrefix: "[mode: ask]\n" },
 				{ id: "plan", displayName: "Plan", promptPrefix: "[mode: plan]\n" },
 			],
-			models: [],
+			// OpenCode routes prompts through configured providers; the
+			// CLI flag is `--model <provider>/<id>`. The seed list below
+			// covers the providers OpenCode ships with by default — the
+			// user can override via `opencode.json` and the picker will
+			// still send the chosen value verbatim. Picker may overlay
+			// agent-reported models when ACP `initialize` surfaces them.
+			models: [
+				{
+					id: "anthropic/claude-sonnet-4-5",
+					displayName: "Claude Sonnet 4.5 (default)",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "anthropic/claude-opus-4-5",
+					displayName: "Claude Opus 4.5",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "anthropic/claude-haiku-4-5",
+					displayName: "Claude Haiku 4.5",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "openai/gpt-5",
+					displayName: "OpenAI GPT-5",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "openai/gpt-5-mini",
+					displayName: "OpenAI GPT-5 Mini",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "openai/gpt-5-codex",
+					displayName: "OpenAI GPT-5 Codex",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "google/gemini-2.5-pro",
+					displayName: "Gemini 2.5 Pro",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "google/gemini-2.5-flash",
+					displayName: "Gemini 2.5 Flash",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "xai/grok-4",
+					displayName: "xAI Grok 4",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "deepseek/deepseek-v3.2",
+					displayName: "DeepSeek V3.2",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+			],
 			acceptsFollowUp: true,
 		},
 	},
 	{
-		id: "claude-code",
+		// Catalog id MUST match `AcpProviderDescriptor.id` so
+		// `lookupCatalogEntry` resolves. The known-agent catalog
+		// registers the Zed-published ACP wrapper under `claude-acp`
+		// (`@zed-industries/claude-agent-acp`); using `claude-code`
+		// here made the lookup miss and the model dropdown stayed
+		// empty.
+		id: "claude-acp",
 		capabilities: {
 			modes: [],
 			models: [
@@ -168,6 +241,56 @@ export const AGENT_CAPABILITIES_CATALOG: readonly AgentCatalogEntry[] = [
 				{
 					id: "claude-sonnet-4.6",
 					displayName: "Claude Sonnet 4.6",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+			],
+			acceptsFollowUp: true,
+		},
+	},
+	{
+		// Catalog id MUST match `AcpProviderDescriptor.id` so
+		// `lookupCatalogEntry` resolves. The known-agent catalog
+		// registers JetBrains Junie under `junie`; without an entry
+		// here the model dropdown stayed empty after the user picked
+		// "JetBrains Junie" in the composer.
+		id: "junie",
+		capabilities: {
+			modes: [],
+			// Junie ships with the JetBrains AI provider stack — the
+			// effective model list depends on the user's JetBrains AI
+			// subscription. The seed below covers the providers Junie
+			// exposes by default; the picker sends the chosen value
+			// verbatim and Junie surfaces an error if the model is not
+			// available in the user's plan.
+			models: [
+				{
+					id: "anthropic/claude-sonnet-4-5",
+					displayName: "Claude Sonnet 4.5 (default)",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "anthropic/claude-opus-4-5",
+					displayName: "Claude Opus 4.5",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "openai/gpt-5",
+					displayName: "OpenAI GPT-5",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "openai/gpt-5-mini",
+					displayName: "OpenAI GPT-5 Mini",
+					invocation: "cli-flag",
+					invocationTemplate: "--model {id}",
+				},
+				{
+					id: "google/gemini-2.5-pro",
+					displayName: "Gemini 2.5 Pro",
 					invocation: "cli-flag",
 					invocationTemplate: "--model {id}",
 				},

@@ -42,7 +42,8 @@
       "!.specsmd/**/*",
       "!.kiro/**/*",
       "!.qoder/**/*",
-      "!.sonarlint/**/*"
+      "!.sonarlint/**/*",
+      "!.opencode/**/*"
     ],
     "ignoreUnknown": false
   },
