@@ -1891,8 +1891,6 @@ b {
 	right: 0;
 	min-width: 200px;
 	max-width: 320px;
-	max-height: 320px;
-	overflow-y: auto;
 	background: var(--vscode-editorWidget-background);
 	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.4));
 	border-radius: 6px;
@@ -1902,6 +1900,13 @@ b {
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
+	/*
+	 * NEVER set `overflow: auto/hidden` here — the inner ChipDropdown
+	 * submenus (`.agent-chat-chip__menu`) anchor with
+	 * `position: absolute` above their chip and would be clipped by a
+	 * scrolling ancestor. Since we surface at most a handful of chips
+	 * inside the overflow popover, the natural height is fine.
+	 */
 }
 
 .agent-chat-chip-overflow__menu-item {
@@ -1922,4 +1927,14 @@ b {
 	width: 100%;
 	max-width: none;
 	justify-content: flex-start;
+}
+
+/*
+ * When a ChipDropdown lives inside the overflow popover, its own
+ * submenu must visually sit above the popover frame (the popover has
+ * z-index: 60 and creates a stacking context). Bumping the submenu
+ * z-index keeps it on top when it grows past the popover edge.
+ */
+.agent-chat-chip-overflow__menu .agent-chat-chip__menu {
+	z-index: 70;
 }
