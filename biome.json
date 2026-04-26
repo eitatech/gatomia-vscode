@@ -43,7 +43,8 @@
       "!.kiro/**/*",
       "!.qoder/**/*",
       "!.sonarlint/**/*",
-      "!.opencode/**/*"
+      "!.opencode/**/*",
+      "!.half/**/*"
     ],
     "ignoreUnknown": false
   },
