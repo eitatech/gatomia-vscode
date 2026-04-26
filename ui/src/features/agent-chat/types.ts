@@ -161,6 +161,20 @@ export interface ToolCallAffectedFile {
 	languageId?: string;
 }
 
+/**
+ * Summary of a file write the agent has queued via `writeTextFile` and
+ * is awaiting accept/reject from the user. Surfaced through the
+ * `agent-chat/pending-writes/changed` event when the
+ * `gatomia.agentChat.bufferFileWrites` flag is on.
+ */
+export interface PendingFileWriteSummary {
+	id: string;
+	path: string;
+	linesAdded: number;
+	linesRemoved: number;
+	languageId?: string;
+}
+
 export interface ToolCallChatMessage extends ChatMessageBase {
 	role: "tool";
 	toolCallId: string;

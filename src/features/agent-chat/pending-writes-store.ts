@@ -46,6 +46,12 @@ export interface PendingWriteRequest {
 	 * not yet exist (a `writeTextFile` against a brand-new path).
 	 */
 	oldText: string | null;
+	/** Lines added relative to `oldText`. Computed before enqueue. */
+	linesAdded?: number;
+	/** Lines removed relative to `oldText`. Computed before enqueue. */
+	linesRemoved?: number;
+	/** Language hint derived from the path (used by the UI badge). */
+	languageId?: string;
 }
 
 export interface PendingWrite extends PendingWriteRequest {
@@ -96,6 +102,9 @@ export class PendingWritesStore {
 				path: request.path,
 				proposedContent: request.proposedContent,
 				oldText: request.oldText,
+				linesAdded: request.linesAdded,
+				linesRemoved: request.linesRemoved,
+				languageId: request.languageId,
 				resolve,
 			});
 		});
@@ -108,15 +117,7 @@ export class PendingWritesStore {
 	 * pass to React state — the array is frozen.
 	 */
 	peek(): readonly PendingWrite[] {
-		return Object.freeze(
-			this.entries.map((entry) => ({
-				id: entry.id,
-				createdAt: entry.createdAt,
-				path: entry.path,
-				proposedContent: entry.proposedContent,
-				oldText: entry.oldText,
-			}))
-		);
+		return Object.freeze(this.entries.map((entry) => snapshotOf(entry)));
 	}
 
 	/**
@@ -214,5 +215,8 @@ function snapshotOf(entry: PendingEntry): PendingWrite {
 		path: entry.path,
 		proposedContent: entry.proposedContent,
 		oldText: entry.oldText,
+		linesAdded: entry.linesAdded,
+		linesRemoved: entry.linesRemoved,
+		languageId: entry.languageId,
 	};
 }

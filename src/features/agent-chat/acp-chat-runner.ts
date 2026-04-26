@@ -98,13 +98,18 @@ export interface AcpChatRunnerSessionManager {
 
 /**
  * Locally-scoped projection of a pending file write — kept structural
- * so the runner does not need to import the concrete store type.
+ * so the runner does not need to import the concrete store type. The
+ * `linesAdded` / `linesRemoved` fields mirror what the diff card uses
+ * for tool-call cards, computed once when the write is enqueued.
  */
 export interface PendingWriteSnapshot {
 	id: string;
 	path: string;
 	proposedContent?: string;
 	oldText?: string | null;
+	linesAdded?: number;
+	linesRemoved?: number;
+	languageId?: string;
 }
 
 export type FlushPendingWritesAction =
@@ -324,9 +329,10 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 
 	/**
 	 * Hook into the manager's buffer-then-apply queue. Each snapshot
-	 * change is forwarded to panel listeners as a
-	 * `pending-writes/changed` event. The manager exposes the API as
-	 * optional so older builds without buffering keep working.
+	 * change is fanned out to host-level listeners (the chat view
+	 * provider) so the webview can keep its Accept/Reject bar in sync.
+	 * The manager exposes the API as optional so older builds without
+	 * buffering keep working.
 	 */
 	private subscribePendingWrites(): void {
 		if (this.pendingWritesSubscription) {
@@ -342,19 +348,42 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 			this.session.agentId,
 			cwd,
 			(writes) => {
-				this.fireEvent({
-					type: "pending-writes/changed",
-					sessionId: this.sessionId,
-					writes: writes.map((entry) => ({
-						id: entry.id,
-						path: entry.path,
-						linesAdded: 0,
-						linesRemoved: 0,
-					})),
-					at: this.now(),
-				});
+				this.latestPendingWrites = writes;
+				for (const listener of this.pendingWritesListeners) {
+					try {
+						listener(writes);
+					} catch (error) {
+						logTelemetry(AGENT_CHAT_TELEMETRY_EVENTS.ERROR, {
+							sessionId: this.sessionId,
+							stage: "pending-writes-listener",
+							error: error instanceof Error ? error.message : String(error),
+						});
+					}
+				}
 			}
 		);
+	}
+
+	/**
+	 * Subscribe to pending-writes snapshot changes for this runner.
+	 * Replays the current snapshot synchronously on attach so the
+	 * caller can render the bar immediately.
+	 */
+	onPendingWritesChanged(
+		listener: (writes: readonly PendingWriteSnapshot[]) => void
+	): Disposable {
+		this.pendingWritesListeners.add(listener);
+		listener(this.latestPendingWrites);
+		return {
+			dispose: () => {
+				this.pendingWritesListeners.delete(listener);
+			},
+		};
+	}
+
+	/** Snapshot of the currently buffered writes (host-side reads). */
+	getPendingWrites(): readonly PendingWriteSnapshot[] {
+		return this.latestPendingWrites;
 	}
 
 	/**

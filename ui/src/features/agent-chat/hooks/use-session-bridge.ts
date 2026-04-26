@@ -24,6 +24,7 @@ import type {
 	ModeDescriptor,
 	ModelDescriptor,
 	NewSessionRequest,
+	PendingFileWriteSummary,
 	SidebarSessionListItem,
 	UserChatMessage,
 } from "@/features/agent-chat/types";
@@ -51,6 +52,8 @@ export interface AgentChatBridgeState {
 	readonly sessions: readonly SidebarSessionListItem[];
 	/** Last "session/cleared" reason emitted by the host (sidebar-only). */
 	readonly clearedReason: ClearReason | undefined;
+	/** Pending file writes the agent is awaiting Accept/Reject for. */
+	readonly pendingWrites: readonly PendingFileWriteSummary[];
 }
 
 export interface AgentChatBridge {
@@ -67,6 +70,11 @@ export interface AgentChatBridge {
 	startNewSession(request: NewSessionRequest): void;
 	/** Sidebar-only: ask the host to unbind so the empty composer renders. */
 	requestNewChat(): void;
+	/** Phase 4: settle every pending file write at once. */
+	acceptAllPendingWrites(): void;
+	rejectAllPendingWrites(): void;
+	acceptPendingWrite(id: string): void;
+	rejectPendingWrite(id: string): void;
 }
 
 // ============================================================================
@@ -84,6 +92,7 @@ const INITIAL_STATE: AgentChatBridgeState = {
 	catalog: { providers: [], agentFiles: [] },
 	sessions: [],
 	clearedReason: undefined,
+	pendingWrites: [],
 };
 
 type BridgeAction =
@@ -123,6 +132,10 @@ type BridgeAction =
 	| {
 			type: "sessions/list-changed";
 			payload: { sessions: SidebarSessionListItem[] };
+	  }
+	| {
+			type: "pending-writes/changed";
+			payload: { writes: readonly PendingFileWriteSummary[] };
 	  };
 
 function reducer(
@@ -191,6 +204,8 @@ function reducer(
 			return { ...state, catalog: action.payload.catalog };
 		case "sessions/list-changed":
 			return { ...state, sessions: action.payload.sessions };
+		case "pending-writes/changed":
+			return { ...state, pendingWrites: action.payload.writes };
 		default:
 			return state;
 	}
@@ -213,82 +228,108 @@ function translateIncoming(
 	if (!typed?.type) {
 		return;
 	}
-	switch (typed.type) {
-		case "agent-chat/session/loaded": {
-			const payload = typed.payload as {
-				session: AgentChatSessionView;
-				messages: ChatMessage[];
-				availableModes: ModeDescriptor[];
-				availableModels: ModelDescriptor[];
-				availableTargets: ExecutionTargetOption[];
-				hasArchivedTranscript: boolean;
-			};
-			// Panel mode binds to a fixed `initialSessionId` and must drop
-			// `session/loaded` messages addressed to other sessions. The
-			// sidebar surface omits `initialSessionId` and adopts whatever
-			// the host has bound, including switches between sessions.
-			if (initialSessionId && payload.session.id !== initialSessionId) {
-				return;
-			}
-			return { type: "session/loaded", payload };
-		}
-		case "agent-chat/messages/appended": {
-			const payload = typed.payload as {
-				sessionId: string;
-				messages: ChatMessage[];
-			};
-			if (activeSessionId && payload.sessionId !== activeSessionId) {
-				return;
-			}
-			return {
-				type: "messages/appended",
-				payload: { messages: payload.messages },
-			};
-		}
-		case "agent-chat/messages/updated": {
-			const payload = typed.payload as {
-				sessionId: string;
-				updates: Array<{ id: string; patch: Partial<ChatMessage> }>;
-			};
-			if (activeSessionId && payload.sessionId !== activeSessionId) {
-				return;
-			}
-			return {
-				type: "messages/updated",
-				payload: { updates: payload.updates },
-			};
-		}
-		case "agent-chat/session/lifecycle-changed": {
-			const payload = typed.payload as {
-				sessionId: string;
-				to: AgentChatSessionView["lifecycleState"];
-			};
-			if (activeSessionId && payload.sessionId !== activeSessionId) {
-				return;
-			}
-			return {
-				type: "session/lifecycle-changed",
-				payload: { to: payload.to },
-			};
-		}
-		case "agent-chat/session/cleared": {
-			const payload = typed.payload as { reason: ClearReason };
-			return { type: "session/cleared", payload };
-		}
-		case "agent-chat/catalog/loaded": {
-			const payload = typed.payload as { catalog: AgentChatCatalog };
-			return { type: "catalog/loaded", payload };
-		}
-		case "agent-chat/sessions/list-changed": {
-			const payload = typed.payload as {
-				sessions: SidebarSessionListItem[];
-			};
-			return { type: "sessions/list-changed", payload };
-		}
-		default:
-			return;
+	const handler = INCOMING_HANDLERS[typed.type];
+	if (!handler) {
+		return;
 	}
+	return handler({
+		payload: typed.payload,
+		activeSessionId,
+		initialSessionId,
+	});
 }
+
+interface TranslateContext {
+	payload: unknown;
+	activeSessionId: string | undefined;
+	initialSessionId: string | undefined;
+}
+
+const INCOMING_HANDLERS: Record<
+	string,
+	(ctx: TranslateContext) => BridgeAction | undefined
+> = {
+	"agent-chat/session/loaded": (ctx) => {
+		const payload = ctx.payload as {
+			session: AgentChatSessionView;
+			messages: ChatMessage[];
+			availableModes: ModeDescriptor[];
+			availableModels: ModelDescriptor[];
+			availableTargets: ExecutionTargetOption[];
+			hasArchivedTranscript: boolean;
+		};
+		// Panel mode binds to a fixed `initialSessionId` and must drop
+		// `session/loaded` messages addressed to other sessions.
+		if (ctx.initialSessionId && payload.session.id !== ctx.initialSessionId) {
+			return;
+		}
+		return { type: "session/loaded", payload };
+	},
+	"agent-chat/messages/appended": (ctx) => {
+		const payload = ctx.payload as {
+			sessionId: string;
+			messages: ChatMessage[];
+		};
+		if (ctx.activeSessionId && payload.sessionId !== ctx.activeSessionId) {
+			return;
+		}
+		return {
+			type: "messages/appended",
+			payload: { messages: payload.messages },
+		};
+	},
+	"agent-chat/messages/updated": (ctx) => {
+		const payload = ctx.payload as {
+			sessionId: string;
+			updates: Array<{ id: string; patch: Partial<ChatMessage> }>;
+		};
+		if (ctx.activeSessionId && payload.sessionId !== ctx.activeSessionId) {
+			return;
+		}
+		return {
+			type: "messages/updated",
+			payload: { updates: payload.updates },
+		};
+	},
+	"agent-chat/session/lifecycle-changed": (ctx) => {
+		const payload = ctx.payload as {
+			sessionId: string;
+			to: AgentChatSessionView["lifecycleState"];
+		};
+		if (ctx.activeSessionId && payload.sessionId !== ctx.activeSessionId) {
+			return;
+		}
+		return {
+			type: "session/lifecycle-changed",
+			payload: { to: payload.to },
+		};
+	},
+	"agent-chat/session/cleared": (ctx) => ({
+		type: "session/cleared",
+		payload: ctx.payload as { reason: ClearReason },
+	}),
+	"agent-chat/catalog/loaded": (ctx) => ({
+		type: "catalog/loaded",
+		payload: ctx.payload as { catalog: AgentChatCatalog },
+	}),
+	"agent-chat/sessions/list-changed": (ctx) => ({
+		type: "sessions/list-changed",
+		payload: ctx.payload as { sessions: SidebarSessionListItem[] },
+	}),
+	"agent-chat/pending-writes/changed": (ctx) => {
+		const payload = ctx.payload as {
+			sessionId: string;
+			writes: readonly PendingFileWriteSummary[];
+		};
+		if (ctx.activeSessionId && payload.sessionId !== ctx.activeSessionId) {
+			return;
+		}
+		return {
+			type: "pending-writes/changed",
+			payload: { writes: payload.writes },
+		};
+	},
+};
 
 /**
  * Apply a partial patch to a discriminated-union ChatMessage without widening
@@ -453,6 +494,34 @@ export function useSessionBridge(initialSessionId?: string): AgentChatBridge {
 		});
 	}, []);
 
+	const acceptAllPendingWrites = useCallback(() => {
+		vscode.postMessage({
+			type: "agent-chat/pending-writes/accept-all",
+			payload: {},
+		});
+	}, []);
+
+	const rejectAllPendingWrites = useCallback(() => {
+		vscode.postMessage({
+			type: "agent-chat/pending-writes/reject-all",
+			payload: {},
+		});
+	}, []);
+
+	const acceptPendingWrite = useCallback((id: string) => {
+		vscode.postMessage({
+			type: "agent-chat/pending-writes/accept-one",
+			payload: { id },
+		});
+	}, []);
+
+	const rejectPendingWrite = useCallback((id: string) => {
+		vscode.postMessage({
+			type: "agent-chat/pending-writes/reject-one",
+			payload: { id },
+		});
+	}, []);
+
 	return useMemo<AgentChatBridge>(
 		() => ({
 			state,
@@ -465,6 +534,10 @@ export function useSessionBridge(initialSessionId?: string): AgentChatBridge {
 			switchSession,
 			startNewSession,
 			requestNewChat,
+			acceptAllPendingWrites,
+			rejectAllPendingWrites,
+			acceptPendingWrite,
+			rejectPendingWrite,
 		}),
 		[
 			state,
@@ -477,6 +550,10 @@ export function useSessionBridge(initialSessionId?: string): AgentChatBridge {
 			switchSession,
 			startNewSession,
 			requestNewChat,
+			acceptAllPendingWrites,
+			rejectAllPendingWrites,
+			acceptPendingWrite,
+			rejectPendingWrite,
 		]
 	);
 }

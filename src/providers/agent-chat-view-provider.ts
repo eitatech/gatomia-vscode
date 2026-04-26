@@ -39,6 +39,7 @@ import {
 	commands,
 	window,
 } from "vscode";
+import type { PendingWriteSnapshot } from "../features/agent-chat/acp-chat-runner";
 import type { AgentChatRegistry } from "../features/agent-chat/agent-chat-registry";
 import type { AgentChatSessionStore } from "../features/agent-chat/agent-chat-session-store";
 import {
@@ -593,6 +594,47 @@ class SidebarSessionBinding {
 				});
 			})
 		);
+
+		// Phase 4 — wire the runner's pending-writes feed (if it
+		// exposes one) to the webview so the Cursor-style Accept/Reject
+		// bar can mirror the in-flight `writeTextFile` queue.
+		const runner = this.registry.getRunner(this.sessionId) as
+			| {
+					onPendingWritesChanged?: (
+						listener: (writes: readonly PendingWriteSnapshot[]) => void
+					) => Disposable;
+			  }
+			| undefined;
+		const subscribe = runner?.onPendingWritesChanged;
+		if (subscribe) {
+			this.subscriptions.push(
+				subscribe.call(runner, (writes) => {
+					this.sendPendingWrites(writes).catch((err) => {
+						this.outputChannel?.appendLine(
+							`[AgentChatView] pending-writes push failed: ${err instanceof Error ? err.message : String(err)}`
+						);
+					});
+				})
+			);
+		}
+	}
+
+	private async sendPendingWrites(
+		writes: readonly PendingWriteSnapshot[]
+	): Promise<void> {
+		await this.postMessage({
+			type: "agent-chat/pending-writes/changed",
+			payload: {
+				sessionId: this.sessionId,
+				writes: writes.map((w) => ({
+					id: w.id,
+					path: w.path,
+					linesAdded: w.linesAdded ?? 0,
+					linesRemoved: w.linesRemoved ?? 0,
+					languageId: w.languageId,
+				})),
+			},
+		});
 	}
 
 	dispose(): void {

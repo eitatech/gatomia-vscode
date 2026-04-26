@@ -18,6 +18,7 @@ import { useMemo } from "react";
 import { ChatTranscript } from "@/features/agent-chat/components/chat-transcript";
 import { InputBar } from "@/features/agent-chat/components/input-bar";
 import { NewSessionComposer } from "@/features/agent-chat/components/new-session-composer";
+import { PendingChangesBar } from "@/features/agent-chat/components/pending-changes-bar";
 import { RetryAction } from "@/features/agent-chat/components/retry-action";
 import { SessionSwitcher } from "@/features/agent-chat/components/session-switcher";
 import { StatusHeader } from "@/features/agent-chat/components/status-header";
@@ -43,6 +44,10 @@ export function AgentChatFeature(): JSX.Element {
 		switchSession,
 		startNewSession,
 		requestNewChat,
+		acceptAllPendingWrites,
+		rejectAllPendingWrites,
+		acceptPendingWrite,
+		rejectPendingWrite,
 	} = bridge;
 
 	const latestRetryableError = useMemo(
@@ -130,6 +135,13 @@ export function AgentChatFeature(): JSX.Element {
 					}}
 				/>
 			) : null}
+			<PendingChangesBar
+				onAcceptAll={acceptAllPendingWrites}
+				onAcceptOne={acceptPendingWrite}
+				onRejectAll={rejectAllPendingWrites}
+				onRejectOne={rejectPendingWrite}
+				writes={state.pendingWrites}
+			/>
 			<InputBar
 				acceptsFollowUp={session.acceptsFollowUp}
 				busy={isBusyState(session.lifecycleState)}

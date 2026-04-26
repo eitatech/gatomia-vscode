@@ -725,13 +725,17 @@ async function handleBufferedWrite(args: {
 		oldText = null;
 	}
 
+	const stats = computeDiffStats({ oldText, newText: params.content });
 	output.appendLine(
-		`[ACP][${providerId}] writeTextFile buffered (${params.path}); awaiting user accept/reject`
+		`[ACP][${providerId}] writeTextFile buffered (${params.path}); awaiting user accept/reject (+${stats.linesAdded} -${stats.linesRemoved})`
 	);
 	const { promise } = store.enqueueWrite({
 		path: params.path,
 		proposedContent: params.content,
 		oldText,
+		linesAdded: stats.linesAdded,
+		linesRemoved: stats.linesRemoved,
+		languageId: guessLanguageId(params.path),
 	});
 	const decision = await promise;
 	if (decision === "rejected") {

@@ -1247,6 +1247,159 @@ b {
 		var(--vscode-editor-font-family, "Menlo", "Consolas", monospace);
 }
 
+/* --- Pending file-write review bar (Phase 4) ------------------------ */
+
+.agent-chat-pending-bar {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 8px 10px;
+	background: var(--vscode-input-background);
+	border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+	border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+}
+
+.agent-chat-pending-bar__row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.agent-chat-pending-bar__summary {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: none;
+	padding: 2px 4px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 12px;
+	min-width: 0;
+}
+
+.agent-chat-pending-bar__summary:hover {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+}
+
+.agent-chat-pending-bar__count {
+	font-weight: 500;
+	white-space: nowrap;
+}
+
+.agent-chat-pending-bar__stats {
+	font-family:
+		var(--vscode-editor-font-family, "Menlo", "Consolas", monospace);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+}
+
+.agent-chat-pending-bar__added {
+	color: var(--vscode-charts-green, #4caf50);
+}
+
+.agent-chat-pending-bar__removed {
+	color: var(--vscode-charts-red, #e74c3c);
+}
+
+.agent-chat-pending-bar__chevron {
+	font-size: 14px;
+	line-height: 1;
+	transition: transform 120ms ease-in-out;
+	opacity: 0.7;
+}
+
+.agent-chat-pending-bar__chevron--open {
+	transform: rotate(90deg);
+}
+
+.agent-chat-pending-bar__actions {
+	display: inline-flex;
+	gap: 6px;
+	flex-shrink: 0;
+}
+
+.agent-chat-pending-bar__reject,
+.agent-chat-pending-bar__accept {
+	border: none;
+	border-radius: 6px;
+	padding: 4px 12px;
+	font-size: 11px;
+	font-weight: 500;
+	cursor: pointer;
+}
+
+.agent-chat-pending-bar__reject {
+	background: var(
+		--vscode-button-secondaryBackground,
+		rgba(128, 128, 128, 0.2)
+	);
+	color: var(
+		--vscode-button-secondaryForeground,
+		var(--vscode-foreground)
+	);
+}
+
+.agent-chat-pending-bar__reject:hover {
+	background: var(
+		--vscode-button-secondaryHoverBackground,
+		rgba(128, 128, 128, 0.3)
+	);
+}
+
+.agent-chat-pending-bar__accept {
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+}
+
+.agent-chat-pending-bar__accept:hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+.agent-chat-pending-bar__list {
+	list-style: none;
+	margin: 4px 0 0;
+	padding: 0;
+	border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+	padding-top: 4px;
+}
+
+.agent-chat-pending-bar__item {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 3px 4px;
+	font-size: 11px;
+}
+
+.agent-chat-pending-bar__path {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family:
+		var(--vscode-editor-font-family, "Menlo", "Consolas", monospace);
+}
+
+.agent-chat-pending-bar__reject-one,
+.agent-chat-pending-bar__accept-one {
+	border: none;
+	background: transparent;
+	color: var(--vscode-textLink-foreground);
+	font-size: 10px;
+	cursor: pointer;
+	padding: 2px 4px;
+}
+
+.agent-chat-pending-bar__reject-one:hover,
+.agent-chat-pending-bar__accept-one:hover {
+	text-decoration: underline;
+}
+
 /* Delivery badge under user messages (pending/queued/rejected) */
 .agent-chat-message__badge {
 	font-size: 10px;
