@@ -414,6 +414,167 @@ describe("AcpClient", () => {
 
 			expect(response).toEqual({ outcome: { outcome: "cancelled" } });
 		});
+
+		describe("remembered always-decisions (per AcpClient memo)", () => {
+			const invokeWithKind = (toolKind: string): Promise<unknown> =>
+				(
+					handlerRef.current as {
+						requestPermission: (p: unknown) => Promise<unknown>;
+					}
+				).requestPermission({
+					options,
+					sessionId: "session-1",
+					toolCall: {
+						toolCallId: `tc-${Math.random()}`,
+						title: `Execute something (${toolKind})`,
+						kind: toolKind,
+					},
+				});
+
+			it("auto-applies allow_always for subsequent calls of the same kind without prompting again", async () => {
+				const prompter = vi.fn().mockResolvedValue("opt-always");
+				const client = new AcpClient({
+					descriptor,
+					cwd: "/tmp/workspace",
+					output: makeOutputChannel(),
+					permissionDefault: "ask",
+					promptForPermission: prompter,
+				});
+				await client.ensureStarted();
+
+				const first = await invokeWithKind("execute");
+				const second = await invokeWithKind("execute");
+				const third = await invokeWithKind("execute");
+
+				// User was prompted exactly once. The next two calls were
+				// auto-resolved from the memo.
+				expect(prompter).toHaveBeenCalledTimes(1);
+				expect(first).toEqual({
+					outcome: { outcome: "selected", optionId: "opt-always" },
+				});
+				expect(second).toEqual({
+					outcome: { outcome: "selected", optionId: "opt-always" },
+				});
+				expect(third).toEqual({
+					outcome: { outcome: "selected", optionId: "opt-always" },
+				});
+			});
+
+			it("does NOT cache an allow_once decision — every call still prompts", async () => {
+				const prompter = vi.fn().mockResolvedValue("opt-allow"); // allow_once
+				const client = new AcpClient({
+					descriptor,
+					cwd: "/tmp/workspace",
+					output: makeOutputChannel(),
+					permissionDefault: "ask",
+					promptForPermission: prompter,
+				});
+				await client.ensureStarted();
+
+				await invokeWithKind("execute");
+				await invokeWithKind("execute");
+
+				expect(prompter).toHaveBeenCalledTimes(2);
+			});
+
+			it("isolates the cache per tool kind", async () => {
+				const prompter = vi.fn().mockResolvedValue("opt-always");
+				const client = new AcpClient({
+					descriptor,
+					cwd: "/tmp/workspace",
+					output: makeOutputChannel(),
+					permissionDefault: "ask",
+					promptForPermission: prompter,
+				});
+				await client.ensureStarted();
+
+				await invokeWithKind("execute");
+				await invokeWithKind("read");
+
+				// Different kinds → both required prompting.
+				expect(prompter).toHaveBeenCalledTimes(2);
+
+				prompter.mockClear();
+				await invokeWithKind("execute");
+				await invokeWithKind("read");
+				// Both kinds are now memoised — no more prompts.
+				expect(prompter).not.toHaveBeenCalled();
+			});
+
+			it("does not cache when toolCall.kind is missing", async () => {
+				const prompter = vi.fn().mockResolvedValue("opt-always");
+				const client = new AcpClient({
+					descriptor,
+					cwd: "/tmp/workspace",
+					output: makeOutputChannel(),
+					permissionDefault: "ask",
+					promptForPermission: prompter,
+				});
+				await client.ensureStarted();
+
+				const handler = handlerRef.current as {
+					requestPermission: (p: unknown) => Promise<unknown>;
+				};
+				await handler.requestPermission({
+					options,
+					sessionId: "session-1",
+					toolCall: { toolCallId: "tc-1", title: "Untyped" },
+				});
+				await handler.requestPermission({
+					options,
+					sessionId: "session-1",
+					toolCall: { toolCallId: "tc-2", title: "Untyped" },
+				});
+
+				expect(prompter).toHaveBeenCalledTimes(2);
+			});
+
+			it("caches reject_always symmetrically", async () => {
+				const rejectAlwaysOptions = [
+					{
+						optionId: "opt-reject-always",
+						name: "Reject always",
+						kind: "reject_always" as const,
+					},
+					{
+						optionId: "opt-allow",
+						name: "Allow",
+						kind: "allow_once" as const,
+					},
+				];
+				const prompter = vi.fn().mockResolvedValue("opt-reject-always");
+				const client = new AcpClient({
+					descriptor,
+					cwd: "/tmp/workspace",
+					output: makeOutputChannel(),
+					permissionDefault: "ask",
+					promptForPermission: prompter,
+				});
+				await client.ensureStarted();
+
+				const handler = handlerRef.current as {
+					requestPermission: (p: unknown) => Promise<unknown>;
+				};
+				const first = await handler.requestPermission({
+					options: rejectAlwaysOptions,
+					sessionId: "session-1",
+					toolCall: { toolCallId: "tc-1", title: "Delete x", kind: "delete" },
+				});
+				const second = await handler.requestPermission({
+					options: rejectAlwaysOptions,
+					sessionId: "session-1",
+					toolCall: { toolCallId: "tc-2", title: "Delete y", kind: "delete" },
+				});
+
+				expect(prompter).toHaveBeenCalledTimes(1);
+				expect(first).toEqual({
+					outcome: { outcome: "selected", optionId: "opt-reject-always" },
+				});
+				expect(second).toEqual({
+					outcome: { outcome: "selected", optionId: "opt-reject-always" },
+				});
+			});
+		});
 	});
 
 	describe("per-session event bus (T012)", () => {

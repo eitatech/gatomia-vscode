@@ -18,13 +18,34 @@ import type { AcpProviderDescriptor } from "./types";
 export interface PermissionPromptRequest {
 	options: Array<{ optionId: string; name: string; kind: string }>;
 	sessionId: string;
-	toolCall?: { title?: string | null } | null;
+	toolCall?: {
+		title?: string | null;
+		/**
+		 * ACP tool category used by the host to remember "always" decisions
+		 * across calls. See `ToolKind` in @agentclientprotocol/sdk.
+		 */
+		kind?: string | null;
+	} | null;
 }
 export type PermissionPrompter = (
 	request: PermissionPromptRequest
 ) => Promise<string | null>;
 
 export type PermissionMode = "ask" | "allow" | "deny";
+
+/**
+ * Decisions remembered for the lifetime of an `AcpClient` so that an
+ * `allow_always` / `reject_always` answer is honoured for subsequent tool
+ * calls of the same `ToolKind` without re-prompting the user. The store is
+ * keyed by tool kind (e.g. `"execute"`, `"read"`) and holds the option
+ * `kind` the user selected; the live `optionId` is re-resolved from the
+ * incoming options array because optionIds rotate per request.
+ */
+type RememberedDecisionKind = "allow_always" | "reject_always";
+const REMEMBERABLE_KINDS = new Set<RememberedDecisionKind>([
+	"allow_always",
+	"reject_always",
+]);
 
 /**
  * Structured per-session events fanned out by {@link AcpClient.subscribeSession}.
@@ -111,6 +132,18 @@ export class AcpClient {
 	private readonly sessionListeners = new Map<
 		string,
 		Set<AcpSessionEventListener>
+	>();
+
+	/**
+	 * Remembered `allow_always` / `reject_always` decisions keyed by ACP
+	 * `ToolKind`. Lives for the lifetime of the AcpClient (one per provider
+	 * + cwd) so users do not have to re-authorise the same category of
+	 * action — e.g. confirming "Allow always" once for an `execute` tool
+	 * call covers every subsequent shell-style invocation in the session.
+	 */
+	private readonly rememberedDecisions = new Map<
+		string,
+		RememberedDecisionKind
 	>();
 
 	constructor(options: AcpClientOptions) {
@@ -481,6 +514,7 @@ export class AcpClient {
 		const providerId = this.descriptor.id;
 		const permissionDefault = this.permissionDefault;
 		const promptForPermission = this.promptForPermission;
+		const rememberedDecisions = this.rememberedDecisions;
 		// Bind the bus emitter so the handler object (not the AcpClient
 		// instance) can still fan out events without losing `this`.
 		const emit = (sessionId: string, event: AcpSessionEvent): void =>
@@ -537,6 +571,7 @@ export class AcpClient {
 					prompter: promptForPermission,
 					output,
 					providerId,
+					rememberedDecisions,
 				}),
 			async readTextFile(params) {
 				try {
@@ -581,12 +616,21 @@ interface ResolvePermissionArgs {
 	params: {
 		options?: Array<{ optionId: string; name: string; kind: string }>;
 		sessionId: string;
-		toolCall?: { title?: string | null } | null;
+		toolCall?: {
+			title?: string | null;
+			kind?: string | null;
+		} | null;
 	};
 	mode: PermissionMode;
 	prompter: PermissionPrompter | undefined;
 	output: OutputChannel;
 	providerId: string;
+	/**
+	 * Per-AcpClient memo of `allow_always` / `reject_always` decisions
+	 * keyed by tool kind. Mutated in-place when the user picks an "always"
+	 * option, and consulted on subsequent prompts to short-circuit the UI.
+	 */
+	rememberedDecisions: Map<string, RememberedDecisionKind>;
 }
 
 const toCancelled = (): PermissionOutcome => ({
@@ -601,12 +645,94 @@ const pickAuto = (
 	kinds: Set<string>
 ): string | undefined => options.find((opt) => kinds.has(opt.kind))?.optionId;
 
+interface MemoContext {
+	toolKind: string | null;
+	options: Array<{ optionId: string; kind: string }>;
+	rememberedDecisions: Map<string, RememberedDecisionKind>;
+	output: OutputChannel;
+	providerId: string;
+	title: string;
+}
+
+/**
+ * Returns a `PermissionOutcome` from the per-AcpClient memo when an
+ * `allow_always` / `reject_always` decision has been recorded for this
+ * tool kind. Returns `null` when there is no remembered decision (or when
+ * the agent dropped support for the matching option, in which case the
+ * stale entry is purged).
+ */
+function applyRememberedDecision(ctx: MemoContext): PermissionOutcome | null {
+	const { toolKind, options, rememberedDecisions, output, providerId, title } =
+		ctx;
+	if (!toolKind) {
+		return null;
+	}
+	const remembered = rememberedDecisions.get(toolKind);
+	if (!remembered) {
+		return null;
+	}
+	const optionId =
+		options.find((opt) => opt.kind === remembered)?.optionId ??
+		pickAuto(
+			options,
+			remembered === "allow_always" ? ALLOW_KINDS : REJECT_KINDS
+		);
+	if (!optionId) {
+		rememberedDecisions.delete(toolKind);
+		return null;
+	}
+	output.appendLine(
+		`[ACP][${providerId}] permission auto-resolved (${title}) from remembered ${remembered} for kind=${toolKind}`
+	);
+	return toSelected(optionId);
+}
+
+/**
+ * Stores the user's choice when it carries `allow_always` /
+ * `reject_always` semantics so future calls of the same tool kind skip
+ * the prompt.
+ */
+function rememberAlwaysDecision(
+	ctx: MemoContext & { chosenOptionId: string }
+): void {
+	const {
+		toolKind,
+		chosenOptionId,
+		options,
+		rememberedDecisions,
+		output,
+		providerId,
+	} = ctx;
+	if (!toolKind) {
+		return;
+	}
+	const chosenOption = options.find((opt) => opt.optionId === chosenOptionId);
+	const chosenKind = chosenOption?.kind;
+	if (!isRememberable(chosenKind)) {
+		return;
+	}
+	rememberedDecisions.set(toolKind, chosenKind);
+	output.appendLine(
+		`[ACP][${providerId}] remembered ${chosenKind} for kind=${toolKind} — future calls of this kind will not prompt`
+	);
+}
+
+function isRememberable(
+	kind: string | undefined
+): kind is RememberedDecisionKind {
+	return (
+		kind !== undefined && REMEMBERABLE_KINDS.has(kind as RememberedDecisionKind)
+	);
+}
+
 async function resolvePermission(
 	args: ResolvePermissionArgs
 ): Promise<PermissionOutcome> {
-	const { params, mode, prompter, output, providerId } = args;
+	const { params, mode, prompter, output, providerId, rememberedDecisions } =
+		args;
 	const options = params.options ?? [];
 	const title = params.toolCall?.title ?? "unknown";
+	const toolKind = params.toolCall?.kind ?? null;
 
 	if (mode === "allow") {
 		const optionId = pickAuto(options, ALLOW_KINDS) ?? options[0]?.optionId;
@@ -630,6 +756,19 @@ async function resolvePermission(
 		return toSelected(optionId);
 	}
 
+	const memoCtx: MemoContext = {
+		toolKind,
+		options,
+		rememberedDecisions,
+		output,
+		providerId,
+		title,
+	};
+	const remembered = applyRememberedDecision(memoCtx);
+	if (remembered) {
+		return remembered;
+	}
+
 	if (!prompter) {
 		output.appendLine(
 			`[ACP][${providerId}] permission requested (${title}); no prompter registered, cancelling`
@@ -651,6 +790,9 @@ async function resolvePermission(
 		);
 		return toCancelled();
 	}
+
+	rememberAlwaysDecision({ ...memoCtx, chosenOptionId: chosen });
+
 	output.appendLine(
 		`[ACP][${providerId}] permission selected (${title}) -> ${chosen}`
 	);
