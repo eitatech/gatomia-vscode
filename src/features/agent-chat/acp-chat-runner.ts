@@ -78,7 +78,40 @@ export interface AcpChatRunnerSessionManager {
 		sessionId: string,
 		listener: AcpSessionEventListener
 	): Disposable;
+	/**
+	 * Optional pending-writes plumbing (Phase 4). When the manager
+	 * exposes the buffer-then-apply API the runner forwards snapshot
+	 * changes to the panel via `pending-writes/changed` events. Older
+	 * managers that omit this method continue to work unchanged.
+	 */
+	subscribePendingWrites?(
+		providerId: string,
+		cwd: string | undefined,
+		listener: (writes: readonly PendingWriteSnapshot[]) => void
+	): Disposable;
+	flushPendingWrites?(
+		providerId: string,
+		cwd: string | undefined,
+		action: FlushPendingWritesAction
+	): void;
 }
+
+/**
+ * Locally-scoped projection of a pending file write — kept structural
+ * so the runner does not need to import the concrete store type.
+ */
+export interface PendingWriteSnapshot {
+	id: string;
+	path: string;
+	proposedContent?: string;
+	oldText?: string | null;
+}
+
+export type FlushPendingWritesAction =
+	| { kind: "accept-all" }
+	| { kind: "reject-all" }
+	| { kind: "accept-one"; id: string }
+	| { kind: "reject-one"; id: string };
 
 export interface AcpChatRunnerOptions {
 	/** The session this runner drives. Must already be registered in the store. */
@@ -115,7 +148,22 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 	private readonly now: () => number;
 
 	private subscription?: Disposable;
+	private pendingWritesSubscription?: Disposable;
 	private disposed = false;
+
+	/**
+	 * Latest pending-writes snapshot received from the manager. Cached
+	 * so that {@link onPendingWritesChanged} can replay the current
+	 * state to a freshly-attached listener (e.g. when the webview
+	 * binds to this session after the agent already queued some
+	 * writes).
+	 */
+	private latestPendingWrites: readonly PendingWriteSnapshot[] = [];
+
+	/** Listeners registered via {@link onPendingWritesChanged}. */
+	private readonly pendingWritesListeners = new Set<
+		(writes: readonly PendingWriteSnapshot[]) => void
+	>();
 
 	/**
 	 * True while a turn is in flight with the ACP agent (we've called
@@ -271,6 +319,55 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 				});
 			}
 		);
+		this.subscribePendingWrites();
+	}
+
+	/**
+	 * Hook into the manager's buffer-then-apply queue. Each snapshot
+	 * change is forwarded to panel listeners as a
+	 * `pending-writes/changed` event. The manager exposes the API as
+	 * optional so older builds without buffering keep working.
+	 */
+	private subscribePendingWrites(): void {
+		if (this.pendingWritesSubscription) {
+			return;
+		}
+		const subscribe = this.manager.subscribePendingWrites;
+		if (!subscribe) {
+			return;
+		}
+		const cwd = this.resolveCwd();
+		this.pendingWritesSubscription = subscribe.call(
+			this.manager,
+			this.session.agentId,
+			cwd,
+			(writes) => {
+				this.fireEvent({
+					type: "pending-writes/changed",
+					sessionId: this.sessionId,
+					writes: writes.map((entry) => ({
+						id: entry.id,
+						path: entry.path,
+						linesAdded: 0,
+						linesRemoved: 0,
+					})),
+					at: this.now(),
+				});
+			}
+		);
+	}
+
+	/**
+	 * Settle the pending file-write buffer for this session's provider.
+	 * No-ops when the manager does not expose the optional API (legacy
+	 * paths without the buffer-then-apply feature flag).
+	 */
+	flushPendingWrites(action: FlushPendingWritesAction): void {
+		const flush = this.manager.flushPendingWrites;
+		if (!flush) {
+			return;
+		}
+		flush.call(this.manager, this.session.agentId, this.resolveCwd(), action);
 	}
 
 	private resolveCwd(): string | undefined {
@@ -402,6 +499,8 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 			toolCallId: event.toolCallId,
 			title: event.title,
 			status: (event.status as ToolCallChatMessage["status"]) ?? "pending",
+			toolKind: event.toolKind,
+			affectedFiles: event.affectedFiles,
 		};
 		await this.store.appendMessages(this.sessionId, [message]);
 
@@ -425,10 +524,21 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 		}
 		const nextStatus =
 			(event.status as ToolCallChatMessage["status"]) ?? "running";
+		// Updates may carry a richer `affectedFiles` payload than the
+		// initial `tool_call` (the agent often emits the diff body in a
+		// follow-up notification). Merge both so the card stays in sync.
+		const patch: Partial<ChatMessage> = { status: nextStatus };
+		if (event.toolKind !== undefined) {
+			(patch as Partial<ToolCallChatMessage>).toolKind = event.toolKind;
+		}
+		if (event.affectedFiles !== undefined) {
+			(patch as Partial<ToolCallChatMessage>).affectedFiles =
+				event.affectedFiles;
+		}
 		await this.store.updateMessages(this.sessionId, [
 			{
 				id: messageId,
-				patch: { status: nextStatus } as Partial<ChatMessage>,
+				patch,
 			},
 		]);
 
@@ -565,6 +675,8 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 		this.disposed = true;
 		this.subscription?.dispose();
 		this.subscription = undefined;
+		this.pendingWritesSubscription?.dispose();
+		this.pendingWritesSubscription = undefined;
 	}
 
 	// ------------------------------------------------------------------

@@ -682,9 +682,44 @@ class SidebarSessionBinding {
 			case "agent-chat/control/retry":
 				await this.routeToRunner("retry");
 				return;
+			case "agent-chat/pending-writes/accept-all":
+				this.flushPendingWrites({ kind: "accept-all" });
+				return;
+			case "agent-chat/pending-writes/reject-all":
+				this.flushPendingWrites({ kind: "reject-all" });
+				return;
+			case "agent-chat/pending-writes/accept-one":
+				this.flushPendingWrites({
+					kind: "accept-one",
+					id: (message.payload as { id?: string } | undefined)?.id ?? "",
+				});
+				return;
+			case "agent-chat/pending-writes/reject-one":
+				this.flushPendingWrites({
+					kind: "reject-one",
+					id: (message.payload as { id?: string } | undefined)?.id ?? "",
+				});
+				return;
 			default:
 				return;
 		}
+	}
+
+	/**
+	 * Forwards an Accept/Reject decision to the runner. The runner owns
+	 * the manager reference and translates the action into a flush on
+	 * the underlying ACP client's pending-writes store.
+	 */
+	private flushPendingWrites(action: {
+		kind: "accept-all" | "reject-all" | "accept-one" | "reject-one";
+		id?: string;
+	}): void {
+		const runner = this.registry.getRunner(this.sessionId) as
+			| {
+					flushPendingWrites?: (a: typeof action) => void;
+			  }
+			| undefined;
+		runner?.flushPendingWrites?.(action);
 	}
 
 	private async handleInputSubmit(payload: {

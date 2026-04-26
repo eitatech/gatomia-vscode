@@ -8,6 +8,13 @@ import {
 	type Client,
 } from "@agentclientprotocol/sdk";
 import type { Disposable, OutputChannel } from "vscode";
+import { computeDiffStats } from "../../features/agent-chat/diff-stats";
+import {
+	type FlushAction,
+	type PendingWrite,
+	type PendingWritesListener,
+	PendingWritesStore,
+} from "../../features/agent-chat/pending-writes-store";
 import { getExtendedPath } from "../../utils/cli-detector";
 import type { AcpProviderDescriptor } from "./types";
 
@@ -54,6 +61,26 @@ const REMEMBERABLE_KINDS = new Set<RememberedDecisionKind>([
  * specs/018-agent-chat-panel/research.md §R2 — do not rename kinds without
  * updating the research doc and every downstream consumer.
  */
+/**
+ * Per-event projection of a file affected by a tool call. Surfaced so
+ * the UI can render the Cursor-style `arquivo.ts +47 -1` cards without
+ * having to re-parse the raw ACP `Diff` payload on every chunk update.
+ */
+export interface AcpAffectedFile {
+	/** Absolute or workspace-relative path reported by the agent. */
+	path: string;
+	/** Lines added relative to `oldText`. */
+	linesAdded: number;
+	/** Lines removed relative to `oldText`. */
+	linesRemoved: number;
+	/**
+	 * Best-effort language guess derived from the path extension. The
+	 * webview uses this purely to pick an icon — it is *not* an
+	 * authoritative VS Code `LanguageId`.
+	 */
+	languageId?: string;
+}
+
 export type AcpSessionEvent =
 	| { kind: "agent-message-chunk"; text: string; at: number }
 	| {
@@ -61,12 +88,16 @@ export type AcpSessionEvent =
 			toolCallId: string;
 			title?: string;
 			status?: string;
+			toolKind?: string;
+			affectedFiles?: AcpAffectedFile[];
 			at: number;
 	  }
 	| {
 			kind: "tool-call-update";
 			toolCallId: string;
 			status?: string;
+			toolKind?: string;
+			affectedFiles?: AcpAffectedFile[];
 			at: number;
 	  }
 	| { kind: "turn-finished"; stopReason: string; at: number }
@@ -90,6 +121,14 @@ export interface AcpClientOptions {
 	 * the child process. Defaults to 15 s.
 	 */
 	initializeTimeoutMs?: number;
+	/**
+	 * When true, every `writeTextFile` request from the agent is buffered
+	 * in the {@link PendingWritesStore} and only persisted to disk after
+	 * the user accepts it via the chat UI. Defaults to false (legacy
+	 * "fire and forget" behaviour) so the redesign can ship dark and be
+	 * toggled on per workspace.
+	 */
+	bufferFileWrites?: boolean;
 }
 
 const ALLOW_KINDS = new Set(["allow_once", "allow_always"]);
@@ -146,6 +185,15 @@ export class AcpClient {
 		RememberedDecisionKind
 	>();
 
+	/**
+	 * Buffer of `writeTextFile` calls awaiting user approval. Only
+	 * touched when {@link AcpClientOptions.bufferFileWrites} is true;
+	 * otherwise stays empty and the legacy direct-write path runs.
+	 */
+	private readonly pendingWritesStore = new PendingWritesStore();
+
+	private readonly bufferFileWrites: boolean;
+
 	constructor(options: AcpClientOptions) {
 		this.descriptor = options.descriptor;
 		this.cwd = options.cwd;
@@ -154,6 +202,36 @@ export class AcpClient {
 		this.promptForPermission = options.promptForPermission;
 		this.initializeTimeoutMs =
 			options.initializeTimeoutMs ?? DEFAULT_INITIALIZE_TIMEOUT_MS;
+		this.bufferFileWrites = options.bufferFileWrites ?? false;
+	}
+
+	/**
+	 * Subscribe to pending-writes snapshot changes. Used by the host
+	 * (chat runner) to forward updates to the webview.
+	 */
+	subscribePendingWrites(listener: PendingWritesListener): {
+		dispose: () => void;
+	} {
+		return this.pendingWritesStore.subscribe(listener);
+	}
+
+	/**
+	 * Settle one or more pending writes. The store rejects the matching
+	 * promises in `writeTextFile` (see {@link AcpClient.buildClientHandler})
+	 * which then either persists the file or surfaces the rejection to
+	 * the agent.
+	 */
+	flushPendingWrites(action: FlushAction): readonly PendingWrite[] {
+		return this.pendingWritesStore.flush(action);
+	}
+
+	/**
+	 * Cancels every queued write — the matching agent calls receive a
+	 * rejection. Called from session shutdown / cancel paths so the
+	 * agent never hangs waiting on a decision that nobody can make.
+	 */
+	cancelPendingWrites(reason?: string): void {
+		this.pendingWritesStore.cancelAll(reason);
 	}
 
 	/** Returns the most recently used session key, or null when no prompt has run. */
@@ -515,6 +593,8 @@ export class AcpClient {
 		const permissionDefault = this.permissionDefault;
 		const promptForPermission = this.promptForPermission;
 		const rememberedDecisions = this.rememberedDecisions;
+		const pendingWritesStore = this.pendingWritesStore;
+		const bufferFileWrites = this.bufferFileWrites;
 		// Bind the bus emitter so the handler object (not the AcpClient
 		// instance) can still fan out events without losing `this`.
 		const emit = (sessionId: string, event: AcpSessionEvent): void =>
@@ -537,26 +617,25 @@ export class AcpClient {
 						}
 						break;
 					case "tool_call":
-						output.appendLine(
-							`\n[ACP][${providerId}] tool_call: ${update.title ?? ""} (${update.status ?? "pending"})`
-						);
-						emit(sessionId, {
-							kind: "tool-call",
-							toolCallId: update.toolCallId,
-							title: update.title ?? undefined,
-							status: update.status ?? undefined,
+						emitToolCallEvent({
+							output,
+							providerId,
+							sessionId,
+							update,
 							at,
+							emit,
+							kind: "tool-call",
 						});
 						break;
 					case "tool_call_update":
-						output.appendLine(
-							`[ACP][${providerId}] tool_call_update: ${update.toolCallId} -> ${update.status ?? "unknown"}`
-						);
-						emit(sessionId, {
-							kind: "tool-call-update",
-							toolCallId: update.toolCallId,
-							status: update.status ?? undefined,
+						emitToolCallEvent({
+							output,
+							providerId,
+							sessionId,
+							update,
 							at,
+							emit,
+							kind: "tool-call-update",
 						});
 						break;
 					default:
@@ -591,6 +670,14 @@ export class AcpClient {
 				}
 			},
 			async writeTextFile(params) {
+				if (bufferFileWrites) {
+					return await handleBufferedWrite({
+						params,
+						store: pendingWritesStore,
+						providerId,
+						output,
+					});
+				}
 				try {
 					await writeFile(params.path, params.content, "utf8");
 					return {};
@@ -607,6 +694,221 @@ export class AcpClient {
 
 const toMessage = (error: unknown): string =>
 	error instanceof Error ? error.message : String(error);
+
+/**
+ * Buffers a `writeTextFile` request through the pending-writes store
+ * and only persists the file once the user accepts. Rejection is
+ * surfaced as a thrown error so the agent's ACP RPC reply carries the
+ * failure (and the agent can react / retry / abort the turn).
+ *
+ * Reads `oldText` from disk on a best-effort basis: missing files map
+ * to `null`, every other read error is logged and treated as `null`
+ * so we never block the queue waiting on a flaky `stat`.
+ */
+async function handleBufferedWrite(args: {
+	params: { path: string; content: string };
+	store: PendingWritesStore;
+	providerId: string;
+	output: OutputChannel;
+}): Promise<Record<string, never>> {
+	const { params, store, providerId, output } = args;
+	let oldText: string | null;
+	try {
+		oldText = await readFile(params.path, "utf8");
+	} catch (error: unknown) {
+		const code = (error as NodeJS.ErrnoException | undefined)?.code;
+		if (code !== "ENOENT") {
+			output.appendLine(
+				`[ACP][${providerId}] writeTextFile pre-read failed (${params.path}): ${toMessage(error)} — treating as new file`
+			);
+		}
+		oldText = null;
+	}
+
+	output.appendLine(
+		`[ACP][${providerId}] writeTextFile buffered (${params.path}); awaiting user accept/reject`
+	);
+	const { promise } = store.enqueueWrite({
+		path: params.path,
+		proposedContent: params.content,
+		oldText,
+	});
+	const decision = await promise;
+	if (decision === "rejected") {
+		output.appendLine(
+			`[ACP][${providerId}] writeTextFile rejected by user (${params.path})`
+		);
+		throw new Error(`User rejected file write: ${params.path}`);
+	}
+	try {
+		await writeFile(params.path, params.content, "utf8");
+		output.appendLine(
+			`[ACP][${providerId}] writeTextFile accepted (${params.path})`
+		);
+		return {};
+	} catch (error) {
+		output.appendLine(
+			`[ACP][${providerId}] writeTextFile flush failed (${params.path}): ${toMessage(error)}`
+		);
+		throw error;
+	}
+}
+
+/**
+ * Emits a `tool-call` / `tool-call-update` event with the affected
+ * files projection attached. Pulled out of the giant `sessionUpdate`
+ * switch so the parent function stays under the cyclomatic complexity
+ * cap enforced by ultracite (max 15).
+ */
+function emitToolCallEvent(args: {
+	output: OutputChannel;
+	providerId: string;
+	sessionId: string;
+	at: number;
+	emit: (sessionId: string, event: AcpSessionEvent) => void;
+	kind: "tool-call" | "tool-call-update";
+	update: {
+		toolCallId: string;
+		title?: string | null;
+		status?: string | null;
+		kind?: string | null;
+		content?: ReadonlyArray<{
+			type?: string;
+			path?: string;
+			oldText?: string | null;
+			newText?: string;
+		}> | null;
+		locations?: ReadonlyArray<{ path?: string }> | null;
+	};
+}): void {
+	const { output, providerId, sessionId, at, emit, kind, update } = args;
+	if (kind === "tool-call") {
+		output.appendLine(
+			`\n[ACP][${providerId}] tool_call: ${update.title ?? ""} (${update.status ?? "pending"})`
+		);
+	} else {
+		output.appendLine(
+			`[ACP][${providerId}] tool_call_update: ${update.toolCallId} -> ${update.status ?? "unknown"}`
+		);
+	}
+	const affectedFiles = extractAffectedFiles(update);
+	const sharedPayload = {
+		toolCallId: update.toolCallId,
+		status: update.status ?? undefined,
+		toolKind: update.kind ?? undefined,
+		affectedFiles: affectedFiles.length > 0 ? affectedFiles : undefined,
+		at,
+	};
+	if (kind === "tool-call") {
+		emit(sessionId, {
+			kind,
+			...sharedPayload,
+			title: update.title ?? undefined,
+		});
+	} else {
+		emit(sessionId, { kind, ...sharedPayload });
+	}
+}
+
+/**
+ * Walks an ACP `tool_call` / `tool_call_update` payload and returns
+ * one {@link AcpAffectedFile} per `Diff` content entry. Used by the UI
+ * to render the Cursor-style `arquivo.ts +N -M` cards. Tool calls that
+ * do not modify files (everything except `kind: edit | delete | move`)
+ * naturally produce an empty array because they ship no `Diff` content.
+ *
+ * Falls back gracefully for partial / malformed payloads — every field
+ * is optional in the ACP schema and we never throw out of the event
+ * handler.
+ */
+function extractAffectedFiles(update: {
+	content?: ReadonlyArray<{
+		type?: string;
+		path?: string;
+		oldText?: string | null;
+		newText?: string;
+	}> | null;
+	locations?: ReadonlyArray<{ path?: string }> | null;
+}): AcpAffectedFile[] {
+	const result: AcpAffectedFile[] = [];
+	const diffs = update.content?.filter((entry) => entry?.type === "diff") ?? [];
+	for (const diff of diffs) {
+		if (typeof diff.path !== "string" || typeof diff.newText !== "string") {
+			continue;
+		}
+		const stats = computeDiffStats({
+			oldText: diff.oldText ?? null,
+			newText: diff.newText,
+		});
+		result.push({
+			path: diff.path,
+			linesAdded: stats.linesAdded,
+			linesRemoved: stats.linesRemoved,
+			languageId: guessLanguageId(diff.path),
+		});
+	}
+
+	// If the agent only reports `locations` (no diff body) still surface
+	// the path so the card can render the file name with no stats.
+	if (result.length === 0 && update.locations) {
+		for (const location of update.locations) {
+			if (typeof location?.path !== "string") {
+				continue;
+			}
+			result.push({
+				path: location.path,
+				linesAdded: 0,
+				linesRemoved: 0,
+				languageId: guessLanguageId(location.path),
+			});
+		}
+	}
+	return result;
+}
+
+/**
+ * Guesses a `LanguageId`-ish hint from a file path's extension. The
+ * webview only uses this to pick an icon — it is not authoritative and
+ * does not need to match the VS Code `languages` registry. Unknown
+ * extensions return `undefined` so the card falls back to a generic
+ * file icon.
+ */
+function guessLanguageId(path: string): string | undefined {
+	const dot = path.lastIndexOf(".");
+	if (dot < 0) {
+		return;
+	}
+	const ext = path.slice(dot + 1).toLowerCase();
+	const map: Record<string, string> = {
+		ts: "typescript",
+		tsx: "typescriptreact",
+		js: "javascript",
+		jsx: "javascriptreact",
+		json: "json",
+		md: "markdown",
+		py: "python",
+		rs: "rust",
+		go: "go",
+		java: "java",
+		kt: "kotlin",
+		rb: "ruby",
+		cs: "csharp",
+		cpp: "cpp",
+		cc: "cpp",
+		c: "c",
+		h: "cpp",
+		yaml: "yaml",
+		yml: "yaml",
+		toml: "toml",
+		sh: "shellscript",
+		bash: "shellscript",
+		css: "css",
+		scss: "scss",
+		html: "html",
+		sql: "sql",
+	};
+	return map[ext];
+}
 
 type PermissionOutcome =
 	| { outcome: { outcome: "cancelled" } }

@@ -33,6 +33,10 @@ import { SteeringExplorerProvider } from "./providers/steering-explorer-provider
 import { WikiExplorerProvider } from "./providers/wiki-explorer-provider";
 import type { AgentChatRegistry as AgentChatRegistryType } from "./features/agent-chat/agent-chat-registry";
 import type { AgentChatSessionStore as AgentChatSessionStoreType } from "./features/agent-chat/agent-chat-session-store";
+import {
+	createDefaultEntryPointsHost,
+	registerAgentChatEntryPoints,
+} from "./features/agent-chat/agent-chat-entry-points";
 import { AcpProviderRegistry } from "./services/acp/acp-provider-registry";
 import { AcpSessionManager } from "./services/acp/acp-session-manager";
 import {
@@ -2081,6 +2085,17 @@ function readPermissionDefault(): "ask" | "allow" | "deny" {
 	return "ask";
 }
 
+/**
+ * Reads the `gatomia.agentChat.bufferFileWrites` setting. When true,
+ * every `writeTextFile` from an ACP agent is queued in the
+ * pending-writes store and only persisted to disk after the user
+ * accepts it through the chat UI (Phase 4 buffer-then-apply flow).
+ */
+function readBufferFileWritesFlag(): boolean {
+	const config = workspace.getConfiguration("gatomia");
+	return config.get<boolean>("agentChat.bufferFileWrites", true) === true;
+}
+
 function createAcpPermissionPrompter(
 	output: OutputChannel
 ): (request: {
@@ -2203,6 +2218,7 @@ function bootstrapAcpRouter(context: ExtensionContext): void {
 		const workspaceRoot =
 			workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
 		const permissionDefault = readPermissionDefault();
+		const bufferFileWrites = readBufferFileWritesFlag();
 		acpSessionManager = new AcpSessionManager({
 			registry,
 			output,
@@ -2210,9 +2226,10 @@ function bootstrapAcpRouter(context: ExtensionContext): void {
 			permissionDefault,
 			promptForPermission: createAcpPermissionPrompter(output),
 			beforeSpawn: createAcpNpxConsentPrompter(output),
+			bufferFileWrites,
 		});
 		output.appendLine(
-			`[ACP] Session manager ready (permissionDefault=${permissionDefault})`
+			`[ACP] Session manager ready (permissionDefault=${permissionDefault}, bufferFileWrites=${bufferFileWrites})`
 		);
 
 		const dispatcher = new ChatDispatcher({
@@ -2916,6 +2933,20 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 								sessionId,
 								listener
 							),
+						// Phase 4 — pending file-write buffer plumbing.
+						subscribePendingWrites: (providerId, runnerCwd, listener) =>
+							sessionManager.subscribePendingWrites(
+								providerId,
+								runnerCwd ?? cwd,
+								listener
+							),
+						flushPendingWrites: (providerId, runnerCwd, action) => {
+							sessionManager.flushPendingWrites(
+								providerId,
+								runnerCwd ?? cwd,
+								action
+							);
+						},
 					},
 					acpSessionId,
 				});
@@ -3022,6 +3053,19 @@ async function bootstrapAgentChat(context: ExtensionContext): Promise<void> {
 				sidebarController.pushSessionList();
 			})
 		);
+
+		// Surface the chat from the keyboard (Cmd+L) and the status bar
+		// without forcing the user to hunt for the view in the activity
+		// bar. Also runs a one-time migration that moves the chat
+		// container into the secondary side bar (right-hand) so it lines
+		// up with the workflow most users expect from chat-style tools.
+		const entryPointDisposables = registerAgentChatEntryPoints(
+			createDefaultEntryPointsHost(context),
+			outputChannel
+		);
+		for (const disposable of entryPointDisposables) {
+			context.subscriptions.push(disposable);
+		}
 
 		outputChannel.appendLine(
 			"[AgentChat] Session store + sidebar webview + running-agents tree initialised; commands registered"

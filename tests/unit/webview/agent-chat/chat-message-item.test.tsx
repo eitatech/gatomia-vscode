@@ -122,4 +122,64 @@ describe("ChatMessageItem", () => {
 		expect(screen.getByText(REJECTED_RE)).toBeInTheDocument();
 		expect(screen.getByText(READ_ONLY_SESSION_RE)).toBeInTheDocument();
 	});
+
+	it("wraps user content in a dedicated bubble div for the new layout", () => {
+		// Phase 2 redesign: user messages render inside a `__bubble`
+		// element so we can apply the soft right-aligned pill from the
+		// mockup. The test pins the structure so future refactors stay
+		// honest.
+		const { container } = render(
+			<ChatMessageItem
+				message={userMessage({ id: "u-bubble", content: "ping" })}
+			/>
+		);
+		const bubble = container.querySelector(".agent-chat-message__bubble");
+		expect(bubble).not.toBeNull();
+		expect(bubble?.textContent).toContain("ping");
+	});
+
+	it("renders an avatar dot before agent content", () => {
+		// The avatar is purely decorative (aria-hidden) but must be in
+		// the DOM so CSS can colour it; the testid lets the test catch
+		// regressions if it gets removed.
+		render(
+			<ChatMessageItem
+				message={{
+					id: "a-avatar",
+					sessionId: "s-1",
+					timestamp: 1000,
+					sequence: 1,
+					role: "agent",
+					content: "with avatar",
+					turnId: "t-1",
+					isTurnComplete: true,
+				}}
+			/>
+		);
+		expect(screen.getByTestId("agent-avatar")).toBeInTheDocument();
+	});
+
+	it("uses the status modifier class on tool messages so the dot can be styled", () => {
+		// Tool calls show a coloured dot keyed off the `status` modifier
+		// (pending → blue pulse, succeeded → green, failed → red). The
+		// CSS lives in `app.css`; the component's only job is to emit
+		// the matching className.
+		const { container } = render(
+			<ChatMessageItem
+				message={{
+					id: "t-1",
+					sessionId: "s-1",
+					timestamp: 1000,
+					sequence: 4,
+					role: "tool",
+					toolCallId: "tc-1",
+					title: "Run lint",
+					status: "succeeded",
+				}}
+			/>
+		);
+		const dot = container.querySelector(".agent-chat-message__tool-dot");
+		expect(dot).not.toBeNull();
+		expect(dot?.className).toContain("agent-chat-message__tool-dot--succeeded");
+	});
 });

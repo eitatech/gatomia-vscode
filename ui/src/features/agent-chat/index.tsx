@@ -132,6 +132,9 @@ export function AgentChatFeature(): JSX.Element {
 			) : null}
 			<InputBar
 				acceptsFollowUp={session.acceptsFollowUp}
+				busy={isBusyState(session.lifecycleState)}
+				modelLabel={session.selectedModelId ?? session.agentDisplayName}
+				onCancel={cancel}
 				onSubmit={submit}
 				readOnly={session.isReadOnly}
 				readOnlyReason={
@@ -181,6 +184,14 @@ function isTerminalState(
 		state === "cancelled" ||
 		state === "ended-by-shutdown"
 	);
+}
+
+function isBusyState(
+	state: NonNullable<
+		ReturnType<typeof useSessionBridge>["state"]["session"]
+	>["lifecycleState"]
+): boolean {
+	return state === "running" || state === "initializing";
 }
 
 function findLatestRetryableError(

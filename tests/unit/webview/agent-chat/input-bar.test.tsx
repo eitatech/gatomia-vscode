@@ -10,6 +10,11 @@ import { InputBar } from "@/features/agent-chat/components/input-bar";
 const SEND_BUTTON_RE = /send/i;
 const NO_FOLLOW_UP_RE = /does not accept follow-up/i;
 const READ_ONLY_RE = /read-only cloud session/i;
+const ATTACH_BUTTON_RE = /add attachment/i;
+const CODE_MODE_RE = /code mode/i;
+const DICTATION_RE = /dictation/i;
+const STOP_BUTTON_RE = /stop/i;
+const ASK_PLACEHOLDER_RE = /Ask anything/i;
 
 afterEach(() => {
 	cleanup();
@@ -55,5 +60,57 @@ describe("InputBar", () => {
 		);
 		const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
 		expect(textarea.disabled).toBe(true);
+	});
+
+	it("renders the toolbar chrome (attach + Code chip + mic) regardless of state", () => {
+		// The toolbar buttons are placeholders that mirror the Cursor-
+		// style mockup. They are rendered but disabled until follow-up
+		// UX work wires real handlers — the test pins the chrome so the
+		// redesign cannot accidentally drop them.
+		render(<InputBar acceptsFollowUp={true} onSubmit={vi.fn()} />);
+		expect(
+			screen.getByRole("button", { name: ATTACH_BUTTON_RE })
+		).toBeDisabled();
+		expect(screen.getByRole("button", { name: CODE_MODE_RE })).toBeDisabled();
+		expect(screen.getByRole("button", { name: DICTATION_RE })).toBeDisabled();
+	});
+
+	it("shows the model label in the toolbar when provided", () => {
+		render(
+			<InputBar
+				acceptsFollowUp={true}
+				modelLabel="claude-sonnet-4.6"
+				onSubmit={vi.fn()}
+			/>
+		);
+		expect(screen.getByText("claude-sonnet-4.6")).toBeInTheDocument();
+	});
+
+	it("renders the activity spinner when busy is true", () => {
+		render(<InputBar acceptsFollowUp={true} busy={true} onSubmit={vi.fn()} />);
+		expect(screen.getByTestId("input-activity")).toBeInTheDocument();
+	});
+
+	it("swaps Send for a Stop button when busy with a cancel handler", () => {
+		const onCancel = vi.fn();
+		render(
+			<InputBar
+				acceptsFollowUp={true}
+				busy={true}
+				onCancel={onCancel}
+				onSubmit={vi.fn()}
+			/>
+		);
+		// Send button is hidden while the agent is running.
+		expect(screen.queryByRole("button", { name: SEND_BUTTON_RE })).toBeNull();
+		const stopButton = screen.getByRole("button", { name: STOP_BUTTON_RE });
+		fireEvent.click(stopButton);
+		expect(onCancel).toHaveBeenCalledTimes(1);
+	});
+
+	it("uses the new Cursor-style placeholder when enabled", () => {
+		render(<InputBar acceptsFollowUp={true} onSubmit={vi.fn()} />);
+		const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+		expect(textarea.placeholder).toMatch(ASK_PLACEHOLDER_RE);
 	});
 });

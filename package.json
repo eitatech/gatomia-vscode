@@ -304,6 +304,12 @@
           "default": true,
           "description": "Consult the public ACP Registry to suggest additional providers. Built-in providers (Devin, Gemini) do not depend on this.",
           "order": 54
+        },
+        "gatomia.agentChat.bufferFileWrites": {
+          "type": "boolean",
+          "default": true,
+          "description": "Buffer agent file edits and require explicit Accept/Reject before they hit disk. When disabled, edits are written immediately (legacy behaviour).",
+          "order": 55
         }
       }
     },
@@ -927,6 +933,20 @@
         "title": "Show Agent Chat History",
         "category": "GatomIA",
         "icon": "$(history)"
+      },
+      {
+        "command": "gatomia.agentChat.openInSecondarySidebar",
+        "title": "Open Agent Chat in Secondary Side Bar",
+        "category": "GatomIA",
+        "icon": "$(comment-discussion)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "gatomia.agentChat.openInSecondarySidebar",
+        "key": "ctrl+l",
+        "mac": "cmd+l",
+        "when": "!terminalFocus && !inSnippetMode && editorTextFocus || !terminalFocus && !inSnippetMode"
       }
     ],
     "menus": {
@@ -1250,6 +1270,9 @@
         },
         {
           "command": "gatomia.settings.openGlobalConfig"
+        },
+        {
+          "command": "gatomia.agentChat.openInSecondarySidebar"
         }
       ]
     }

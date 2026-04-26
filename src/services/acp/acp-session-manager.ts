@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { Disposable, OutputChannel } from "vscode";
+import type {
+	FlushAction,
+	PendingWrite,
+	PendingWritesListener,
+} from "../../features/agent-chat/pending-writes-store";
 import {
 	AcpClient,
 	type AcpSessionEventListener,
@@ -45,6 +50,12 @@ export interface AcpSessionManagerOptions {
 	 * is only invoked for descriptors whose `spawnCommand` is `"npx"`.
 	 */
 	beforeSpawn?: BeforeSpawnHook;
+	/**
+	 * Forwarded to every spawned {@link AcpClient}. Enables the
+	 * buffer-then-apply flow for `writeTextFile` so the user can review
+	 * file changes before they hit disk (Phase 4 redesign).
+	 */
+	bufferFileWrites?: boolean;
 }
 
 /**
@@ -64,6 +75,7 @@ export class AcpSessionManager {
 	private readonly permissionDefault: PermissionMode | undefined;
 	private readonly promptForPermission: PermissionPrompter | undefined;
 	private readonly beforeSpawn: BeforeSpawnHook | undefined;
+	private readonly bufferFileWrites: boolean;
 	/**
 	 * Cached clients keyed by `${providerId}::${cwd}` (F1 remediation) so two
 	 * concurrent worktree sessions for the same provider never share a
@@ -83,6 +95,39 @@ export class AcpSessionManager {
 		this.permissionDefault = options.permissionDefault;
 		this.promptForPermission = options.promptForPermission;
 		this.beforeSpawn = options.beforeSpawn;
+		this.bufferFileWrites = options.bufferFileWrites ?? false;
+	}
+
+	/**
+	 * Subscribe to the pending file-write buffer kept by the
+	 * `(providerId, cwd)` ACP client. Returns a disposable; the listener
+	 * is invoked synchronously with the current snapshot on attach
+	 * (mirrors the underlying store contract).
+	 */
+	subscribePendingWrites(
+		providerId: string,
+		cwd: string | undefined,
+		listener: PendingWritesListener
+	): Disposable {
+		const client = this.ensureClient(providerId, cwd ?? this.cwd);
+		return client.subscribePendingWrites(listener);
+	}
+
+	/**
+	 * Settle pending writes on the matching client. The store rejects
+	 * the underlying agent promises which then either persist the file
+	 * (on accept) or surface the rejection to the agent.
+	 */
+	flushPendingWrites(
+		providerId: string,
+		cwd: string | undefined,
+		action: FlushAction
+	): readonly PendingWrite[] {
+		const client = this.findClient(providerId, cwd ?? this.cwd);
+		if (!client) {
+			return [];
+		}
+		return client.flushPendingWrites(action);
 	}
 
 	async send(
@@ -250,6 +295,7 @@ export class AcpSessionManager {
 			output: this.output,
 			permissionDefault: this.permissionDefault,
 			promptForPermission: this.promptForPermission,
+			bufferFileWrites: this.bufferFileWrites,
 		});
 		this.clients.set(key, client);
 		return client;

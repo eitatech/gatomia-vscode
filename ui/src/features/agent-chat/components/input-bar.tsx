@@ -5,6 +5,20 @@
  * accept new input: read-only cloud sessions, agents with
  * `acceptsFollowUp: false` after the first turn, or sessions in a terminal
  * state (FR-003, FR-004).
+ *
+ * Visual layout (image 1 / Phase 2 redesign):
+ *   ┌────────────────────────────────────────────────┐
+ *   │ Ask anything (⌘L)                              │  ← textarea (placeholder)
+ *   │                                                │
+ *   ├────────────────────────────────────────────────┤
+ *   │ [+] [<>Code] modelLabel        [○] [🎤] [Send] │  ← toolbar
+ *   └────────────────────────────────────────────────┘
+ *
+ * The `+`, `<>Code`, mic and pulse icons are placeholders that match the
+ * mockup chrome but are not yet wired to runtime behaviour — they are
+ * `disabled` so they don't trap focus or imply functionality. Replacing
+ * them with real handlers is tracked separately (mode toggle, attachments
+ * and dictation each need their own UX spec).
  */
 
 import { useCallback, useState } from "react";
@@ -15,6 +29,9 @@ interface InputBarProps {
 	readonly readOnly?: boolean;
 	readonly readOnlyReason?: string;
 	readonly terminal?: boolean;
+	readonly busy?: boolean;
+	readonly modelLabel?: string;
+	readonly onCancel?: () => void;
 }
 
 export function InputBar({
@@ -23,6 +40,9 @@ export function InputBar({
 	readOnly,
 	readOnlyReason,
 	terminal,
+	busy,
+	modelLabel,
+	onCancel,
 }: InputBarProps): JSX.Element {
 	const [value, setValue] = useState("");
 
@@ -43,6 +63,9 @@ export function InputBar({
 		setValue("");
 	}, [value, disabled, onSubmit]);
 
+	const canSend = !disabled && value.trim().length > 0;
+	const showStop = Boolean(busy) && Boolean(onCancel);
+
 	return (
 		<div className="agent-chat-input">
 			<textarea
@@ -56,7 +79,7 @@ export function InputBar({
 					}
 				}}
 				placeholder={
-					disabled ? (disabledReason ?? "Input disabled") : "Type a message…"
+					disabled ? (disabledReason ?? "Input disabled") : "Ask anything (⌘L)"
 				}
 				rows={3}
 				value={value}
@@ -66,15 +89,72 @@ export function InputBar({
 					{disabledReason}
 				</div>
 			) : null}
-			<div className="agent-chat-input__actions">
-				<button
-					aria-label="Send"
-					disabled={disabled || value.trim().length === 0}
-					onClick={handleSubmit}
-					type="button"
-				>
-					Send
-				</button>
+			<div className="agent-chat-input__toolbar">
+				<div className="agent-chat-input__toolbar-left">
+					<button
+						aria-label="Add attachment (coming soon)"
+						className="agent-chat-input__icon-button"
+						disabled
+						title="Attachments coming soon"
+						type="button"
+					>
+						+
+					</button>
+					<button
+						aria-label="Code mode"
+						className="agent-chat-input__chip"
+						disabled
+						title="Code mode (coming soon)"
+						type="button"
+					>
+						<span className="agent-chat-input__chip-icon">{"<>"}</span>
+						<span className="agent-chat-input__chip-label">Code</span>
+					</button>
+					{modelLabel ? (
+						<span className="agent-chat-input__model-label" title={modelLabel}>
+							{modelLabel}
+						</span>
+					) : null}
+				</div>
+				<div className="agent-chat-input__toolbar-right">
+					{busy ? (
+						<span
+							aria-hidden="true"
+							className="agent-chat-input__activity"
+							data-testid="input-activity"
+						/>
+					) : null}
+					<button
+						aria-label="Dictation (coming soon)"
+						className="agent-chat-input__icon-button"
+						disabled
+						title="Dictation coming soon"
+						type="button"
+					>
+						🎤
+					</button>
+					{showStop ? (
+						<button
+							aria-label="Stop"
+							className="agent-chat-input__stop"
+							onClick={onCancel}
+							title="Stop the agent"
+							type="button"
+						>
+							■
+						</button>
+					) : (
+						<button
+							aria-label="Send"
+							className="agent-chat-input__send"
+							disabled={!canSend}
+							onClick={handleSubmit}
+							type="button"
+						>
+							Send
+						</button>
+					)}
+				</div>
 			</div>
 		</div>
 	);

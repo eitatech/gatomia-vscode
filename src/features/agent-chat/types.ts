@@ -237,12 +237,32 @@ export type ToolCallStatus =
 	| "failed"
 	| "cancelled";
 
+/**
+ * Per-tool-call projection of a file the agent is reading or
+ * modifying. Populated from the ACP `Diff` payloads on `tool_call` /
+ * `tool_call_update` notifications; the webview uses it to render the
+ * Cursor-style `arquivo.ts +N -M` cards (Phase 3 redesign).
+ */
+export interface ToolCallAffectedFile {
+	path: string;
+	linesAdded: number;
+	linesRemoved: number;
+	languageId?: string;
+}
+
 export interface ToolCallChatMessage extends ChatMessageBase {
 	role: "tool";
 	toolCallId: string;
 	title?: string;
 	/** Latest status reported by the agent. */
 	status: ToolCallStatus;
+	/** ACP `ToolKind` (read/edit/execute/...) when the agent reports it. */
+	toolKind?: string;
+	/**
+	 * Files referenced by this tool call. Empty / undefined for tools
+	 * that do not touch files (e.g. `kind: "execute"`).
+	 */
+	affectedFiles?: readonly ToolCallAffectedFile[];
 }
 
 /**
@@ -357,7 +377,29 @@ export type AgentChatEvent =
 			message: string;
 			retryable: boolean;
 			at: number;
+	  }
+	| {
+			type: "pending-writes/changed";
+			sessionId: string;
+			writes: readonly PendingWriteSummary[];
+			at: number;
 	  };
+
+/**
+ * Light projection of a queued ACP `writeTextFile` call. The webview
+ * receives this through the `pending-writes/changed` event and renders
+ * the Cursor-style "X file +Y -Z" bar above the input. The full
+ * `proposedContent` is intentionally omitted to keep the bridge
+ * payload small — the webview only needs the diff stats and path to
+ * render the summary.
+ */
+export interface PendingWriteSummary {
+	id: string;
+	path: string;
+	linesAdded: number;
+	linesRemoved: number;
+	languageId?: string;
+}
 
 // ============================================================================
 // Runner handle (forward-compatible; see W3 fix)

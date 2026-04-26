@@ -655,6 +655,137 @@ describe("AcpClient", () => {
 			expect(second.kind).toBe("tool-call-update");
 		});
 
+		it("projects ACP `Diff` content into affectedFiles with computed +N/-M stats", async () => {
+			// Phase 3 plumbing: when the agent emits a `tool_call` with
+			// a `diff` content entry the host must surface the file path,
+			// language hint, and lines added / removed so the webview
+			// can render the Cursor-style card.
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "tool_call",
+					toolCallId: "tc-edit",
+					title: "Update sidebar",
+					status: "pending",
+					kind: "edit",
+					content: [
+						{
+							type: "diff",
+							path: "/repo/src/sidebar.ts",
+							oldText: "alpha\nbeta\n",
+							newText: "alpha\nbeta\ngamma\n",
+						},
+					],
+				},
+			});
+
+			expect(listener).toHaveBeenCalledTimes(1);
+			const event = listener.mock.calls[0][0] as {
+				kind: string;
+				toolKind?: string;
+				affectedFiles?: Array<{
+					path: string;
+					linesAdded: number;
+					linesRemoved: number;
+					languageId?: string;
+				}>;
+			};
+			expect(event.kind).toBe("tool-call");
+			expect(event.toolKind).toBe("edit");
+			expect(event.affectedFiles).toHaveLength(1);
+			const [file] = event.affectedFiles ?? [];
+			expect(file).toMatchObject({
+				path: "/repo/src/sidebar.ts",
+				linesAdded: 1,
+				linesRemoved: 0,
+				languageId: "typescript",
+			});
+		});
+
+		it("falls back to ToolCall.locations when no diff content is present", async () => {
+			// Some agents only ship `locations` (a "follow-along" hint
+			// that points the IDE at a file) without a full diff body.
+			// We still want to surface the file in the card so the user
+			// can scan what is being read, even if `+0 -0`.
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "tool_call",
+					toolCallId: "tc-read",
+					title: "Inspect README",
+					status: "pending",
+					kind: "read",
+					locations: [{ path: "README.md", line: 1 }],
+				},
+			});
+
+			const event = listener.mock.calls[0][0] as {
+				affectedFiles?: Array<{
+					path: string;
+					linesAdded: number;
+					linesRemoved: number;
+				}>;
+			};
+			expect(event.affectedFiles).toEqual([
+				{
+					path: "README.md",
+					linesAdded: 0,
+					linesRemoved: 0,
+					languageId: "markdown",
+				},
+			]);
+		});
+
+		it("omits affectedFiles when the tool call has no diff and no locations", async () => {
+			// Pure execute calls (e.g. `bash`) ship neither diff nor
+			// locations — the event must omit `affectedFiles` entirely
+			// so the UI falls back to the legacy compact title row.
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "tool_call",
+					toolCallId: "tc-exec",
+					title: "Run shell",
+					status: "pending",
+					kind: "execute",
+				},
+			});
+
+			const event = listener.mock.calls[0][0] as {
+				affectedFiles?: unknown;
+				toolKind?: string;
+			};
+			expect(event.affectedFiles).toBeUndefined();
+			expect(event.toolKind).toBe("execute");
+		});
+
 		it("only notifies subscribers for the matching sessionId", async () => {
 			const client = new AcpClient({
 				descriptor,

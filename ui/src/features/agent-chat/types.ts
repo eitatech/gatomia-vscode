@@ -149,11 +149,31 @@ export type ToolCallStatus =
 	| "failed"
 	| "cancelled";
 
+/**
+ * Per-tool-call projection of a file the agent is reading or modifying.
+ * Mirrors `ToolCallAffectedFile` from the extension types — kept in
+ * lockstep so the bridge can serialise the message verbatim.
+ */
+export interface ToolCallAffectedFile {
+	path: string;
+	linesAdded: number;
+	linesRemoved: number;
+	languageId?: string;
+}
+
 export interface ToolCallChatMessage extends ChatMessageBase {
 	role: "tool";
 	toolCallId: string;
 	title?: string;
 	status: ToolCallStatus;
+	/** ACP `ToolKind` (read/edit/execute/...) when the agent reports it. */
+	toolKind?: string;
+	/**
+	 * Files referenced by this tool call. The webview renders a
+	 * `ToolCallCard` when this is non-empty; otherwise it falls back to
+	 * a plain title row.
+	 */
+	affectedFiles?: readonly ToolCallAffectedFile[];
 }
 
 export type ErrorChatMessageCategory =
