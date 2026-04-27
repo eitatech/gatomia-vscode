@@ -25,6 +25,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChipDropdown, type ChipDropdownOption } from "./chip-dropdown";
 import { ChipOverflowBar, type ChipOverflowItem } from "./chip-overflow-bar";
 import { PermissionChip } from "./permission-chip";
+import { providerIconClass } from "./provider-icon";
 import type {
 	AgentChatAgentFileOption,
 	AgentChatProviderOption,
@@ -70,6 +71,13 @@ interface ComposerSelection {
 	readonly providerId: string | undefined;
 	readonly modelId: string | undefined;
 	readonly agentFileId: string | undefined;
+	/**
+	 * Optional thinking-level pick. The chip is hidden when the active
+	 * provider does not surface any thinking levels (per ACP).
+	 */
+	readonly thinkingLevelId: string | undefined;
+	/** Same, for the agent role chip. */
+	readonly agentRoleId: string | undefined;
 }
 
 export function NewSessionComposer({
@@ -94,6 +102,8 @@ export function NewSessionComposer({
 		providerId: defaultProviderId,
 		modelId: defaultProvider?.models[0]?.id,
 		agentFileId: undefined,
+		thinkingLevelId: defaultProvider?.thinkingLevels[0]?.id,
+		agentRoleId: defaultProvider?.agentRoles[0]?.id,
 	});
 
 	// Keep the default in sync as the catalog hydrates after mount.
@@ -108,6 +118,8 @@ export function NewSessionComposer({
 			providerId: defaultProviderId,
 			modelId: defaultProvider?.models[0]?.id,
 			agentFileId: undefined,
+			thinkingLevelId: defaultProvider?.thinkingLevels[0]?.id,
+			agentRoleId: defaultProvider?.agentRoles[0]?.id,
 		});
 	}, [defaultProviderId, defaultProvider, selection.providerId]);
 
@@ -183,10 +195,16 @@ export function NewSessionComposer({
 	const handleProviderChange = useCallback(
 		(providerId: string) => {
 			const next = providers.find((p) => p.id === providerId);
+			// When switching providers, reset model/thinking/role to the
+			// new provider's first option (or undefined when the catalogue
+			// is empty for that knob). The agent file is workspace-scoped,
+			// not provider-scoped, so we keep the user's existing pick.
 			setSelection({
 				providerId,
 				modelId: next?.models[0]?.id,
 				agentFileId: selection.agentFileId,
+				thinkingLevelId: next?.thinkingLevels[0]?.id,
+				agentRoleId: next?.agentRoles[0]?.id,
 			});
 		},
 		[providers, selection.agentFileId]
@@ -194,19 +212,22 @@ export function NewSessionComposer({
 
 	const handleAgentFileChange = useCallback((agentFileId: string) => {
 		setSelection((prev) => ({
-			providerId: prev.providerId,
-			modelId: prev.modelId,
+			...prev,
 			agentFileId:
 				agentFileId === NO_AGENT_FILE_VALUE ? undefined : agentFileId,
 		}));
 	}, []);
 
 	const handleModelChange = useCallback((modelId: string) => {
-		setSelection((prev) => ({
-			providerId: prev.providerId,
-			modelId,
-			agentFileId: prev.agentFileId,
-		}));
+		setSelection((prev) => ({ ...prev, modelId }));
+	}, []);
+
+	const handleThinkingLevelChange = useCallback((thinkingLevelId: string) => {
+		setSelection((prev) => ({ ...prev, thinkingLevelId }));
+	}, []);
+
+	const handleAgentRoleChange = useCallback((agentRoleId: string) => {
+		setSelection((prev) => ({ ...prev, agentRoleId }));
 	}, []);
 
 	const canSubmit = Boolean(selection.providerId) && prompt.trim().length > 0;
@@ -224,6 +245,8 @@ export function NewSessionComposer({
 			providerId,
 			modelId: selection.modelId,
 			agentFileId: selection.agentFileId,
+			thinkingLevelId: selection.thinkingLevelId,
+			agentRoleId: selection.agentRoleId,
 			taskInstruction: trimmed,
 		});
 		setPrompt("");
@@ -234,33 +257,62 @@ export function NewSessionComposer({
 		? "Loading…"
 		: (selectedModel?.displayName ?? "Default");
 
+	// Thinking-level chip options + presence flag (chip stays hidden when
+	// the active provider exposes none).
+	const thinkingLevels = selectedProvider?.thinkingLevels ?? [];
+	const showThinkingChip = thinkingLevels.length > 0;
+	const selectedThinkingLevel = thinkingLevels.find(
+		(t) => t.id === selection.thinkingLevelId
+	);
+	const thinkingOptions = useMemo<readonly ChipDropdownOption<string>[]>(
+		() =>
+			thinkingLevels.map((level) => ({
+				value: level.id,
+				label: level.displayName,
+				description: level.description,
+				icon: "codicon-pulse",
+			})),
+		[thinkingLevels]
+	);
+
+	// Agent-role chip options + presence flag.
+	const agentRoles = selectedProvider?.agentRoles ?? [];
+	const showAgentRoleChip = agentRoles.length > 0;
+	const selectedAgentRole = agentRoles.find(
+		(r) => r.id === selection.agentRoleId
+	);
+	const agentRoleOptions = useMemo<readonly ChipDropdownOption<string>[]>(
+		() =>
+			agentRoles.map((role) => ({
+				value: role.id,
+				label: role.displayName,
+				description: role.description,
+				icon: "codicon-shield",
+			})),
+		[agentRoles]
+	);
+
+	// Chip order matches the reference image:
+	// Provider (icon-only) → Model → Thinking → Agent-role → Agent-file → Permission.
 	const chipItems = useMemo<readonly ChipOverflowItem[]>(() => {
 		const list: ChipOverflowItem[] = [
 			{
-				key: "agent",
+				key: "provider",
 				node: (
 					<ChipDropdown
 						ariaPrefix="Agent"
 						currentLabel={
 							selectedProvider ? selectedProvider.displayName : "Select agent"
 						}
-						icon="codicon-robot"
+						icon={
+							selectedProvider
+								? providerIconClass(selectedProvider.id)
+								: "codicon-robot"
+						}
+						iconOnly
 						onChange={handleProviderChange}
 						options={providerOptions}
 						value={selection.providerId}
-					/>
-				),
-			},
-			{
-				key: "agent-file",
-				node: (
-					<ChipDropdown
-						ariaPrefix="Agent file"
-						currentLabel={selectedAgentFile?.displayName ?? "None"}
-						icon="codicon-file-code"
-						onChange={handleAgentFileChange}
-						options={agentFileOptions}
-						value={selection.agentFileId ?? NO_AGENT_FILE_VALUE}
 					/>
 				),
 			},
@@ -281,6 +333,49 @@ export function NewSessionComposer({
 				),
 			});
 		}
+		if (showThinkingChip) {
+			list.push({
+				key: "thinking",
+				node: (
+					<ChipDropdown
+						ariaPrefix="Thinking"
+						currentLabel={selectedThinkingLevel?.displayName ?? "Default"}
+						icon="codicon-pulse"
+						onChange={handleThinkingLevelChange}
+						options={thinkingOptions}
+						value={selection.thinkingLevelId}
+					/>
+				),
+			});
+		}
+		if (showAgentRoleChip) {
+			list.push({
+				key: "agent-role",
+				node: (
+					<ChipDropdown
+						ariaPrefix="Agent role"
+						currentLabel={selectedAgentRole?.displayName ?? "Agent"}
+						icon="codicon-shield"
+						onChange={handleAgentRoleChange}
+						options={agentRoleOptions}
+						value={selection.agentRoleId}
+					/>
+				),
+			});
+		}
+		list.push({
+			key: "agent-file",
+			node: (
+				<ChipDropdown
+					ariaPrefix="Agent file"
+					currentLabel={selectedAgentFile?.displayName ?? "None"}
+					icon="codicon-file-code"
+					onChange={handleAgentFileChange}
+					options={agentFileOptions}
+					value={selection.agentFileId ?? NO_AGENT_FILE_VALUE}
+				/>
+			),
+		});
 		list.push({
 			key: "permission",
 			node: (
@@ -297,9 +392,17 @@ export function NewSessionComposer({
 		selection.providerId,
 		selection.agentFileId,
 		selection.modelId,
+		selection.thinkingLevelId,
+		selection.agentRoleId,
 		selectedAgentFile,
+		selectedThinkingLevel,
+		selectedAgentRole,
 		agentFileOptions,
+		thinkingOptions,
+		agentRoleOptions,
 		showModelChip,
+		showThinkingChip,
+		showAgentRoleChip,
 		modelLabel,
 		isLoadingModels,
 		modelOptions,
@@ -307,6 +410,8 @@ export function NewSessionComposer({
 		handleProviderChange,
 		handleAgentFileChange,
 		handleModelChange,
+		handleThinkingLevelChange,
+		handleAgentRoleChange,
 		onChangePermissionDefault,
 	]);
 

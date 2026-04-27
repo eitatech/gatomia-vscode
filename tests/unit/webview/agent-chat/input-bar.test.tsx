@@ -11,8 +11,10 @@ const SEND_BUTTON_RE = /send/i;
 const NO_FOLLOW_UP_RE = /does not accept follow-up/i;
 const READ_ONLY_RE = /read-only cloud session/i;
 const ATTACH_BUTTON_RE = /add attachment/i;
-const CODE_MODE_RE = /code mode/i;
 const DICTATION_RE = /dictation/i;
+const PROVIDER_CHIP_RE = /^Provider:/i;
+const THINKING_CHIP_RE = /^Thinking:/i;
+const AGENT_ROLE_CHIP_RE = /^Agent role:/i;
 const STOP_BUTTON_RE = /stop/i;
 const ASK_PLACEHOLDER_RE = /Ask anything/i;
 const PERMISSION_CHIP_RE = /^Permission:/i;
@@ -85,18 +87,20 @@ describe("InputBar", () => {
 		expect(textarea.disabled).toBe(true);
 	});
 
-	it("renders the toolbar chrome (attach + Code chip + mic) regardless of state", () => {
-		// The toolbar buttons are placeholders that mirror the Cursor-
-		// style mockup. They are rendered but disabled until follow-up
-		// UX work wires real handlers — the test pins the chrome so the
-		// redesign cannot accidentally drop them.
+	it("renders the toolbar chrome (attach + dictation) regardless of state", () => {
+		// The attach + dictation icons are placeholders that mirror the
+		// Cursor-style mockup. They are rendered but disabled until
+		// follow-up UX work wires real handlers — the test pins the
+		// chrome so the redesign cannot accidentally drop them. The
+		// older "Code mode" pill was replaced by the dynamic Provider /
+		// Model / Thinking / Agent-role chips that drive their own
+		// dedicated tests below.
 		render(
 			<InputBar {...DEFAULT_PROPS} acceptsFollowUp={true} onSubmit={vi.fn()} />
 		);
 		expect(
 			screen.getByRole("button", { name: ATTACH_BUTTON_RE })
 		).toBeDisabled();
-		expect(screen.getByRole("button", { name: CODE_MODE_RE })).toBeDisabled();
 		expect(screen.getByRole("button", { name: DICTATION_RE })).toBeDisabled();
 	});
 
@@ -178,5 +182,62 @@ describe("InputBar", () => {
 			screen.getByRole("menuitem", { name: PERMISSION_CHIP_AUTO_OPTION_RE })
 		);
 		expect(onChangePermissionDefault).toHaveBeenCalledWith("allow");
+	});
+
+	it("renders the icon-only Provider chip when providerId is supplied", () => {
+		// The active session pins its provider, so the chip is purely
+		// informational — disabled, no chevron — and surfaces the
+		// agent name through its accessible label.
+		render(
+			<InputBar
+				{...DEFAULT_PROPS}
+				acceptsFollowUp={true}
+				onSubmit={vi.fn()}
+				providerDisplayName="Claude"
+				providerId="claude-acp"
+			/>
+		);
+		const chip = screen.getByRole("button", { name: PROVIDER_CHIP_RE });
+		expect(chip).toBeDisabled();
+	});
+
+	it("renders the Thinking and Agent-role chips when the agent surfaces them", () => {
+		const onChangeThinkingLevel = vi.fn();
+		const onChangeAgentRole = vi.fn();
+		render(
+			<InputBar
+				{...DEFAULT_PROPS}
+				acceptsFollowUp={true}
+				availableAgentRoles={[
+					{ id: "agent", displayName: "Agent" },
+					{ id: "plan", displayName: "Plan" },
+				]}
+				availableThinkingLevels={[
+					{ id: "low", displayName: "low" },
+					{ id: "high", displayName: "high" },
+				]}
+				onChangeAgentRole={onChangeAgentRole}
+				onChangeThinkingLevel={onChangeThinkingLevel}
+				onSubmit={vi.fn()}
+				selectedAgentRoleId="agent"
+				selectedThinkingLevelId="high"
+			/>
+		);
+		expect(
+			screen.getByRole("button", { name: THINKING_CHIP_RE })
+		).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: AGENT_ROLE_CHIP_RE })
+		).toBeDefined();
+	});
+
+	it("hides Thinking and Agent-role chips when the agent does not surface them", () => {
+		render(
+			<InputBar {...DEFAULT_PROPS} acceptsFollowUp={true} onSubmit={vi.fn()} />
+		);
+		expect(screen.queryByRole("button", { name: THINKING_CHIP_RE })).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: AGENT_ROLE_CHIP_RE })
+		).toBeNull();
 	});
 });

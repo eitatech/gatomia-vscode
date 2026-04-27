@@ -169,13 +169,24 @@ describe("resolveFromCatalog", () => {
 			if (!entry.capabilities) {
 				continue;
 			}
-			const resolved = resolveFromCatalog(entry.id);
-			expect(resolved).toStrictEqual({
+			// `thinkingLevels` and `agentRoles` are spread back only when
+			// the entry actually surfaced them — mirrors the resolver's
+			// "omit when undefined" contract so the strict-equal check
+			// keeps working for legacy entries that do not seed them.
+			const expected: Record<string, unknown> = {
 				source: "catalog",
 				modes: entry.capabilities.modes,
 				models: entry.capabilities.models,
 				acceptsFollowUp: entry.capabilities.acceptsFollowUp,
-			});
+			};
+			if (entry.capabilities.thinkingLevels) {
+				expected.thinkingLevels = entry.capabilities.thinkingLevels;
+			}
+			if (entry.capabilities.agentRoles) {
+				expected.agentRoles = entry.capabilities.agentRoles;
+			}
+			const resolved = resolveFromCatalog(entry.id);
+			expect(resolved).toStrictEqual(expected);
 		}
 	});
 });

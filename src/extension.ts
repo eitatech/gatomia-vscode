@@ -2130,41 +2130,6 @@ function createAcpPermissionPrompter(
 }
 
 /**
- * Returns a `BeforeSpawnHook` that asks the user before spawning a remote
- * provider via `npx -y <package>`. The hook short-circuits to `true` for
- * descriptors that are not npx-based; `AcpSessionManager` already filters
- * those out, but we keep a defensive guard.
- */
-function createAcpNpxConsentPrompter(
-	output: OutputChannel
-): (
-	descriptor: { id: string; displayName: string; spawnArgs: string[] },
-	context: { cwd: string }
-) => Promise<boolean> {
-	return async (descriptor) => {
-		try {
-			// spawnArgs for npx descriptors is `["-y", "<package>", ...rest]`.
-			const npxPackage =
-				descriptor.spawnArgs[0] === "-y"
-					? descriptor.spawnArgs[1]
-					: descriptor.spawnArgs[0];
-			const choice = await window.showWarningMessage(
-				`Run ${descriptor.displayName} via \`npx -y ${npxPackage ?? descriptor.id}\`? This will download and execute a third-party package.`,
-				{ modal: true },
-				"Continue",
-				"Cancel"
-			);
-			return choice === "Continue";
-		} catch (error) {
-			output.appendLine(
-				`[ACP] npx consent prompt failed: ${error instanceof Error ? error.message : String(error)}`
-			);
-			return false;
-		}
-	};
-}
-
-/**
  * Returns the singleton {@link KnownAgentDetector}, lazily creating one
  * when `bootstrapAcpRouter` has not yet captured it (defensive — every
  * activation path runs `bootstrapAcpRouter` first).
@@ -2219,13 +2184,17 @@ function bootstrapAcpRouter(context: ExtensionContext): void {
 			workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
 		const permissionDefault = readPermissionDefault();
 		const bufferFileWrites = readBufferFileWritesFlag();
+		// `beforeSpawn` is intentionally omitted: spawning an ACP agent via
+		// `npx -y <package>` no longer triggers a confirmation modal. The
+		// user already opted in by selecting the agent in the picker, and
+		// re-prompting on every launch was disruptive without adding real
+		// safety (npm itself prints what it is about to download).
 		acpSessionManager = new AcpSessionManager({
 			registry,
 			output,
 			cwd: workspaceRoot,
 			permissionDefault,
 			promptForPermission: createAcpPermissionPrompter(output),
-			beforeSpawn: createAcpNpxConsentPrompter(output),
 			bufferFileWrites,
 		});
 		output.appendLine(

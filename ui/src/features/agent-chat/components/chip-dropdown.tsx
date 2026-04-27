@@ -69,6 +69,13 @@ export interface ChipDropdownProps<T extends string> {
 	readonly title?: string;
 	/** Optional content rendered ABOVE the options list (e.g. status note). */
 	readonly menuHeader?: ReactNode;
+	/**
+	 * Render only the icon and chevron in the toggle, hiding the label
+	 * visually (still in the aria-label for screen readers + tooltip).
+	 * Used by the Provider chip per the Cursor/Windsurf-style toolbar
+	 * design where the agent is identified by its logo only.
+	 */
+	readonly iconOnly?: boolean;
 }
 
 export function ChipDropdown<T extends string>({
@@ -81,6 +88,7 @@ export function ChipDropdown<T extends string>({
 	disabled,
 	title,
 	menuHeader,
+	iconOnly,
 }: ChipDropdownProps<T>): JSX.Element {
 	const [open, setOpen] = useState(false);
 	const containerRef = useRef<HTMLDivElement | null>(null);
@@ -133,7 +141,9 @@ export function ChipDropdown<T extends string>({
 				type="button"
 			>
 				{icon ? <i aria-hidden="true" className={`codicon ${icon}`} /> : null}
-				<span className="agent-chat-chip__label">{currentLabel}</span>
+				{iconOnly ? null : (
+					<span className="agent-chat-chip__label">{currentLabel}</span>
+				)}
 				{disabled ? null : (
 					<i aria-hidden="true" className="codicon codicon-chevron-down" />
 				)}

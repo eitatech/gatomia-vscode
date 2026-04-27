@@ -26,7 +26,11 @@ import type {
 	AgentSourceEnum,
 } from "../hooks/agent-registry-types";
 import { lookupCatalogEntry } from "./agent-capabilities-catalog";
-import type { ModelDescriptor } from "./types";
+import type {
+	AgentRoleDescriptor,
+	ModelDescriptor,
+	ThinkingLevelDescriptor,
+} from "./types";
 
 // ---------------------------------------------------------------------------
 // Public shapes (mirrored on the webview side via postMessage payloads)
@@ -52,6 +56,17 @@ export interface AgentChatProviderOption {
 	readonly installUrl?: string;
 	/** Static model catalogue from `agent-capabilities-catalog.ts`. */
 	readonly models: readonly ModelDescriptor[];
+	/**
+	 * Static thinking-level catalogue (e.g. low/medium/high). Empty when
+	 * the provider does not expose a reasoning effort knob — the
+	 * picker hides the chip in that case.
+	 */
+	readonly thinkingLevels: readonly ThinkingLevelDescriptor[];
+	/**
+	 * Static agent-role catalogue (e.g. agent/plan/ask). Empty when the
+	 * provider does not expose an agent-role knob.
+	 */
+	readonly agentRoles: readonly AgentRoleDescriptor[];
 }
 
 export interface AgentChatAgentFileOption {
@@ -128,6 +143,8 @@ function projectProviders(
 			npxPackage,
 			installUrl: descriptor.installUrl || undefined,
 			models: catalogEntry?.capabilities?.models ?? [],
+			thinkingLevels: catalogEntry?.capabilities?.thinkingLevels ?? [],
+			agentRoles: catalogEntry?.capabilities?.agentRoles ?? [],
 		};
 	});
 }

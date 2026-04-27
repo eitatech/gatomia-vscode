@@ -23,8 +23,8 @@ interface PermissionChipProps {
 const OPTIONS: readonly ChipDropdownOption<PermissionDefaultMode>[] = [
 	{
 		value: "ask",
-		label: "Ask",
-		description: "Prompt before each tool call.",
+		label: "Ask (Default)",
+		description: "Prompt before each tool call. This is the default policy.",
 		icon: "codicon-question",
 	},
 	{
@@ -43,8 +43,12 @@ const OPTIONS: readonly ChipDropdownOption<PermissionDefaultMode>[] = [
 
 const DEFAULT_VALUE: PermissionDefaultMode = "ask";
 
+// Short label rendered inside the chip toggle button. We surface
+// "Ask (Default)" rather than just "Ask" so the user always knows the
+// fallback policy (per PR feedback). All values are rendered in plain
+// text — never italic.
 const SHORT_LABEL: Record<PermissionDefaultMode, string> = {
-	ask: "Ask",
+	ask: "Ask (Default)",
 	allow: "Auto",
 	deny: "Reject",
 };

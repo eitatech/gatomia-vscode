@@ -374,6 +374,38 @@ i {
 	font-style: italic !important;
 }
 
+/*
+ * Codicons use the <i> tag by convention (`<i class="codicon ...">`),
+ * which means the global `i { font-style: italic }` rule above tilts
+ * every icon glyph by ~10° (synthetic italic from the browser, since
+ * the codicon font has no italic variant). The bullet-proof fix is to
+ * force `font-style: normal` on:
+ *   1. anything carrying the `.codicon` class (defensive, should be
+ *      enough on its own thanks to higher specificity than bare `i`),
+ *   2. every descendant of the agent-chat composer/input toolbars and
+ *      the chip dropdown chrome — covers the case where a future
+ *      sibling rule, Tailwind preflight, or a reused `<i>` styled by a
+ *      third-party stylesheet leaks italic into the redesigned UI.
+ *
+ * The selectors below are intentionally over-broad: the toolbar text
+ * (`<span>` labels, button copy) was rendering italic in some setups
+ * and the user explicitly asked for *no* italic anywhere in this
+ * surface, so we lock it in.
+ */
+i.codicon,
+.codicon,
+.codicon::before,
+.agent-chat-chip,
+.agent-chat-chip *,
+.agent-chat-chip-overflow,
+.agent-chat-chip-overflow *,
+.agent-chat-input,
+.agent-chat-input *,
+.agent-chat-new-session,
+.agent-chat-new-session * {
+	font-style: normal !important;
+}
+
 strong,
 b {
 	font-weight: 700 !important;
@@ -791,8 +823,10 @@ b {
 }
 
 /*
- * Circular icon-only submit — the user explicitly asked for an arrow-up
- * icon and no text label. Matches the VS Code chat panel send button.
+ * Rounded-square icon-only submit (mirrors the VS Code / Cursor chat
+ * send button on the second reference image). When disabled the
+ * background drops to the muted toolbar color and the icon takes the
+ * VS Code description-foreground token — NEVER italic.
  */
 .agent-chat-new-session__submit {
 	display: inline-flex;
@@ -804,14 +838,18 @@ b {
 	background: var(--vscode-button-background);
 	color: var(--vscode-button-foreground);
 	border: none;
-	border-radius: 50%;
+	border-radius: 6px;
 	font-size: 13px;
 	cursor: pointer;
 	flex-shrink: 0;
 }
 
 .agent-chat-new-session__submit:disabled {
-	opacity: 0.5;
+	background: var(
+		--vscode-toolbar-hoverBackground,
+		rgba(128, 128, 128, 0.16)
+	);
+	color: var(--vscode-descriptionForeground);
 	cursor: not-allowed;
 }
 
@@ -875,12 +913,13 @@ b {
 /*
  * The disabled-reason renders as a thin banner ABOVE the box — never
  * between the textarea and the toolbar (per the redesign screenshots).
+ * Uses the description-foreground token rather than italic to signal
+ * "informational, not actionable".
  */
 .agent-chat-input__disabled-reason {
 	font-size: 10px;
-	opacity: 0.75;
 	padding: 0 4px;
-	font-style: italic;
+	color: var(--vscode-descriptionForeground);
 }
 
 /*
@@ -1029,9 +1068,9 @@ b {
 	background: var(--vscode-button-background);
 	color: var(--vscode-button-foreground);
 	border: none;
-	border-radius: 50%;
+	border-radius: 6px;
 	padding: 0;
-	font-size: 12px;
+	font-size: 13px;
 	cursor: pointer;
 }
 
@@ -1044,8 +1083,18 @@ b {
 	background: var(--vscode-button-hoverBackground);
 }
 
+/*
+ * Disabled send state — muted toolbar background + description
+ * foreground. We deliberately AVOID `font-style: italic` and
+ * low-opacity tricks; the user wants a clean gray vs. coloured icon
+ * difference.
+ */
 .agent-chat-input__send:disabled {
-	opacity: 0.45;
+	background: var(
+		--vscode-toolbar-hoverBackground,
+		rgba(128, 128, 128, 0.16)
+	);
+	color: var(--vscode-descriptionForeground);
 	cursor: not-allowed;
 }
 

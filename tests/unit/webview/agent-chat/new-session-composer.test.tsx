@@ -22,6 +22,8 @@ const PERMISSION_CHIP_RE = /^Permission:/i;
 const AGENT_CHIP_RE = /^Agent:/i;
 const AGENT_FILE_CHIP_RE = /^Agent file:/i;
 const MODEL_CHIP_RE = /^Model:/i;
+const THINKING_CHIP_RE = /^Thinking:/i;
+const AGENT_ROLE_CHIP_RE = /^Agent role:/i;
 const ALLOW_OPTION_RE = /^Auto-approve$/;
 const START_CHAT_RE = /Start chat/i;
 const PROMPT_PLACEHOLDER_RE = /Describe the task/i;
@@ -43,6 +45,14 @@ const PROVIDERS: readonly AgentChatProviderOption[] = [
 				displayName: "Sonnet 4.6",
 				invocation: "initial-prompt",
 			},
+		],
+		thinkingLevels: [
+			{ id: "off", displayName: "Off" },
+			{ id: "on", displayName: "On" },
+		],
+		agentRoles: [
+			{ id: "agent", displayName: "Agent" },
+			{ id: "plan", displayName: "Plan" },
 		],
 	},
 ];
@@ -126,10 +136,10 @@ describe("NewSessionComposer", () => {
 		expect(submit.disabled).toBe(true);
 	});
 
-	it("renders Agent / Agent file / Model as chip dropdowns matching the permission chip", () => {
-		// Agent chip + Agent file chip render unconditionally; Model chip
-		// only renders when the active provider has at least one model
-		// (Claude in this fixture surfaces `claude-sonnet-4.6`).
+	it("renders Agent / Agent file / Model / Thinking / Agent role chips when supported", () => {
+		// Agent chip + Agent file chip render unconditionally; Model,
+		// Thinking and Agent role chips render only when the active
+		// provider exposes at least one option.
 		render(
 			<NewSessionComposer
 				agentFiles={[]}
@@ -145,15 +155,23 @@ describe("NewSessionComposer", () => {
 			screen.getByRole("button", { name: AGENT_FILE_CHIP_RE })
 		).toBeDefined();
 		expect(screen.getByRole("button", { name: MODEL_CHIP_RE })).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: THINKING_CHIP_RE })
+		).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: AGENT_ROLE_CHIP_RE })
+		).toBeDefined();
 	});
 
-	it("hides the Model chip when the active provider exposes no models", () => {
-		const noModelProviders: readonly AgentChatProviderOption[] = [
+	it("hides the Model / Thinking / Agent-role chips when the active provider exposes none", () => {
+		const minimalProviders: readonly AgentChatProviderOption[] = [
 			{
 				...PROVIDERS[0],
-				id: "no-models",
-				displayName: "No models",
+				id: "minimal",
+				displayName: "Minimal",
 				models: [],
+				thinkingLevels: [],
+				agentRoles: [],
 			},
 		];
 		render(
@@ -162,10 +180,40 @@ describe("NewSessionComposer", () => {
 				onChangePermissionDefault={vi.fn()}
 				onStart={vi.fn()}
 				permissionDefault="ask"
-				providers={noModelProviders}
+				providers={minimalProviders}
 			/>
 		);
 
 		expect(screen.queryByRole("button", { name: MODEL_CHIP_RE })).toBeNull();
+		expect(screen.queryByRole("button", { name: THINKING_CHIP_RE })).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: AGENT_ROLE_CHIP_RE })
+		).toBeNull();
+	});
+
+	it("includes thinking-level and agent-role picks in the start payload", () => {
+		// Pre-selected defaults are the first option of each list, so a
+		// straight submit must echo them back to the bridge.
+		const onStart = vi.fn<(request: NewSessionRequest) => void>();
+		render(
+			<NewSessionComposer
+				agentFiles={[]}
+				onChangePermissionDefault={vi.fn()}
+				onStart={onStart}
+				permissionDefault="ask"
+				providers={PROVIDERS}
+			/>
+		);
+
+		const textarea = screen.getByPlaceholderText(
+			PROMPT_PLACEHOLDER_RE
+		) as HTMLTextAreaElement;
+		fireEvent.change(textarea, { target: { value: "ship it" } });
+		fireEvent.click(screen.getByRole("button", { name: START_CHAT_RE }));
+
+		expect(onStart).toHaveBeenCalledTimes(1);
+		const startedWith = onStart.mock.calls[0][0];
+		expect(startedWith.thinkingLevelId).toBe("off");
+		expect(startedWith.agentRoleId).toBe("agent");
 	});
 });

@@ -5,10 +5,12 @@
  *   1. Lists every provider from `AcpProviderRegistry.list()` grouped into
  *      "Installed", "Available via npx", "Install required".
  *   2. After picking, asks for the initial prompt via `showInputBox`.
- *   3. Asks for the execution target (local / new worktree).
- *   4. Confirms before invoking `npx -y <package>` for providers whose
- *      probe reports `canRunViaNpx: true` and `installed: false`.
- *   5. Routes the final payload to the injected `startNew` callback.
+ *   3. Routes the final payload to the injected `startNew` callback.
+ *
+ * The npx-launch confirmation modal that used to gate `available-via-npx`
+ * providers was removed: the QuickPick choice is already an explicit
+ * opt-in and the modal interrupted every launch without adding real
+ * safety. The tests below pin the post-removal contract.
  *
  * Pure function — no real VS Code surface; all UI calls are passed in via
  * `deps.window.showQuickPick` / `showInputBox` / `showWarningMessage`.
@@ -21,8 +23,7 @@ import {
 	type NewSessionProviderItem,
 } from "../../../src/commands/agent-chat-new-session";
 
-// Top-level regex constants (biome lint/performance/useTopLevelRegex).
-const NPX_RE = /npx/i;
+// Top-level regex constant (biome lint/performance/useTopLevelRegex).
 const AUGGIE_RE = /Auggie CLI/;
 
 // ---------------------------------------------------------------------------
@@ -168,7 +169,10 @@ describe("handleNewSession", () => {
 		expect(startNew).not.toHaveBeenCalled();
 	});
 
-	it("shows an npx warning before launching an available-via-npx provider and proceeds on Continue", async () => {
+	it("launches available-via-npx providers directly without a confirmation modal", async () => {
+		// Regression: the user explicitly asked for npx-based agents to spawn
+		// straight through. The QuickPick choice is the opt-in; we do not
+		// show any `showWarningMessage` modal between picking and `startNew`.
 		const { deps, startNew, showQuickPick, showInputBox, showWarningMessage } =
 			makeDeps();
 		showQuickPick.mockResolvedValueOnce({
@@ -176,41 +180,17 @@ describe("handleNewSession", () => {
 			providerId: "auggie",
 		});
 		showInputBox.mockResolvedValueOnce("hi");
-		showWarningMessage.mockResolvedValueOnce("Continue");
 
 		await handleNewSession(deps);
 
-		expect(showWarningMessage).toHaveBeenCalledTimes(1);
-		const message = showWarningMessage.mock.calls[0]?.[0];
-		expect(message).toMatch(NPX_RE);
-		expect(message).toMatch(AUGGIE_RE);
+		expect(showWarningMessage).not.toHaveBeenCalled();
+		expect(startNew).toHaveBeenCalledTimes(1);
 		expect(startNew).toHaveBeenCalledWith(
-			expect.objectContaining({ agentId: "auggie" })
+			expect.objectContaining({
+				agentId: "auggie",
+				agentDisplayName: expect.stringMatching(AUGGIE_RE),
+			})
 		);
-	});
-
-	it("aborts the launch when the user picks 'Install manually' on the npx warning", async () => {
-		const {
-			deps,
-			startNew,
-			openExternal,
-			showQuickPick,
-			showInputBox,
-			showWarningMessage,
-		} = makeDeps();
-		showQuickPick.mockResolvedValueOnce({
-			label: "Auggie CLI",
-			providerId: "auggie",
-		});
-		showInputBox.mockResolvedValueOnce("hi");
-		showWarningMessage.mockResolvedValueOnce("Install manually");
-
-		await handleNewSession(deps);
-
-		expect(startNew).not.toHaveBeenCalled();
-		// We don't have an installUrl on auggie in the fixture, so openExternal
-		// should NOT be called. (Different test below covers the URL case.)
-		expect(openExternal).not.toHaveBeenCalled();
 	});
 
 	it("opens the install URL and aborts startNew when the user picks 'Install required' tier", async () => {
@@ -227,20 +207,5 @@ describe("handleNewSession", () => {
 		expect(openExternal).toHaveBeenCalledTimes(1);
 		expect(startNew).not.toHaveBeenCalled();
 		expect(showInputBox).not.toHaveBeenCalled();
-	});
-
-	it("aborts the launch when the user dismisses the npx warning (no button picked)", async () => {
-		const { deps, startNew, showQuickPick, showInputBox, showWarningMessage } =
-			makeDeps();
-		showQuickPick.mockResolvedValueOnce({
-			label: "Auggie CLI",
-			providerId: "auggie",
-		});
-		showInputBox.mockResolvedValueOnce("hi");
-		showWarningMessage.mockResolvedValueOnce(undefined);
-
-		await handleNewSession(deps);
-
-		expect(startNew).not.toHaveBeenCalled();
 	});
 });

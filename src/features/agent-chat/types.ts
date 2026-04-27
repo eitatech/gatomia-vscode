@@ -68,12 +68,49 @@ export interface ModelDescriptor {
 }
 
 /**
+ * Reasoning / thinking effort level surfaced by the agent.
+ *
+ * Distinct from {@link ModeDescriptor} (which is the high-level
+ * conversational mode like "Agent / Plan / Ask") and from
+ * {@link ModelDescriptor} (which selects the underlying LLM). Examples:
+ *
+ *   - GPT-5 / Codex: `low`, `medium`, `high`
+ *   - Claude Extended Thinking: `off`, `on` (or budget tiers)
+ *   - Qwen Thinking: `disabled`, `enabled`
+ *
+ * Optional per provider; agents that do not expose a knob omit the
+ * `thinkingLevels` array entirely so the chip is hidden.
+ */
+export interface ThinkingLevelDescriptor {
+	id: string;
+	displayName: string;
+	description?: string;
+}
+
+/**
+ * High-level conversational role / agent type the user can pick before
+ * a turn (e.g. Cursor's "Agent / Ask / Edit", Windsurf's "Cascade Auto
+ * vs Cascade Plan"). Persisted alongside the session selection so each
+ * turn can carry the user's intent.
+ */
+export interface AgentRoleDescriptor {
+	id: string;
+	displayName: string;
+	description?: string;
+}
+
+/**
  * Result of the hybrid capability discovery resolver.
  *
  * Discriminated by `source`:
  *   - "agent"   — agent reported capabilities via ACP `initialize` (authoritative).
  *   - "catalog" — agent silent; gatomia-maintained catalog supplied the values.
  *   - "none"    — neither source has values; selectors MUST be hidden.
+ *
+ * `thinkingLevels` and `agentRoles` are optional even on `"agent"` /
+ * `"catalog"` results because not every provider exposes them — the
+ * picker MUST hide the corresponding chip when the array is undefined
+ * or empty.
  *
  * @see contracts/agent-capabilities-contract.md
  */
@@ -82,12 +119,16 @@ export type ResolvedCapabilities =
 			source: "agent";
 			modes: ModeDescriptor[];
 			models: ModelDescriptor[];
+			thinkingLevels?: ThinkingLevelDescriptor[];
+			agentRoles?: AgentRoleDescriptor[];
 			acceptsFollowUp: boolean;
 	  }
 	| {
 			source: "catalog";
 			modes: ModeDescriptor[];
 			models: ModelDescriptor[];
+			thinkingLevels?: ThinkingLevelDescriptor[];
+			agentRoles?: AgentRoleDescriptor[];
 			acceptsFollowUp: boolean;
 	  }
 	| { source: "none" };
@@ -325,6 +366,19 @@ export interface AgentChatSession {
 	 * agent does not implement the experimental capability.
 	 */
 	currentModelId?: string;
+	/** User-picked thinking level (e.g. "high"). Optional per provider. */
+	selectedThinkingLevelId?: string;
+	/** User-picked agent role (e.g. "agent" / "plan"). Optional per provider. */
+	selectedAgentRoleId?: string;
+	/**
+	 * Thinking levels surfaced by this provider for this session,
+	 * mirroring `availableModels`. When omitted/empty, the chip stays
+	 * hidden. Filled from `capabilities.thinkingLevels` at session
+	 * creation and refreshed if the agent updates them mid-session.
+	 */
+	availableThinkingLevels?: ThinkingLevelDescriptor[];
+	/** Same as above, for the agent-role picker. */
+	availableAgentRoles?: AgentRoleDescriptor[];
 	executionTarget: ExecutionTarget;
 	lifecycleState: SessionLifecycleState;
 	trigger: SessionTrigger;
@@ -540,6 +594,10 @@ export interface CreateSessionInput {
 	selectedModelId?: string;
 	availableModels?: ModelDescriptor[];
 	currentModelId?: string;
+	selectedThinkingLevelId?: string;
+	selectedAgentRoleId?: string;
+	availableThinkingLevels?: ThinkingLevelDescriptor[];
+	availableAgentRoles?: AgentRoleDescriptor[];
 	executionTarget: ExecutionTarget;
 	trigger: SessionTrigger;
 	worktree: WorktreeHandle | null;

@@ -9,10 +9,12 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PermissionChip } from "@/features/agent-chat/components/permission-chip";
 
-const ASK_TOGGLE_RE = /Permission:\s*Ask/;
+const ASK_TOGGLE_RE = /Permission:\s*Ask\s*\(Default\)/;
 const AUTO_TOGGLE_RE = /Permission:\s*Auto/;
 const REJECT_TOGGLE_RE = /Permission:\s*Reject/;
-const ASK_OPTION_RE = /^Ask$/;
+// "Ask" option label was renamed to "Ask (Default)" in the redesign so
+// users can tell at a glance which permission mode is the fallback.
+const ASK_OPTION_RE = /^Ask\s*\(Default\)$/;
 const ALLOW_OPTION_RE = /^Auto-approve$/;
 const REJECT_OPTION_RE = /^Reject$/;
 

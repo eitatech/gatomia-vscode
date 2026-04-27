@@ -18,9 +18,11 @@ import { lookupCatalogEntry } from "./agent-capabilities-catalog";
 import type { AgentCatalogEntry } from "./agent-capabilities-catalog";
 import { AGENT_CHAT_TELEMETRY_EVENTS, logTelemetry } from "./telemetry";
 import type {
+	AgentRoleDescriptor,
 	ModeDescriptor,
 	ModelDescriptor,
 	ResolvedCapabilities,
+	ThinkingLevelDescriptor,
 } from "./types";
 
 /** ACP `AgentCapabilities` subset consumed by the resolver. */
@@ -35,6 +37,23 @@ export interface AgentInitializeCapabilities {
 		displayName?: string;
 		invocation?: "initial-prompt" | "cli-flag";
 		invocationTemplate?: string;
+	}>;
+	/**
+	 * Optional reasoning effort tiers (e.g. low/medium/high) reported
+	 * by the agent. When the agent does not surface this field the
+	 * resolver falls back to the catalog entry, which may also be
+	 * empty/undefined — in which case the chip stays hidden.
+	 */
+	thinkingLevels?: Array<{
+		id: string;
+		displayName?: string;
+		description?: string;
+	}>;
+	/** Optional agent role / type list (Cursor-style Agent / Plan / Ask). */
+	agentRoles?: Array<{
+		id: string;
+		displayName?: string;
+		description?: string;
 	}>;
 	acceptsFollowUp?: boolean;
 }
@@ -123,10 +142,22 @@ export class AgentCapabilitiesService {
 		const cataloged = this.catalog.lookup(agentId);
 
 		if (reported && hasAgentSignal(reported)) {
+			// Agent reports what it knows; we top up with the catalog
+			// so a partial agent payload still benefits from any tiers
+			// the catalog has (e.g. agent surfaces models but not
+			// thinking levels, so the catalog fills that gap). The
+			// optional fields stay OFF the result entirely when neither
+			// source supplied a list — keeps existing
+			// `toStrictEqual({ … })` tests valid and the JSON payload
+			// crossing the bridge a touch smaller.
+			const thinkingLevels = pickThinkingLevels(reported, cataloged);
+			const agentRoles = pickAgentRoles(reported, cataloged);
 			return {
 				source: "agent",
 				modes: normalizeModes(reported.modes ?? []),
 				models: normalizeModels(reported.models ?? []),
+				...(thinkingLevels ? { thinkingLevels } : {}),
+				...(agentRoles ? { agentRoles } : {}),
 				acceptsFollowUp:
 					reported.acceptsFollowUp ??
 					cataloged?.capabilities?.acceptsFollowUp ??
@@ -137,10 +168,18 @@ export class AgentCapabilitiesService {
 		if (cataloged?.capabilities) {
 			// Use the injected catalog's result directly so tests that inject a
 			// stub lookup don't require mutating the module-level seed list.
+			const thinkingLevels = cataloged.capabilities.thinkingLevels
+				? [...cataloged.capabilities.thinkingLevels]
+				: undefined;
+			const agentRoles = cataloged.capabilities.agentRoles
+				? [...cataloged.capabilities.agentRoles]
+				: undefined;
 			return {
 				source: "catalog",
 				modes: [...cataloged.capabilities.modes],
 				models: [...cataloged.capabilities.models],
+				...(thinkingLevels ? { thinkingLevels } : {}),
+				...(agentRoles ? { agentRoles } : {}),
 				acceptsFollowUp: cataloged.capabilities.acceptsFollowUp,
 			};
 		}
@@ -217,4 +256,76 @@ function normalizeModels(
 		});
 	}
 	return out;
+}
+
+function normalizeThinkingLevels(
+	raw: NonNullable<AgentInitializeCapabilities["thinkingLevels"]>
+): ThinkingLevelDescriptor[] {
+	const seen = new Set<string>();
+	const out: ThinkingLevelDescriptor[] = [];
+	for (const entry of raw) {
+		if (typeof entry.id !== "string" || entry.id.length === 0) {
+			continue;
+		}
+		if (seen.has(entry.id)) {
+			continue;
+		}
+		seen.add(entry.id);
+		out.push({
+			id: entry.id,
+			displayName: entry.displayName ?? humanize(entry.id),
+			description: entry.description,
+		});
+	}
+	return out;
+}
+
+function normalizeAgentRoles(
+	raw: NonNullable<AgentInitializeCapabilities["agentRoles"]>
+): AgentRoleDescriptor[] {
+	const seen = new Set<string>();
+	const out: AgentRoleDescriptor[] = [];
+	for (const entry of raw) {
+		if (typeof entry.id !== "string" || entry.id.length === 0) {
+			continue;
+		}
+		if (seen.has(entry.id)) {
+			continue;
+		}
+		seen.add(entry.id);
+		out.push({
+			id: entry.id,
+			displayName: entry.displayName ?? humanize(entry.id),
+			description: entry.description,
+		});
+	}
+	return out;
+}
+
+/**
+ * Decide which thinking-level list wins on a hybrid resolution. Agents
+ * that surface their own list always take precedence; otherwise we
+ * inherit the catalog list so a partial ACP payload doesn't accidentally
+ * hide the chip.
+ */
+function pickThinkingLevels(
+	reported: AgentInitializeCapabilities,
+	cataloged: AgentCatalogEntry | undefined
+): ThinkingLevelDescriptor[] | undefined {
+	if (reported.thinkingLevels && reported.thinkingLevels.length > 0) {
+		return normalizeThinkingLevels(reported.thinkingLevels);
+	}
+	const fromCatalog = cataloged?.capabilities?.thinkingLevels;
+	return fromCatalog ? [...fromCatalog] : undefined;
+}
+
+function pickAgentRoles(
+	reported: AgentInitializeCapabilities,
+	cataloged: AgentCatalogEntry | undefined
+): AgentRoleDescriptor[] | undefined {
+	if (reported.agentRoles && reported.agentRoles.length > 0) {
+		return normalizeAgentRoles(reported.agentRoles);
+	}
+	const fromCatalog = cataloged?.capabilities?.agentRoles;
+	return fromCatalog ? [...fromCatalog] : undefined;
 }

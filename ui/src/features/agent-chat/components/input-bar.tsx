@@ -25,10 +25,14 @@
  */
 
 import { type ChangeEvent, useCallback, useMemo, useState } from "react";
+import { ChipDropdown, type ChipDropdownOption } from "./chip-dropdown";
 import { PermissionChip } from "./permission-chip";
+import { providerIconClass } from "./provider-icon";
 import type {
+	AgentRoleDescriptor,
 	ModelDescriptor,
 	PermissionDefaultMode,
+	ThinkingLevelDescriptor,
 } from "@/features/agent-chat/types";
 
 interface InputBarProps {
@@ -66,6 +70,25 @@ interface InputBarProps {
 	readonly onRefreshModels?: () => void;
 	/** True while a model probe for the active provider is in flight. */
 	readonly modelsLoading?: boolean;
+	/**
+	 * Provider id of the active session. Drives the leftmost icon-only
+	 * chip (the agent identifier in the toolbar). When omitted the chip
+	 * falls back to the generic robot codicon.
+	 */
+	readonly providerId?: string;
+	/** Display name shown as the provider chip's tooltip + a11y label. */
+	readonly providerDisplayName?: string;
+	/**
+	 * Thinking levels reported by the agent for this session. Empty /
+	 * undefined hides the chip.
+	 */
+	readonly availableThinkingLevels?: readonly ThinkingLevelDescriptor[];
+	readonly selectedThinkingLevelId?: string;
+	readonly onChangeThinkingLevel?: (id: string) => void;
+	/** Agent roles reported by the agent for this session. */
+	readonly availableAgentRoles?: readonly AgentRoleDescriptor[];
+	readonly selectedAgentRoleId?: string;
+	readonly onChangeAgentRole?: (id: string) => void;
 }
 
 export function InputBar({
@@ -84,6 +107,14 @@ export function InputBar({
 	onChangeModel,
 	onRefreshModels,
 	modelsLoading,
+	providerId,
+	providerDisplayName,
+	availableThinkingLevels,
+	selectedThinkingLevelId,
+	onChangeThinkingLevel,
+	availableAgentRoles,
+	selectedAgentRoleId,
+	onChangeAgentRole,
 }: InputBarProps): JSX.Element {
 	const [value, setValue] = useState("");
 
@@ -144,20 +175,12 @@ export function InputBar({
 						>
 							<i aria-hidden="true" className="codicon codicon-add" />
 						</button>
-						<button
-							aria-label="Code mode (coming soon)"
-							className="agent-chat-input__chip"
-							disabled
-							title="Code mode (coming soon)"
-							type="button"
-						>
-							<i aria-hidden="true" className="codicon codicon-code" />
-							<span className="agent-chat-input__chip-label">Code</span>
-						</button>
-						<PermissionChip
-							onChange={onChangePermissionDefault}
-							value={permissionDefault}
-						/>
+						{providerId ? (
+							<ProviderIconChip
+								displayName={providerDisplayName ?? providerId}
+								providerId={providerId}
+							/>
+						) : null}
 						<ModelChip
 							availableModels={availableModels}
 							currentModelId={currentModelId}
@@ -165,6 +188,20 @@ export function InputBar({
 							modelLabel={modelLabel}
 							onChange={onChangeModel}
 							onRefresh={onRefreshModels}
+						/>
+						<ThinkingChip
+							onChange={onChangeThinkingLevel}
+							options={availableThinkingLevels}
+							value={selectedThinkingLevelId}
+						/>
+						<AgentRoleChip
+							onChange={onChangeAgentRole}
+							options={availableAgentRoles}
+							value={selectedAgentRoleId}
+						/>
+						<PermissionChip
+							onChange={onChangePermissionDefault}
+							value={permissionDefault}
 						/>
 					</div>
 					<div className="agent-chat-input__toolbar-right">
@@ -202,7 +239,7 @@ export function InputBar({
 								onClick={handleSubmit}
 								type="button"
 							>
-								<i aria-hidden="true" className="codicon codicon-send" />
+								<i aria-hidden="true" className="codicon codicon-arrow-up" />
 							</button>
 						)}
 					</div>
@@ -347,4 +384,124 @@ function ModelChip({
 	}
 
 	return null;
+}
+
+interface ProviderIconChipProps {
+	readonly providerId: string;
+	readonly displayName: string;
+}
+
+/**
+ * Icon-only chip identifying the active provider on the InputBar
+ * toolbar. Mirrors the leftmost element of the second reference image
+ * (`@ Gemini 3 Flash`) — we only render the agent's logo glyph because
+ * the model chip immediately to its right already carries the textual
+ * label the user cares about.
+ *
+ * Today the chip is non-interactive (an active session is locked to
+ * its spawned provider). It still uses the same chrome as the rest of
+ * the chips so the row reads as a single coherent toolbar.
+ */
+function ProviderIconChip({
+	providerId,
+	displayName,
+}: ProviderIconChipProps): JSX.Element {
+	return (
+		<span className="agent-chat-chip" title={displayName}>
+			<button
+				aria-label={`Provider: ${displayName}`}
+				className="agent-chat-chip__toggle"
+				disabled
+				type="button"
+			>
+				<i
+					aria-hidden="true"
+					className={`codicon ${providerIconClass(providerId)}`}
+				/>
+			</button>
+		</span>
+	);
+}
+
+interface ThinkingChipProps {
+	readonly options: readonly ThinkingLevelDescriptor[] | undefined;
+	readonly value: string | undefined;
+	readonly onChange: ((id: string) => void) | undefined;
+}
+
+/**
+ * Wraps {@link ChipDropdown} with the on-session thinking-level
+ * contract: hide entirely when the agent did not surface any tier and
+ * defer to the bridge handler when the user picks a new value.
+ */
+function ThinkingChip({
+	options,
+	value,
+	onChange,
+}: ThinkingChipProps): JSX.Element | null {
+	const dropdownOptions = useMemo<readonly ChipDropdownOption<string>[]>(() => {
+		if (!options) {
+			return [];
+		}
+		return options.map((level) => ({
+			value: level.id,
+			label: level.displayName,
+			description: level.description,
+			icon: "codicon-pulse",
+		}));
+	}, [options]);
+	if (!options || options.length === 0) {
+		return null;
+	}
+	const active = options.find((o) => o.id === value);
+	return (
+		<ChipDropdown
+			ariaPrefix="Thinking"
+			currentLabel={active?.displayName ?? options[0].displayName}
+			disabled={!onChange}
+			icon="codicon-pulse"
+			onChange={(next) => onChange?.(next)}
+			options={dropdownOptions}
+			value={value}
+		/>
+	);
+}
+
+interface AgentRoleChipProps {
+	readonly options: readonly AgentRoleDescriptor[] | undefined;
+	readonly value: string | undefined;
+	readonly onChange: ((id: string) => void) | undefined;
+}
+
+function AgentRoleChip({
+	options,
+	value,
+	onChange,
+}: AgentRoleChipProps): JSX.Element | null {
+	const dropdownOptions = useMemo<readonly ChipDropdownOption<string>[]>(() => {
+		if (!options) {
+			return [];
+		}
+		return options.map((role) => ({
+			value: role.id,
+			label: role.displayName,
+			description: role.description,
+			icon: "codicon-shield",
+		}));
+	}, [options]);
+	if (!options || options.length === 0) {
+		return null;
+	}
+	const active = options.find((o) => o.id === value);
+	return (
+		<ChipDropdown
+			ariaPrefix="Agent role"
+			currentLabel={active?.displayName ?? options[0].displayName}
+			disabled={!onChange}
+			icon="codicon-shield"
+			onChange={(next) => onChange?.(next)}
+			options={dropdownOptions}
+			value={value}
+		/>
+	);
 }

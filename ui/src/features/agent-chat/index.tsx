@@ -51,6 +51,8 @@ export function AgentChatFeature(): JSX.Element {
 		rejectPendingWrite,
 		changePermissionDefault,
 		changeModel,
+		changeThinkingLevel,
+		changeAgentRole,
 		probeModels,
 	} = bridge;
 
@@ -152,7 +154,9 @@ export function AgentChatFeature(): JSX.Element {
 			/>
 			<InputBar
 				acceptsFollowUp={session.acceptsFollowUp}
+				availableAgentRoles={session.availableAgentRoles}
 				availableModels={session.availableModels ?? state.availableModels}
+				availableThinkingLevels={session.availableThinkingLevels}
 				busy={isBusyState(session.lifecycleState)}
 				currentModelId={session.currentModelId ?? session.selectedModelId}
 				modelLabel={session.selectedModelId ?? session.agentDisplayName}
@@ -160,15 +164,21 @@ export function AgentChatFeature(): JSX.Element {
 					state.modelsLoading?.[deriveProviderIdForSession(session)]
 				)}
 				onCancel={cancel}
+				onChangeAgentRole={changeAgentRole}
 				onChangeModel={changeModel}
 				onChangePermissionDefault={changePermissionDefault}
+				onChangeThinkingLevel={changeThinkingLevel}
 				onRefreshModels={() => probeModels(deriveProviderIdForSession(session))}
 				onSubmit={submit}
 				permissionDefault={state.permissionDefault}
+				providerDisplayName={session.agentDisplayName}
+				providerId={deriveProviderIdForSession(session)}
 				readOnly={session.isReadOnly}
 				readOnlyReason={
 					session.isReadOnly ? "This is a read-only cloud session." : undefined
 				}
+				selectedAgentRoleId={session.selectedAgentRoleId}
+				selectedThinkingLevelId={session.selectedThinkingLevelId}
 				terminal={isTerminalState(session.lifecycleState)}
 			/>
 			<button

@@ -77,6 +77,16 @@ export interface AgentChatBridge {
 	retry(): void;
 	changeMode(modeId: string): void;
 	changeModel(modelId: string): void;
+	/**
+	 * Persist a new thinking-level pick through the bridge so the host
+	 * can forward it to the running agent (mirrors `changeModel`).
+	 */
+	changeThinkingLevel(thinkingLevelId: string): void;
+	/**
+	 * Persist a new agent-role / agent-type pick through the bridge so
+	 * the host can forward it to the running agent.
+	 */
+	changeAgentRole(agentRoleId: string): void;
 	changeTarget(target: ExecutionTarget): void;
 	/** Sidebar-only: switch the bound session via the host. */
 	switchSession(sessionId: string): void;
@@ -558,6 +568,32 @@ export function useSessionBridge(initialSessionId?: string): AgentChatBridge {
 		[activeSessionId]
 	);
 
+	const changeThinkingLevel = useCallback(
+		(thinkingLevelId: string) => {
+			if (!activeSessionId) {
+				return;
+			}
+			vscode.postMessage({
+				type: "agent-chat/control/change-thinking-level",
+				payload: { sessionId: activeSessionId, thinkingLevelId },
+			});
+		},
+		[activeSessionId]
+	);
+
+	const changeAgentRole = useCallback(
+		(agentRoleId: string) => {
+			if (!activeSessionId) {
+				return;
+			}
+			vscode.postMessage({
+				type: "agent-chat/control/change-agent-role",
+				payload: { sessionId: activeSessionId, agentRoleId },
+			});
+		},
+		[activeSessionId]
+	);
+
 	const changeTarget = useCallback(
 		(target: ExecutionTarget) => {
 			if (!activeSessionId) {
@@ -645,6 +681,8 @@ export function useSessionBridge(initialSessionId?: string): AgentChatBridge {
 			retry,
 			changeMode,
 			changeModel,
+			changeThinkingLevel,
+			changeAgentRole,
 			changeTarget,
 			switchSession,
 			startNewSession,
@@ -663,6 +701,8 @@ export function useSessionBridge(initialSessionId?: string): AgentChatBridge {
 			retry,
 			changeMode,
 			changeModel,
+			changeThinkingLevel,
+			changeAgentRole,
 			changeTarget,
 			switchSession,
 			startNewSession,

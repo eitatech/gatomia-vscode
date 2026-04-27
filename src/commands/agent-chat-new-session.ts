@@ -202,7 +202,6 @@ export async function handleNewSession(deps: NewSessionDeps): Promise<void> {
 	// tests intentionally inject a minimal `{label, providerId}` shape.
 	const provider = providers.find((p) => p.id === picked.providerId);
 	const availability = picked.availability ?? provider?.availability;
-	const npxPackage = picked.npxPackage ?? provider?.npxPackage;
 	const installUrl = picked.installUrl ?? provider?.installUrl;
 	const displayName =
 		picked.displayName ?? provider?.displayName ?? picked.label;
@@ -224,44 +223,16 @@ export async function handleNewSession(deps: NewSessionDeps): Promise<void> {
 		return;
 	}
 
-	if (availability === "available-via-npx") {
-		const accepted = await confirmNpxLaunch(
-			deps,
-			displayName,
-			npxPackage,
-			installUrl
-		);
-		if (!accepted) {
-			return;
-		}
-	}
-
+	// `available-via-npx` agents used to require an additional
+	// confirmation modal here. We removed it because the QuickPick choice
+	// is already an explicit opt-in and the modal interrupted every
+	// launch without adding real safety. The spawn now starts straight
+	// through `deps.startNew`.
 	await deps.startNew({
 		agentId: picked.providerId,
 		agentDisplayName: displayName,
 		taskInstruction,
 	});
-}
-
-async function confirmNpxLaunch(
-	deps: NewSessionDeps,
-	displayName: string,
-	npxPackage: string | undefined,
-	installUrl: string | undefined
-): Promise<boolean> {
-	const buttons = ["Continue", "Install manually"];
-	const choice = await deps.window.showWarningMessage(
-		`Run ${displayName} via \`npx -y ${npxPackage ?? displayName}\`? This will download and execute a third-party package.`,
-		{ modal: true },
-		...buttons
-	);
-	if (choice === "Continue") {
-		return true;
-	}
-	if (choice === "Install manually" && installUrl) {
-		await openInstallUrl(deps, installUrl);
-	}
-	return false;
 }
 
 async function openInstallUrl(

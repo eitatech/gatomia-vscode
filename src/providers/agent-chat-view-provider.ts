@@ -566,6 +566,8 @@ export class AgentChatViewProvider
 				agentDisplayName: provider.displayName,
 				agentCommand: "",
 				mode: payload.modelId,
+				thinkingLevelId: payload.thinkingLevelId,
+				agentRoleId: payload.agentRoleId,
 				taskInstruction: composePromptWithAgentFile(
 					trimmed,
 					payload.agentFileId,
@@ -933,6 +935,16 @@ class SidebarSessionBinding {
 		const isReadOnly = current.source === "cloud";
 		const availableModels = current.availableModels ?? [];
 		const currentModelId = current.currentModelId ?? current.selectedModelId;
+		// Thinking levels & agent roles ride alongside the model fields:
+		// the runner persists them through the store, the view-provider
+		// projects them here, and the webview chips light up only when
+		// the corresponding array is non-empty.
+		const availableThinkingLevels = current.availableThinkingLevels?.length
+			? current.availableThinkingLevels
+			: undefined;
+		const availableAgentRoles = current.availableAgentRoles?.length
+			? current.availableAgentRoles
+			: undefined;
 		await this.postMessage({
 			type: "agent-chat/session/loaded",
 			payload: {
@@ -945,6 +957,10 @@ class SidebarSessionBinding {
 					selectedModelId: current.selectedModelId,
 					availableModels,
 					currentModelId,
+					selectedThinkingLevelId: current.selectedThinkingLevelId,
+					selectedAgentRoleId: current.selectedAgentRoleId,
+					availableThinkingLevels,
+					availableAgentRoles,
 					executionTarget: {
 						kind: current.executionTarget.kind,
 						label: executionTargetLabel(current.executionTarget.kind),
@@ -1251,6 +1267,10 @@ interface NewSessionRequestPayload {
 	readonly providerId?: string;
 	readonly modelId?: string;
 	readonly agentFileId?: string;
+	/** Optional thinking-level pick (e.g. "high"). */
+	readonly thinkingLevelId?: string;
+	/** Optional agent-role pick (e.g. "agent" / "plan"). */
+	readonly agentRoleId?: string;
 	readonly taskInstruction?: string;
 }
 

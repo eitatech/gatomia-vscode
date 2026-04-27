@@ -10,9 +10,11 @@
  */
 
 import type {
+	AgentRoleDescriptor,
 	ModeDescriptor,
 	ModelDescriptor,
 	ResolvedCapabilities,
+	ThinkingLevelDescriptor,
 } from "./types";
 
 /** Version of the catalog schema. Bumped on breaking changes. */
@@ -23,6 +25,16 @@ export interface KnownAgentCapabilities {
 	modes: readonly ModeDescriptor[];
 	/** Empty array = "model selector hidden for this agent". */
 	models: readonly ModelDescriptor[];
+	/**
+	 * Optional list of reasoning effort tiers (e.g. low/medium/high).
+	 * Empty / undefined = "thinking-level chip hidden for this agent".
+	 */
+	thinkingLevels?: readonly ThinkingLevelDescriptor[];
+	/**
+	 * Optional list of high-level agent roles (Cursor-style
+	 * Agent / Plan / Ask). Empty / undefined = "role chip hidden".
+	 */
+	agentRoles?: readonly AgentRoleDescriptor[];
 	/** Default: true. Set to false for agents that reject follow-ups. */
 	acceptsFollowUp: boolean;
 }
@@ -149,6 +161,42 @@ export const AGENT_CAPABILITIES_CATALOG: readonly AgentCatalogEntry[] = [
 					invocationTemplate: "--model {id}",
 				},
 			],
+			// Claude exposes the "extended thinking" knob with three tiers
+			// (off / on / max). The labels mirror Anthropic's CLI flag.
+			thinkingLevels: [
+				{
+					id: "off",
+					displayName: "Off",
+					description: "No extended thinking budget.",
+				},
+				{
+					id: "on",
+					displayName: "On",
+					description: "Standard extended thinking.",
+				},
+				{
+					id: "max",
+					displayName: "Max",
+					description: "Maximum thinking budget.",
+				},
+			],
+			agentRoles: [
+				{
+					id: "agent",
+					displayName: "Agent",
+					description: "Read, edit and execute autonomously.",
+				},
+				{
+					id: "plan",
+					displayName: "Plan",
+					description: "Outline an approach without editing files.",
+				},
+				{
+					id: "ask",
+					displayName: "Ask",
+					description: "Answer questions only — no tool execution.",
+				},
+			],
 			acceptsFollowUp: true,
 		},
 	},
@@ -168,6 +216,20 @@ export const AGENT_CAPABILITIES_CATALOG: readonly AgentCatalogEntry[] = [
 					displayName: "Gemini 2.5 Flash",
 					invocation: "cli-flag",
 					invocationTemplate: "--model {id}",
+				},
+			],
+			// Gemini CLI does not expose a reasoning-effort knob today;
+			// agentRoles mirrors the documented `gemini --mode <id>` flags.
+			agentRoles: [
+				{
+					id: "agent",
+					displayName: "Agent",
+					description: "Default Gemini agent loop.",
+				},
+				{
+					id: "chat",
+					displayName: "Chat",
+					description: "Plain chat — no autonomous tool use.",
 				},
 			],
 			acceptsFollowUp: true,
@@ -243,6 +305,37 @@ export const AGENT_CAPABILITIES_CATALOG: readonly AgentCatalogEntry[] = [
 					displayName: "Claude Sonnet 4.6",
 					invocation: "cli-flag",
 					invocationTemplate: "--model {id}",
+				},
+			],
+			// GPT-5 / Codex thinking levels (mirrors
+			// `--reasoning-effort low|medium|high`).
+			thinkingLevels: [
+				{
+					id: "low",
+					displayName: "low",
+					description: "Fast, lightweight reasoning.",
+				},
+				{
+					id: "medium",
+					displayName: "medium",
+					description: "Balanced reasoning effort.",
+				},
+				{
+					id: "high",
+					displayName: "high",
+					description: "Maximum reasoning effort.",
+				},
+			],
+			agentRoles: [
+				{
+					id: "agent",
+					displayName: "Agent",
+					description: "Default Copilot agent loop.",
+				},
+				{
+					id: "ask",
+					displayName: "Ask",
+					description: "Answer questions only — no tool calls.",
 				},
 			],
 			acceptsFollowUp: true,
@@ -321,10 +414,20 @@ export function resolveFromCatalog(agentId: string): ResolvedCapabilities {
 	if (!entry?.capabilities) {
 		return { source: "none" };
 	}
+	const caps = entry.capabilities;
+	const thinkingLevels = caps.thinkingLevels
+		? [...caps.thinkingLevels]
+		: undefined;
+	const agentRoles = caps.agentRoles ? [...caps.agentRoles] : undefined;
+	// Optional fields are intentionally omitted (not set to `undefined`)
+	// when no list is supplied so the result still satisfies the
+	// `toStrictEqual({...})` assertions used by the catalog tests.
 	return {
 		source: "catalog",
-		modes: [...entry.capabilities.modes],
-		models: [...entry.capabilities.models],
-		acceptsFollowUp: entry.capabilities.acceptsFollowUp,
+		modes: [...caps.modes],
+		models: [...caps.models],
+		...(thinkingLevels ? { thinkingLevels } : {}),
+		...(agentRoles ? { agentRoles } : {}),
+		acceptsFollowUp: caps.acceptsFollowUp,
 	};
 }

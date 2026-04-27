@@ -50,17 +50,43 @@ export interface ModelDescriptor {
 	invocationTemplate?: string;
 }
 
+/**
+ * Reasoning / thinking effort surfaced by the agent (e.g. "low",
+ * "medium", "high"). Mirrors `ThinkingLevelDescriptor` on the
+ * extension side; chips stay hidden when the array is empty.
+ */
+export interface ThinkingLevelDescriptor {
+	id: string;
+	displayName: string;
+	description?: string;
+}
+
+/**
+ * High-level agent role / type (e.g. "Agent", "Plan", "Ask"). Mirrors
+ * `AgentRoleDescriptor` on the extension side; chips stay hidden when
+ * the array is empty.
+ */
+export interface AgentRoleDescriptor {
+	id: string;
+	displayName: string;
+	description?: string;
+}
+
 export type ResolvedCapabilities =
 	| {
 			source: "agent";
 			modes: ModeDescriptor[];
 			models: ModelDescriptor[];
+			thinkingLevels?: ThinkingLevelDescriptor[];
+			agentRoles?: AgentRoleDescriptor[];
 			acceptsFollowUp: boolean;
 	  }
 	| {
 			source: "catalog";
 			modes: ModeDescriptor[];
 			models: ModelDescriptor[];
+			thinkingLevels?: ThinkingLevelDescriptor[];
+			agentRoles?: AgentRoleDescriptor[];
 			acceptsFollowUp: boolean;
 	  }
 	| { source: "none" };
@@ -248,6 +274,19 @@ export interface AgentChatSessionView {
 	 * and "agent confirmed this via session/set_model".
 	 */
 	currentModelId?: string;
+	/**
+	 * Thinking level the user picked for this session (id, e.g. "high").
+	 * Undefined when the agent does not expose a thinking-level knob.
+	 */
+	selectedThinkingLevelId?: string;
+	/** Same, for the agent role / agent type chip. */
+	selectedAgentRoleId?: string;
+	/**
+	 * Thinking levels available for this session — empty/undefined hides
+	 * the chip. Sourced from `capabilities.thinkingLevels`.
+	 */
+	availableThinkingLevels?: ThinkingLevelDescriptor[];
+	availableAgentRoles?: AgentRoleDescriptor[];
 	executionTarget: ExecutionTargetView;
 	lifecycleState: SessionLifecycleState;
 	acceptsFollowUp: boolean;
@@ -284,6 +323,14 @@ export interface AgentChatProviderOption {
 	npxPackage?: string;
 	installUrl?: string;
 	models: ModelDescriptor[];
+	/**
+	 * Static catalogue of thinking levels — empty array hides the chip
+	 * on the empty-state composer. The on-session InputBar mirrors the
+	 * value via `AgentChatSessionView.availableThinkingLevels`.
+	 */
+	thinkingLevels: ThinkingLevelDescriptor[];
+	/** Static catalogue of agent roles — same hide-when-empty contract. */
+	agentRoles: AgentRoleDescriptor[];
 }
 
 export interface AgentChatAgentFileOption {
@@ -330,5 +377,9 @@ export interface NewSessionRequest {
 	providerId: string;
 	modelId?: string;
 	agentFileId?: string;
+	/** Optional thinking-level pick (e.g. "high") propagated to the agent. */
+	thinkingLevelId?: string;
+	/** Optional agent-role pick (e.g. "agent" / "plan"). */
+	agentRoleId?: string;
 	taskInstruction: string;
 }
