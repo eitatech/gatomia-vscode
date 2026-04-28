@@ -1,8 +1,12 @@
 /**
  * AgentChatViewProvider — the canonical Agent Chat sidebar webview view.
  *
- * Lives in its own activity-bar container (`gatomia-chat`) and owns a single
- * `vscode.WebviewView`. The view can show three states:
+ * Lives inside the shared `gatomia` activity-bar container (alongside Specs,
+ * Hooks, Steering, etc.) and owns a single `vscode.WebviewView`. On hosts
+ * that support it, the view is migrated individually to the auxiliary side
+ * bar — see `agent-chat-entry-points.ts` for the migration logic.
+ *
+ * The view can show three states:
  *
  *   1. **Empty / idle** — no session bound. The webview composer doubles as a
  *      "new session" launcher: the user picks a provider, model, and agent
@@ -125,6 +129,25 @@ export interface AgentChatViewController {
 // ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
+
+/**
+ * Companion view id for hosts that cannot use the auxiliary side bar.
+ *
+ * Why two ids: the `vscode.moveViews` command can only relocate views
+ * into another *container* — it cannot move a view to a "location"
+ * (see microsoft/vscode#156527), so we cannot reuse a single view id
+ * across primary and auxiliary side bars at runtime. Instead we declare
+ * the chat view *twice* in `package.json` — once inside the auxiliary
+ * `gatomia-chat` container (default for VS Code, Insiders, Cursor,
+ * VSCodium, Positron) and once inside the primary `gatomia` container
+ * (used by Windsurf / Antigravity, whose auxiliary bar is reserved for
+ * their native AI chat) — and gate them with the
+ * `gatomia.host.chatInPrimary` context key set during activation. Only
+ * one of the two views is ever visible at a time. The provider is
+ * registered against both ids so whichever one the host renders ends
+ * up wired to the same controller.
+ */
+export const AGENT_CHAT_PRIMARY_VIEW_TYPE = "gatomia.views.agentChatPrimary";
 
 export class AgentChatViewProvider
 	implements WebviewViewProvider, AgentChatViewController
@@ -272,7 +295,36 @@ export class AgentChatViewProvider
 	// ------------------------------------------------------------------
 
 	async reveal(): Promise<void> {
-		await commands.executeCommand("workbench.view.extension.gatomia-chat");
+		// The chat view is declared twice in `package.json` (once in the
+		// auxiliary `gatomia-chat` container, once in the primary
+		// `gatomia` container) and gated with the
+		// `gatomia.host.chatInPrimary` context key — see the comment on
+		// `AGENT_CHAT_PRIMARY_VIEW_TYPE` for the rationale. Only one is
+		// ever visible at a time, but we don't track which one here, so
+		// we issue both `.focus` commands and let the inactive one
+		// no-op. The active one resolves the webview if it hasn't been
+		// resolved yet.
+		const candidateViewIds = [
+			AgentChatViewProvider.viewType,
+			AGENT_CHAT_PRIMARY_VIEW_TYPE,
+		];
+		// Issue both focus calls in parallel — the host renders only
+		// one of the two views (the other's `when` clause is false), so
+		// one call resolves and the other rejects/no-ops. Running them
+		// in parallel keeps `reveal()` consuming a single microtask
+		// roundtrip, which matters for callers that race subsequent
+		// `postMessage`s after the await (e.g. `startNewSessionFlow`).
+		await Promise.all(
+			candidateViewIds.map((viewId) =>
+				Promise.resolve(commands.executeCommand(`${viewId}.focus`)).catch(
+					() => {
+						// `<viewId>.focus` rejects when the view's `when`
+						// clause evaluates to false (host gated it out).
+						// The other id will succeed.
+					}
+				)
+			)
+		);
 		// If the view exists, also bring it forward (no-op when it isn't
 		// resolved yet — the workbench command above will resolve it).
 		this.view?.show?.(true);

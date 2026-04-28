@@ -1,11 +1,16 @@
 /**
  * AgentChatEntryPoints — unit coverage.
  *
- * The entry-points module wires three host-level surfaces (command,
- * status bar, first-run migration) together. The tests exercise the
- * registration shape + the side effects of running the command and the
- * migration via a fake `AgentChatEntryPointsHost` so we don't have to
- * boot a real VS Code instance.
+ * The entry-points module wires two host-level surfaces (command +
+ * status bar) together. The tests exercise the registration shape and
+ * the side effects of running the open command via a fake
+ * `AgentChatEntryPointsHost` so we don't have to boot a real VS Code
+ * instance.
+ *
+ * Placement of the chat view itself is declarative
+ * (`package.json#contributes.views` + the
+ * `gatomia.host.chatInPrimary` context key set in `extension.ts`), so
+ * it is not tested here — see the integration tests.
  */
 
 import {
@@ -18,14 +23,14 @@ import {
 	vi,
 } from "vitest";
 import {
-	MOVE_CHAT_TO_SECONDARY_SIDEBAR_COMMAND,
 	OPEN_IN_SECONDARY_SIDEBAR_COMMAND,
 	registerAgentChatEntryPoints,
+	shouldUseAuxiliaryBar,
 	type AgentChatEntryPointsHost,
 } from "../../../../src/features/agent-chat/agent-chat-entry-points";
+import type { IdeHost } from "../../../../src/utils/ide-host-detector";
 
 const OPEN_TOOLTIP_RE = /Open Agent Chat/i;
-const MIGRATION_FLAG_KEY = "gatomia.agentChat.movedToAuxiliary.v2";
 
 interface FakeStatusBarItem {
 	text: string;
@@ -40,10 +45,9 @@ interface FakeHost extends AgentChatEntryPointsHost {
 	registeredCommands: Map<string, (...args: unknown[]) => unknown>;
 	executedCommands: Array<{ id: string; args: unknown[] }>;
 	statusItem: FakeStatusBarItem;
-	globalState: Map<string, boolean>;
 }
 
-function makeHost(initialFlag = false): FakeHost {
+function makeHost(ideHost: IdeHost = "vscode"): FakeHost {
 	const registeredCommands = new Map<string, (...args: unknown[]) => unknown>();
 	const executedCommands: Array<{ id: string; args: unknown[] }> = [];
 	const statusItem: FakeStatusBarItem = {
@@ -54,16 +58,11 @@ function makeHost(initialFlag = false): FakeHost {
 		hide: vi.fn(),
 		dispose: vi.fn(),
 	};
-	const globalState = new Map<string, boolean>();
-	if (initialFlag) {
-		globalState.set(MIGRATION_FLAG_KEY, true);
-	}
 
 	const host: FakeHost = {
 		registeredCommands,
 		executedCommands,
 		statusItem,
-		globalState,
 		registerCommand: (commandId, handler) => {
 			registeredCommands.set(commandId, handler);
 			return { dispose: vi.fn() };
@@ -73,11 +72,7 @@ function makeHost(initialFlag = false): FakeHost {
 			return Promise.resolve(undefined);
 		}),
 		createStatusBarItem: () => statusItem,
-		getGlobalStateFlag: (key) => globalState.get(key) === true,
-		setGlobalStateFlag: (key, value) => {
-			globalState.set(key, value);
-			return Promise.resolve();
-		},
+		getIdeHost: () => ideHost,
 	};
 	return host;
 }
@@ -127,22 +122,47 @@ describe("registerAgentChatEntryPoints", () => {
 		expect(host.statusItem.show).toHaveBeenCalledTimes(1);
 	});
 
-	it("returns disposables that include the status bar dispose", () => {
+	it("returns disposables that include the command + status bar wrappers", () => {
 		const host = makeHost();
 		const disposables = registerAgentChatEntryPoints(host, outputChannel);
-		// 3 entries: open command + manual move command + status bar
-		// wrapper. Add new entries here when registering more.
-		expect(disposables).toHaveLength(3);
+		// 2 entries: open command + status bar wrapper. Add new entries
+		// here when registering more.
+		expect(disposables).toHaveLength(2);
 		for (const disposable of disposables) {
 			disposable.dispose();
 		}
 		expect(host.statusItem.dispose).toHaveBeenCalledTimes(1);
 	});
+
+	it("does not register a separate manual move command (removed)", () => {
+		const host = makeHost();
+		registerAgentChatEntryPoints(host, outputChannel);
+		expect(
+			host.registeredCommands.has(
+				"gatomia.agentChat.moveChatToSecondarySidebar"
+			)
+		).toBe(false);
+	});
+
+	it("does not call vscode.moveViews on activation (removed: that command cannot move into a location)", async () => {
+		// Regression for microsoft/vscode#156527: the previous
+		// implementation called `vscode.moveViews` with
+		// `destinationId: "workbench.view.auxiliary"`, but VS Code only
+		// allows moving views into another *container*, not a
+		// location. Placement is now declarative + context-key based.
+		const host = makeHost();
+		registerAgentChatEntryPoints(host, outputChannel);
+		await new Promise((resolve) => setImmediate(resolve));
+		const moveCalls = host.executedCommands.filter(
+			(entry) => entry.id === "vscode.moveViews"
+		);
+		expect(moveCalls).toHaveLength(0);
+	});
 });
 
 describe("openInSecondarySidebar command handler", () => {
-	it("focuses the auxiliary side bar before focusing the chat view", async () => {
-		const host = makeHost(true); // skip migration so we can assert order cleanly
+	it("on hosts with an auxiliary bar: focuses the auxiliary bar before focusing the chat view", async () => {
+		const host = makeHost("vscode");
 		registerAgentChatEntryPoints(host, outputChannel);
 		const handler = host.registeredCommands.get(
 			OPEN_IN_SECONDARY_SIDEBAR_COMMAND
@@ -151,14 +171,43 @@ describe("openInSecondarySidebar command handler", () => {
 		await handler?.();
 
 		const ids = host.executedCommands.map((entry) => entry.id);
-		expect(ids).toEqual([
-			"workbench.action.focusAuxiliaryBar",
-			"gatomia.views.agentChat.focus",
-		]);
+		// Auxiliary bar opened first, then both candidate view ids are
+		// asked to focus (only one will be active given the host's
+		// context-key state).
+		expect(ids[0]).toBe("workbench.action.focusAuxiliaryBar");
+		expect(ids).toContain("gatomia.views.agentChat.focus");
+		expect(ids).toContain("gatomia.views.agentChatPrimary.focus");
 	});
 
-	it("still attempts to focus the view if focusAuxiliaryBar throws", async () => {
-		const host = makeHost(true);
+	it("on Windsurf: skips focusAuxiliaryBar and focuses the view ids directly", async () => {
+		const host = makeHost("windsurf");
+		registerAgentChatEntryPoints(host, outputChannel);
+		const handler = host.registeredCommands.get(
+			OPEN_IN_SECONDARY_SIDEBAR_COMMAND
+		);
+		await handler?.();
+
+		const ids = host.executedCommands.map((entry) => entry.id);
+		expect(ids).not.toContain("workbench.action.focusAuxiliaryBar");
+		expect(ids).toContain("gatomia.views.agentChat.focus");
+		expect(ids).toContain("gatomia.views.agentChatPrimary.focus");
+	});
+
+	it("on Antigravity: skips focusAuxiliaryBar and focuses the view ids directly", async () => {
+		const host = makeHost("antigravity");
+		registerAgentChatEntryPoints(host, outputChannel);
+		const handler = host.registeredCommands.get(
+			OPEN_IN_SECONDARY_SIDEBAR_COMMAND
+		);
+		await handler?.();
+
+		const ids = host.executedCommands.map((entry) => entry.id);
+		expect(ids).not.toContain("workbench.action.focusAuxiliaryBar");
+		expect(ids).toContain("gatomia.views.agentChat.focus");
+	});
+
+	it("still attempts to focus the views if focusAuxiliaryBar throws", async () => {
+		const host = makeHost("vscode");
 		(host.executeCommand as Mock).mockImplementation(
 			(id: string, ...args: unknown[]) => {
 				host.executedCommands.push({ id, args });
@@ -175,162 +224,46 @@ describe("openInSecondarySidebar command handler", () => {
 		await handler?.();
 		const ids = host.executedCommands.map((entry) => entry.id);
 		expect(ids).toContain("gatomia.views.agentChat.focus");
-	});
-});
-
-describe("first-activation migration", () => {
-	it("stops at the first successful vscode.moveViews and persists the flag", async () => {
-		const host = makeHost(false);
-		registerAgentChatEntryPoints(host, outputChannel);
-		// The migration is fire-and-forget — flush microtasks so the
-		// async helper completes before we assert.
-		await new Promise((resolve) => setImmediate(resolve));
-
-		const moveCalls = host.executedCommands.filter(
-			(entry) => entry.id === "vscode.moveViews"
-		);
-		// Default fake host returns success on the first attempt, so we
-		// must not fall through to the rest of the chain.
-		expect(moveCalls).toHaveLength(1);
-		expect(moveCalls[0]?.args[0]).toMatchObject({
-			viewIds: ["gatomia.views.agentChat"],
-			destinationId: "workbench.view.auxiliary",
-		});
-		expect(host.globalState.get(MIGRATION_FLAG_KEY)).toBe(true);
+		expect(ids).toContain("gatomia.views.agentChatPrimary.focus");
 	});
 
-	it("skips moveViews when the migration flag is already set", async () => {
-		const host = makeHost(true);
-		registerAgentChatEntryPoints(host, outputChannel);
-		await new Promise((resolve) => setImmediate(resolve));
-		const moveCalls = host.executedCommands.filter(
-			(entry) => entry.id === "vscode.moveViews"
-		);
-		expect(moveCalls).toHaveLength(0);
-	});
-
-	it("walks the fallback chain when the first attempt rejects", async () => {
-		const host = makeHost(false);
-		let attempt = 0;
+	it("survives a single view focus rejection and tries the other id", async () => {
+		// `<viewId>.focus` throws when the view's `when` clause is false
+		// — the inactive view id should not block the active one.
+		const host = makeHost("vscode");
 		(host.executeCommand as Mock).mockImplementation(
 			(id: string, ...args: unknown[]) => {
 				host.executedCommands.push({ id, args });
-				if (id === "vscode.moveViews") {
-					attempt += 1;
-					if (attempt === 1) {
-						return Promise.reject(new Error("first id rejected"));
-					}
-					return Promise.resolve(undefined);
+				if (id === "gatomia.views.agentChatPrimary.focus") {
+					return Promise.reject(new Error("view not visible"));
 				}
 				return Promise.resolve(undefined);
 			}
 		);
 		registerAgentChatEntryPoints(host, outputChannel);
-		await new Promise((resolve) => setImmediate(resolve));
-
-		const moveCalls = host.executedCommands.filter(
-			(entry) => entry.id === "vscode.moveViews"
-		);
-		// First call rejected, second call accepted, no third call.
-		expect(moveCalls).toHaveLength(2);
-		expect(moveCalls[1]?.args[0]).toMatchObject({
-			viewIds: ["gatomia-chat"],
-			destinationId: "workbench.view.auxiliary",
-		});
-		expect(host.globalState.get(MIGRATION_FLAG_KEY)).toBe(true);
-	});
-
-	it("still records the migration flag even when every fallback rejects", async () => {
-		const host = makeHost(false);
-		(host.executeCommand as Mock).mockImplementation(
-			(id: string, ...args: unknown[]) => {
-				host.executedCommands.push({ id, args });
-				if (id === "vscode.moveViews") {
-					return Promise.reject(
-						new Error("legacy host does not know vscode.moveViews")
-					);
-				}
-				return Promise.resolve(undefined);
-			}
-		);
-		registerAgentChatEntryPoints(host, outputChannel);
-		await new Promise((resolve) => setImmediate(resolve));
-
-		// Every fallback in MOVE_ATTEMPTS should have been tried.
-		const moveCalls = host.executedCommands.filter(
-			(entry) => entry.id === "vscode.moveViews"
-		);
-		expect(moveCalls.length).toBeGreaterThanOrEqual(3);
-		expect(host.globalState.get(MIGRATION_FLAG_KEY)).toBe(true);
-	});
-});
-
-describe("moveChatToSecondarySidebar command (manual escape hatch)", () => {
-	it("registers the manual move command", () => {
-		const host = makeHost(true);
-		registerAgentChatEntryPoints(host, outputChannel);
-		expect(
-			host.registeredCommands.has(MOVE_CHAT_TO_SECONDARY_SIDEBAR_COMMAND)
-		).toBe(true);
-	});
-
-	it("re-runs the move chain even when the migration flag is already set", async () => {
-		const host = makeHost(true);
-		registerAgentChatEntryPoints(host, outputChannel);
-		// First-run migration must NOT fire because the flag is set.
-		await new Promise((resolve) => setImmediate(resolve));
-		expect(
-			host.executedCommands.filter((e) => e.id === "vscode.moveViews")
-		).toHaveLength(0);
-
-		// Manually invoking the command should attempt the move chain.
 		const handler = host.registeredCommands.get(
-			MOVE_CHAT_TO_SECONDARY_SIDEBAR_COMMAND
+			OPEN_IN_SECONDARY_SIDEBAR_COMMAND
 		);
 		await handler?.();
 
-		const moveCalls = host.executedCommands.filter(
-			(e) => e.id === "vscode.moveViews"
-		);
-		expect(moveCalls.length).toBeGreaterThanOrEqual(1);
-	});
-
-	it("focuses the auxiliary bar and the view after a successful manual move", async () => {
-		const host = makeHost(true);
-		registerAgentChatEntryPoints(host, outputChannel);
-		await new Promise((resolve) => setImmediate(resolve));
-
-		const handler = host.registeredCommands.get(
-			MOVE_CHAT_TO_SECONDARY_SIDEBAR_COMMAND
-		);
-		await handler?.();
-
-		const ids = host.executedCommands.map((e) => e.id);
-		expect(ids).toContain("workbench.action.focusAuxiliaryBar");
+		const ids = host.executedCommands.map((entry) => entry.id);
 		expect(ids).toContain("gatomia.views.agentChat.focus");
+		expect(ids).toContain("gatomia.views.agentChatPrimary.focus");
+	});
+});
+
+describe("shouldUseAuxiliaryBar", () => {
+	it("returns false for Windsurf and Antigravity", () => {
+		expect(shouldUseAuxiliaryBar("windsurf")).toBe(false);
+		expect(shouldUseAuxiliaryBar("antigravity")).toBe(false);
 	});
 
-	it("does not focus when every move attempt rejects", async () => {
-		const host = makeHost(true);
-		(host.executeCommand as Mock).mockImplementation(
-			(id: string, ...args: unknown[]) => {
-				host.executedCommands.push({ id, args });
-				if (id === "vscode.moveViews") {
-					return Promise.reject(new Error("rejected by host"));
-				}
-				return Promise.resolve(undefined);
-			}
-		);
-		registerAgentChatEntryPoints(host, outputChannel);
-		await new Promise((resolve) => setImmediate(resolve));
-
-		const handler = host.registeredCommands.get(
-			MOVE_CHAT_TO_SECONDARY_SIDEBAR_COMMAND
-		);
-		await handler?.();
-
-		const ids = host.executedCommands.map((e) => e.id);
-		expect(ids).not.toContain("workbench.action.focusAuxiliaryBar");
-		expect(ids).not.toContain("gatomia.views.agentChat.focus");
+	it("returns true for the VS Code family and unknown hosts", () => {
+		expect(shouldUseAuxiliaryBar("vscode")).toBe(true);
+		expect(shouldUseAuxiliaryBar("vscode-insiders")).toBe(true);
+		expect(shouldUseAuxiliaryBar("vscodium")).toBe(true);
+		expect(shouldUseAuxiliaryBar("cursor")).toBe(true);
+		expect(shouldUseAuxiliaryBar("positron")).toBe(true);
+		expect(shouldUseAuxiliaryBar("unknown")).toBe(true);
 	});
 });

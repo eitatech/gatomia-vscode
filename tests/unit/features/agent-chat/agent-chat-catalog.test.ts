@@ -145,6 +145,48 @@ describe("buildAgentChatCatalog", () => {
 		});
 	});
 
+	it("excludes extension-sourced chat participants from the agent-file picker", () => {
+		// Regression: GitHub Copilot Chat declares several
+		// `chatParticipants` in its manifest with the same
+		// `displayName` (e.g. "GitHubCopilot (Extension)"), and the
+		// AgentRegistry surfaces all of them. Those are not
+		// user-authored AGENT.md presets — the picker showed a wall
+		// of duplicate "Extension" rows instead of the workspace's
+		// `.github/agents/*.agent.md` files.
+		const agentRegistry = makeAgentRegistry([
+			{
+				id: "file:my-preset",
+				displayName: "My Preset",
+				source: "file",
+				sourcePath: "/abs/path.md",
+				available: true,
+			},
+			{
+				id: "extension:GitHub.copilot-chat:editor",
+				displayName: "GitHubCopilot (Extension)",
+				description: "Ask or edit in context",
+				source: "extension",
+				available: true,
+			},
+			{
+				id: "extension:GitHub.copilot-chat:workspace",
+				displayName: "GitHubCopilot (Extension)",
+				description: "Edit files in your workspace",
+				source: "extension",
+				available: true,
+			},
+		]);
+		const catalog = buildAgentChatCatalog({
+			acpProviderRegistry: null,
+			agentRegistry: agentRegistry as never,
+		});
+		expect(catalog.agentFiles).toHaveLength(1);
+		expect(catalog.agentFiles[0]?.id).toBe("file:my-preset");
+		expect(catalog.agentFiles.every((entry) => entry.source === "file")).toBe(
+			true
+		);
+	});
+
 	it("downgrades a local provider to install-required when the probe says missing", () => {
 		// Regression: opencode/junie were marked "installed" purely because
 		// their descriptor.source was "local" — even when their binary was

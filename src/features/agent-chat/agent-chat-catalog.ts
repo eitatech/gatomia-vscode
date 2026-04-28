@@ -204,8 +204,15 @@ function projectAgentFiles(
 	} catch {
 		return [];
 	}
+	// The picker is the "AGENT.md preset" picker — only file-based
+	// entries from `.github/agents/*.agent.md` belong here. The shared
+	// `AgentRegistry` also surfaces `chatParticipants` declared by
+	// installed extensions (e.g. GitHub Copilot Chat ships several with
+	// identical "GitHubCopilot (Extension)" display names), which are
+	// not user-authored presets and would just clutter the dropdown
+	// with duplicate rows.
 	return entries
-		.filter((entry) => entry.available)
+		.filter((entry) => entry.available && entry.source === "file")
 		.map(
 			(entry): AgentChatAgentFileOption => ({
 				id: entry.id,

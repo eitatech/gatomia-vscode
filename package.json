@@ -336,10 +336,17 @@
           "name": "Agent Chat",
           "type": "webview",
           "icon": "comment-discussion",
-          "when": "!(workbenchState == empty || workspaceFolderCount == 0)"
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && !gatomia.host.chatInPrimary"
         }
       ],
       "gatomia": [
+        {
+          "id": "gatomia.views.agentChatPrimary",
+          "name": "Agent Chat",
+          "type": "webview",
+          "icon": "comment-discussion",
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && gatomia.host.chatInPrimary"
+        },
         {
           "id": "gatomia.views.specExplorer",
           "name": "Specs",
@@ -938,15 +945,9 @@
       },
       {
         "command": "gatomia.agentChat.openInSecondarySidebar",
-        "title": "Open Agent Chat in Secondary Side Bar",
+        "title": "Open Agent Chat",
         "category": "GatomIA",
         "icon": "$(comment-discussion)"
-      },
-      {
-        "command": "gatomia.agentChat.moveChatToSecondarySidebar",
-        "title": "Move Agent Chat to Secondary Side Bar",
-        "category": "GatomIA",
-        "icon": "$(layout-sidebar-right)"
       }
     ],
     "keybindings": [
@@ -1281,9 +1282,6 @@
         },
         {
           "command": "gatomia.agentChat.openInSecondarySidebar"
-        },
-        {
-          "command": "gatomia.agentChat.moveChatToSecondarySidebar"
         }
       ]
     }

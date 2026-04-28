@@ -260,6 +260,14 @@ describe("AgentChatViewProvider", () => {
 			type: "agent-chat/control/request-new-chat",
 			payload: {},
 		});
+		// `startNewSessionFlow` awaits `reveal()`, which now issues both
+		// `<viewId>.focus` commands in parallel via `Promise.all` to
+		// keep the chat view visible across hosts (see
+		// `AGENT_CHAT_PRIMARY_VIEW_TYPE`). That extra microtask
+		// roundtrip pushes the `session/cleared` post past the previous
+		// 2-tick flush — drain the queue with a couple more ticks.
+		await Promise.resolve();
+		await Promise.resolve();
 		await Promise.resolve();
 		await Promise.resolve();
 
@@ -349,8 +357,15 @@ describe("AgentChatViewProvider", () => {
 		await viewProvider.focusSession(session.id);
 		await Promise.resolve();
 
+		// `reveal()` focuses both declared chat-view ids in parallel.
+		// Exactly one is visible at a time per host, but the provider
+		// is host-agnostic and asks the workbench to focus both — see
+		// `AGENT_CHAT_PRIMARY_VIEW_TYPE` for the rationale.
 		expect(commands.executeCommand).toHaveBeenCalledWith(
-			"workbench.view.extension.gatomia-chat"
+			"gatomia.views.agentChat.focus"
+		);
+		expect(commands.executeCommand).toHaveBeenCalledWith(
+			"gatomia.views.agentChatPrimary.focus"
 		);
 		const types = view.webview.postMessage.mock.calls.map(
 			([m]) => (m as { type: string }).type

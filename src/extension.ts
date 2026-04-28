@@ -2754,8 +2754,11 @@ async function bootstrapAgentChat(
 		const { promptForCapWarning } = await import(
 			"./features/agent-chat/cap-warning-prompt"
 		);
-		const { AgentChatViewProvider } = await import(
-			"./providers/agent-chat-view-provider"
+		const { AgentChatViewProvider, AGENT_CHAT_PRIMARY_VIEW_TYPE } =
+			await import("./providers/agent-chat-view-provider");
+		const { detectIdeHost } = await import("./utils/ide-host-detector");
+		const { shouldUseAuxiliaryBar } = await import(
+			"./features/agent-chat/agent-chat-entry-points"
 		);
 
 		const archive = createVscodeArchiveWriter(context.globalStorageUri);
@@ -2823,9 +2826,39 @@ async function bootstrapAgentChat(
 			},
 			outputChannel,
 		});
+		// Tell VS Code which of the two declared chat-view ids should be
+		// active for this host. Hosts that reserve the auxiliary side bar
+		// for their own AI chat (Windsurf, Antigravity) render the chat
+		// inside the primary `gatomia` container; everything else uses
+		// the auxiliary `gatomia-chat` container. The `when` clauses in
+		// `package.json#contributes.views` consume this context key.
+		const ideHost = detectIdeHost();
+		const chatInPrimary = !shouldUseAuxiliaryBar(ideHost);
+		try {
+			await commands.executeCommand(
+				"setContext",
+				"gatomia.host.chatInPrimary",
+				chatInPrimary
+			);
+		} catch (error) {
+			outputChannel.appendLine(
+				`[AgentChat] setContext gatomia.host.chatInPrimary failed: ${
+					error instanceof Error ? error.message : String(error)
+				}`
+			);
+		}
+
+		// Register the same controller against both view ids — only one
+		// is visible at a time (gated by the context key set above) so
+		// the inactive registration is a cheap no-op.
 		context.subscriptions.push(
 			window.registerWebviewViewProvider(
 				AgentChatViewProvider.viewType,
+				sidebarController,
+				{ webviewOptions: { retainContextWhenHidden: true } }
+			),
+			window.registerWebviewViewProvider(
+				AGENT_CHAT_PRIMARY_VIEW_TYPE,
 				sidebarController,
 				{ webviewOptions: { retainContextWhenHidden: true } }
 			),
