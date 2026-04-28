@@ -13,6 +13,9 @@ const ENDED_SHUTDOWN_RE = /ended because VS Code closed/i;
 const QUEUED_RE = /queued/i;
 const REJECTED_RE = /rejected/i;
 const READ_ONLY_SESSION_RE = /read-only session/i;
+const THINKING_LABEL_RE = /thinking…/i;
+const THOUGHTS_LABEL_RE = /^Thoughts$/;
+const PLAN_HEADER_RE = /^Plan \(/;
 
 afterEach(() => {
 	cleanup();
@@ -157,6 +160,74 @@ describe("ChatMessageItem", () => {
 			/>
 		);
 		expect(screen.getByTestId("agent-avatar")).toBeInTheDocument();
+	});
+
+	it("renders a streaming ThoughtChatMessage with the 'Thinking…' label and content", () => {
+		render(
+			<ChatMessageItem
+				message={{
+					id: "th-1",
+					sessionId: "s-1",
+					timestamp: 1000,
+					sequence: 1,
+					role: "thought",
+					content: "Considering the trade-offs.",
+					turnId: "t-1",
+					isTurnComplete: false,
+				}}
+			/>
+		);
+		expect(screen.getByText(THINKING_LABEL_RE)).toBeInTheDocument();
+		expect(screen.getByText("Considering the trade-offs.")).toBeInTheDocument();
+	});
+
+	it("renders a finished ThoughtChatMessage with the 'Thoughts' label", () => {
+		// Once the turn settles the panel collapses by default and the
+		// header copy switches from `Thinking…` to `Thoughts`.
+		render(
+			<ChatMessageItem
+				message={{
+					id: "th-2",
+					sessionId: "s-1",
+					timestamp: 1000,
+					sequence: 1,
+					role: "thought",
+					content: "All done.",
+					turnId: "t-1",
+					isTurnComplete: true,
+				}}
+			/>
+		);
+		expect(screen.getByText(THOUGHTS_LABEL_RE)).toBeInTheDocument();
+	});
+
+	it("renders a PlanChatMessage with header counts and one row per entry", () => {
+		render(
+			<ChatMessageItem
+				message={{
+					id: "pl-1",
+					sessionId: "s-1",
+					timestamp: 1000,
+					sequence: 1,
+					role: "plan",
+					turnId: "t-1",
+					entries: [
+						{ content: "Read repo", status: "completed" },
+						{
+							content: "Write code",
+							status: "in_progress",
+							priority: "high",
+						},
+						{ content: "Run tests", status: "pending" },
+					],
+				}}
+			/>
+		);
+		expect(screen.getByText(PLAN_HEADER_RE)).toBeInTheDocument();
+		expect(screen.getByText("Read repo")).toBeInTheDocument();
+		expect(screen.getByText("Write code")).toBeInTheDocument();
+		expect(screen.getByText("Run tests")).toBeInTheDocument();
+		expect(screen.getByText("high")).toBeInTheDocument();
 	});
 
 	it("uses the status modifier class on tool messages so the dot can be styled", () => {

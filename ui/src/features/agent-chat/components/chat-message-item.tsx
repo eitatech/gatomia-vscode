@@ -47,6 +47,77 @@ export function ChatMessageItem({
 					<div className="agent-chat-message__content">{message.content}</div>
 				</div>
 			);
+		case "thought":
+			// Chain-of-thought block — surfaced verbatim so the user can
+			// see WHY the agent decided to call the next tool / write a
+			// file. Rendered as a muted `<details>` that auto-expands
+			// while streaming and stays collapsible after the turn ends.
+			return (
+				<div
+					className="agent-chat-message agent-chat-message--thought"
+					data-thought-complete={message.isTurnComplete ? "true" : "false"}
+					data-turn-id={message.turnId}
+				>
+					<details
+						className="agent-chat-message__thought"
+						open={!message.isTurnComplete}
+					>
+						<summary className="agent-chat-message__thought-summary">
+							<i aria-hidden="true" className="codicon codicon-lightbulb" />
+							<span>{message.isTurnComplete ? "Thoughts" : "Thinking…"}</span>
+						</summary>
+						<div className="agent-chat-message__thought-content">
+							{message.content}
+						</div>
+					</details>
+				</div>
+			);
+		case "plan": {
+			// Idempotent task list the agent is working through. We
+			// render it as a checkbox-style summary so progress is
+			// scannable. Status drives the icon (pending / running /
+			// done) and the strikethrough on the text.
+			const total = message.entries.length;
+			const done = message.entries.filter(
+				(e) => e.status === "completed"
+			).length;
+			return (
+				<div
+					className="agent-chat-message agent-chat-message--plan"
+					data-turn-id={message.turnId}
+				>
+					<div className="agent-chat-message__plan-header">
+						<i aria-hidden="true" className="codicon codicon-checklist" />
+						<span>
+							Plan ({done}/{total})
+						</span>
+					</div>
+					<ul className="agent-chat-message__plan-list">
+						{message.entries.map((entry, idx) => (
+							<li
+								className={`agent-chat-message__plan-item agent-chat-message__plan-item--${entry.status}`}
+								key={`${message.id}-${idx}`}
+							>
+								<i
+									aria-hidden="true"
+									className={`codicon ${planIconClass(entry.status)}`}
+								/>
+								<span className="agent-chat-message__plan-text">
+									{entry.content}
+								</span>
+								{entry.priority ? (
+									<span
+										className={`agent-chat-message__plan-priority agent-chat-message__plan-priority--${entry.priority}`}
+									>
+										{entry.priority}
+									</span>
+								) : null}
+							</li>
+						))}
+					</ul>
+				</div>
+			);
+		}
 		case "system":
 			return (
 				<div
@@ -139,4 +210,23 @@ function DeliveryBadge({
 			) : null}
 		</div>
 	);
+}
+
+/**
+ * Map a `PlanEntry.status` to the codicon class that visually
+ * represents that state. Used by the plan-list renderer above so
+ * pending / running / completed items each get their own glyph and the
+ * progress is scannable at a glance.
+ */
+function planIconClass(
+	status: "pending" | "in_progress" | "completed"
+): string {
+	switch (status) {
+		case "completed":
+			return "codicon-pass-filled";
+		case "in_progress":
+			return "codicon-loading codicon-modifier-spin";
+		default:
+			return "codicon-circle-large-outline";
+	}
 }

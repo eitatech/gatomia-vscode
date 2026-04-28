@@ -46,8 +46,11 @@ import {
 	type ErrorChatMessage,
 	type ErrorChatMessageCategory,
 	type ModelDescriptor,
+	type PlanChatMessage,
+	type PlanEntry,
 	type SessionLifecycleState,
 	TERMINAL_STATES,
+	type ThoughtChatMessage,
 	type ToolCallChatMessage,
 	type UserChatMessage,
 } from "./types";
@@ -205,6 +208,25 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 	 * patch the same transcript entry in place.
 	 */
 	private readonly toolCallMessageIdByToolCallId = new Map<string, string>();
+
+	/**
+	 * The ephemeral thought-message entry maintained during a turn.
+	 * Streamed `agent_thought_chunk` events append into the same
+	 * message so the UI can render the partial chain-of-thought
+	 * incrementally.
+	 */
+	private inFlightThoughtMessageId: string | undefined;
+
+	/** Coalesced thought text for the in-flight turn. */
+	private thoughtBuffer = "";
+
+	/**
+	 * Plan message id for the current turn. Plans are idempotent — each
+	 * `plan-update` REPLACES the previous entries list — so the runner
+	 * patches the same message in place rather than appending a new
+	 * one.
+	 */
+	private inFlightPlanMessageId: string | undefined;
 
 	constructor(options: AcpChatRunnerOptions) {
 		this.session = options.session;
@@ -453,6 +475,12 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 			case "agent-message-chunk":
 				await this.handleAgentChunk(event.text, event.at);
 				break;
+			case "agent-thought-chunk":
+				await this.handleThoughtChunk(event.text, event.at);
+				break;
+			case "plan-update":
+				await this.handlePlanUpdate(event.entries, event.at);
+				break;
 			case "tool-call":
 				await this.handleToolCallStarted(event);
 				break;
@@ -473,6 +501,11 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 				);
 				break;
 			default:
+				// available-commands-update / current-mode-update /
+				// usage-update / session-info-update / user-message-chunk
+				// are observed on the bus for future consumers but do not
+				// produce transcript entries today. We deliberately skip
+				// them so the chat stays focused on the agent's narrative.
 				break;
 		}
 	}
@@ -519,6 +552,81 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 			currentModelId,
 			at,
 		});
+	}
+
+	private async handleThoughtChunk(
+		textDelta: string,
+		_at: number
+	): Promise<void> {
+		// Coalesce streaming thoughts into a single ThoughtChatMessage
+		// per turn, mirroring how `handleAgentChunk` handles user-facing
+		// content. Thoughts share the same turnId as the agent-visible
+		// reply, so the webview can group them together (collapsible
+		// "thinking" panel above the agent message).
+		this.thoughtBuffer += textDelta;
+		const turnId = this.currentTurnId ?? randomUUID();
+		this.currentTurnId = turnId;
+
+		if (this.inFlightThoughtMessageId) {
+			await this.store.updateMessages(this.sessionId, [
+				{
+					id: this.inFlightThoughtMessageId,
+					patch: { content: this.thoughtBuffer } as Partial<ChatMessage>,
+				},
+			]);
+			return;
+		}
+
+		const id = randomUUID();
+		const message: ThoughtChatMessage = {
+			id,
+			sessionId: this.sessionId,
+			timestamp: this.now(),
+			sequence: this.nextSequence,
+			role: "thought",
+			content: this.thoughtBuffer,
+			turnId,
+			isTurnComplete: false,
+		};
+		this.inFlightThoughtMessageId = id;
+		this.nextSequence += 1;
+		await this.store.appendMessages(this.sessionId, [message]);
+	}
+
+	private async handlePlanUpdate(
+		entries: readonly PlanEntry[],
+		at: number
+	): Promise<void> {
+		// Plans are idempotent — the agent re-emits the entire entries
+		// list on every `plan` notification. We patch the same message
+		// in place so the UI sees a single live list rather than a
+		// growing pile of duplicates.
+		const turnId = this.currentTurnId ?? randomUUID();
+		this.currentTurnId = turnId;
+
+		if (this.inFlightPlanMessageId) {
+			await this.store.updateMessages(this.sessionId, [
+				{
+					id: this.inFlightPlanMessageId,
+					patch: { entries } as Partial<ChatMessage>,
+				},
+			]);
+			return;
+		}
+
+		const id = randomUUID();
+		const message: PlanChatMessage = {
+			id,
+			sessionId: this.sessionId,
+			timestamp: at,
+			sequence: this.nextSequence,
+			role: "plan",
+			turnId,
+			entries,
+		};
+		this.inFlightPlanMessageId = id;
+		this.nextSequence += 1;
+		await this.store.appendMessages(this.sessionId, [message]);
 	}
 
 	private async handleAgentChunk(
@@ -646,6 +754,18 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 			]);
 		}
 
+		// Mark the streaming thought entry (if any) as complete so the
+		// webview can stop the "thinking…" pulse and collapse the panel
+		// once the turn settles.
+		if (this.inFlightThoughtMessageId) {
+			await this.store.updateMessages(this.sessionId, [
+				{
+					id: this.inFlightThoughtMessageId,
+					patch: { isTurnComplete: true } as Partial<ChatMessage>,
+				},
+			]);
+		}
+
 		// T078 — coalesce per-turn stream telemetry: one event per completed
 		// turn (not per chunk) with the coalesced character count so we can
 		// trend output volume without fanning out high-frequency events.
@@ -667,6 +787,9 @@ export class AcpChatRunner implements AgentChatRunnerHandle {
 		this.turnInFlight = false;
 		this.turnBuffer = "";
 		this.inFlightAgentMessageId = undefined;
+		this.thoughtBuffer = "";
+		this.inFlightThoughtMessageId = undefined;
+		this.inFlightPlanMessageId = undefined;
 		this.currentTurnId = undefined;
 
 		const queued = this.queuedFollowUp;

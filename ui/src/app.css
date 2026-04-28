@@ -1183,6 +1183,169 @@ b {
 	color: var(--vscode-descriptionForeground);
 }
 
+/* --- Thought (chain-of-thought) ----------------------------------- */
+
+/*
+ * Chain-of-thought block — rendered as a muted `<details>` with a
+ * lightbulb icon. Sits ABOVE the agent's user-facing reply for the
+ * same turn and stays collapsible after the turn ends.
+ */
+.agent-chat-message--thought {
+	padding: 4px 12px 0 12px;
+}
+
+.agent-chat-message__thought {
+	background: var(--vscode-textBlockQuote-background, transparent);
+	border-left: 2px solid var(--vscode-textLink-foreground, #6c6c6c);
+	padding: 6px 10px;
+	border-radius: 4px;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	margin: 0;
+}
+
+.agent-chat-message__thought-summary {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	user-select: none;
+	font-weight: 500;
+	color: var(--vscode-descriptionForeground);
+}
+
+.agent-chat-message__thought-summary i.codicon {
+	opacity: 0.85;
+}
+
+.agent-chat-message__thought-content {
+	margin-top: 6px;
+	white-space: pre-wrap;
+	font-family: var(--vscode-editor-font-family, "Menlo", "Consolas", monospace);
+	font-size: 11px;
+	line-height: 1.45;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.9;
+}
+
+/*
+ * Pulse the lightbulb while the agent is still streaming thoughts so
+ * the UI feels alive (mirrors the "Thinking…" copy in the summary).
+ */
+.agent-chat-message--thought[data-thought-complete="false"]
+	.agent-chat-message__thought-summary
+	i.codicon {
+	animation: agent-chat-thought-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes agent-chat-thought-pulse {
+	0%,
+	100% {
+		opacity: 0.55;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
+/* --- Plan (idempotent task list) ---------------------------------- */
+
+/*
+ * Compact checklist surfaced via the ACP `plan` notification. Each
+ * `plan-update` REPLACES the entries list, so the runner patches the
+ * same message in place — the UI just rerenders the list with the new
+ * statuses. Strikes through completed entries so the user can tell at
+ * a glance how far along the agent is.
+ */
+.agent-chat-message--plan {
+	padding: 6px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.agent-chat-message__plan-header {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	opacity: 0.75;
+}
+
+.agent-chat-message__plan-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.agent-chat-message__plan-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	line-height: 1.4;
+	color: var(--vscode-foreground);
+	padding: 1px 0;
+}
+
+.agent-chat-message__plan-item i.codicon {
+	flex-shrink: 0;
+	font-size: 13px;
+	opacity: 0.85;
+}
+
+.agent-chat-message__plan-item--completed .agent-chat-message__plan-text {
+	text-decoration: line-through;
+	color: var(--vscode-descriptionForeground);
+}
+
+.agent-chat-message__plan-item--in_progress i.codicon {
+	color: var(--vscode-charts-blue, var(--vscode-textLink-foreground));
+}
+
+.agent-chat-message__plan-item--pending {
+	color: var(--vscode-descriptionForeground);
+}
+
+.agent-chat-message__plan-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.agent-chat-message__plan-priority {
+	margin-left: auto;
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	padding: 1px 6px;
+	border-radius: 4px;
+	background: var(--vscode-badge-background, rgba(128, 128, 128, 0.2));
+	color: var(--vscode-badge-foreground, var(--vscode-foreground));
+	opacity: 0.8;
+}
+
+.agent-chat-message__plan-priority--high {
+	background: color-mix(
+		in srgb,
+		var(--vscode-editorWarning-foreground, #d83b01) 25%,
+		transparent
+	);
+	color: var(--vscode-editorWarning-foreground, #d83b01);
+	opacity: 1;
+}
+
+.agent-chat-message__plan-priority--low {
+	opacity: 0.55;
+}
+
 /* Tool: compact title + status row */
 .agent-chat-message--tool {
 	align-items: center;

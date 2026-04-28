@@ -706,6 +706,83 @@ describe("AcpClient", () => {
 			expect(second.kind).toBe("tool-call-update");
 		});
 
+		it("fans out agent_thought_chunk events as `agent-thought-chunk` with the text payload", async () => {
+			// Thoughts are surfaced as a separate event kind so the
+			// runner can render them in a muted "Thinking…" panel
+			// without conflating them with the agent's user-facing
+			// reply.
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "agent_thought_chunk",
+					content: { type: "text", text: "deciding…" },
+				},
+			});
+
+			expect(listener).toHaveBeenCalledTimes(1);
+			const event = listener.mock.calls[0]?.[0] as {
+				kind: string;
+				text: string;
+			};
+			expect(event.kind).toBe("agent-thought-chunk");
+			expect(event.text).toBe("deciding…");
+		});
+
+		it("fans out plan notifications as `plan-update` events with normalised entries", async () => {
+			// Plan notifications carry the full task list on every
+			// emission. The client must forward them verbatim so the
+			// runner can patch the existing `PlanChatMessage` in place.
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "plan",
+					entries: [
+						{ content: "Read repo", status: "completed" },
+						{
+							content: "Write code",
+							status: "in_progress",
+							priority: "high",
+						},
+					],
+				},
+			});
+
+			expect(listener).toHaveBeenCalledTimes(1);
+			const event = listener.mock.calls[0]?.[0] as {
+				kind: string;
+				entries: Array<{ content: string; status: string; priority?: string }>;
+			};
+			expect(event.kind).toBe("plan-update");
+			expect(event.entries).toHaveLength(2);
+			expect(event.entries[0]).toEqual({
+				content: "Read repo",
+				status: "completed",
+			});
+			expect(event.entries[1]).toEqual({
+				content: "Write code",
+				status: "in_progress",
+				priority: "high",
+			});
+		});
+
 		it("projects ACP `Diff` content into affectedFiles with computed +N/-M stats", async () => {
 			// Phase 3 plumbing: when the agent emits a `tool_call` with
 			// a `diff` content entry the host must surface the file path,

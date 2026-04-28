@@ -140,50 +140,12 @@ export class AgentCapabilitiesService {
 	private computeResolution(agentId: string): ResolvedCapabilities {
 		const reported = this.reader.getInitializeCapabilities(agentId);
 		const cataloged = this.catalog.lookup(agentId);
-
 		if (reported && hasAgentSignal(reported)) {
-			// Agent reports what it knows; we top up with the catalog
-			// so a partial agent payload still benefits from any tiers
-			// the catalog has (e.g. agent surfaces models but not
-			// thinking levels, so the catalog fills that gap). The
-			// optional fields stay OFF the result entirely when neither
-			// source supplied a list — keeps existing
-			// `toStrictEqual({ … })` tests valid and the JSON payload
-			// crossing the bridge a touch smaller.
-			const thinkingLevels = pickThinkingLevels(reported, cataloged);
-			const agentRoles = pickAgentRoles(reported, cataloged);
-			return {
-				source: "agent",
-				modes: normalizeModes(reported.modes ?? []),
-				models: normalizeModels(reported.models ?? []),
-				...(thinkingLevels ? { thinkingLevels } : {}),
-				...(agentRoles ? { agentRoles } : {}),
-				acceptsFollowUp:
-					reported.acceptsFollowUp ??
-					cataloged?.capabilities?.acceptsFollowUp ??
-					DEFAULT_ACCEPTS_FOLLOW_UP,
-			};
+			return resolveFromReported(reported, cataloged);
 		}
-
 		if (cataloged?.capabilities) {
-			// Use the injected catalog's result directly so tests that inject a
-			// stub lookup don't require mutating the module-level seed list.
-			const thinkingLevels = cataloged.capabilities.thinkingLevels
-				? [...cataloged.capabilities.thinkingLevels]
-				: undefined;
-			const agentRoles = cataloged.capabilities.agentRoles
-				? [...cataloged.capabilities.agentRoles]
-				: undefined;
-			return {
-				source: "catalog",
-				modes: [...cataloged.capabilities.modes],
-				models: [...cataloged.capabilities.models],
-				...(thinkingLevels ? { thinkingLevels } : {}),
-				...(agentRoles ? { agentRoles } : {}),
-				acceptsFollowUp: cataloged.capabilities.acceptsFollowUp,
-			};
+			return resolveFromCatalog(cataloged.capabilities);
 		}
-
 		return { source: "none" };
 	}
 
@@ -211,6 +173,58 @@ function hasAgentSignal(reported: AgentInitializeCapabilities): boolean {
 	const hasModels = (reported.models?.length ?? 0) > 0;
 	const hasFollowUpFlag = reported.acceptsFollowUp !== undefined;
 	return hasModes || hasModels || hasFollowUpFlag;
+}
+
+/**
+ * Builds an `agent`-sourced `ResolvedCapabilities`. The agent reports
+ * what it knows; the catalog tops up gaps so a partial payload still
+ * benefits from any tiers we have on file (e.g. agent surfaces models
+ * but not thinking levels, so the catalog fills that gap). Optional
+ * fields stay OFF the result entirely when neither source supplied a
+ * list — keeps existing `toStrictEqual({ … })` tests valid and the
+ * JSON payload crossing the bridge a touch smaller.
+ */
+function resolveFromReported(
+	reported: AgentInitializeCapabilities,
+	cataloged: AgentCatalogEntry | undefined
+): ResolvedCapabilities {
+	const thinkingLevels = pickThinkingLevels(reported, cataloged);
+	const agentRoles = pickAgentRoles(reported, cataloged);
+	return {
+		source: "agent",
+		modes: normalizeModes(reported.modes ?? []),
+		models: normalizeModels(reported.models ?? []),
+		...(thinkingLevels ? { thinkingLevels } : {}),
+		...(agentRoles ? { agentRoles } : {}),
+		acceptsFollowUp:
+			reported.acceptsFollowUp ??
+			cataloged?.capabilities?.acceptsFollowUp ??
+			DEFAULT_ACCEPTS_FOLLOW_UP,
+	};
+}
+
+/**
+ * Builds a `catalog`-sourced `ResolvedCapabilities`. We use the
+ * injected catalog entry directly so tests that inject a stub lookup
+ * don't require mutating the module-level seed list. Both
+ * `thinkingLevels` and `agentRoles` are cloned shallowly so mutation
+ * downstream can't poison the catalog.
+ */
+function resolveFromCatalog(
+	caps: NonNullable<AgentCatalogEntry["capabilities"]>
+): ResolvedCapabilities {
+	const thinkingLevels = caps.thinkingLevels
+		? [...caps.thinkingLevels]
+		: undefined;
+	const agentRoles = caps.agentRoles ? [...caps.agentRoles] : undefined;
+	return {
+		source: "catalog",
+		modes: [...caps.modes],
+		models: [...caps.models],
+		...(thinkingLevels ? { thinkingLevels } : {}),
+		...(agentRoles ? { agentRoles } : {}),
+		acceptsFollowUp: caps.acceptsFollowUp,
+	};
 }
 
 function normalizeModes(

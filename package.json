@@ -319,7 +319,9 @@
           "id": "gatomia",
           "title": "GatomIA",
           "icon": "./assets/icons/gatomia.svg"
-        },
+        }
+      ],
+      "auxiliarybar": [
         {
           "id": "gatomia-chat",
           "title": "GatomIA Chat",

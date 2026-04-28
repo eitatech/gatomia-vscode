@@ -359,6 +359,105 @@ describe("AcpChatRunner (T019)", () => {
 			expect(toolMsg?.status).toBe("succeeded");
 		});
 
+		it("maps agent-thought-chunk events into a coalesced ThoughtChatMessage", async () => {
+			// The runner appends one thought entry on the first chunk and
+			// then patches the same message in place as more chunks arrive,
+			// so the transcript stays at exactly one thought per turn.
+			const session = await seedSession();
+			const runner = makeRunner(session);
+			runner.start("hello");
+			await Promise.resolve();
+
+			manager.emit("acp-session-1", {
+				kind: "agent-thought-chunk",
+				text: "Considering ",
+				at: 50,
+			});
+			manager.emit("acp-session-1", {
+				kind: "agent-thought-chunk",
+				text: "options.",
+				at: 60,
+			});
+			await new Promise((resolve) => setTimeout(resolve, 0));
+
+			const file = memento._store.get(
+				`gatomia.agentChat.sessions.transcript.${session.id}`
+			) as { messages: ChatMessage[] };
+			const thoughts = file.messages.filter(
+				(m) => m.role === "thought"
+			) as Array<{ content: string; isTurnComplete: boolean }>;
+			expect(thoughts).toHaveLength(1);
+			expect(thoughts[0]?.content).toBe("Considering options.");
+			expect(thoughts[0]?.isTurnComplete).toBe(false);
+		});
+
+		it("flips ThoughtChatMessage.isTurnComplete to true on turn-finished", async () => {
+			const session = await seedSession();
+			const runner = makeRunner(session);
+			runner.start("hello");
+			await Promise.resolve();
+
+			manager.emit("acp-session-1", {
+				kind: "agent-thought-chunk",
+				text: "All clear.",
+				at: 50,
+			});
+			manager.emit("acp-session-1", {
+				kind: "turn-finished",
+				stopReason: "end_turn",
+				at: 100,
+			});
+			manager.resolvePendingSend();
+			await new Promise((resolve) => setTimeout(resolve, 0));
+
+			const file = memento._store.get(
+				`gatomia.agentChat.sessions.transcript.${session.id}`
+			) as { messages: ChatMessage[] };
+			const thought = file.messages.find((m) => m.role === "thought") as
+				| { isTurnComplete: boolean }
+				| undefined;
+			expect(thought?.isTurnComplete).toBe(true);
+		});
+
+		it("maps plan-update events into a PlanChatMessage and patches it in place", async () => {
+			// Plans are idempotent — every `plan-update` REPLACES the
+			// entries list. The runner must keep a single plan message
+			// per turn rather than appending duplicates.
+			const session = await seedSession();
+			const runner = makeRunner(session);
+			runner.start("hello");
+			await Promise.resolve();
+
+			manager.emit("acp-session-1", {
+				kind: "plan-update",
+				entries: [
+					{ content: "Read repo", status: "pending" },
+					{ content: "Write code", status: "pending" },
+				],
+				at: 50,
+			});
+			manager.emit("acp-session-1", {
+				kind: "plan-update",
+				entries: [
+					{ content: "Read repo", status: "completed" },
+					{ content: "Write code", status: "in_progress", priority: "high" },
+				],
+				at: 60,
+			});
+			await new Promise((resolve) => setTimeout(resolve, 0));
+
+			const file = memento._store.get(
+				`gatomia.agentChat.sessions.transcript.${session.id}`
+			) as { messages: ChatMessage[] };
+			const plans = file.messages.filter((m) => m.role === "plan") as Array<{
+				entries: ReadonlyArray<{ status: string }>;
+			}>;
+			expect(plans).toHaveLength(1);
+			expect(plans[0]?.entries).toHaveLength(2);
+			expect(plans[0]?.entries[0]?.status).toBe("completed");
+			expect(plans[0]?.entries[1]?.status).toBe("in_progress");
+		});
+
 		it("maps error events to an ErrorChatMessage marked retryable", async () => {
 			const session = await seedSession();
 			const runner = makeRunner(session);

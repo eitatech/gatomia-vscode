@@ -254,6 +254,43 @@ export interface AgentChatMessage extends ChatMessageBase {
 	stopReason?: string;
 }
 
+/**
+ * Streaming chain-of-thought / reasoning the agent emits via the ACP
+ * `agent_thought_chunk` notification. Rendered as a collapsible muted
+ * block above the agent's user-facing message so the user can see *why*
+ * the agent decided to do what it did.
+ *
+ * Coalesced per turn (one entry per turn, content grows as chunks
+ * arrive) — same lifecycle as {@link AgentChatMessage}.
+ */
+export interface ThoughtChatMessage extends ChatMessageBase {
+	role: "thought";
+	content: string;
+	/** Same `turnId` as the `AgentChatMessage` it precedes. */
+	turnId: string;
+	/** True once the turn finished; false during streaming. */
+	isTurnComplete: boolean;
+}
+
+/** Single entry in an ACP `plan` update. */
+export interface PlanEntry {
+	content: string;
+	priority?: "low" | "medium" | "high";
+	status: "pending" | "in_progress" | "completed";
+}
+
+/**
+ * Plan snapshot emitted by the agent during a turn. Plans are
+ * idempotent — each `plan` notification *replaces* the previous entries
+ * list (the runner overwrites the message in place rather than
+ * appending a new one).
+ */
+export interface PlanChatMessage extends ChatMessageBase {
+	role: "plan";
+	turnId: string;
+	entries: readonly PlanEntry[];
+}
+
 export type SystemChatMessageKind =
 	| "session-started"
 	| "mode-changed"
@@ -330,6 +367,8 @@ export interface ErrorChatMessage extends ChatMessageBase {
 export type ChatMessage =
 	| UserChatMessage
 	| AgentChatMessage
+	| ThoughtChatMessage
+	| PlanChatMessage
 	| SystemChatMessage
 	| ToolCallChatMessage
 	| ErrorChatMessage;

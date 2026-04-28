@@ -86,8 +86,59 @@ export interface AcpAffectedFile {
 	languageId?: string;
 }
 
+/**
+ * One entry in an ACP `plan` update — mirrors the SDK's
+ * `Plan.entries[]` shape but kept in our own type so the rest of the
+ * codebase doesn't need a transitive dependency on the SDK schema.
+ */
+export interface AcpPlanEntry {
+	content: string;
+	priority?: "low" | "medium" | "high";
+	status: "pending" | "in_progress" | "completed";
+}
+
+/**
+ * Slash-command surfaced by the agent via `available_commands_update`.
+ * The webview can use these to power a `/`-trigger autocomplete.
+ */
+export interface AcpAvailableCommand {
+	name: string;
+	description?: string;
+	input?: { hint?: string };
+}
+
+/**
+ * Token / cost / context-window snapshot pushed by `usage_update`.
+ * Fields mirror the SDK `Cost` and `Usage` payloads — all optional
+ * because agents emit whichever they track.
+ */
+export interface AcpUsageSnapshot {
+	/** Tokens used so far in this session. */
+	used?: number;
+	/** Total context-window size (tokens). */
+	size?: number;
+	/** Cumulative cost in `currency` for this session. */
+	cost?: { amount: number; currency: string };
+}
+
 export type AcpSessionEvent =
 	| { kind: "agent-message-chunk"; text: string; at: number }
+	| { kind: "agent-thought-chunk"; text: string; at: number }
+	| { kind: "user-message-chunk"; text: string; at: number }
+	| { kind: "plan-update"; entries: readonly AcpPlanEntry[]; at: number }
+	| {
+			kind: "available-commands-update";
+			commands: readonly AcpAvailableCommand[];
+			at: number;
+	  }
+	| { kind: "current-mode-update"; modeId: string; at: number }
+	| { kind: "usage-update"; usage: AcpUsageSnapshot; at: number }
+	| {
+			kind: "session-info-update";
+			title?: string;
+			updatedAt?: string;
+			at: number;
+	  }
 	| {
 			kind: "tool-call";
 			toolCallId: string;
@@ -849,45 +900,17 @@ export class AcpClient {
 
 		return {
 			sessionUpdate(params) {
-				const update = params.update;
-				const sessionId = params.sessionId;
-				const at = Date.now();
-				switch (update.sessionUpdate) {
-					case "agent_message_chunk":
-						if (update.content.type === "text") {
-							output.append(update.content.text);
-							emit(sessionId, {
-								kind: "agent-message-chunk",
-								text: update.content.text,
-								at,
-							});
-						}
-						break;
-					case "tool_call":
-						emitToolCallEvent({
-							output,
-							providerId,
-							sessionId,
-							update,
-							at,
-							emit,
-							kind: "tool-call",
-						});
-						break;
-					case "tool_call_update":
-						emitToolCallEvent({
-							output,
-							providerId,
-							sessionId,
-							update,
-							at,
-							emit,
-							kind: "tool-call-update",
-						});
-						break;
-					default:
-						break;
-				}
+				// Thin trampoline — the actual switch lives in
+				// `dispatchSessionUpdate` so this method stays under the
+				// cyclomatic complexity cap enforced by ultracite (max 15).
+				dispatchSessionUpdate({
+					update: params.update,
+					sessionId: params.sessionId,
+					at: Date.now(),
+					output,
+					providerId,
+					emit,
+				});
 				return Promise.resolve();
 			},
 			requestPermission: (params) =>
@@ -1002,6 +1025,212 @@ async function handleBufferedWrite(args: {
 			`[ACP][${providerId}] writeTextFile flush failed (${params.path}): ${toMessage(error)}`
 		);
 		throw error;
+	}
+}
+
+/**
+ * Top-level dispatcher for the ACP `session/update` notification. The
+ * agent talks to us through one fat union (`SessionNotification`) and
+ * we fan it out into the per-session event bus our runner consumes.
+ *
+ * The switch is split across a handful of small helpers so each piece
+ * stays under the cyclomatic complexity cap (max 15) enforced by
+ * ultracite. The shape of `update` is the ACP SDK's
+ * `SessionUpdateUnion` — see the `@zed-industries/agent-client-protocol`
+ * package for the canonical definition.
+ */
+interface DispatchCtx {
+	update: { sessionUpdate: string } & Record<string, unknown>;
+	sessionId: string;
+	at: number;
+	output: OutputChannel;
+	providerId: string;
+	emit: (sessionId: string, event: AcpSessionEvent) => void;
+}
+
+function dispatchSessionUpdate(ctx: DispatchCtx): void {
+	if (handleChunkUpdate(ctx)) {
+		return;
+	}
+	if (handlePlanOrCommandsUpdate(ctx)) {
+		return;
+	}
+	if (handleSessionMetaUpdate(ctx)) {
+		return;
+	}
+	handleToolCallUpdate(ctx);
+}
+
+/**
+ * Dispatches the three streaming-content notifications:
+ * `agent_message_chunk`, `agent_thought_chunk`, `user_message_chunk`.
+ * Returns `true` when handled.
+ */
+function handleChunkUpdate(ctx: DispatchCtx): boolean {
+	const { update, sessionId, at, output, emit } = ctx;
+	const u = update as {
+		sessionUpdate: string;
+		content?: { type?: string; text?: string };
+	};
+	if (u.sessionUpdate === "agent_message_chunk") {
+		if (u.content?.type === "text" && typeof u.content.text === "string") {
+			output.append(u.content.text);
+			emit(sessionId, {
+				kind: "agent-message-chunk",
+				text: u.content.text,
+				at,
+			});
+		}
+		return true;
+	}
+	if (u.sessionUpdate === "agent_thought_chunk") {
+		// Thoughts are the agent's chain-of-thought stream. Surfaced
+		// verbatim so the user can see *why* the agent decided to
+		// invoke a tool / write a file.
+		if (u.content?.type === "text" && typeof u.content.text === "string") {
+			output.append(`\n[thought] ${u.content.text}\n`);
+			emit(sessionId, {
+				kind: "agent-thought-chunk",
+				text: u.content.text,
+				at,
+			});
+		}
+		return true;
+	}
+	if (u.sessionUpdate === "user_message_chunk") {
+		// Echoed user input — some agents replay the prompt after
+		// expansion. Forwarded as a low-priority event; the runner
+		// currently ignores it but the bus stays observable for
+		// future consumers.
+		if (u.content?.type === "text" && typeof u.content.text === "string") {
+			emit(sessionId, {
+				kind: "user-message-chunk",
+				text: u.content.text,
+				at,
+			});
+		}
+		return true;
+	}
+	return false;
+}
+
+/** Dispatches `plan` and `available_commands_update`. */
+function handlePlanOrCommandsUpdate(ctx: DispatchCtx): boolean {
+	const { update, sessionId, at, output, emit } = ctx;
+	const kind = (update as { sessionUpdate: string }).sessionUpdate;
+	if (kind === "plan") {
+		const raw = (update as { entries?: readonly AcpPlanEntry[] }).entries;
+		const entries = (raw ?? []).map((e) => ({
+			content: e.content,
+			priority: e.priority,
+			status: e.status,
+		})) as AcpPlanEntry[];
+		output.appendLine(
+			`\n[plan] ${entries.length} entr${entries.length === 1 ? "y" : "ies"}`
+		);
+		emit(sessionId, { kind: "plan-update", entries, at });
+		return true;
+	}
+	if (kind === "available_commands_update") {
+		const cmds =
+			(
+				update as {
+					availableCommands?: readonly {
+						name: string;
+						description?: string;
+						input?: { hint?: string };
+					}[];
+				}
+			).availableCommands ?? [];
+		emit(sessionId, {
+			kind: "available-commands-update",
+			commands: cmds.map((c) => ({
+				name: c.name,
+				description: c.description,
+				input: c.input ? { hint: c.input.hint } : undefined,
+			})),
+			at,
+		});
+		return true;
+	}
+	return false;
+}
+
+/** Dispatches `current_mode_update`, `session_info_update`, `usage_update`. */
+function handleSessionMetaUpdate(ctx: DispatchCtx): boolean {
+	const { update, sessionId, at, emit } = ctx;
+	const kind = (update as { sessionUpdate: string }).sessionUpdate;
+	if (kind === "current_mode_update") {
+		emit(sessionId, {
+			kind: "current-mode-update",
+			modeId: (update as unknown as { currentModeId: string }).currentModeId,
+			at,
+		});
+		return true;
+	}
+	if (kind === "session_info_update") {
+		const u = update as { title?: string | null; updatedAt?: string | null };
+		emit(sessionId, {
+			kind: "session-info-update",
+			title: u.title ?? undefined,
+			updatedAt: u.updatedAt ?? undefined,
+			at,
+		});
+		return true;
+	}
+	if (kind === "usage_update") {
+		const u = update as {
+			used?: number;
+			size?: number;
+			cost?: { amount: number; currency: string } | null;
+		};
+		emit(sessionId, {
+			kind: "usage-update",
+			usage: {
+				used: u.used,
+				size: u.size,
+				cost:
+					u.cost == null
+						? undefined
+						: { amount: u.cost.amount, currency: u.cost.currency },
+			},
+			at,
+		});
+		return true;
+	}
+	return false;
+}
+
+/** Dispatches `tool_call` / `tool_call_update`. */
+function handleToolCallUpdate(ctx: DispatchCtx): void {
+	const { update, sessionId, at, output, providerId, emit } = ctx;
+	const kind = (update as { sessionUpdate: string }).sessionUpdate;
+	if (kind === "tool_call") {
+		emitToolCallEvent({
+			output,
+			providerId,
+			sessionId,
+			update: update as unknown as Parameters<
+				typeof emitToolCallEvent
+			>[0]["update"],
+			at,
+			emit,
+			kind: "tool-call",
+		});
+		return;
+	}
+	if (kind === "tool_call_update") {
+		emitToolCallEvent({
+			output,
+			providerId,
+			sessionId,
+			update: update as unknown as Parameters<
+				typeof emitToolCallEvent
+			>[0]["update"],
+			at,
+			emit,
+			kind: "tool-call-update",
+		});
 	}
 }
 
