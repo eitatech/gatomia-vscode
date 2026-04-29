@@ -7,7 +7,13 @@ import type { AcpProviderProbe } from "../types";
 const DEFAULT_TIMEOUT_MS = 5000;
 const GEMINI_ENV_VAR = "GEMINI_API_KEY";
 const GOOGLE_ENV_VAR = "GOOGLE_API_KEY";
-const ACP_FLAG_PATTERN = /--experimental-acp|\bacp\b/i;
+// Match the actual CLI flag forms only:
+//   - `--acp`              (current)
+//   - `--experimental-acp` (legacy)
+// A bare mention of "ACP" in help prose (e.g. "Agent Client Protocol") is NOT
+// enough to flip `acpSupported` to true — the CLI must explicitly advertise a
+// flag we can pass to the spawn invocation.
+const ACP_FLAG_PATTERN = /(?:^|\s)--(?:experimental-)?acp\b/im;
 
 /**
  * Probe the Gemini CLI to determine whether GatomIA can route prompts to it
@@ -18,9 +24,9 @@ const ACP_FLAG_PATTERN = /--experimental-acp|\bacp\b/i;
  *   2. Authentication is considered OK when either `GEMINI_API_KEY` /
  *      `GOOGLE_API_KEY` env var is set, OR the OAuth credentials file created
  *      by `gemini auth login` (`~/.gemini/oauth_creds.json`) is readable.
- *   3. ACP capability is detected by looking for the ACP flag in the
- *      `gemini --help` output (the flag was `--experimental-acp` as of v0.3;
- *      this probe also accepts a plain `acp` subcommand to be forward-compat).
+ *   3. ACP capability is detected by looking for an `--acp` or
+ *      `--experimental-acp` flag in the `gemini --help` output. Bare mentions
+ *      of the word "ACP" in prose do not count.
  */
 export const probeGeminiCli = async (
 	timeoutMs: number = DEFAULT_TIMEOUT_MS

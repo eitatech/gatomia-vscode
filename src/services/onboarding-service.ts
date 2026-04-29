@@ -2,7 +2,8 @@ import { Uri, env, window } from "vscode";
 import type { AcpProviderDescriptor } from "./acp/types";
 
 export interface OnboardingStore {
-	get<T>(key: string, fallback?: T): T;
+	get<T>(key: string): T | undefined;
+	get<T>(key: string, fallback: T): T;
 	update(key: string, value: unknown): Thenable<void> | Promise<void>;
 }
 

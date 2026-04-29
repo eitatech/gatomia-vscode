@@ -214,7 +214,7 @@ export class ChatParticipantRegistry {
 				this.renderResponse(stream, response);
 
 				// Send telemetry
-				context.telemetry.sendTelemetryEvent(
+				executionContext.telemetry.sendTelemetryEvent(
 					"agent.tool.executed",
 					{
 						agentId: agent.id,
@@ -235,12 +235,17 @@ export class ChatParticipantRegistry {
 
 				// T061 - Render error with actionable guidance
 				// T062 - Send error telemetry with classification
-				this.handleToolExecutionError(error, stream, context.telemetry, {
-					agentId: agent.id,
-					commandName,
-					toolName: command.tool,
-					duration,
-				});
+				this.handleToolExecutionError(
+					error,
+					stream,
+					executionContext.telemetry,
+					{
+						agentId: agent.id,
+						commandName,
+						toolName: command.tool,
+						duration,
+					}
+				);
 			}
 		} catch (error) {
 			this.outputChannel.appendLine(
@@ -257,7 +262,9 @@ export class ChatParticipantRegistry {
 		agent: AgentDefinition,
 		chatContext: ChatContext
 	): ToolExecutionContext {
-		const workspaceFolders = workspace.workspaceFolders || [];
+		const workspaceFolders = workspace.workspaceFolders
+			? [...workspace.workspaceFolders]
+			: [];
 		const workspaceUri = workspaceFolders[0]?.uri || Uri.file(process.cwd());
 		const workspaceName = workspaceFolders[0]?.name || "Workspace";
 

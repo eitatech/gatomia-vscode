@@ -3,6 +3,8 @@
  * Based on specs/006-welcome-screen/contracts/messages.md
  */
 
+import type { IdeHost } from "../utils/ide-host-detector";
+
 // ============================================================================
 // Extension → Webview Messages
 // ============================================================================
@@ -18,6 +20,7 @@ export interface WelcomeStateMessage {
 	hasShownBefore: boolean;
 	dontShowOnStartup: boolean;
 	currentView: "setup" | "features" | "configuration" | "status" | "learning";
+	ideHost: IdeHost;
 	dependencies: DependencyStatus;
 	configuration: ConfigurationState;
 	diagnostics: SystemDiagnostic[];
@@ -62,11 +65,36 @@ export type InstallableDependency =
 	| "speckit"
 	| "openspec"
 	| "copilot-cli"
-	| "gatomia-cli";
+	| "gatomia-cli"
+	| "devin-cli"
+	| "gemini-cli";
+
+/**
+ * System-level prerequisites required by most tool dependencies.
+ * These are always required regardless of IDE host.
+ */
+export type SystemPrerequisiteKey = "node" | "python" | "uv";
+
+export interface SystemPrerequisiteStatus {
+	installed: boolean;
+	version: string | null;
+}
+
+export interface WelcomeInstallProgressMessage {
+	type: "welcome/install-progress";
+	stepId: string;
+	status: "started" | "running" | "finished" | "error";
+	message?: string;
+}
 
 export interface WelcomeDiagnosticAddedMessage {
 	type: "welcome/diagnostic-added";
 	diagnostic: SystemDiagnostic;
+}
+
+export interface WelcomeInstallAllFinishedMessage {
+	type: "welcome/install-all-finished";
+	errored: boolean;
 }
 
 export interface WelcomeErrorMessage {
@@ -82,7 +110,9 @@ export type ExtensionToWebviewMessage =
 	| WelcomeConfigUpdatedMessage
 	| WelcomeDependencyStatusMessage
 	| WelcomeDiagnosticAddedMessage
-	| WelcomeErrorMessage;
+	| WelcomeErrorMessage
+	| WelcomeInstallProgressMessage
+	| WelcomeInstallAllFinishedMessage;
 
 // ============================================================================
 // Webview → Extension Messages
@@ -107,6 +137,16 @@ export interface WelcomeUpdateConfigMessage {
 export interface WelcomeInstallDependencyMessage {
 	type: "welcome/install-dependency";
 	dependency: InstallableDependency;
+}
+
+export interface WelcomeInstallMissingDependenciesMessage {
+	type: "welcome/install-missing-dependencies";
+	dependencies: InstallableDependency[];
+}
+
+export interface WelcomeInstallPrerequisiteMessage {
+	type: "welcome/install-prerequisite";
+	prerequisite: SystemPrerequisiteKey;
 }
 
 export interface WelcomeRefreshDependenciesMessage {
@@ -139,6 +179,8 @@ export type WebviewToExtensionMessage =
 	| WelcomeExecuteCommandMessage
 	| WelcomeUpdateConfigMessage
 	| WelcomeInstallDependencyMessage
+	| WelcomeInstallMissingDependenciesMessage
+	| WelcomeInstallPrerequisiteMessage
 	| WelcomeRefreshDependenciesMessage
 	| WelcomeUpdatePreferenceMessage
 	| WelcomeOpenExternalMessage
@@ -183,6 +225,12 @@ export interface DependencyStatus {
 		authenticated: boolean;
 		acpSupported: boolean;
 	};
+	/**
+	 * System-level prerequisites required for most tool installs.
+	 * Optional on the interface so older fixtures remain valid; the
+	 * DependencyChecker populates it on every `checkAll()` call.
+	 */
+	prerequisites?: Record<SystemPrerequisiteKey, SystemPrerequisiteStatus>;
 	lastChecked: number;
 }
 
@@ -226,9 +274,31 @@ export interface LearningResource {
 	estimatedMinutes: number | null;
 }
 
+/**
+ * High-level grouping for quick-action cards rendered in the Welcome Screen
+ * "Features" tab. The order of this union is not guaranteed to match render
+ * order; the UI keeps its own `FEATURE_AREA_ORDER` list to ensure a stable
+ * presentation regardless of how the provider emits actions.
+ *
+ * @remarks
+ * `Chat Provider` is only populated on ACP-capable IDE hosts (Windsurf /
+ * Antigravity) where GatomIA routes prompts through the companion CLI via the
+ * Agent Client Protocol.
+ */
+export type FeatureArea =
+	| "Specs"
+	| "SpecKit Workflow"
+	| "Actions"
+	| "Hooks"
+	| "Steering"
+	| "Cloud Agents"
+	| "Chat Provider"
+	| "Documentation"
+	| "Configuration";
+
 export interface FeatureAction {
 	id: string;
-	featureArea: "Specs" | "Actions" | "Hooks" | "Steering";
+	featureArea: FeatureArea;
 	label: string;
 	description: string;
 	commandId: string;
@@ -243,6 +313,7 @@ export interface FeatureAction {
 export interface WelcomeScreenState {
 	extensionVersion: string;
 	vscodeVersion: string;
+	ideHost: IdeHost;
 	hasShownBefore: boolean;
 	dontShowOnStartup: boolean;
 	currentView: "setup" | "features" | "configuration" | "status" | "learning";
