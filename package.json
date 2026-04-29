@@ -103,6 +103,14 @@
           "default": true,
           "description": "Controls visibility of the Repo Wiki view in the activity bar."
         },
+        "gatomia.agentChat.maxConcurrentAcpSessions": {
+          "type": "integer",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Maximum number of concurrent ACP Agent Chat sessions. When reached, starting a new chat surfaces a QuickPick that lets you cancel an idle session or abort the start.",
+          "order": 50
+        },
         "gatomia.copilot.specsPath": {
           "type": "string",
           "default": "speckit",
@@ -296,6 +304,12 @@
           "default": true,
           "description": "Consult the public ACP Registry to suggest additional providers. Built-in providers (Devin, Gemini) do not depend on this.",
           "order": 54
+        },
+        "gatomia.agentChat.bufferFileWrites": {
+          "type": "boolean",
+          "default": true,
+          "description": "Buffer agent file edits and require explicit Accept/Reject before they hit disk. When disabled, edits are written immediately (legacy behaviour).",
+          "order": 55
         }
       }
     },
@@ -306,10 +320,33 @@
           "title": "GatomIA",
           "icon": "./assets/icons/gatomia.svg"
         }
+      ],
+      "auxiliarybar": [
+        {
+          "id": "gatomia-chat",
+          "title": "GatomIA Chat",
+          "icon": "./assets/icons/gatomia.svg"
+        }
       ]
     },
     "views": {
+      "gatomia-chat": [
+        {
+          "id": "gatomia.views.agentChat",
+          "name": "Agent Chat",
+          "type": "webview",
+          "icon": "comment-discussion",
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && !gatomia.host.chatInPrimary"
+        }
+      ],
       "gatomia": [
+        {
+          "id": "gatomia.views.agentChatPrimary",
+          "name": "Agent Chat",
+          "type": "webview",
+          "icon": "comment-discussion",
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0) && gatomia.host.chatInPrimary"
+        },
         {
           "id": "gatomia.views.specExplorer",
           "name": "Specs",
@@ -344,6 +381,12 @@
           "id": "gatomia.views.cloudAgents",
           "name": "Cloud Agents",
           "icon": "cloud",
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0)"
+        },
+        {
+          "id": "gatomia.views.runningAgents",
+          "name": "Running Agents",
+          "icon": "pulse",
           "when": "!(workbenchState == empty || workspaceFolderCount == 0)"
         },
         {
@@ -851,10 +894,92 @@
         "title": "Cancel Active ACP Session",
         "category": "GatomIA",
         "icon": "$(debug-stop)"
+      },
+      {
+        "command": "gatomia.agentChat.openForSession",
+        "title": "Open Agent Chat",
+        "category": "GatomIA",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "gatomia.agentChat.cancel",
+        "title": "Cancel Agent Chat Session",
+        "category": "GatomIA",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "gatomia.agentChat.openLogChannel",
+        "title": "Open ACP Log Channel",
+        "category": "GatomIA",
+        "icon": "$(output)"
+      },
+      {
+        "command": "gatomia.agentChat.cleanupOrphanedWorktree",
+        "title": "Clean Up Orphaned Worktree",
+        "category": "GatomIA",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "gatomia.agentChat.newSession",
+        "title": "New Agent Chat Session…",
+        "category": "GatomIA",
+        "icon": "$(add)"
+      },
+      {
+        "command": "gatomia.agentChat.openPanel",
+        "title": "Open Agent Chat Panel",
+        "category": "GatomIA",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "gatomia.agentChat.focusSidebar",
+        "title": "Focus Agent Chat Sidebar",
+        "category": "GatomIA",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "gatomia.agentChat.toggleHistory",
+        "title": "Show Agent Chat History",
+        "category": "GatomIA",
+        "icon": "$(history)"
+      },
+      {
+        "command": "gatomia.agentChat.openInSecondarySidebar",
+        "title": "Open Agent Chat",
+        "category": "GatomIA",
+        "icon": "$(comment-discussion)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "gatomia.agentChat.openInSecondarySidebar",
+        "key": "ctrl+l",
+        "mac": "cmd+l",
+        "when": "!terminalFocus && !inSnippetMode && editorTextFocus || !terminalFocus && !inSnippetMode"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "gatomia.agentChat.newSession",
+          "when": "view == gatomia.views.agentChat",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gatomia.agentChat.toggleHistory",
+          "when": "view == gatomia.views.agentChat",
+          "group": "navigation@2"
+        },
+        {
+          "command": "gatomia.agentChat.newSession",
+          "when": "view == gatomia.views.runningAgents",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gatomia.agentChat.openPanel",
+          "when": "view == gatomia.views.runningAgents",
+          "group": "navigation@2"
+        },
         {
           "command": "gatomia.refreshCloudAgents",
           "when": "view == gatomia.views.cloudAgents && gatomia.cloudAgent.hasProvider",
@@ -1076,6 +1201,21 @@
           "command": "gatomia.hooks.viewLogs",
           "when": "view == gatomia.views.hooksExplorer && (viewItem == hook-enabled || viewItem == hook-disabled)",
           "group": "7_modification@2"
+        },
+        {
+          "command": "gatomia.agentChat.cancel",
+          "when": "view == gatomia.views.runningAgents && (viewItem == agent-chat-session || viewItem == agent-chat-session-worktree)",
+          "group": "inline@1"
+        },
+        {
+          "command": "gatomia.agentChat.openLogChannel",
+          "when": "view == gatomia.views.runningAgents && (viewItem == agent-chat-session || viewItem == agent-chat-session-worktree || viewItem == agent-chat-group-active || viewItem == agent-chat-group-recent)",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gatomia.agentChat.cleanupOrphanedWorktree",
+          "when": "view == gatomia.views.runningAgents && viewItem == agent-chat-orphan-worktree",
+          "group": "inline@1"
         }
       ],
       "commandPalette": [
@@ -1139,6 +1279,9 @@
         },
         {
           "command": "gatomia.settings.openGlobalConfig"
+        },
+        {
+          "command": "gatomia.agentChat.openInSecondarySidebar"
         }
       ]
     }

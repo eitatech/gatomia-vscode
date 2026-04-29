@@ -23,11 +23,6 @@ const SimpleView = lazy(() =>
 const HooksView = lazy(() =>
 	import("./features/hooks-view").then((m) => ({ default: m.HooksView }))
 );
-const DependenciesView = lazy(() =>
-	import("./features/dependencies-view").then((m) => ({
-		default: m.DependenciesView,
-	}))
-);
 const PreviewApp = lazy(() =>
 	import("./features/preview/preview-app").then((m) => ({
 		default: m.PreviewApp,
@@ -38,6 +33,11 @@ const WelcomeScreen = lazy(() =>
 		default: m.WelcomeScreen,
 	}))
 );
+const AgentChatFeature = lazy(() =>
+	import("./features/agent-chat").then((m) => ({
+		default: m.AgentChatFeature,
+	}))
+);
 
 export type SupportedPage =
 	| "simple"
@@ -45,9 +45,9 @@ export type SupportedPage =
 	| "create-spec"
 	| "create-steering"
 	| "hooks"
-	| "dependencies"
 	| "document-preview"
-	| "welcome-screen";
+	| "welcome-screen"
+	| "agent-chat";
 
 function LoadingFallback() {
 	return (
@@ -79,7 +79,6 @@ const pageRenderers = {
 	"create-spec": () => withSuspense(CreateSpecView),
 	"create-steering": () => withSuspense(CreateSteeringView),
 	hooks: () => withSuspense(HooksView),
-	dependencies: () => withSuspense(DependenciesView),
 	"document-preview": () => withSuspense(PreviewApp),
 	"welcome-screen": () => (
 		<Suspense fallback={<LoadingFallback />}>
@@ -88,6 +87,7 @@ const pageRenderers = {
 			</WelcomeErrorBoundary>
 		</Suspense>
 	),
+	"agent-chat": () => withSuspense(AgentChatFeature),
 } satisfies Record<SupportedPage, () => JSX.Element>;
 
 export const getPageRenderer = (pageName: string) => {

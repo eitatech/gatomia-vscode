@@ -129,7 +129,15 @@ describe("AcpProviderRegistry", () => {
 			const fetchMock = vi.fn().mockResolvedValue({
 				ok: true,
 				json: async () => ({
-					agents: [{ id: "codex", displayName: "Codex" }],
+					agents: [
+						{
+							id: "codex",
+							displayName: "Codex",
+							distribution: {
+								npx: { package: "@openai/codex" },
+							},
+						},
+					],
 				}),
 			});
 

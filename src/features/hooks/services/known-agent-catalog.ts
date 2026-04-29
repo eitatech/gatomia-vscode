@@ -22,7 +22,8 @@ export type KnownAgentId =
 	| "github-copilot"
 	| "codex-acp"
 	| "mistral-vibe"
-	| "opencode";
+	| "opencode"
+	| "junie";
 
 /**
  * Strategy for detecting whether a known agent is installed on the system.
@@ -47,6 +48,10 @@ export interface KnownAgentEntry {
 	 * The agent is considered installed if ANY strategy succeeds.
 	 */
 	installChecks: InstallCheckStrategy[];
+	/** Optional install URL surfaced in onboarding when the binary is missing. */
+	installUrl?: string;
+	/** Optional one-line description shown in the New Session picker. */
+	description?: string;
 }
 
 // ============================================================================
@@ -54,7 +59,7 @@ export interface KnownAgentEntry {
 // ============================================================================
 
 /**
- * The 7 known ACP-compatible agents supported out-of-the-box.
+ * The 8 known ACP-compatible agents supported out-of-the-box.
  * Command strings are derived from the ACP public registry
  * at https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json
  *
@@ -93,12 +98,21 @@ export const KNOWN_AGENTS: readonly KnownAgentEntry[] = [
 	{
 		id: "github-copilot",
 		displayName: "GitHub Copilot",
-		agentCommand: "npx @github/copilot-language-server --acp",
+		// As of @github/copilot >= 1.0.x the unified Copilot CLI binary
+		// (`copilot`) speaks ACP natively via `--acp`. We prefer the direct
+		// binary spawn over `npx` so users with the global install don't
+		// re-download anything. The legacy `@github/copilot-language-server`
+		// path is preserved below for backward compatibility.
+		agentCommand: "copilot --acp",
 		installChecks: [
-			// npm global install: the binary is named copilot-language-server (not github-copilot-language-server)
-			{ strategy: "npm-global", target: "@github/copilot-language-server" },
-			// Binary present in PATH — installed via npm -g, the binary is copilot-language-server
+			// New unified product (npm i -g @github/copilot) — binary is `copilot`.
+			{ strategy: "path", target: "copilot" },
+			{ strategy: "npm-global", target: "@github/copilot" },
+			// Legacy language-server distribution. Some users still have
+			// only this installed; keep recognising it so they aren't
+			// nagged to re-install.
 			{ strategy: "path", target: "copilot-language-server" },
+			{ strategy: "npm-global", target: "@github/copilot-language-server" },
 		],
 	},
 	{
@@ -124,6 +138,17 @@ export const KNOWN_AGENTS: readonly KnownAgentEntry[] = [
 		displayName: "OpenCode",
 		agentCommand: "opencode acp",
 		installChecks: [{ strategy: "path", target: "opencode" }],
+		installUrl: "https://opencode.ai",
+	},
+	{
+		id: "junie",
+		displayName: "JetBrains Junie",
+		// JetBrains' Junie CLI ships with `junie` and exposes ACP via the
+		// `--acp=true` flag (per JetBrains docs).
+		agentCommand: "junie --acp=true",
+		installChecks: [{ strategy: "path", target: "junie" }],
+		installUrl: "https://www.jetbrains.com/junie",
+		description: "JetBrains' AI coding agent with ACP support",
 	},
 ] as const;
 

@@ -108,8 +108,23 @@ export class AgentService {
 			this.registry.setToolRegistry(this.toolRegistry);
 			this.registry.setResourceCache(this.resourceCache);
 
-			// T067 - Register built-in help handler
-			this.toolRegistry.register("agent.help", helpHandler);
+			// T067 - Register built-in help handler. We wrap `helpHandler`
+			// (synchronous, custom params shape) so it satisfies the
+			// `ToolHandler` contract (`(ToolExecutionParams) => Promise<ToolResponse>`).
+			this.toolRegistry.register("agent.help", (params) => {
+				const result = helpHandler({
+					input: params.input,
+					context: { agent: params.context.agent },
+					telemetry: {
+						sendEvent: (eventName, properties) =>
+							params.context.telemetry.sendTelemetryEvent(
+								eventName,
+								properties as Record<string, string> | undefined
+							),
+					},
+				});
+				return Promise.resolve({ content: result.content });
+			});
 			this.outputChannel.appendLine(
 				"[AgentService] Registered built-in help handler"
 			);

@@ -174,12 +174,16 @@ export class DocumentPreviewPanel {
 				await this.handleExecuteTaskGroup(message.payload);
 				return;
 			case "preview/open-file":
-				await this.options.onOpenFile?.(message.payload?.filePath);
+				if (message.payload?.filePath) {
+					await this.options.onOpenFile?.(message.payload.filePath);
+				}
 				return;
-			default:
+			default: {
+				const unknownMessage = message as { type?: string } | undefined;
 				this.outputChannel.appendLine(
-					`[DocumentPreviewPanel] Unknown message received: ${message?.type ?? "undefined"}`
+					`[DocumentPreviewPanel] Unknown message received: ${unknownMessage?.type ?? "undefined"}`
 				);
+			}
 		}
 	}
 

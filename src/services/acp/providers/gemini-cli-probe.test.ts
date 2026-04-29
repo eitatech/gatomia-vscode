@@ -131,4 +131,41 @@ describe("probeGeminiCli", () => {
 		expect(probe.installed).toBe(false);
 		expect(probe.error).toContain("spawn EACCES");
 	});
+
+	it("does NOT flag ACP support when help only mentions 'ACP' in prose", async () => {
+		process.env.GEMINI_API_KEY = "gk_test";
+		mockedCheckCLI
+			.mockResolvedValueOnce({ installed: true, version: "1.0.0" })
+			.mockResolvedValueOnce({
+				installed: true,
+				version: null,
+				output:
+					"Gemini CLI — a command-line tool compatible with the Agent Client Protocol (ACP).\nUsage: gemini [command] [options]\n  --help     Show help",
+			});
+		mockedLocate.mockResolvedValueOnce("/usr/local/bin/gemini");
+		mockedAccess.mockRejectedValueOnce(new Error("no creds"));
+
+		const probe = await probeGeminiCli();
+
+		expect(probe.installed).toBe(true);
+		expect(probe.acpSupported).toBe(false);
+	});
+
+	it("flags ACP support when help advertises the new --acp flag", async () => {
+		process.env.GEMINI_API_KEY = "gk_test";
+		mockedCheckCLI
+			.mockResolvedValueOnce({ installed: true, version: "1.0.0" })
+			.mockResolvedValueOnce({
+				installed: true,
+				version: null,
+				output: "  --acp                Run Gemini CLI in ACP server mode",
+			});
+		mockedLocate.mockResolvedValueOnce("/usr/local/bin/gemini");
+		mockedAccess.mockRejectedValueOnce(new Error("no creds"));
+
+		const probe = await probeGeminiCli();
+
+		expect(probe.installed).toBe(true);
+		expect(probe.acpSupported).toBe(true);
+	});
 });

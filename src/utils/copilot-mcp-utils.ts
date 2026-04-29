@@ -259,10 +259,12 @@ export async function executeMCPTool(
 			parameters
 		);
 
-		// Invoke the tool using VS Code's Language Model API
+		// Invoke the tool using VS Code's Language Model API. We are calling
+		// this outside of a chat request, so `toolInvocationToken` is
+		// intentionally `undefined` per the VS Code API contract.
 		const result = await lm.invokeTool(
 			toolName,
-			{ input: parameters },
+			{ input: parameters, toolInvocationToken: undefined },
 			new CancellationTokenSource().token
 		);
 

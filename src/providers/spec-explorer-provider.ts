@@ -10,7 +10,10 @@ import {
 	TreeItemCollapsibleState,
 	workspace,
 } from "vscode";
-import type { Specification } from "../features/spec/review-flow/types";
+import type {
+	ChangeRequestStatus,
+	Specification,
+} from "../features/spec/review-flow/types";
 import type { SpecManager } from "../features/spec/spec-manager";
 import { SPEC_SYSTEM_MODE, type SpecSystemMode } from "../constants";
 import {
@@ -1169,8 +1172,9 @@ class SpecItem extends TreeItem {
 		this.iconPath = new ThemeIcon(icon, color);
 
 		// Build tooltip with details
-		const statusEmoji = {
+		const statusEmoji: Record<ChangeRequestStatus, string> = {
 			open: "🔴",
+			blocked: "🚫",
 			inProgress: "🟡",
 			addressed: "✅",
 		};
