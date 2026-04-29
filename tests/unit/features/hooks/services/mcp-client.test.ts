@@ -186,8 +186,8 @@ describe("MCPClientService", () => {
 	});
 
 	describe("validateParameters", () => {
-		it("validates successfully with all required parameters", () => {
-			const result = service.validateParameters(
+		it("validates successfully with all required parameters", async () => {
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{
@@ -199,8 +199,8 @@ describe("MCPClientService", () => {
 			expect(result.errors).toHaveLength(0);
 		});
 
-		it("returns error for missing required parameter", () => {
-			const result = service.validateParameters(
+		it("returns error for missing required parameter", async () => {
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{} // Missing 'title'
@@ -212,8 +212,8 @@ describe("MCPClientService", () => {
 			expect(result.errors[0].message).toContain("Required parameter");
 		});
 
-		it("validates parameter types correctly", () => {
-			const result = service.validateParameters(
+		it("validates parameter types correctly", async () => {
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{
@@ -228,8 +228,8 @@ describe("MCPClientService", () => {
 			).toContain("incorrect type");
 		});
 
-		it("validates string type correctly", () => {
-			const result = service.validateParameters(
+		it("validates string type correctly", async () => {
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{
@@ -241,8 +241,8 @@ describe("MCPClientService", () => {
 			expect(result.valid).toBe(true);
 		});
 
-		it("validates number type correctly", () => {
-			const result = service.validateParameters(
+		it("validates number type correctly", async () => {
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{
@@ -254,8 +254,8 @@ describe("MCPClientService", () => {
 			expect(result.valid).toBe(true);
 		});
 
-		it("validates boolean type correctly", () => {
-			const result = service.validateParameters(
+		it("validates boolean type correctly", async () => {
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{
@@ -267,8 +267,8 @@ describe("MCPClientService", () => {
 			expect(result.valid).toBe(true);
 		});
 
-		it("rejects invalid number type", () => {
-			const result = service.validateParameters(
+		it("rejects invalid number type", async () => {
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{
@@ -281,8 +281,8 @@ describe("MCPClientService", () => {
 			expect(result.errors.some((e) => e.parameter === "priority")).toBe(true);
 		});
 
-		it("rejects invalid boolean type", () => {
-			const result = service.validateParameters(
+		it("rejects invalid boolean type", async () => {
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{
@@ -295,8 +295,8 @@ describe("MCPClientService", () => {
 			expect(result.errors.some((e) => e.parameter === "urgent")).toBe(true);
 		});
 
-		it("validates enum values correctly", () => {
-			const result = service.validateParameters(
+		it("validates enum values correctly", async () => {
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{
@@ -308,8 +308,8 @@ describe("MCPClientService", () => {
 			expect(result.valid).toBe(true);
 		});
 
-		it("rejects invalid enum values", () => {
-			const result = service.validateParameters(
+		it("rejects invalid enum values", async () => {
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{
@@ -325,8 +325,8 @@ describe("MCPClientService", () => {
 			).toContain("enum");
 		});
 
-		it("handles null values for non-required parameters", () => {
-			const result = service.validateParameters(
+		it("handles null values for non-required parameters", async () => {
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{
@@ -338,8 +338,8 @@ describe("MCPClientService", () => {
 			expect(result.valid).toBe(true);
 		});
 
-		it("rejects null values for required parameters", () => {
-			const result = service.validateParameters(
+		it("rejects null values for required parameters", async () => {
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{
@@ -351,8 +351,8 @@ describe("MCPClientService", () => {
 			expect(result.errors.some((e) => e.parameter === "title")).toBe(true);
 		});
 
-		it("handles undefined values for non-required parameters", () => {
-			const result = service.validateParameters(
+		it("handles undefined values for non-required parameters", async () => {
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{
@@ -364,10 +364,10 @@ describe("MCPClientService", () => {
 			expect(result.valid).toBe(true);
 		});
 
-		it("returns error when tool not found", () => {
+		it("returns error when tool not found", async () => {
 			mockDiscoveryService.getTool = vi.fn().mockReturnValue(undefined);
 
-			const result = service.validateParameters(
+			const result = await service.validateParameters(
 				"github-server",
 				"nonexistent-tool",
 				{ title: "Test" }
@@ -378,8 +378,8 @@ describe("MCPClientService", () => {
 			expect(result.errors[0].parameter).toBe("_tool");
 		});
 
-		it("handles multiple validation errors", () => {
-			const result = service.validateParameters(
+		it("handles multiple validation errors", async () => {
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{
@@ -393,8 +393,8 @@ describe("MCPClientService", () => {
 			expect(result.errors.length).toBeGreaterThan(1);
 		});
 
-		it("accepts extra parameters not in schema", () => {
-			const result = service.validateParameters(
+		it("accepts extra parameters not in schema", async () => {
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{
@@ -407,7 +407,7 @@ describe("MCPClientService", () => {
 			expect(result.valid).toBe(true);
 		});
 
-		it("handles schema without properties", () => {
+		it("handles schema without properties", async () => {
 			const minimalTool: MCPTool = {
 				...mockTool,
 				inputSchema: {
@@ -417,7 +417,7 @@ describe("MCPClientService", () => {
 			};
 			mockDiscoveryService.getTool = vi.fn().mockReturnValue(minimalTool);
 
-			const result = service.validateParameters(
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{ anything: "goes" }
@@ -426,7 +426,7 @@ describe("MCPClientService", () => {
 			expect(result.valid).toBe(true);
 		});
 
-		it("handles schema without required array", () => {
+		it("handles schema without required array", async () => {
 			const optionalTool: MCPTool = {
 				...mockTool,
 				inputSchema: {
@@ -439,7 +439,7 @@ describe("MCPClientService", () => {
 			};
 			mockDiscoveryService.getTool = vi.fn().mockReturnValue(optionalTool);
 
-			const result = service.validateParameters(
+			const result = await service.validateParameters(
 				"github-server",
 				"create-issue",
 				{} // All parameters optional

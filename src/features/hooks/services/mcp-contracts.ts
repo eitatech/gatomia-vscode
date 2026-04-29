@@ -118,7 +118,7 @@ export interface IMCPClientService {
 		serverId: string,
 		toolName: string,
 		parameters: Record<string, unknown>
-	): ParameterValidationResult;
+	): Promise<ParameterValidationResult>;
 }
 
 /**

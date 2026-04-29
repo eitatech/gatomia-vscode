@@ -4,23 +4,77 @@
  * Based on specs/006-welcome-screen FR-013 tasks T098-T111
  */
 
-import type { DependencyStatus, SystemDiagnostic } from "../types";
+import type {
+	DependencyStatus,
+	IdeHost,
+	InstallableDependency,
+	SystemDiagnostic,
+	SystemPrerequisiteKey,
+	SystemPrerequisiteStatus,
+} from "../types";
+import { computeRequirementProfile } from "../requirements";
 import { vscode } from "../../../bridge/vscode";
+import { formatRelativeTime } from "../../../utils/relative-time";
 
 interface StatusSectionProps {
 	extensionVersion: string;
 	vscodeVersion: string;
+	ideHost: IdeHost;
 	dependencies: DependencyStatus;
 	diagnostics: SystemDiagnostic[];
-	onInstallDependency: (dependencyId: string) => void;
+	onInstallDependency: (dependencyId: InstallableDependency) => void;
+	onInstallPrerequisite?: (prerequisite: SystemPrerequisiteKey) => void;
 	onOpenExternal?: (url: string) => void;
+}
+
+/**
+ * Prerequisite item for rendering in the Status view.
+ */
+interface PrerequisiteItem {
+	id: SystemPrerequisiteKey;
+	name: string;
+	installed: boolean;
+	version: string | null;
+}
+
+const PREREQ_NAMES: Record<SystemPrerequisiteKey, string> = {
+	node: "Node.js",
+	python: "Python 3.11+",
+	uv: "uv (package manager)",
+};
+
+const PREREQ_KEYS: readonly SystemPrerequisiteKey[] = ["node", "python", "uv"];
+
+const UNKNOWN_PREREQ_STATUS: SystemPrerequisiteStatus = {
+	installed: false,
+	version: null,
+};
+
+/**
+ * Build prereq items from the populated `dependencies.prerequisites`
+ * field (when present). When absent, each entry falls back to
+ * "not installed" so the UI still surfaces the requirement.
+ */
+function getPrerequisiteItems(
+	dependencies: DependencyStatus
+): PrerequisiteItem[] {
+	const prereqs = dependencies.prerequisites;
+	return PREREQ_KEYS.map((key) => {
+		const status = prereqs?.[key] ?? UNKNOWN_PREREQ_STATUS;
+		return {
+			id: key,
+			name: PREREQ_NAMES[key],
+			installed: status.installed,
+			version: status.version,
+		};
+	});
 }
 
 /**
  * Dependency item for rendering
  */
 interface DependencyItem {
-	id: "copilot-chat" | "speckit" | "openspec" | "copilot-cli" | "gatomia-cli";
+	id: InstallableDependency;
 	name: string;
 	installed: boolean;
 	version: string | null;
@@ -28,25 +82,27 @@ interface DependencyItem {
 }
 
 /**
- * Get health status based on dependencies and diagnostics
+ * Get health status based on dependencies and diagnostics using the
+ * IDE-aware requirement profile as source of truth.
+ *
+ * Missing system prerequisites (Node.js, Python, uv) are also treated
+ * as errors because they block every tool install — but only when the
+ * prerequisites block has been populated by the extension, so older
+ * fixtures that omit the field do not incorrectly flip to "error".
  */
 function getHealthStatus(
+	ideHost: IdeHost,
 	dependencies: DependencyStatus,
 	diagnostics: SystemDiagnostic[]
 ) {
 	const hasErrors = diagnostics.some((d) => d.severity === "error");
+	const profile = computeRequirementProfile(ideHost, dependencies);
+	const hasMissingDeps = profile.missing.length > 0;
+	const prereqs = dependencies.prerequisites;
+	const hasMissingPrereqs =
+		prereqs !== undefined && PREREQ_KEYS.some((key) => !prereqs[key].installed);
 
-	// Check if any required dependencies are missing
-	const specSystemInstalled =
-		dependencies.speckit.installed || dependencies.openspec.installed;
-	const hasMissingDeps = !(
-		dependencies.copilotChat.installed &&
-		dependencies.copilotCli.installed &&
-		specSystemInstalled &&
-		dependencies.gatomiaCli.installed
-	);
-
-	if (hasErrors || hasMissingDeps) {
+	if (hasErrors || hasMissingDeps || hasMissingPrereqs) {
 		return "error";
 	}
 
@@ -58,70 +114,99 @@ function getHealthStatus(
 	return "healthy";
 }
 
-/**
- * Convert DependencyStatus object to array for rendering
- */
-function getDependencyItems(dependencies: DependencyStatus): DependencyItem[] {
-	return [
-		{
-			id: "copilot-chat",
-			name: "GitHub Copilot Chat",
-			installed: dependencies.copilotChat.installed,
-			version: dependencies.copilotChat.version,
-			required: true,
-		},
-		{
-			id: "speckit",
-			name: "SpecKit CLI",
-			installed: dependencies.speckit.installed,
-			version: dependencies.speckit.version,
-			required: false,
-		},
-		{
-			id: "openspec",
-			name: "OpenSpec CLI",
-			installed: dependencies.openspec.installed,
-			version: dependencies.openspec.version,
-			required: false,
-		},
-		{
-			id: "copilot-cli",
-			name: "GitHub Copilot CLI",
-			installed: dependencies.copilotCli.installed,
-			version: dependencies.copilotCli.version,
-			required: true,
-		},
-		{
-			id: "gatomia-cli",
-			name: "GatomIA CLI",
-			installed: dependencies.gatomiaCli.installed,
-			version: dependencies.gatomiaCli.version,
-			required: true,
-		},
-	];
-}
+const DEP_NAMES: Record<InstallableDependency, string> = {
+	"copilot-chat": "GitHub Copilot Chat",
+	"copilot-cli": "GitHub Copilot CLI",
+	"devin-cli": "Devin CLI",
+	"gemini-cli": "Gemini CLI",
+	speckit: "SpecKit CLI",
+	openspec: "OpenSpec CLI",
+	"gatomia-cli": "GatomIA CLI",
+};
+
+const getDepInstalled = (
+	dep: InstallableDependency,
+	dependencies: DependencyStatus
+): boolean => {
+	switch (dep) {
+		case "copilot-chat":
+			return dependencies.copilotChat.installed;
+		case "copilot-cli":
+			return dependencies.copilotCli.installed;
+		case "speckit":
+			return dependencies.speckit.installed;
+		case "openspec":
+			return dependencies.openspec.installed;
+		case "gatomia-cli":
+			return dependencies.gatomiaCli.installed;
+		case "devin-cli":
+			return dependencies.devinCli?.installed ?? false;
+		case "gemini-cli":
+			return dependencies.geminiCli?.installed ?? false;
+		default: {
+			const _exhaustive: never = dep;
+			return _exhaustive;
+		}
+	}
+};
+
+const getDepVersion = (
+	dep: InstallableDependency,
+	dependencies: DependencyStatus
+): string | null => {
+	switch (dep) {
+		case "copilot-chat":
+			return dependencies.copilotChat.version;
+		case "copilot-cli":
+			return dependencies.copilotCli.version;
+		case "speckit":
+			return dependencies.speckit.version;
+		case "openspec":
+			return dependencies.openspec.version;
+		case "gatomia-cli":
+			return dependencies.gatomiaCli.version;
+		case "devin-cli":
+			return dependencies.devinCli?.version ?? null;
+		case "gemini-cli":
+			return dependencies.geminiCli?.version ?? null;
+		default: {
+			const _exhaustive: never = dep;
+			return _exhaustive;
+		}
+	}
+};
 
 /**
- * Format timestamp to relative time
+ * Convert DependencyStatus object to array for rendering, filtered and
+ * categorised by the IDE-aware requirement profile. Hidden deps are not
+ * listed; optional deps keep `required: false`.
  */
-function formatRelativeTime(timestamp: number): string {
-	const now = Date.now();
-	const diff = now - timestamp;
+function getDependencyItems(
+	ideHost: IdeHost,
+	dependencies: DependencyStatus
+): DependencyItem[] {
+	const profile = computeRequirementProfile(ideHost, dependencies);
+	const requiredSet = new Set(profile.required);
+	const optionalSet = new Set(profile.optional);
+	const visible = [...profile.required, ...profile.optional];
 
-	const minutes = Math.floor(diff / 60_000);
-	const hours = Math.floor(diff / 3_600_000);
-	const days = Math.floor(diff / 86_400_000);
-
-	if (minutes < 1) {
-		return "just now";
-	}
-	if (minutes < 60) {
-		return `${minutes}m ago`;
-	}
-	if (hours < 24) {
-		return `${hours}h ago`;
-	}
-	return `${days}d ago`;
+	return visible.map((dep) => ({
+		id: dep,
+		name: DEP_NAMES[dep],
+		installed: getDepInstalled(dep, dependencies),
+		version: getDepVersion(dep, dependencies),
+		// "Required" in the UI sense: a missing required dep drives the
+		// red banner. Spec systems appear as required cards but the actual
+		// requirement is "at least one" — reflect that by marking them as
+		// required only when neither is installed.
+		required:
+			requiredSet.has(dep) &&
+			!(
+				(dep === "speckit" || dep === "openspec") &&
+				(dependencies.speckit.installed || dependencies.openspec.installed)
+			) &&
+			!optionalSet.has(dep),
+	}));
 }
 
 /**
@@ -160,14 +245,17 @@ function getDependencyIconClass(installed: boolean, required: boolean): string {
 export function StatusSection({
 	extensionVersion,
 	vscodeVersion,
+	ideHost,
 	dependencies,
 	diagnostics,
 	onInstallDependency,
+	onInstallPrerequisite,
 	onOpenExternal,
 }: StatusSectionProps) {
-	const healthStatus = getHealthStatus(dependencies, diagnostics);
+	const healthStatus = getHealthStatus(ideHost, dependencies, diagnostics);
 	const allHealthy = healthStatus === "healthy";
-	const dependencyItems = getDependencyItems(dependencies);
+	const dependencyItems = getDependencyItems(ideHost, dependencies);
+	const prerequisiteItems = getPrerequisiteItems(dependencies);
 
 	return (
 		<div className="status-section">
@@ -233,6 +321,46 @@ export function StatusSection({
 				>
 					<i className="codicon codicon-book" /> View Changelog
 				</button>
+			</div>
+
+			{/* System Prerequisites */}
+			<div className="dependency-status">
+				<h3>System Prerequisites</h3>
+				<div className="dependency-list">
+					{prerequisiteItems.map((prereq) => (
+						<div
+							className={`dependency-item ${prereq.installed ? "" : "dependency-item--missing"}`}
+							key={prereq.id}
+						>
+							<div className="dependency-info">
+								<i
+									className={`codicon ${prereq.installed ? "codicon-pass-filled" : "codicon-error"} dependency-icon`}
+								/>
+								<div className="dependency-details">
+									<div className="dependency-name">
+										{prereq.name}
+										<span className="dependency-badge">Required</span>
+									</div>
+									{prereq.installed && prereq.version && (
+										<div className="dependency-version">v{prereq.version}</div>
+									)}
+									{!prereq.installed && (
+										<div className="dependency-status-text">Not installed</div>
+									)}
+								</div>
+							</div>
+							{!prereq.installed && onInstallPrerequisite && (
+								<button
+									className="install-button"
+									onClick={() => onInstallPrerequisite(prereq.id)}
+									type="button"
+								>
+									Install
+								</button>
+							)}
+						</div>
+					))}
+				</div>
 			</div>
 
 			{/* Dependency Status */}

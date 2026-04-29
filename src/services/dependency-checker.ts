@@ -1,19 +1,19 @@
 /**
  * DependencyChecker Service
- * Detects installation status and versions of GatomIA dependencies
- * Based on specs/006-welcome-screen/research.md section 0
+ * Detects installation status and versions of GatomIA dependencies and
+ * system-level prerequisites (Node.js, Python, uv).
+ * Based on specs/006-welcome-screen/research.md section 0.
  */
 
 import { type OutputChannel, extensions } from "vscode";
-import type { DependencyStatus } from "../types/welcome";
+import type {
+	DependencyStatus,
+	SystemPrerequisiteKey,
+	SystemPrerequisiteStatus,
+} from "../types/welcome";
 import { checkCLI } from "../utils/cli-detector";
 import { probeDevinCli } from "./acp/providers/devin-cli-probe";
 import { probeGeminiCli } from "./acp/providers/gemini-cli-probe";
-
-interface CLIDetectionResult {
-	installed: boolean;
-	version: string | null;
-}
 
 interface CacheEntry {
 	timestamp: number;
@@ -58,15 +58,27 @@ export class DependencyChecker {
 		);
 
 		const copilotChat = this.checkCopilotChat();
-		const [speckit, openspec, copilotCli, gatomiaCli, devinProbe, geminiProbe] =
-			await Promise.all([
-				this.checkSpecKitCLI(),
-				this.checkOpenSpecCLI(),
-				this.checkCopilotCLI(),
-				this.checkGatomiaCLI(),
-				probeDevinCli(DependencyChecker.CLI_TIMEOUT_MS),
-				probeGeminiCli(DependencyChecker.CLI_TIMEOUT_MS),
-			]);
+		const [
+			speckit,
+			openspec,
+			copilotCli,
+			gatomiaCli,
+			devinProbe,
+			geminiProbe,
+			node,
+			python,
+			uv,
+		] = await Promise.all([
+			this.checkSpecKitCLI(),
+			this.checkOpenSpecCLI(),
+			this.checkCopilotCLI(),
+			this.checkGatomiaCLI(),
+			probeDevinCli(DependencyChecker.CLI_TIMEOUT_MS),
+			probeGeminiCli(DependencyChecker.CLI_TIMEOUT_MS),
+			this.checkNode(),
+			this.checkPython(),
+			this.checkUv(),
+		]);
 
 		const result: DependencyStatus = {
 			copilotChat,
@@ -86,6 +98,11 @@ export class DependencyChecker {
 				authenticated: geminiProbe.authenticated,
 				acpSupported: geminiProbe.acpSupported,
 			},
+			prerequisites: {
+				node,
+				python,
+				uv,
+			},
 			lastChecked: Date.now(),
 		};
 
@@ -96,7 +113,7 @@ export class DependencyChecker {
 		};
 
 		this.outputChannel.appendLine(
-			`[DependencyChecker] Check complete: Copilot=${copilotChat.installed}, SpecKit=${speckit.installed}, OpenSpec=${openspec.installed}, CopilotCLI=${copilotCli.installed}, GatomIA=${gatomiaCli.installed}, Devin=${devinProbe.installed}(auth=${devinProbe.authenticated}), Gemini=${geminiProbe.installed}(auth=${geminiProbe.authenticated})`
+			`[DependencyChecker] Check complete: Copilot=${copilotChat.installed}, SpecKit=${speckit.installed}, OpenSpec=${openspec.installed}, CopilotCLI=${copilotCli.installed}, GatomIA=${gatomiaCli.installed}, Devin=${devinProbe.installed}(auth=${devinProbe.authenticated}), Gemini=${geminiProbe.installed}(auth=${geminiProbe.authenticated}), Node=${node.installed}, Python=${python.installed}, UV=${uv.installed}`
 		);
 
 		return result;
@@ -155,7 +172,7 @@ export class DependencyChecker {
 
 	/**
 	 * Check SpecKit CLI installation
-	 * Command: specify version (same as DependenciesViewProvider)
+	 * Command: specify version
 	 * Uses extended PATH to find UV-installed tools
 	 */
 	private async checkSpecKitCLI(): Promise<DependencyStatus["speckit"]> {
@@ -228,6 +245,65 @@ export class DependencyChecker {
 
 		this.outputChannel.appendLine(
 			`[DependencyChecker] GatomIA CLI: ${result.installed ? `installed (v${result.version || "unknown"})` : "NOT installed"}${result.error ? ` - ${result.error}` : ""}`
+		);
+
+		return {
+			installed: result.installed,
+			version: result.version,
+		};
+	}
+
+	/**
+	 * Check Node.js installation.
+	 * Uses `node --version` which returns e.g. `v20.10.0`.
+	 */
+	private checkNode(): Promise<SystemPrerequisiteStatus> {
+		return this.checkPrerequisite("node", "node --version");
+	}
+
+	/**
+	 * Check Python installation.
+	 * Prefers `python3 --version` (macOS/Linux convention) and falls back to
+	 * `python --version` (Windows + some Linux distros).
+	 */
+	private async checkPython(): Promise<SystemPrerequisiteStatus> {
+		const primary = await checkCLI(
+			"python3 --version",
+			DependencyChecker.CLI_TIMEOUT_MS
+		);
+		const result = primary.installed
+			? primary
+			: await checkCLI("python --version", DependencyChecker.CLI_TIMEOUT_MS);
+
+		this.outputChannel.appendLine(
+			`[DependencyChecker] Python: ${result.installed ? `installed (v${result.version || "unknown"})` : "NOT installed"}${result.error ? ` - ${result.error}` : ""}`
+		);
+
+		return {
+			installed: result.installed,
+			version: result.version,
+		};
+	}
+
+	/**
+	 * Check the uv package manager installation.
+	 * uv is required to install SpecKit and GatomIA CLI via `uv tool install`.
+	 */
+	private checkUv(): Promise<SystemPrerequisiteStatus> {
+		return this.checkPrerequisite("uv", "uv --version");
+	}
+
+	/**
+	 * Shared helper for prerequisites with a single probing command.
+	 */
+	private async checkPrerequisite(
+		key: SystemPrerequisiteKey,
+		command: string
+	): Promise<SystemPrerequisiteStatus> {
+		const result = await checkCLI(command, DependencyChecker.CLI_TIMEOUT_MS);
+
+		this.outputChannel.appendLine(
+			`[DependencyChecker] ${key}: ${result.installed ? `installed (v${result.version || "unknown"})` : "NOT installed"}${result.error ? ` - ${result.error}` : ""}`
 		);
 
 		return {

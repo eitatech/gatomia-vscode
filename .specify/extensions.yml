@@ -31,6 +31,27 @@ hooks:
     prompt: Generate task dependency diagram after task breakdown?
     description: Auto-generate dependency DAG after tasks are created
     condition: null
+  - extension: agent-assign
+    command: speckit.agent-assign.assign
+    enabled: true
+    optional: true
+    prompt: Assign agents to the generated tasks?
+    description: Automatically assign specialized agents to tasks after generation
+    condition: null
+  - extension: spec-validate
+    command: speckit.spec-validate.validate-tasks
+    enabled: true
+    optional: true
+    prompt: Tasks generated. Run task validation now?
+    description: Run task validation after tasks are generated
+    condition: null
+  - extension: maqa
+    command: speckit.maqa.coordinator
+    enabled: true
+    optional: true
+    prompt: Launch MAQA coordinator to start parallel implementation?
+    description: Optionally start the coordinator workflow after task breakdown
+    condition: null
   after_implement:
   - extension: cleanup
     command: speckit.cleanup.run
@@ -53,6 +74,13 @@ hooks:
     optional: true
     prompt: Run bugfix consistency check after implementation?
     description: Verify spec artifact consistency after implementation completes
+    condition: null
+  - extension: review
+    command: speckit.review.run
+    enabled: true
+    optional: true
+    prompt: Run PR review on implemented changes?
+    description: Comprehensive review after implementation
     condition: null
   after_plan:
   - extension: critique
@@ -90,4 +118,75 @@ hooks:
     optional: true
     prompt: Check artifact sync status after specification?
     description: Show sync status after spec generation
+    condition: null
+  - extension: spec-validate
+    command: speckit.spec-validate.validate
+    enabled: true
+    optional: true
+    prompt: Spec generated. Run comprehension validation now?
+    description: Run spec validation after specification is generated
+    condition: null
+  - extension: worktrees
+    command: speckit.worktrees.create
+    enabled: true
+    optional: false
+    prompt: Execute speckit.worktrees.create?
+    description: Auto-spawn a worktree after a new feature is specified
+    condition: null
+  - extension: worktree
+    command: speckit.worktree.create
+    enabled: true
+    optional: true
+    prompt: Create an isolated worktree for this new feature?
+    description: Auto-spawn a worktree after a new feature is specified
+    condition: null
+  before_specify:
+  - extension: tinyspec
+    command: speckit.tinyspec.classify
+    enabled: true
+    optional: true
+    prompt: Check if this task is small enough for the lightweight tinyspec workflow?
+    description: Auto-classify task complexity before starting the full SDD workflow
+    condition: null
+  before_implement:
+  - extension: spec-validate
+    command: speckit.spec-validate.gate
+    enabled: true
+    optional: false
+    prompt: Execute speckit.spec-validate.gate?
+    description: Hard gate implementation on validation and review policy
+    condition: null
+  after_init:
+  - extension: brownfield
+    command: speckit.brownfield.scan
+    enabled: true
+    optional: true
+    prompt: Scan this existing project to customize spec-kit configuration?
+    description: Auto-scan project after spec-kit init to detect tech stack and conventions
+    condition: null
+  before_tasks:
+  - extension: plan-review-gate
+    command: speckit.plan-review-gate.check
+    enabled: true
+    optional: false
+    prompt: Execute speckit.plan-review-gate.check?
+    description: Require a merge request before proceeding to task generation
+    condition: null
+  before_constitution:
+  - extension: memorylint
+    command: speckit.memorylint.run
+    enabled: true
+    optional: true
+    prompt: Run MemoryLint to prune out-of-bounds architecture rules and enrich missing
+      infrastructure guidelines in AGENTS.md?
+    description: ''
+    condition: null
+  before_plan:
+  - extension: memorylint
+    command: speckit.memorylint.load-agents
+    enabled: true
+    optional: false
+    prompt: Execute speckit.memorylint.load-agents?
+    description: 'Mandatory gate: Load AGENTS.md to enforce core rules and prevent
+      rule drift during the planning (plan.md generation) phase.'
     condition: null

@@ -7,7 +7,7 @@
  * @feature 001-hooks-refactor Phase 6
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ACPActionParams } from "../../../../../src/features/hooks/types";
 import type { TemplateContext } from "../../../../../src/features/hooks/template-variable-parser";
 
@@ -48,10 +48,13 @@ const mockSpawn = spawn as unknown as ReturnType<typeof vi.fn>;
 
 import {
 	ACPActionExecutor,
+	type ACPActionChatRouter,
+	type ACPExecutionResult,
 	ACPSpawnFailedError,
 	ACPTimeoutError,
 	ACPProtocolError,
 	ACPEmptyResponseError,
+	setAcpActionChatRouter,
 } from "../../../../../src/features/hooks/actions/acp-action";
 
 // ---------------------------------------------------------------------------
@@ -517,6 +520,82 @@ describe("ACPActionExecutor", () => {
 				(call: unknown[]) => String(call[0])
 			);
 			expect(writeCalls.length).toBeGreaterThan(0);
+		});
+	});
+
+	// -----------------------------------------------------------------------
+	// T037: chat panel routing (feature-flag gated, spec 018)
+	// -----------------------------------------------------------------------
+
+	describe("T037 chat router delegation", () => {
+		afterEach(() => {
+			setAcpActionChatRouter(undefined);
+		});
+
+		it("runs legacy path when no chat router is registered", async () => {
+			// No router set — legacy path must fire (stdin writes + spawn).
+			const executePromise = executor.execute(baseParams, baseContext);
+			await simulateSuccessfulACP(["legacy output"]);
+			const result = await executePromise;
+
+			expect(result.output).toBe("legacy output");
+			expect(mockStdin.write).toHaveBeenCalled();
+		});
+
+		it("delegates to the chat router when isChatEnabled returns true", async () => {
+			const delegateResult: ACPExecutionResult = {
+				output: "from chat runner",
+				stopReason: "end_turn",
+				durationMs: 42,
+			};
+			const router: ACPActionChatRouter = {
+				isChatEnabled: vi.fn(() => true),
+				delegate: vi.fn(() => Promise.resolve(delegateResult)),
+			};
+			setAcpActionChatRouter(router);
+
+			const result = await executor.execute(baseParams, baseContext);
+
+			expect(result).toBe(delegateResult);
+			expect(router.delegate).toHaveBeenCalledTimes(1);
+			expect(router.delegate).toHaveBeenCalledWith(
+				baseParams,
+				baseContext,
+				expect.objectContaining({ timeoutMs: expect.any(Number) })
+			);
+			// Legacy path should NOT have spawned a subprocess.
+			expect(mockStdin.write).not.toHaveBeenCalled();
+		});
+
+		it("falls back to legacy path when isChatEnabled returns false", async () => {
+			const router: ACPActionChatRouter = {
+				isChatEnabled: vi.fn(() => false),
+				delegate: vi.fn(() =>
+					Promise.reject(new Error("should not be called"))
+				),
+			};
+			setAcpActionChatRouter(router);
+
+			const executePromise = executor.execute(baseParams, baseContext);
+			await simulateSuccessfulACP(["fallback output"]);
+			const result = await executePromise;
+
+			expect(result.output).toBe("fallback output");
+			expect(router.delegate).not.toHaveBeenCalled();
+			expect(router.isChatEnabled).toHaveBeenCalled();
+		});
+
+		it("propagates router errors unchanged", async () => {
+			const routerError = new Error("boom: agent crashed");
+			const router: ACPActionChatRouter = {
+				isChatEnabled: vi.fn(() => true),
+				delegate: vi.fn(() => Promise.reject(routerError)),
+			};
+			setAcpActionChatRouter(router);
+
+			await expect(executor.execute(baseParams, baseContext)).rejects.toBe(
+				routerError
+			);
 		});
 	});
 });

@@ -374,6 +374,38 @@ i {
 	font-style: italic !important;
 }
 
+/*
+ * Codicons use the <i> tag by convention (`<i class="codicon ...">`),
+ * which means the global `i { font-style: italic }` rule above tilts
+ * every icon glyph by ~10° (synthetic italic from the browser, since
+ * the codicon font has no italic variant). The bullet-proof fix is to
+ * force `font-style: normal` on:
+ *   1. anything carrying the `.codicon` class (defensive, should be
+ *      enough on its own thanks to higher specificity than bare `i`),
+ *   2. every descendant of the agent-chat composer/input toolbars and
+ *      the chip dropdown chrome — covers the case where a future
+ *      sibling rule, Tailwind preflight, or a reused `<i>` styled by a
+ *      third-party stylesheet leaks italic into the redesigned UI.
+ *
+ * The selectors below are intentionally over-broad: the toolbar text
+ * (`<span>` labels, button copy) was rendering italic in some setups
+ * and the user explicitly asked for *no* italic anywhere in this
+ * surface, so we lock it in.
+ */
+i.codicon,
+.codicon,
+.codicon::before,
+.agent-chat-chip,
+.agent-chat-chip *,
+.agent-chat-chip-overflow,
+.agent-chat-chip-overflow *,
+.agent-chat-input,
+.agent-chat-input *,
+.agent-chat-new-session,
+.agent-chat-new-session * {
+	font-style: normal !important;
+}
+
 strong,
 b {
 	font-weight: 700 !important;
@@ -475,4 +507,1646 @@ b {
 	color: var(--vscode-errorForeground);
 	padding: 1rem;
 	font-family: monospace;
+}
+
+/* --- Agent Chat Sidebar Styles --- */
+
+.agent-chat-feature {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+
+/* Status header — agent name + lifecycle badge.
+   Without these rules the two <span>s collapse into one another and the
+   sidebar shows e.g. "GitHub CopilotWaiting for input" with no separator. */
+.agent-chat-status-header {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.agent-chat-status-header__name {
+	font-weight: 600;
+	font-size: 12px;
+	color: var(--vscode-foreground);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.agent-chat-status-header__badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 1px 6px;
+	border-radius: 8px;
+	font-size: 10px;
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	white-space: nowrap;
+	background: var(--vscode-badge-background, rgba(128, 128, 128, 0.2));
+	color: var(--vscode-badge-foreground, var(--vscode-foreground));
+}
+
+.agent-chat-status-header__badge--initializing,
+.agent-chat-status-header__badge--running {
+	background: var(
+		--vscode-statusBarItem-prominentBackground,
+		rgba(14, 99, 156, 0.4)
+	);
+	color: var(
+		--vscode-statusBarItem-prominentForeground,
+		var(--vscode-foreground)
+	);
+}
+
+.agent-chat-status-header__badge--waiting-for-input {
+	background: var(
+		--vscode-statusBarItem-warningBackground,
+		rgba(207, 145, 14, 0.4)
+	);
+	color: var(
+		--vscode-statusBarItem-warningForeground,
+		var(--vscode-foreground)
+	);
+}
+
+.agent-chat-status-header__badge--completed {
+	background: var(--vscode-testing-iconPassed, rgba(72, 187, 120, 0.3));
+	color: var(--vscode-foreground);
+}
+
+.agent-chat-status-header__badge--failed,
+.agent-chat-status-header__badge--cancelled,
+.agent-chat-status-header__badge--ended-by-shutdown {
+	background: var(
+		--vscode-statusBarItem-errorBackground,
+		rgba(220, 53, 69, 0.4)
+	);
+	color: var(
+		--vscode-statusBarItem-errorForeground,
+		var(--vscode-foreground)
+	);
+}
+
+.agent-chat-feature--loading,
+.agent-chat-feature--error {
+	padding: 12px;
+	color: var(--vscode-foreground);
+}
+
+/*
+ * Empty-state layout: SessionsList grows to fill the upper area while
+ * the NewSessionComposer is anchored to the bottom — mirrors the active
+ * session layout where the InputBar sits at the bottom of the panel.
+ */
+.agent-chat-feature--empty {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	color: var(--vscode-foreground);
+}
+
+.agent-chat-feature__empty-main {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.agent-chat-feature__topbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+	background: var(--vscode-sideBar-background);
+}
+
+.agent-chat-feature__title {
+	font-weight: 600;
+	font-size: 12px;
+	color: var(--vscode-foreground);
+}
+
+.agent-chat-feature__cancel {
+	display: none;
+}
+
+.agent-chat-switcher {
+	position: relative;
+}
+
+.agent-chat-switcher__toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
+	border-radius: 4px;
+	padding: 2px 8px;
+	font-size: 11px;
+	cursor: pointer;
+}
+
+.agent-chat-switcher__toggle:hover {
+	background: var(--vscode-toolbar-hoverBackground);
+}
+
+.agent-chat-switcher__count {
+	font-variant-numeric: tabular-nums;
+	opacity: 0.85;
+}
+
+.agent-chat-switcher__popup {
+	position: absolute;
+	right: 0;
+	top: calc(100% + 4px);
+	min-width: 240px;
+	max-width: 320px;
+	max-height: 360px;
+	overflow-y: auto;
+	background: var(--vscode-editorWidget-background);
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.4));
+	border-radius: 6px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+	padding: 4px;
+	z-index: 50;
+}
+
+.agent-chat-switcher__action {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: none;
+	padding: 6px 8px;
+	font-size: 12px;
+	border-radius: 4px;
+	cursor: pointer;
+	text-align: left;
+}
+
+.agent-chat-switcher__action:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.agent-chat-switcher__empty {
+	padding: 8px;
+	font-size: 11px;
+	opacity: 0.7;
+}
+
+.agent-chat-switcher__list {
+	list-style: none;
+	margin: 4px 0 0 0;
+	padding: 0;
+}
+
+.agent-chat-switcher__item {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	width: 100%;
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: none;
+	padding: 6px 8px;
+	font-size: 12px;
+	border-radius: 4px;
+	cursor: pointer;
+	text-align: left;
+}
+
+.agent-chat-switcher__item:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.agent-chat-switcher__item--active {
+	background: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
+.agent-chat-switcher__item-name {
+	font-weight: 500;
+}
+
+.agent-chat-switcher__item-meta {
+	font-size: 10px;
+	opacity: 0.75;
+}
+
+/* --- New-session composer (Copilot-style integrated box) ----------- */
+
+.agent-chat-new-session {
+	display: flex;
+	flex-direction: column;
+	padding: 12px;
+}
+
+/*
+ * Single rounded container that holds the pickers row, the textarea and
+ * the toolbar — visually mirrors the on-session InputBar (`.agent-chat-input`).
+ * Children render with no individual borders so the box feels unified.
+ */
+.agent-chat-new-session__box {
+	display: flex;
+	flex-direction: column;
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
+	border-radius: 6px;
+	/*
+	 * NOTE: never set `overflow: hidden` here — the chip dropdowns
+	 * (`.agent-chat-chip__menu`) anchor with `position: absolute` and
+	 * grow upward past the box edge, mirroring the VS Code/Cursor
+	 * model picker. Clipping the overflow truncates the menu mid-line.
+	 */
+}
+
+.agent-chat-new-session__box:focus-within {
+	border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.agent-chat-new-session__textarea {
+	width: 100%;
+	resize: none;
+	background: transparent;
+	color: var(--vscode-input-foreground);
+	border: none;
+	padding: 8px 10px;
+	font-family: inherit;
+	font-size: 13px;
+	line-height: 1.45;
+	min-height: 72px;
+	box-sizing: border-box;
+}
+
+.agent-chat-new-session__textarea:focus {
+	outline: none;
+}
+
+.agent-chat-new-session__toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 6px 8px;
+	border-top: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.25));
+}
+
+.agent-chat-new-session__toolbar-left {
+	display: flex;
+	align-items: center;
+	flex: 1 1 auto;
+	min-width: 0;
+	/*
+	 * NEVER set `overflow: hidden` here — the chip dropdown menus
+	 * (`.agent-chat-chip__menu`) anchor above the chip with
+	 * `position: absolute` and would be clipped. The ChipOverflowBar
+	 * already hides off-bounds chips via `display: none`, so a visual
+	 * clip would be redundant and harmful.
+	 */
+}
+
+.agent-chat-new-session__toolbar-right {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	flex-shrink: 0;
+}
+
+/*
+ * Rounded-square icon-only submit (mirrors the VS Code / Cursor chat
+ * send button on the second reference image). When disabled the
+ * background drops to the muted toolbar color and the icon takes the
+ * VS Code description-foreground token — NEVER italic.
+ */
+.agent-chat-new-session__submit {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border: none;
+	border-radius: 6px;
+	font-size: 13px;
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.agent-chat-new-session__submit:disabled {
+	background: var(
+		--vscode-toolbar-hoverBackground,
+		rgba(128, 128, 128, 0.16)
+	);
+	color: var(--vscode-descriptionForeground);
+	cursor: not-allowed;
+}
+
+.agent-chat-new-session__submit:not(:disabled):hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+/*
+ * Picker bar — compact inline row (Copilot-style chip pickers). Renders
+ * Agent / Model / Agent-file as discrete dropdown chips inline, sized to
+ * the selected option, with no oversized uppercase labels above each.
+ * The visually hidden label keeps the field accessible.
+ */
+.agent-chat-picker {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+	gap: 6px;
+	align-items: center;
+}
+
+.agent-chat-picker__field {
+	display: inline-flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 4px;
+}
+
+.agent-chat-picker__label {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	opacity: 0.6;
+}
+
+.agent-chat-picker__select {
+	background: transparent;
+	color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
+	border: 1px solid var(--vscode-dropdown-border, rgba(128, 128, 128, 0.35));
+	border-radius: 4px;
+	padding: 2px 6px;
+	font-size: 11px;
+	max-width: 180px;
+}
+
+.agent-chat-picker__select:hover:not(:disabled) {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.12));
+}
+
+/* --- Active-session input bar (Copilot-style integrated box) ------- */
+
+.agent-chat-input {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px;
+	border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+	background: var(--vscode-sideBar-background);
+}
+
+/*
+ * The disabled-reason renders as a thin banner ABOVE the box — never
+ * between the textarea and the toolbar (per the redesign screenshots).
+ * Uses the description-foreground token rather than italic to signal
+ * "informational, not actionable".
+ */
+.agent-chat-input__disabled-reason {
+	font-size: 10px;
+	padding: 0 4px;
+	color: var(--vscode-descriptionForeground);
+}
+
+/*
+ * Single rounded container that wraps the textarea AND the toolbar so
+ * the input feels like one widget — matches the Copilot/Windsurf chat
+ * compose box. The textarea and toolbar render with no individual
+ * borders; the focus ring is applied to the wrapper.
+ */
+.agent-chat-input__box {
+	display: flex;
+	flex-direction: column;
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
+	border-radius: 6px;
+	/* See note on `.agent-chat-new-session__box` — overflow stays
+	 * visible so the PermissionChip menu can render above the toolbar. */
+}
+
+.agent-chat-input__box:focus-within {
+	border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.agent-chat-input__textarea {
+	width: 100%;
+	resize: none;
+	background: transparent;
+	color: var(--vscode-input-foreground);
+	border: none;
+	padding: 8px 10px;
+	font-family: inherit;
+	font-size: 13px;
+	line-height: 1.45;
+	min-height: 56px;
+	box-sizing: border-box;
+}
+
+.agent-chat-input__textarea:focus {
+	outline: none;
+}
+
+.agent-chat-input__toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 6px 8px;
+	background: transparent;
+	border-top: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.25));
+}
+
+.agent-chat-input__toolbar-left,
+.agent-chat-input__toolbar-right {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+}
+
+.agent-chat-input__icon-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 14px;
+	line-height: 1;
+}
+
+.agent-chat-input__icon-button:not(:disabled):hover {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+}
+
+.agent-chat-input__icon-button:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+.agent-chat-input__chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 8px;
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
+	border-radius: 999px;
+	font-size: 11px;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.agent-chat-input__chip:not(:disabled):hover {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+}
+
+.agent-chat-input__chip:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.agent-chat-input__chip-icon {
+	font-family:
+		var(--vscode-editor-font-family, "Menlo", "Consolas", monospace);
+	font-size: 10px;
+	opacity: 0.85;
+}
+
+.agent-chat-input__model-label {
+	display: inline-block;
+	max-width: 160px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 11px;
+	opacity: 0.75;
+}
+
+.agent-chat-input__activity {
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	border: 2px solid var(--vscode-progressBar-background, #0e639c);
+	border-top-color: transparent;
+	animation: agent-chat-spin 0.9s linear infinite;
+}
+
+@keyframes agent-chat-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.agent-chat-input__send {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border: none;
+	border-radius: 6px;
+	padding: 0;
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.agent-chat-input__chip-label {
+	font-size: 11px;
+	line-height: 1;
+}
+
+.agent-chat-input__send:not(:disabled):hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+/*
+ * Disabled send state — muted toolbar background + description
+ * foreground. We deliberately AVOID `font-style: italic` and
+ * low-opacity tricks; the user wants a clean gray vs. coloured icon
+ * difference.
+ */
+.agent-chat-input__send:disabled {
+	background: var(
+		--vscode-toolbar-hoverBackground,
+		rgba(128, 128, 128, 0.16)
+	);
+	color: var(--vscode-descriptionForeground);
+	cursor: not-allowed;
+}
+
+.agent-chat-input__stop {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border-radius: 50%;
+	border: none;
+	background: var(
+		--vscode-statusBarItem-errorBackground,
+		rgba(220, 53, 69, 0.85)
+	);
+	color: var(
+		--vscode-statusBarItem-errorForeground,
+		var(--vscode-foreground)
+	);
+	font-size: 10px;
+	cursor: pointer;
+}
+
+.agent-chat-input__stop:hover {
+	filter: brightness(1.1);
+}
+
+/* --- Chat message variants ------------------------------------------- */
+
+.agent-chat-message {
+	display: flex;
+	gap: 8px;
+	padding: 6px 12px;
+	font-size: 13px;
+	line-height: 1.5;
+	color: var(--vscode-foreground);
+	word-break: break-word;
+}
+
+.agent-chat-message__content {
+	white-space: pre-wrap;
+}
+
+/* User: right-aligned soft bubble */
+.agent-chat-message--user {
+	justify-content: flex-end;
+}
+
+.agent-chat-message--user .agent-chat-message__bubble {
+	max-width: 85%;
+	padding: 8px 12px;
+	border-radius: 14px 14px 4px 14px;
+	background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.1));
+	color: var(--vscode-foreground);
+}
+
+/* Agent: flat-left with leading avatar dot */
+.agent-chat-message--agent {
+	align-items: flex-start;
+}
+
+.agent-chat-message__avatar {
+	flex-shrink: 0;
+	margin-top: 4px;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: linear-gradient(
+		135deg,
+		var(--vscode-textLink-foreground, #4ea1f3),
+		var(--vscode-textLink-activeForeground, #2178c2)
+	);
+}
+
+.agent-chat-message--agent .agent-chat-message__content {
+	flex: 1;
+	min-width: 0;
+}
+
+/* System: discreet banner */
+.agent-chat-message--system {
+	padding: 4px 12px;
+	font-size: 11px;
+	font-style: italic;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* --- Thought (chain-of-thought) ----------------------------------- */
+
+/*
+ * Chain-of-thought block — rendered as a muted `<details>` with a
+ * lightbulb icon. Sits ABOVE the agent's user-facing reply for the
+ * same turn and stays collapsible after the turn ends.
+ */
+.agent-chat-message--thought {
+	padding: 4px 12px 0 12px;
+}
+
+.agent-chat-message__thought {
+	background: var(--vscode-textBlockQuote-background, transparent);
+	border-left: 2px solid var(--vscode-textLink-foreground, #6c6c6c);
+	padding: 6px 10px;
+	border-radius: 4px;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	margin: 0;
+}
+
+.agent-chat-message__thought-summary {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	user-select: none;
+	font-weight: 500;
+	color: var(--vscode-descriptionForeground);
+}
+
+.agent-chat-message__thought-summary i.codicon {
+	opacity: 0.85;
+}
+
+.agent-chat-message__thought-content {
+	margin-top: 6px;
+	white-space: pre-wrap;
+	font-family: var(--vscode-editor-font-family, "Menlo", "Consolas", monospace);
+	font-size: 11px;
+	line-height: 1.45;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.9;
+}
+
+/*
+ * Pulse the lightbulb while the agent is still streaming thoughts so
+ * the UI feels alive (mirrors the "Thinking…" copy in the summary).
+ */
+.agent-chat-message--thought[data-thought-complete="false"]
+	.agent-chat-message__thought-summary
+	i.codicon {
+	animation: agent-chat-thought-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes agent-chat-thought-pulse {
+	0%,
+	100% {
+		opacity: 0.55;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
+/* --- Plan (idempotent task list) ---------------------------------- */
+
+/*
+ * Compact checklist surfaced via the ACP `plan` notification. Each
+ * `plan-update` REPLACES the entries list, so the runner patches the
+ * same message in place — the UI just rerenders the list with the new
+ * statuses. Strikes through completed entries so the user can tell at
+ * a glance how far along the agent is.
+ */
+.agent-chat-message--plan {
+	padding: 6px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.agent-chat-message__plan-header {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	opacity: 0.75;
+}
+
+.agent-chat-message__plan-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.agent-chat-message__plan-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	line-height: 1.4;
+	color: var(--vscode-foreground);
+	padding: 1px 0;
+}
+
+.agent-chat-message__plan-item i.codicon {
+	flex-shrink: 0;
+	font-size: 13px;
+	opacity: 0.85;
+}
+
+.agent-chat-message__plan-item--completed .agent-chat-message__plan-text {
+	text-decoration: line-through;
+	color: var(--vscode-descriptionForeground);
+}
+
+.agent-chat-message__plan-item--in_progress i.codicon {
+	color: var(--vscode-charts-blue, var(--vscode-textLink-foreground));
+}
+
+.agent-chat-message__plan-item--pending {
+	color: var(--vscode-descriptionForeground);
+}
+
+.agent-chat-message__plan-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.agent-chat-message__plan-priority {
+	margin-left: auto;
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	padding: 1px 6px;
+	border-radius: 4px;
+	background: var(--vscode-badge-background, rgba(128, 128, 128, 0.2));
+	color: var(--vscode-badge-foreground, var(--vscode-foreground));
+	opacity: 0.8;
+}
+
+.agent-chat-message__plan-priority--high {
+	background: color-mix(
+		in srgb,
+		var(--vscode-editorWarning-foreground, #d83b01) 25%,
+		transparent
+	);
+	color: var(--vscode-editorWarning-foreground, #d83b01);
+	opacity: 1;
+}
+
+.agent-chat-message__plan-priority--low {
+	opacity: 0.55;
+}
+
+/* Tool: compact title + status row */
+.agent-chat-message--tool {
+	align-items: center;
+	gap: 8px;
+	padding: 6px 12px;
+}
+
+.agent-chat-message__tool-title {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex: 1;
+	min-width: 0;
+}
+
+.agent-chat-message__tool-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family:
+		var(--vscode-editor-font-family, "Menlo", "Consolas", monospace);
+	font-size: 12px;
+}
+
+.agent-chat-message__tool-dot {
+	flex-shrink: 0;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--vscode-charts-foreground, rgba(128, 128, 128, 0.6));
+}
+
+.agent-chat-message__tool-dot--pending,
+.agent-chat-message__tool-dot--running {
+	background: var(--vscode-charts-blue, #4ea1f3);
+	animation: agent-chat-pulse 1.4s ease-in-out infinite;
+}
+
+.agent-chat-message__tool-dot--succeeded {
+	background: var(--vscode-charts-green, #4caf50);
+}
+
+.agent-chat-message__tool-dot--failed,
+.agent-chat-message__tool-dot--cancelled {
+	background: var(--vscode-charts-red, #e74c3c);
+}
+
+@keyframes agent-chat-pulse {
+	0%,
+	100% {
+		opacity: 0.6;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
+.agent-chat-message__status {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	opacity: 0.7;
+}
+
+/* Error: subtle danger banner */
+.agent-chat-message--error {
+	border-left: 3px solid
+		var(--vscode-inputValidation-errorBorder, rgba(220, 53, 69, 0.6));
+	background: var(--vscode-inputValidation-errorBackground, rgba(220, 53, 69, 0.08));
+	color: var(--vscode-inputValidation-errorForeground, var(--vscode-foreground));
+	padding: 6px 12px;
+}
+
+/* --- Tool-call diff card (Phase 3) ---------------------------------- */
+
+.agent-chat-message--tool-card {
+	padding: 4px 12px;
+}
+
+.agent-chat-tool-card {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	width: 100%;
+	border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+	border-radius: 6px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-foreground);
+	overflow: hidden;
+}
+
+.agent-chat-tool-card--pending,
+.agent-chat-tool-card--running {
+	border-color: var(--vscode-charts-blue, rgba(78, 161, 243, 0.5));
+}
+
+.agent-chat-tool-card--succeeded {
+	border-color: var(--vscode-charts-green, rgba(76, 175, 80, 0.4));
+}
+
+.agent-chat-tool-card--failed,
+.agent-chat-tool-card--cancelled {
+	border-color: var(--vscode-charts-red, rgba(231, 76, 60, 0.4));
+}
+
+.agent-chat-tool-card__header {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 6px 10px;
+	background: transparent;
+	color: inherit;
+	border: none;
+	font-size: 12px;
+	cursor: pointer;
+	text-align: left;
+}
+
+.agent-chat-tool-card__header:disabled {
+	cursor: default;
+}
+
+.agent-chat-tool-card__header:not(:disabled):hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.agent-chat-tool-card__lang {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 30px;
+	height: 18px;
+	padding: 0 5px;
+	background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.1));
+	border-radius: 3px;
+	font-family:
+		var(--vscode-editor-font-family, "Menlo", "Consolas", monospace);
+	font-size: 9px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	color: var(--vscode-descriptionForeground);
+	flex-shrink: 0;
+}
+
+.agent-chat-tool-card__lang--small {
+	min-width: 26px;
+	height: 16px;
+	font-size: 8px;
+}
+
+.agent-chat-tool-card__name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family:
+		var(--vscode-editor-font-family, "Menlo", "Consolas", monospace);
+	font-size: 12px;
+}
+
+.agent-chat-tool-card__stats {
+	font-family:
+		var(--vscode-editor-font-family, "Menlo", "Consolas", monospace);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	flex-shrink: 0;
+}
+
+.agent-chat-tool-card__added {
+	color: var(--vscode-charts-green, #4caf50);
+}
+
+.agent-chat-tool-card__removed {
+	color: var(--vscode-charts-red, #e74c3c);
+}
+
+.agent-chat-tool-card__chevron {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 14px;
+	height: 14px;
+	font-size: 14px;
+	line-height: 1;
+	transition: transform 120ms ease-in-out;
+	flex-shrink: 0;
+	opacity: 0.7;
+}
+
+.agent-chat-tool-card__chevron--open {
+	transform: rotate(90deg);
+}
+
+.agent-chat-tool-card__list {
+	list-style: none;
+	margin: 0;
+	padding: 4px 0 6px;
+	border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+}
+
+.agent-chat-tool-card__row {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 4px 10px 4px 14px;
+	font-size: 11px;
+}
+
+.agent-chat-tool-card__row-name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family:
+		var(--vscode-editor-font-family, "Menlo", "Consolas", monospace);
+}
+
+/* --- Pending file-write review bar (Phase 4) ------------------------ */
+
+.agent-chat-pending-bar {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 8px 10px;
+	background: var(--vscode-input-background);
+	border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+	border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+}
+
+.agent-chat-pending-bar__row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.agent-chat-pending-bar__summary {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: none;
+	padding: 2px 4px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 12px;
+	min-width: 0;
+}
+
+.agent-chat-pending-bar__summary:hover {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+}
+
+.agent-chat-pending-bar__count {
+	font-weight: 500;
+	white-space: nowrap;
+}
+
+.agent-chat-pending-bar__stats {
+	font-family:
+		var(--vscode-editor-font-family, "Menlo", "Consolas", monospace);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+}
+
+.agent-chat-pending-bar__added {
+	color: var(--vscode-charts-green, #4caf50);
+}
+
+.agent-chat-pending-bar__removed {
+	color: var(--vscode-charts-red, #e74c3c);
+}
+
+.agent-chat-pending-bar__chevron {
+	font-size: 14px;
+	line-height: 1;
+	transition: transform 120ms ease-in-out;
+	opacity: 0.7;
+}
+
+.agent-chat-pending-bar__chevron--open {
+	transform: rotate(90deg);
+}
+
+.agent-chat-pending-bar__actions {
+	display: inline-flex;
+	gap: 6px;
+	flex-shrink: 0;
+}
+
+.agent-chat-pending-bar__reject,
+.agent-chat-pending-bar__accept {
+	border: none;
+	border-radius: 6px;
+	padding: 4px 12px;
+	font-size: 11px;
+	font-weight: 500;
+	cursor: pointer;
+}
+
+.agent-chat-pending-bar__reject {
+	background: var(
+		--vscode-button-secondaryBackground,
+		rgba(128, 128, 128, 0.2)
+	);
+	color: var(
+		--vscode-button-secondaryForeground,
+		var(--vscode-foreground)
+	);
+}
+
+.agent-chat-pending-bar__reject:hover {
+	background: var(
+		--vscode-button-secondaryHoverBackground,
+		rgba(128, 128, 128, 0.3)
+	);
+}
+
+.agent-chat-pending-bar__accept {
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+}
+
+.agent-chat-pending-bar__accept:hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+.agent-chat-pending-bar__list {
+	list-style: none;
+	margin: 4px 0 0;
+	padding: 0;
+	border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+	padding-top: 4px;
+}
+
+.agent-chat-pending-bar__item {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 3px 4px;
+	font-size: 11px;
+}
+
+.agent-chat-pending-bar__path {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family:
+		var(--vscode-editor-font-family, "Menlo", "Consolas", monospace);
+}
+
+.agent-chat-pending-bar__reject-one,
+.agent-chat-pending-bar__accept-one {
+	border: none;
+	background: transparent;
+	color: var(--vscode-textLink-foreground);
+	font-size: 10px;
+	cursor: pointer;
+	padding: 2px 4px;
+}
+
+.agent-chat-pending-bar__reject-one:hover,
+.agent-chat-pending-bar__accept-one:hover {
+	text-decoration: underline;
+}
+
+/* Delivery badge under user messages (pending/queued/rejected) */
+.agent-chat-message__badge {
+	font-size: 10px;
+	opacity: 0.7;
+	margin-top: 2px;
+	text-align: right;
+}
+
+.agent-chat-message__badge--rejected {
+	color: var(--vscode-errorForeground, #e74c3c);
+}
+
+/* --- Sessions list (empty-state history) ----------------------------- */
+
+.agent-chat-sessions-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 6px 8px 12px;
+	border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+	background: var(--vscode-sideBar-background);
+}
+
+.agent-chat-sessions-list__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 4px 4px 6px;
+}
+
+.agent-chat-sessions-list__title {
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	opacity: 0.7;
+}
+
+.agent-chat-sessions-list__items {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.agent-chat-sessions-list__item {
+	display: grid;
+	grid-template-columns: 12px 1fr auto;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	background: transparent;
+	border: none;
+	color: var(--vscode-foreground);
+	padding: 4px 6px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 12px;
+	text-align: left;
+}
+
+.agent-chat-sessions-list__item:hover {
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
+}
+
+.agent-chat-sessions-list__item--active {
+	background: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
+.agent-chat-sessions-list__status-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--vscode-foreground);
+	opacity: 0.55;
+	justify-self: center;
+}
+
+.agent-chat-sessions-list__status-dot--running,
+.agent-chat-sessions-list__status-dot--initializing,
+.agent-chat-sessions-list__status-dot--waiting-for-input {
+	background: var(--vscode-charts-blue, var(--vscode-textLink-foreground));
+	opacity: 0.95;
+}
+
+.agent-chat-sessions-list__status-dot--completed {
+	background: var(--vscode-charts-green, var(--vscode-foreground));
+	opacity: 0.7;
+}
+
+.agent-chat-sessions-list__status-dot--failed {
+	background: var(--vscode-errorForeground, #e74c3c);
+	opacity: 0.95;
+}
+
+.agent-chat-sessions-list__status-dot--cancelled,
+.agent-chat-sessions-list__status-dot--ended-by-shutdown {
+	background: var(--vscode-foreground);
+	opacity: 0.4;
+}
+
+.agent-chat-sessions-list__item-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.agent-chat-sessions-list__item-meta {
+	font-size: 10px;
+	opacity: 0.65;
+	font-variant-numeric: tabular-nums;
+}
+
+.agent-chat-sessions-list__more {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	background: transparent;
+	border: none;
+	color: var(--vscode-foreground);
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	padding: 4px 6px;
+	margin-top: 2px;
+	cursor: pointer;
+	opacity: 0.7;
+}
+
+.agent-chat-sessions-list__more:hover {
+	opacity: 1;
+}
+
+/* --- Permission toggle (segmented control on the empty composer) ----- */
+
+.agent-chat-permission-toggle {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0;
+	padding: 0;
+	margin: 0;
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
+	border-radius: 6px;
+	overflow: hidden;
+	background: var(--vscode-input-background);
+}
+
+.agent-chat-permission-toggle__legend {
+	width: 100%;
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	opacity: 0.7;
+	padding: 0 0 4px 0;
+	float: left;
+}
+
+.agent-chat-permission-toggle__option {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	flex: 1 1 auto;
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: none;
+	padding: 4px 8px;
+	font-size: 11px;
+	cursor: pointer;
+	border-right: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
+}
+
+.agent-chat-permission-toggle__option:last-of-type {
+	border-right: none;
+}
+
+.agent-chat-permission-toggle__option:hover {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+}
+
+.agent-chat-permission-toggle__option--active {
+	background: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
+.agent-chat-permission-toggle__option:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/*
+ * Generic chip dropdown — shared by Agent / Agent file / Model /
+ * Permission selectors on the empty-state composer and the active
+ * session input bar. All four widgets render identical chrome so the
+ * UI feels consistent.
+ */
+
+.agent-chat-chip {
+	position: relative;
+	display: inline-flex;
+}
+
+.agent-chat-chip__toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
+	border-radius: 999px;
+	padding: 2px 7px;
+	font-size: 10px;
+	line-height: 1.4;
+	cursor: pointer;
+	white-space: nowrap;
+	max-width: 180px;
+}
+
+.agent-chat-chip__toggle:hover:not(:disabled) {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+}
+
+.agent-chat-chip__toggle:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.agent-chat-chip__label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 130px;
+}
+
+.agent-chat-chip__menu {
+	position: absolute;
+	bottom: calc(100% + 4px);
+	left: 0;
+	min-width: 220px;
+	max-width: 320px;
+	max-height: 320px;
+	overflow-y: auto;
+	background: var(--vscode-editorWidget-background);
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.4));
+	border-radius: 6px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+	padding: 4px;
+	z-index: 50;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.agent-chat-chip__menu-header {
+	font-size: 10px;
+	opacity: 0.75;
+	padding: 4px 8px;
+	border-bottom: 1px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
+	margin-bottom: 2px;
+}
+
+.agent-chat-chip__item {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: none;
+	padding: 6px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 10px;
+	text-align: left;
+}
+
+.agent-chat-chip__item:hover:not(:disabled) {
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
+}
+
+.agent-chat-chip__item:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.agent-chat-chip__item--active {
+	background: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
+.agent-chat-chip__item-text {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	min-width: 0;
+}
+
+.agent-chat-chip__item-label {
+	font-weight: 600;
+}
+
+.agent-chat-chip__item-desc {
+	font-size: 9px;
+	opacity: 0.75;
+	white-space: normal;
+}
+
+/*
+ * Chip overflow bar — keeps chips on a single row when the chat panel
+ * is narrow and tucks the rest behind a "…" button (VS Code style).
+ *
+ * The container clips horizontal overflow; the JS controller uses a
+ * ResizeObserver to flag chips that would not fit so they can be hidden
+ * via `--hidden` and reappear inside the popover.
+ */
+
+.agent-chat-chip-overflow {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	min-width: 0;
+	flex: 1 1 auto;
+	/*
+	 * No `overflow: hidden` here — the layout algorithm in
+	 * `chip-overflow-bar.tsx` measures every chip and applies
+	 * `display: none` to the ones that do not fit (plus the visible
+	 * ones definitionally fit), so we never need a visual clip. A
+	 * clip would in fact break the dropdown menus that anchor above
+	 * each chip via `position: absolute`.
+	 */
+}
+
+.agent-chat-chip-overflow__item {
+	display: inline-flex;
+	flex-shrink: 0;
+}
+
+.agent-chat-chip-overflow__item--hidden {
+	display: none;
+}
+
+.agent-chat-chip-overflow__more {
+	position: relative;
+	display: inline-flex;
+	flex-shrink: 0;
+	margin-left: 3px;
+}
+
+.agent-chat-chip-overflow__more--hidden {
+	display: none;
+}
+
+.agent-chat-chip-overflow__more-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	background: transparent;
+	color: var(--vscode-foreground);
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.4));
+	border-radius: 999px;
+	cursor: pointer;
+	font-size: 12px;
+	line-height: 1;
+}
+
+.agent-chat-chip-overflow__more-button:hover {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+}
+
+.agent-chat-chip-overflow__menu {
+	position: absolute;
+	bottom: calc(100% + 4px);
+	right: 0;
+	min-width: 200px;
+	max-width: 320px;
+	background: var(--vscode-editorWidget-background);
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.4));
+	border-radius: 6px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+	padding: 6px;
+	z-index: 60;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	/*
+	 * NEVER set `overflow: auto/hidden` here — the inner ChipDropdown
+	 * submenus (`.agent-chat-chip__menu`) anchor with
+	 * `position: absolute` above their chip and would be clipped by a
+	 * scrolling ancestor. Since we surface at most a handful of chips
+	 * inside the overflow popover, the natural height is fine.
+	 */
+}
+
+.agent-chat-chip-overflow__menu-item {
+	display: flex;
+	align-items: center;
+}
+
+/*
+ * Inside the overflow popover the chips render full-width so each one
+ * is comfortably tappable as a discrete row, similar to the VS Code
+ * editor toolbar overflow menu.
+ */
+.agent-chat-chip-overflow__menu-item .agent-chat-chip {
+	width: 100%;
+}
+
+.agent-chat-chip-overflow__menu-item .agent-chat-chip__toggle {
+	width: 100%;
+	max-width: none;
+	justify-content: flex-start;
+}
+
+/*
+ * When a ChipDropdown lives inside the overflow popover, its own
+ * submenu must visually sit above the popover frame (the popover has
+ * z-index: 60 and creates a stacking context). Bumping the submenu
+ * z-index keeps it on top when it grows past the popover edge.
+ */
+.agent-chat-chip-overflow__menu .agent-chat-chip__menu {
+	z-index: 70;
 }

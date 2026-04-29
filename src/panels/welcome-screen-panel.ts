@@ -16,6 +16,7 @@ import { getWebviewContent } from "../utils/get-webview-content";
 import type {
 	ExtensionToWebviewMessage,
 	InstallableDependency,
+	SystemPrerequisiteKey,
 	WebviewToExtensionMessage,
 } from "../types/welcome";
 
@@ -31,6 +32,12 @@ export interface WelcomeScreenPanelCallbacks {
 	) => Promise<void> | void;
 	onInstallDependency?: (
 		dependency: InstallableDependency
+	) => Promise<void> | void;
+	onInstallMissingDependencies?: (
+		dependencies: InstallableDependency[]
+	) => Promise<void> | void;
+	onInstallPrerequisite?: (
+		prerequisite: SystemPrerequisiteKey
 	) => Promise<void> | void;
 	onRefreshDependencies?: () => Promise<void> | void;
 	onUpdatePreference?: (
@@ -252,6 +259,16 @@ export class WelcomeScreenPanel {
 
 			case "welcome/install-dependency":
 				await this.callbacks.onInstallDependency?.(message.dependency);
+				return;
+
+			case "welcome/install-missing-dependencies":
+				await this.callbacks.onInstallMissingDependencies?.(
+					message.dependencies
+				);
+				return;
+
+			case "welcome/install-prerequisite":
+				await this.callbacks.onInstallPrerequisite?.(message.prerequisite);
 				return;
 
 			case "welcome/refresh-dependencies":
