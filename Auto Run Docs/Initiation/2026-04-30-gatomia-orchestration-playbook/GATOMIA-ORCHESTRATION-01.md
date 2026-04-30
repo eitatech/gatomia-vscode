@@ -10,11 +10,12 @@ This phase delivers the first end-to-end orchestration prototype for GatomIA by 
   - Capture the target slice in `docs/architecture/orchestration/running-agents-prototype.md` using Obsidian-style markdown with YAML front matter, links to `[[Running-Agents-Model]]` and `[[Orchestration-UI-Contract]]`, and explicit notes about reused modules versus new modules
   - Note: baseline mapping and reuse-first target slice captured on 2026-04-30 in `docs/architecture/orchestration/running-agents-prototype.md`
 
-- [ ] Implement a unified orchestration read model for active and recent agents:
+- [x] Implement a unified orchestration read model for active and recent agents:
   - Reuse existing session and provider contracts before creating new types; search for agent session models, lifecycle state helpers, and existing telemetry patterns first
   - Create or refactor a narrow service that merges local running-agent sessions and cloud-agent session progress into one normalized projection for the UI
   - Preserve current tree-view behavior while exposing the same normalized data to a webview-friendly bridge so the prototype has one source of truth
   - Include lifecycle metadata that is already available or derivable now: session id, source, title, agent name, state, timestamps, worktree status, last visible activity, and blocking status
+  - Note: completed on 2026-04-30 by extending `src/features/orchestration/orchestration-read-model.ts` to merge persisted and live agent-chat sessions, derive transcript-backed titles/activity, and normalize provider display names for cloud sessions without changing existing tree providers.
 
 - [ ] Build the first orchestration prototype view that visibly works inside the extension:
   - Reuse the existing page registry, panel, and bridge patterns before introducing new routing or state libraries
