@@ -1,0 +1,51 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "043777f29eaf",
+  "session_id": "ses_21ff15574ffeA3di5dSQLBEB3E",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-30T20:33:25.977573Z",
+  "branch": "018-agent-chat-panel",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "package.json",
+    "src/extension.ts",
+    "tests/unit/webview/cloud-agent-progress-view.test.ts",
+    "ui/src/page-registry.tsx"
+  ],
+  "agent": "OpenCode",
+  "model": "gpt-5.4",
+  "turn_id": "a01642dab355",
+  "checkpoint_transcript_start": 18,
+  "transcript_lines_at_start": 18,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-30T20:33:25.969323Z",
+    "agent_lines": 87,
+    "agent_removed": 18,
+    "human_added": 697,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 784,
+    "total_lines_changed": 802,
+    "agent_percentage": 13.092269326683292,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
