@@ -390,6 +390,13 @@
           "when": "!(workbenchState == empty || workspaceFolderCount == 0)"
         },
         {
+          "id": "gatomia.views.orchestration",
+          "name": "Orchestration",
+          "type": "webview",
+          "icon": "graph",
+          "when": "!(workbenchState == empty || workspaceFolderCount == 0)"
+        },
+        {
           "id": "gatomia.views.overview",
           "name": "Quick Access",
           "icon": "zap",

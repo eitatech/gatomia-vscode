@@ -149,6 +149,14 @@ let agentChatSidebar:
 	| import("./providers/agent-chat-view-provider").AgentChatViewController
 	| null = null;
 
+interface CloudAgentsRuntime {
+	registry: import("./features/cloud-agents/provider-registry").ProviderRegistry;
+	sessionStorage: import("./features/cloud-agents/agent-session-storage").AgentSessionStorage;
+	pollingService: import("./features/cloud-agents/agent-polling-service").AgentPollingService;
+}
+
+let cloudAgentsRuntime: CloudAgentsRuntime | null = null;
+
 export async function activate(context: ExtensionContext) {
 	// Create output channel for debugging
 	outputChannel = window.createOutputChannel("GatomIA - Debug");
@@ -716,6 +724,7 @@ Tasks:
 	// Agent Chat Panel (spec 018) — T038/T039 bootstrap
 	// ========================================================================
 	await bootstrapAgentChat(context, modelCacheService);
+	await bootstrapOrchestrationPrototype(context);
 
 	// Set up file watchers
 	setupFileWatchers(context, specExplorer, steeringExplorer, actionsExplorer);
@@ -2656,6 +2665,7 @@ async function bootstrapCloudAgents(context: ExtensionContext): Promise<void> {
 		await progressProvider.updateContextKeys();
 
 		const pollingService = new AgentPollingService(registry, sessionStorage);
+		cloudAgentsRuntime = { registry, sessionStorage, pollingService };
 		const cleanupService = new CloudCleanup(sessionStorage);
 		await cleanupService.cleanup();
 
@@ -2712,6 +2722,68 @@ async function bootstrapCloudAgents(context: ExtensionContext): Promise<void> {
 	} catch (error) {
 		outputChannel.appendLine(`[CloudAgents] Failed to bootstrap: ${error}`);
 	}
+}
+
+async function bootstrapOrchestrationPrototype(
+	context: ExtensionContext
+): Promise<void> {
+	if (!(agentChatStore && agentChatRegistry)) {
+		outputChannel.appendLine(
+			"[Orchestration] Agent Chat runtime unavailable; skipping orchestration bootstrap"
+		);
+		return;
+	}
+
+	const { OrchestrationReadModel } = await import(
+		"./features/orchestration/orchestration-read-model"
+	);
+	const { OrchestrationViewProvider } = await import(
+		"./providers/orchestration-view-provider"
+	);
+
+	const readModel = new OrchestrationReadModel({
+		store: agentChatStore,
+		registry: agentChatRegistry,
+		cloudSessionStorage: cloudAgentsRuntime?.sessionStorage,
+		cloudProviderRegistry: cloudAgentsRuntime?.registry,
+		agentChatStoreChangeEvent: agentChatStore.onDidChangeManifest,
+		onCloudSessionsChanged: cloudAgentsRuntime
+			? (listener) =>
+					cloudAgentsRuntime.pollingService.onSessionUpdated(listener)
+			: undefined,
+		onCloudProviderChanged: cloudAgentsRuntime
+			? (listener) => {
+					const interval = setInterval(listener, 30_000);
+					return {
+						dispose: () => clearInterval(interval),
+					};
+				}
+			: undefined,
+	});
+
+	const provider = new OrchestrationViewProvider({
+		context,
+		readModel,
+		outputChannel,
+	});
+
+	context.subscriptions.push(
+		window.registerWebviewViewProvider(
+			OrchestrationViewProvider.viewType,
+			provider,
+			{ webviewOptions: { retainContextWhenHidden: true } }
+		),
+		{ dispose: () => provider.dispose() },
+		{ dispose: () => readModel.dispose() },
+		commands.registerCommand("gatomia.orchestration.openPanel", async () => {
+			await provider.reveal();
+		}),
+		commands.registerCommand("gatomia.orchestration.refresh", () => {
+			provider.refresh();
+		})
+	);
+
+	outputChannel.appendLine("[Orchestration] Prototype bootstrapped");
 }
 
 // ============================================================================

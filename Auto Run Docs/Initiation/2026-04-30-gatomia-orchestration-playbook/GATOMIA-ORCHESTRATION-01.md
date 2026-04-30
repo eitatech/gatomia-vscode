@@ -20,11 +20,13 @@ This phase delivers the first end-to-end orchestration prototype for GatomIA by 
   - Note: completed on 2026-04-30 by extending `src/features/orchestration/orchestration-read-model.ts` to merge persisted and live agent-chat sessions, derive transcript-backed titles/activity, and normalize provider display names for cloud sessions without changing existing tree providers.
   - Validation: re-verified on 2026-04-30 with `tests/unit/features/orchestration/orchestration-read-model.test.ts` and `npm run check`; the check required clearing a disposable oversized `.entire/tmp` session artifact before passing.
 
-- [ ] Build the first orchestration prototype view that visibly works inside the extension:
+- [x] Build the first orchestration prototype view that visibly works inside the extension:
   - Reuse the existing page registry, panel, and bridge patterns before introducing new routing or state libraries
   - Add a dedicated orchestration view or panel that renders the normalized session projection with clear columns or cards for Active, Waiting, Completed, and Failed work
   - Ensure the prototype allows at minimum: open session, refresh session state, inspect current status, and navigate back to the existing agent-chat or cloud-agent experience
   - Keep the UI intentionally simple but visually compelling so the user can see live orchestration progress as soon as the phase is complete
+  - Note: completed on 2026-04-30 by wiring the existing orchestration webview provider into the extension bootstrap, adding a simple four-lane card UI in `ui/src/features/orchestration/index.tsx`, and fixing cloud-session navigation so the prototype can jump back to the Cloud Agents surface instead of only refreshing state.
+  - Validation: re-verified on 2026-04-30 with `tests/unit/webview/cloud-agent-progress-view.test.tsx` and `npm run check`.
 
 - [ ] Connect orchestration events, telemetry, and empty states so the prototype behaves like a real product surface:
   - Reuse existing event emitters, output channels, and telemetry helpers before adding new instrumentation paths

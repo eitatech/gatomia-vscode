@@ -38,6 +38,11 @@ const AgentChatFeature = lazy(() =>
 		default: m.AgentChatFeature,
 	}))
 );
+const OrchestrationFeature = lazy(() =>
+	import("./features/orchestration").then((m) => ({
+		default: m.OrchestrationFeature,
+	}))
+);
 
 export type SupportedPage =
 	| "simple"
@@ -47,7 +52,8 @@ export type SupportedPage =
 	| "hooks"
 	| "document-preview"
 	| "welcome-screen"
-	| "agent-chat";
+	| "agent-chat"
+	| "orchestration";
 
 function LoadingFallback() {
 	return (
@@ -88,6 +94,7 @@ const pageRenderers = {
 		</Suspense>
 	),
 	"agent-chat": () => withSuspense(AgentChatFeature),
+	orchestration: () => withSuspense(OrchestrationFeature),
 } satisfies Record<SupportedPage, () => JSX.Element>;
 
 export const getPageRenderer = (pageName: string) => {

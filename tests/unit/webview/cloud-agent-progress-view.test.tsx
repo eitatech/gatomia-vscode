@@ -1,0 +1,136 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { OrchestrationFeature } from "../../../ui/src/features/orchestration";
+
+vi.mock("../../../ui/src/bridge/vscode", () => ({
+	vscode: {
+		postMessage: vi.fn(),
+		getState: vi.fn(() => ({})),
+		setState: vi.fn(),
+	},
+}));
+
+import { vscode } from "../../../ui/src/bridge/vscode";
+
+const fakeVscode = vscode as unknown as {
+	postMessage: ReturnType<typeof vi.fn>;
+};
+
+function postSnapshot(payload: unknown) {
+	window.dispatchEvent(
+		new MessageEvent("message", {
+			data: {
+				type: "orchestration/snapshot",
+				payload,
+			},
+		})
+	);
+}
+
+describe("OrchestrationFeature", () => {
+	beforeEach(() => {
+		fakeVscode.postMessage.mockReset();
+	});
+
+	afterEach(() => {
+		cleanup();
+	});
+
+	it("renders loading state before the first snapshot arrives", () => {
+		render(<OrchestrationFeature />);
+		expect(screen.getByText("Loading orchestration state...")).toBeTruthy();
+		expect(fakeVscode.postMessage).toHaveBeenCalledWith({
+			type: "orchestration/ready",
+		});
+	});
+
+	it("renders bucket columns", async () => {
+		render(<OrchestrationFeature />);
+		postSnapshot({
+			sessions: [
+				{
+					id: "agent-chat:1",
+					source: "agent-chat",
+					sourceSessionId: "1",
+					title: "OpenCode (code)",
+					agentName: "OpenCode",
+					state: "running",
+					bucket: "active",
+					createdAt: Date.now(),
+					updatedAt: Date.now(),
+					lastVisibleActivityAt: Date.now(),
+					isBlocked: false,
+					executionTargetLabel: "Local",
+				},
+			],
+			generatedAt: Date.now(),
+			degradedReasons: [],
+		});
+		expect(
+			await screen.findByTestId("orchestration-bucket-active")
+		).toBeTruthy();
+		expect(
+			await screen.findByTestId("orchestration-bucket-waiting")
+		).toBeTruthy();
+		expect(
+			await screen.findByTestId("orchestration-bucket-completed")
+		).toBeTruthy();
+		expect(
+			await screen.findByTestId("orchestration-bucket-failed")
+		).toBeTruthy();
+	});
+
+	it("renders degraded state messaging and orchestration actions", async () => {
+		render(<OrchestrationFeature />);
+		postSnapshot({
+			sessions: [
+				{
+					id: "cloud-agent:1",
+					source: "cloud-agent",
+					sourceSessionId: "1",
+					title: "T001: Fix auth race",
+					agentName: "Devin",
+					state: "blocked",
+					bucket: "waiting",
+					createdAt: Date.now(),
+					updatedAt: Date.now(),
+					lastVisibleActivityAt: Date.now(),
+					isBlocked: true,
+					executionTargetLabel: "Cloud",
+					externalUrl: "https://example.test/session/1",
+					cloudProviderId: "devin",
+				},
+			],
+			activeProvider: {
+				id: "devin",
+				displayName: "Devin",
+			},
+			generatedAt: Date.now(),
+			degradedReasons: ["Cloud agent session storage is unavailable."],
+		});
+
+		expect(
+			await screen.findByText("Cloud agent session storage is unavailable.")
+		).toBeTruthy();
+		expect(await screen.findByText("Open Cloud Agents")).toBeTruthy();
+		expect(await screen.findByText("Open session")).toBeTruthy();
+		expect(await screen.findByText("Open external")).toBeTruthy();
+
+		fireEvent.click(screen.getByText("Refresh state"));
+		expect(fakeVscode.postMessage).toHaveBeenCalledWith({
+			type: "orchestration/refresh",
+		});
+
+		fireEvent.click(screen.getByText("Open Cloud Agents"));
+		expect(fakeVscode.postMessage).toHaveBeenCalledWith({
+			type: "orchestration/open-existing-surface",
+			payload: { source: "cloud-agent" },
+		});
+
+		fireEvent.click(screen.getByText("Open session"));
+		expect(fakeVscode.postMessage).toHaveBeenCalledWith({
+			type: "orchestration/open-session",
+			payload: { sessionId: "cloud-agent:1" },
+		});
+	});
+});
