@@ -3,7 +3,7 @@
   "checkpoint_id": "043777f29eaf",
   "strategy": "manual-commit",
   "branch": "018-agent-chat-panel",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-01.md",
     "package.json",
@@ -26,13 +26,19 @@
       "transcript": "/04/3777f29eaf/1/full.jsonl",
       "content_hash": "/04/3777f29eaf/1/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/04/3777f29eaf/2/metadata.json",
+      "transcript": "/04/3777f29eaf/2/full.jsonl",
+      "content_hash": "/04/3777f29eaf/2/content_hash.txt",
+      "prompt": "/04/3777f29eaf/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 99493,
+    "input_tokens": 175004,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 1611520,
-    "output_tokens": 6248,
-    "api_call_count": 22
+    "cache_read_tokens": 3434752,
+    "output_tokens": 13954,
+    "api_call_count": 44
   }
 }
