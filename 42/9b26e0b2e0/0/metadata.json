@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "429b26e0b2e0",
+  "session_id": "ses_21fdd9e7affeH7Q2w0R1H3V3aD",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-30T20:48:19.171675Z",
+  "branch": "018-agent-chat-panel",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-01.md"
+  ],
+  "agent": "OpenCode",
+  "model": "",
+  "turn_id": "d082ac0368d0",
+  "checkpoint_transcript_start": 17,
+  "transcript_lines_at_start": 17,
+  "token_usage": {
+    "input_tokens": 3607,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 359552,
+    "output_tokens": 960,
+    "api_call_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-30T20:48:19.161568Z",
+    "agent_lines": 2,
+    "agent_removed": 2,
+    "human_added": 259,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 261,
+    "total_lines_changed": 263,
+    "agent_percentage": 1.520912547528517,
+    "metric_version": 2
+  }
+}
