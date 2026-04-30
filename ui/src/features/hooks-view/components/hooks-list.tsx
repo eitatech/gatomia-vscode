@@ -1,3 +1,4 @@
+import { EmptyState, PanelSection, StatusBadge } from "@/components/workflow";
 import { useMemo, useState } from "react";
 import type { ActionType, Hook, HookExecutionStatusEntry } from "../types";
 import { HookListItem } from "./hook-list-item";
@@ -48,22 +49,21 @@ export const HooksList = ({
 
 	if (isLoading) {
 		return (
-			<div className="flex items-center justify-center py-8 text-[color:var(--vscode-descriptionForeground)] text-sm">
-				Loading hooks...
-			</div>
+			<EmptyState
+				description="Syncing configured trigger rules and execution states from the extension host."
+				eyebrow="Hooks"
+				title="Loading hooks..."
+			/>
 		);
 	}
 
 	if (hooks.length === 0) {
 		return (
-			<div className="flex flex-col items-center justify-center gap-2 py-8">
-				<p className="text-[color:var(--vscode-descriptionForeground)] text-sm">
-					No hooks configured
-				</p>
-				<p className="text-[color:var(--vscode-descriptionForeground)] text-xs">
-					Click "Add Hook" to create your first automation
-				</p>
-			</div>
+			<EmptyState
+				description='Click "Add Hook" to create your first automation'
+				eyebrow="Hooks"
+				title="No hooks configured"
+			/>
 		);
 	}
 
@@ -72,15 +72,18 @@ export const HooksList = ({
 			{grouped.map((group) => {
 				const expanded = expandedGroups.has(group.type);
 				return (
-					<div
+					<PanelSection
 						aria-expanded={expanded}
-						className="rounded border border-[color:color-mix(in_srgb,var(--vscode-foreground)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--vscode-editor-background)_90%,#000000_10%)]"
+						className="overflow-hidden"
+						contentClassName="mt-0"
 						key={group.type}
+						padding="compact"
 						role="treeitem"
 						tabIndex={0}
+						variant="elevated"
 					>
 						<button
-							className="flex w-full items-center justify-between gap-3 border-[color:color-mix(in_srgb,var(--vscode-foreground)_10%,transparent)] border-b px-3 py-2 text-left"
+							className="flex w-full items-center justify-between gap-3 text-left"
 							onClick={() => toggleGroup(group.type)}
 							type="button"
 						>
@@ -100,16 +103,16 @@ export const HooksList = ({
 									</span>
 								</div>
 							</div>
-							<span className="rounded-full bg-[color:var(--vscode-badge-background)] px-2 py-0.5 font-medium text-[color:var(--vscode-badge-foreground)] text-xs">
+							<StatusBadge tone="neutral">
 								{group.hooks.length}{" "}
 								{group.hooks.length === 1 ? "hook" : "hooks"}
-							</span>
+							</StatusBadge>
 						</button>
 
 						{expanded && (
 							<fieldset
 								aria-label={group.title}
-								className="border-0 border-[color:color-mix(in_srgb,var(--vscode-foreground)_15%,transparent)] border-l pl-3"
+								className="mt-3 border-0 border-[color:var(--workflow-panel-border-color)] border-l pl-3"
 							>
 								{group.hooks.length > 0 ? (
 									group.hooks.map((hook) => (
@@ -130,13 +133,13 @@ export const HooksList = ({
 										</div>
 									))
 								) : (
-									<p className="px-3 py-4 text-[color:var(--vscode-descriptionForeground)] text-xs">
+									<p className="rounded-md bg-[color:var(--workflow-panel-subtle-background)] px-3 py-4 text-[color:var(--vscode-descriptionForeground)] text-xs">
 										No hooks configured for this action type yet.
 									</p>
 								)}
 							</fieldset>
 						)}
-					</div>
+					</PanelSection>
 				);
 			})}
 		</div>

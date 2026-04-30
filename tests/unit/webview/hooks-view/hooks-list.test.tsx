@@ -63,13 +63,13 @@ describe("HooksList", () => {
 
 		const agentSection = screen
 			.getByText("Agent Commands")
-			.closest("div[role='treeitem']");
+			.closest("[role='treeitem']");
 		const gitSection = screen
 			.getByText("Git Operations")
-			.closest("div[role='treeitem']");
+			.closest("[role='treeitem']");
 		const githubSection = screen
 			.getByText("GitHub Tools")
-			.closest("div[role='treeitem']");
+			.closest("[role='treeitem']");
 
 		expect(agentSection).not.toBeNull();
 		expect(gitSection).not.toBeNull();

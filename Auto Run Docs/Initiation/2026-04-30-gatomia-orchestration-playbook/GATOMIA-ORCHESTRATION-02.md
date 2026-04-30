@@ -16,10 +16,11 @@ This phase creates the reusable visual and interaction foundation for the redesi
   - Keep file names kebab-case and colocate styles and tests according to current repository patterns
   - Completed 2026-04-30: added VS Code token-backed workflow CSS variables in `ui/src/app.css`, introduced shared workflow primitives under `ui/src/components/workflow/`, and covered the new status mapping and component shells with focused webview tests for later orchestration and cloud-agent adoption.
 
-- [ ] Apply the new design-system foundations to the orchestration prototype and one existing adjacent surface:
+- [x] Apply the new design-system foundations to the orchestration prototype and one existing adjacent surface:
   - Refactor the Phase 01 orchestration UI to consume the shared foundations instead of one-off styling
   - Update one related surface, preferably `Cloud Agents` or `Hooks`, to prove the new components work outside orchestration
   - Preserve existing behavior while improving visual hierarchy, scannability, and state feedback
+  - Completed 2026-04-30: refactored the orchestration prototype to use shared panel, metric, badge, empty-state, and toolbar primitives; updated the Hooks list and row states to the same workflow foundation so status semantics and grouped sections now match across both surfaces without changing their behaviors.
 
 - [ ] Document the design system in structured markdown for future feature phases:
   - Create `docs/architecture/design-system/design-system-foundations.md` with YAML front matter and wiki-links to `[[Design-System-Audit]]` and `[[Workflow-Interaction-Patterns]]`

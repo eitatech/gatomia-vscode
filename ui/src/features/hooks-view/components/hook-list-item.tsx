@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/workflow";
 import { useCallback, useState } from "react";
 import type { Hook, HookExecutionStatusEntry } from "../types";
 
@@ -78,13 +80,14 @@ export const HookListItem = ({
 		}
 
 		return (
-			<span
-				className={`rounded border border-[color:color-mix(in_srgb,var(--vscode-foreground)_20%,transparent)] px-2 py-0.5 ${timingColors[timing]}`}
+			<StatusBadge
+				className={timingColors[timing]}
 				title={tooltipText}
+				tone="neutral"
 			>
 				{timing}
 				{isBlocking && " (blocking)"}
-			</span>
+			</StatusBadge>
 		);
 	};
 
@@ -165,14 +168,15 @@ export const HookListItem = ({
 		}
 
 		return (
-			<span
+			<StatusBadge
 				className={`${badgeBaseClass} ${statusClass}`}
 				data-testid={`hook-status-${hook.id}`}
 				title={errorMessage}
+				tone="neutral"
 			>
 				{icon}
 				<span>{label}</span>
-			</span>
+			</StatusBadge>
 		);
 	};
 
@@ -192,20 +196,16 @@ export const HookListItem = ({
 						{hook.name}
 					</span>
 					{!hook.enabled && (
-						<span className="rounded bg-[color:var(--vscode-badge-background)] px-1.5 py-0.5 text-[10px] text-[color:var(--vscode-badge-foreground)] uppercase tracking-widest">
+						<StatusBadge className="uppercase tracking-widest" tone="neutral">
 							Paused
-						</span>
+						</StatusBadge>
 					)}
 					{renderExecutionStatus()}
 				</div>
 				<div className="flex flex-wrap gap-2 text-[color:var(--vscode-descriptionForeground)] text-xs">
-					<span className="rounded border border-[color:color-mix(in_srgb,var(--vscode-foreground)_20%,transparent)] px-2 py-0.5">
-						{triggerDisplay}
-					</span>
+					<StatusBadge tone="neutral">{triggerDisplay}</StatusBadge>
 					{renderTimingBadge()}
-					<span className="rounded border border-[color:color-mix(in_srgb,var(--vscode-foreground)_20%,transparent)] px-2 py-0.5">
-						{hook.action.type} action
-					</span>
+					<StatusBadge tone="neutral">{hook.action.type} action</StatusBadge>
 					<span className="truncate">
 						{getActionDisplay()}
 						{hook.executionCount > 0 &&
@@ -237,25 +237,22 @@ export const HookListItem = ({
 
 			{/* Delete confirmation */}
 			{showDeleteConfirm && (
-				<div className="mt-2 flex items-center justify-between gap-2 rounded border border-[color:var(--vscode-inputValidation-warningBorder,#cca700)] bg-[color:var(--vscode-inputValidation-warningBackground)] px-3 py-2 text-[color:var(--vscode-inputValidation-warningForeground)]">
+				<div className="mt-2 flex items-center justify-between gap-2 rounded-[var(--workflow-panel-radius)] border border-[color:var(--workflow-status-warning-border)] bg-[color:var(--workflow-status-warning-background)] px-3 py-2 text-[color:var(--vscode-inputValidation-warningForeground)]">
 					<span className="text-[color:var(--vscode-inputValidation-warningForeground)] text-xs">
 						Delete "{hook.name}"?
 					</span>
 					<div className="flex gap-2">
-						<button
-							className="rounded bg-[color:var(--vscode-button-background)] px-2 py-1 text-[color:var(--vscode-button-foreground)] text-xs hover:bg-[color:var(--vscode-button-hoverBackground)]"
-							onClick={handleDeleteConfirm}
-							type="button"
-						>
+						<Button onClick={handleDeleteConfirm} size="sm" type="button">
 							Delete
-						</button>
-						<button
-							className="rounded bg-[color:var(--vscode-button-secondaryBackground)] px-2 py-1 text-[color:var(--vscode-button-secondaryForeground)] text-xs hover:bg-[color:var(--vscode-button-secondaryHoverBackground)]"
+						</Button>
+						<Button
 							onClick={handleDeleteCancel}
+							size="sm"
 							type="button"
+							variant="secondary"
 						>
 							Cancel
-						</button>
+						</Button>
 					</div>
 				</div>
 			)}
