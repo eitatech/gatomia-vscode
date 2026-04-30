@@ -8,7 +8,10 @@
     "Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-01.md",
     "package.json",
     "src/extension.ts",
+    "src/providers/orchestration-view-provider.ts",
     "tests/unit/webview/cloud-agent-progress-view.test.ts",
+    "tests/unit/webview/cloud-agent-progress-view.test.tsx",
+    "ui/src/features/orchestration/index.tsx",
     "ui/src/page-registry.tsx"
   ],
   "sessions": [
@@ -17,13 +20,19 @@
       "transcript": "/04/3777f29eaf/0/full.jsonl",
       "content_hash": "/04/3777f29eaf/0/content_hash.txt",
       "prompt": "/04/3777f29eaf/0/prompt.txt"
+    },
+    {
+      "metadata": "/04/3777f29eaf/1/metadata.json",
+      "transcript": "/04/3777f29eaf/1/full.jsonl",
+      "content_hash": "/04/3777f29eaf/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 9568,
+    "input_tokens": 99493,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 24064,
-    "output_tokens": 244,
-    "api_call_count": 2
+    "cache_read_tokens": 1611520,
+    "output_tokens": 6248,
+    "api_call_count": 22
   }
 }
