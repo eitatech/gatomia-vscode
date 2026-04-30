@@ -84,6 +84,86 @@ body {
 	--sidebar-accent-foreground: oklch(0.205 0 0);
 	--sidebar-border: oklch(0.922 0 0);
 	--sidebar-ring: oklch(0.708 0 0);
+	--workflow-space-page: 1rem;
+	--workflow-space-section: 0.75rem;
+	--workflow-space-card: 1rem;
+	--workflow-space-inline: 0.5rem;
+	--workflow-density-compact-min-height: 2rem;
+	--workflow-density-relaxed-min-height: 2.5rem;
+	--workflow-panel-radius: 0.75rem;
+	--workflow-panel-border-color: var(--vscode-panel-border, var(--border));
+	--workflow-panel-background: var(
+		--vscode-editor-background,
+		var(--background)
+	);
+	--workflow-panel-muted-background: var(
+		--vscode-sideBar-background,
+		var(--sidebar)
+	);
+	--workflow-panel-subtle-background: color-mix(
+		in srgb,
+		var(--workflow-panel-muted-background) 82%,
+		transparent
+	);
+	--workflow-elevation-1: 0 1px 2px color-mix(in srgb, var(--vscode-widget-shadow, #000) 22%, transparent);
+	--workflow-status-active-color: var(--vscode-progressBar-background, #3794ff);
+	--workflow-status-active-background: color-mix(
+		in srgb,
+		var(--workflow-status-active-color) 16%,
+		transparent
+	);
+	--workflow-status-active-border: color-mix(
+		in srgb,
+		var(--workflow-status-active-color) 36%,
+		transparent
+	);
+	--workflow-status-warning-color: var(--vscode-testing-iconQueued, #cca700);
+	--workflow-status-warning-background: color-mix(
+		in srgb,
+		var(--workflow-status-warning-color) 16%,
+		transparent
+	);
+	--workflow-status-warning-border: color-mix(
+		in srgb,
+		var(--workflow-status-warning-color) 36%,
+		transparent
+	);
+	--workflow-status-success-color: var(--vscode-testing-iconPassed, #89d185);
+	--workflow-status-success-background: color-mix(
+		in srgb,
+		var(--workflow-status-success-color) 16%,
+		transparent
+	);
+	--workflow-status-success-border: color-mix(
+		in srgb,
+		var(--workflow-status-success-color) 36%,
+		transparent
+	);
+	--workflow-status-danger-color: var(--vscode-testing-iconFailed, #f48771);
+	--workflow-status-danger-background: color-mix(
+		in srgb,
+		var(--workflow-status-danger-color) 16%,
+		transparent
+	);
+	--workflow-status-danger-border: color-mix(
+		in srgb,
+		var(--workflow-status-danger-color) 36%,
+		transparent
+	);
+	--workflow-status-neutral-color: var(
+		--vscode-descriptionForeground,
+		var(--muted-foreground)
+	);
+	--workflow-status-neutral-background: color-mix(
+		in srgb,
+		var(--workflow-status-neutral-color) 12%,
+		transparent
+	);
+	--workflow-status-neutral-border: color-mix(
+		in srgb,
+		var(--workflow-status-neutral-color) 24%,
+		transparent
+	);
 }
 
 .dark {
