@@ -2,6 +2,8 @@
 
 This phase delivers the first end-to-end orchestration prototype for GatomIA by turning the existing running-agent, agent-chat, and cloud-agent surfaces into a single coherent experience that visibly tracks active sessions. It matters because it gives Product Engineers and Software Engineers a working orchestration dashboard immediately, proves the new direction with minimal refactoring risk, and creates the foundation that later phases will extend with hooks, visual flows, and autonomous task execution.
 
+- NEVER push de code
+
 ## Tasks
 
 - [x] Establish the orchestration prototype baseline by reusing existing extension and webview surfaces before creating new ones:
@@ -16,6 +18,7 @@ This phase delivers the first end-to-end orchestration prototype for GatomIA by 
   - Preserve current tree-view behavior while exposing the same normalized data to a webview-friendly bridge so the prototype has one source of truth
   - Include lifecycle metadata that is already available or derivable now: session id, source, title, agent name, state, timestamps, worktree status, last visible activity, and blocking status
   - Note: completed on 2026-04-30 by extending `src/features/orchestration/orchestration-read-model.ts` to merge persisted and live agent-chat sessions, derive transcript-backed titles/activity, and normalize provider display names for cloud sessions without changing existing tree providers.
+  - Validation: re-verified on 2026-04-30 with `tests/unit/features/orchestration/orchestration-read-model.test.ts` and `npm run check`; the check required clearing a disposable oversized `.entire/tmp` session artifact before passing.
 
 - [ ] Build the first orchestration prototype view that visibly works inside the extension:
   - Reuse the existing page registry, panel, and bridge patterns before introducing new routing or state libraries
