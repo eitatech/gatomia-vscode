@@ -40,8 +40,8 @@ This phase delivers the first end-to-end orchestration prototype for GatomIA by 
   - Add or update unit tests for the normalized orchestration read model, lifecycle grouping, and any new state selectors or adapters
   - Add webview or provider-focused tests that verify the prototype renders meaningful empty, active, and failed states from representative session data
   - Prefer extending existing test suites around providers and stores before creating entirely new harnesses
-  - Note: completed on 2026-04-30 by extending the existing orchestration read-model and webview suites with lifecycle bucket ordering coverage plus representative active/failed session rendering and action assertions.
-  - Validation: verified on 2026-04-30 with `npm test -- tests/unit/features/orchestration/orchestration-read-model.test.ts tests/unit/webview/cloud-agent-progress-view.test.tsx` and `npm run check`.
+  - Note: completed on 2026-04-30 by adding `tests/unit/providers/orchestration-view-provider.test.ts` to exercise snapshot delivery, bridge actions, and degraded fallback behavior without creating a separate orchestration harness, then re-verifying the existing orchestration read-model and webview suites.
+  - Validation: verified on 2026-04-30 with `npm test -- tests/unit/features/orchestration/orchestration-read-model.test.ts`, `npm test -- tests/unit/webview/cloud-agent-progress-view.test.tsx`, `npm test -- tests/unit/providers/orchestration-view-provider.test.ts`, and `npm run check`.
 
 - [ ] Run the orchestration quality gates and fix failures until the prototype is working end-to-end:
   - Run the relevant targeted tests for orchestration changes first
