@@ -104,6 +104,83 @@ describe("OrchestrationFeature", () => {
 		).toBeTruthy();
 	});
 
+	it("renders representative active and failed sessions with actions", async () => {
+		render(<OrchestrationFeature />);
+		postSnapshot({
+			sessions: [
+				{
+					id: "agent-chat:active-1",
+					source: "agent-chat",
+					sourceSessionId: "active-1",
+					title: "Investigate sidebar refresh loop",
+					agentName: "OpenCode",
+					state: "running",
+					bucket: "active",
+					createdAt: 1_710_000_000_000,
+					updatedAt: 1_710_000_001_000,
+					lastVisibleActivityAt: 1_710_000_002_000,
+					isBlocked: false,
+					worktreeStatus: "in-use",
+					executionTargetLabel: "Worktree",
+				},
+				{
+					id: "cloud-agent:failed-1",
+					source: "cloud-agent",
+					sourceSessionId: "failed-1",
+					title: "T042: Repair provider handshake",
+					agentName: "Devin",
+					state: "failed",
+					bucket: "failed",
+					createdAt: 1_710_000_003_000,
+					updatedAt: 1_710_000_004_000,
+					lastVisibleActivityAt: 1_710_000_005_000,
+					isBlocked: false,
+					executionTargetLabel: "Cloud",
+					externalUrl: "https://example.test/session/failed-1",
+					cloudProviderId: "devin",
+				},
+			],
+			cloudProviderRegistryAvailable: true,
+			cloudProviderCount: 1,
+			activeProvider: {
+				id: "devin",
+				displayName: "Devin",
+			},
+			generatedAt: Date.now(),
+			degradedReasons: [],
+		});
+
+		expect(
+			await screen.findByText("Investigate sidebar refresh loop")
+		).toBeTruthy();
+		expect(
+			await screen.findByText("T042: Repair provider handshake")
+		).toBeTruthy();
+		expect(await screen.findByText("in-use")).toBeTruthy();
+		expect(await screen.findByText("failed")).toBeTruthy();
+		expect(await screen.findAllByText("Open session")).toHaveLength(2);
+		expect(await screen.findAllByText("Open original view")).toHaveLength(2);
+		expect(await screen.findByText("Open external")).toBeTruthy();
+
+		fireEvent.click((await screen.findAllByText("Open original view"))[0]);
+		expect(fakeVscode.postMessage).toHaveBeenCalledWith({
+			type: "orchestration/open-existing-surface",
+			payload: { source: "agent-chat" },
+		});
+
+		fireEvent.click((await screen.findAllByText("Open original view"))[1]);
+		expect(fakeVscode.postMessage).toHaveBeenCalledWith({
+			type: "orchestration/open-existing-surface",
+			payload: { source: "cloud-agent" },
+		});
+
+		fireEvent.click(await screen.findByText("Open external"));
+		expect(fakeVscode.postMessage).toHaveBeenCalledWith({
+			type: "orchestration/open-external",
+			payload: { url: "https://example.test/session/failed-1" },
+		});
+	});
+
 	it("renders degraded state messaging and orchestration actions", async () => {
 		render(<OrchestrationFeature />);
 		postSnapshot({

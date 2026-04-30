@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "vscode";
 import { OrchestrationReadModel } from "../../../../src/features/orchestration/orchestration-read-model";
 import type { AgentChatRegistry } from "../../../../src/features/agent-chat/agent-chat-registry";
@@ -109,6 +109,96 @@ describe("OrchestrationReadModel", () => {
 			id: "devin",
 			displayName: "Devin",
 		});
+	});
+
+	it("normalizes lifecycle buckets and sorts sessions by bucket then activity", async () => {
+		const model = new OrchestrationReadModel({
+			store: {
+				listActive: () =>
+					Promise.resolve([
+						makeAgentChatSession({
+							id: "agent-running",
+							updatedAt: 30,
+							lifecycleState: "running",
+						}),
+						makeAgentChatSession({
+							id: "agent-failed",
+							updatedAt: 15,
+							lifecycleState: "failed",
+						}),
+					]),
+				listRecent: () =>
+					Promise.resolve([
+						makeAgentChatSession({
+							id: "agent-completed",
+							updatedAt: 12,
+							lifecycleState: "completed",
+						}),
+					]),
+				workspaceState: {
+					get: () => {
+						return;
+					},
+				},
+			} as unknown as AgentChatSessionStore,
+			registry: {
+				onDidChange: new EventEmitter<void>().event,
+				listActive: () => [],
+				listRecent: () => [],
+			} as unknown as AgentChatRegistry,
+			agentChatStoreChangeEvent: new EventEmitter<unknown>().event,
+			cloudSessionStorage: {
+				getAll: () =>
+					Promise.resolve([
+						makeCloudSession({
+							localId: "cloud-running",
+							status: SessionStatus.RUNNING,
+							updatedAt: 40,
+						}),
+						makeCloudSession({
+							localId: "cloud-blocked",
+							status: SessionStatus.BLOCKED,
+							updatedAt: 25,
+						}),
+						makeCloudSession({
+							localId: "cloud-completed",
+							status: SessionStatus.COMPLETED,
+							updatedAt: 22,
+						}),
+						makeCloudSession({
+							localId: "cloud-cancelled",
+							status: SessionStatus.CANCELLED,
+							updatedAt: 18,
+						}),
+					]),
+			} as unknown as AgentSessionStorage,
+			cloudProviderRegistry: {
+				getAll: () => [{ metadata: { id: "devin", displayName: "Devin" } }],
+				getActive: () => ({
+					metadata: { id: "devin", displayName: "Devin" },
+				}),
+				get: () => ({
+					metadata: { id: "devin", displayName: "Devin" },
+				}),
+			} as unknown as ProviderRegistry,
+		});
+
+		const snapshot = await model.snapshot();
+
+		expect(
+			snapshot.sessions.map((session) => [
+				session.sourceSessionId,
+				session.bucket,
+			])
+		).toEqual([
+			["cloud-running", "active"],
+			["agent-running", "active"],
+			["cloud-blocked", "waiting"],
+			["cloud-completed", "completed"],
+			["agent-completed", "completed"],
+			["cloud-cancelled", "failed"],
+			["agent-failed", "failed"],
+		]);
 	});
 
 	it("prefers live registry sessions and derives title plus last activity from transcript data", async () => {
@@ -254,5 +344,109 @@ describe("OrchestrationReadModel", () => {
 		expect(snapshot.degradedReasons).toContain(
 			"Cloud agent status could not be read."
 		);
+	});
+
+	it("emits change notifications for store, registry, and cloud updates until disposed", () => {
+		const storeEmitter = new EventEmitter<unknown>();
+		const registryEmitter = new EventEmitter<void>();
+		const cloudSessionsEmitter = new EventEmitter<void>();
+		const cloudProviderEmitter = new EventEmitter<void>();
+		const listener = vi.fn();
+
+		const model = new OrchestrationReadModel({
+			store: {
+				listActive: () => Promise.resolve([]),
+				listRecent: () => Promise.resolve([]),
+				workspaceState: {
+					get: () => {
+						return;
+					},
+				},
+			} as unknown as AgentChatSessionStore,
+			registry: {
+				onDidChange: registryEmitter.event,
+				listActive: () => [],
+				listRecent: () => [],
+			} as unknown as AgentChatRegistry,
+			agentChatStoreChangeEvent: storeEmitter.event,
+			onCloudSessionsChanged: (callback) =>
+				cloudSessionsEmitter.event(callback),
+			onCloudProviderChanged: (callback) =>
+				cloudProviderEmitter.event(callback),
+		});
+
+		model.onDidChange(listener);
+
+		storeEmitter.fire(undefined);
+		registryEmitter.fire();
+		cloudSessionsEmitter.fire();
+		cloudProviderEmitter.fire();
+
+		expect(listener).toHaveBeenCalledTimes(4);
+
+		model.dispose();
+		storeEmitter.fire(undefined);
+		registryEmitter.fire();
+		cloudSessionsEmitter.fire();
+		cloudProviderEmitter.fire();
+
+		expect(listener).toHaveBeenCalledTimes(4);
+	});
+
+	it("falls back to provider id and spec path when cloud session details are minimal", async () => {
+		const model = new OrchestrationReadModel({
+			store: {
+				listActive: () => Promise.resolve([]),
+				listRecent: () => Promise.resolve([]),
+				workspaceState: {
+					get: () => {
+						return;
+					},
+				},
+			} as unknown as AgentChatSessionStore,
+			registry: {
+				onDidChange: new EventEmitter<void>().event,
+				listActive: () => [],
+				listRecent: () => [],
+			} as unknown as AgentChatRegistry,
+			agentChatStoreChangeEvent: new EventEmitter<unknown>().event,
+			cloudSessionStorage: {
+				getAll: () =>
+					Promise.resolve([
+						makeCloudSession({
+							localId: "cloud-minimal",
+							providerId: "custom-provider",
+							specPath: "specs/018-agent-chat-panel/tasks.md",
+							tasks: [],
+							status: SessionStatus.COMPLETED,
+							completedAt: 33,
+							isReadOnly: true,
+						}),
+					]),
+			} as unknown as AgentSessionStorage,
+			cloudProviderRegistry: {
+				getAll: () => [{ metadata: { id: "devin", displayName: "Devin" } }],
+				getActive: () => {
+					return;
+				},
+				get: () => {
+					return;
+				},
+			} as unknown as ProviderRegistry,
+		});
+
+		const snapshot = await model.snapshot();
+		const [session] = snapshot.sessions;
+
+		expect(session).toMatchObject({
+			source: "cloud-agent",
+			sourceSessionId: "cloud-minimal",
+			title: "specs/018-agent-chat-panel/tasks.md",
+			agentName: "custom-provider",
+			bucket: "completed",
+			endedAt: 33,
+			worktreeStatus: "read-only",
+			executionTargetLabel: "Cloud",
+		});
 	});
 });

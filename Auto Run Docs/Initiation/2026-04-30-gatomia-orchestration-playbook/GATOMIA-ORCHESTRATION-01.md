@@ -36,10 +36,12 @@ This phase delivers the first end-to-end orchestration prototype for GatomIA by 
   - Note: completed on 2026-04-30 by wiring orchestration refreshes to existing `AgentSessionStorage` and `ProviderRegistry` change events, replacing the prototype's timer-based provider refresh path, and upgrading the orchestration webview with actionable no-session, missing-provider, and degraded-state messaging.
   - Validation: verified on 2026-04-30 with `tests/unit/features/orchestration/orchestration-read-model.test.ts`, `tests/unit/webview/cloud-agent-progress-view.test.tsx`, and `npm run check`.
 
-- [ ] Write test coverage for the orchestration prototype behavior:
+- [x] Write test coverage for the orchestration prototype behavior:
   - Add or update unit tests for the normalized orchestration read model, lifecycle grouping, and any new state selectors or adapters
   - Add webview or provider-focused tests that verify the prototype renders meaningful empty, active, and failed states from representative session data
   - Prefer extending existing test suites around providers and stores before creating entirely new harnesses
+  - Note: completed on 2026-04-30 by extending the existing orchestration read-model and webview suites with lifecycle bucket ordering coverage plus representative active/failed session rendering and action assertions.
+  - Validation: verified on 2026-04-30 with `npm test -- tests/unit/features/orchestration/orchestration-read-model.test.ts tests/unit/webview/cloud-agent-progress-view.test.tsx` and `npm run check`.
 
 - [ ] Run the orchestration quality gates and fix failures until the prototype is working end-to-end:
   - Run the relevant targeted tests for orchestration changes first
