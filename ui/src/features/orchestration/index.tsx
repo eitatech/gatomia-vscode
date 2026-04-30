@@ -24,6 +24,8 @@ interface OrchestrationSession {
 
 interface Snapshot {
 	sessions: OrchestrationSession[];
+	cloudProviderRegistryAvailable: boolean;
+	cloudProviderCount: number;
 	activeProvider?: {
 		id: string;
 		displayName: string;
@@ -41,6 +43,8 @@ interface EmptyStateConfig {
 
 const EMPTY_SNAPSHOT: Snapshot = {
 	sessions: [],
+	cloudProviderRegistryAvailable: false,
+	cloudProviderCount: 0,
 	generatedAt: 0,
 	degradedReasons: [],
 };
@@ -100,6 +104,24 @@ export function OrchestrationFeature(): JSX.Element {
 	const emptyState = useMemo<EmptyStateConfig>(() => {
 		if (
 			snapshot.degradedReasons.some((reason) =>
+				reason.includes("provider wiring is unavailable")
+			)
+		) {
+			return {
+				title: "Cloud orchestration is temporarily unavailable",
+				description:
+					"Start a local agent chat session now, or reopen Cloud Agents after the provider wiring is restored.",
+				actionLabel: "Open Agent Chat",
+				action: () =>
+					vscode.postMessage({
+						type: "orchestration/open-existing-surface",
+						payload: { source: "agent-chat" },
+					}),
+			};
+		}
+
+		if (
+			snapshot.degradedReasons.some((reason) =>
 				reason.includes("No cloud agent providers are registered")
 			)
 		) {
@@ -117,14 +139,30 @@ export function OrchestrationFeature(): JSX.Element {
 		}
 
 		if (
-			snapshot.degradedReasons.some((reason) =>
-				reason.includes("No active cloud agent provider is selected")
+			snapshot.degradedReasons.some(
+				(reason) =>
+					reason.includes("could not be read") ||
+					reason.includes("Failed to read orchestration status")
 			)
 		) {
 			return {
-				title: "Select an active provider",
+				title: "Session status is temporarily unavailable",
 				description:
-					"The orchestration view can still show local sessions, but cloud status will stay empty until you select a provider in Cloud Agents.",
+					"Refresh state to retry the latest reads, or open Cloud Agents for provider-specific status while the orchestration snapshot recovers.",
+				actionLabel: "Refresh state",
+				action: () => vscode.postMessage({ type: "orchestration/refresh" }),
+			};
+		}
+
+		if (
+			snapshot.cloudProviderRegistryAvailable &&
+			snapshot.cloudProviderCount > 0 &&
+			!snapshot.activeProvider
+		) {
+			return {
+				title: "No cloud provider is selected",
+				description:
+					"Agent Chat sessions will appear here automatically. Open Cloud Agents to choose a provider before dispatching remote work.",
 				actionLabel: "Open Cloud Agents",
 				action: () =>
 					vscode.postMessage({
@@ -135,25 +173,27 @@ export function OrchestrationFeature(): JSX.Element {
 		}
 
 		if (
-			snapshot.degradedReasons.some(
-				(reason) =>
-					reason.includes("could not be read") ||
-					reason.includes("Failed to read orchestration status")
-			)
+			snapshot.cloudProviderRegistryAvailable &&
+			snapshot.cloudProviderCount === 0
 		) {
 			return {
-				title: "Status feed unavailable",
+				title: "No sessions yet",
 				description:
-					"Some orchestration status reads failed. Refresh the view to retry, then inspect the output channel if the problem persists.",
-				actionLabel: "Refresh state",
-				action: () => vscode.postMessage({ type: "orchestration/refresh" }),
+					"Start an Agent Chat session now, or configure a cloud provider to bring remote work into this orchestration view.",
+				actionLabel: "Open Agent Chat",
+				action: () =>
+					vscode.postMessage({
+						type: "orchestration/open-existing-surface",
+						payload: { source: "agent-chat" },
+					}),
 			};
 		}
 
 		return {
 			title: "No running or recent sessions",
-			description:
-				"Start an agent chat or dispatch a cloud session to see orchestration progress here.",
+			description: snapshot.activeProvider
+				? `Start an Agent Chat session or dispatch work to ${snapshot.activeProvider.displayName} to see orchestration progress here.`
+				: "Start an agent chat or dispatch a cloud session to see orchestration progress here.",
 			actionLabel: "Open Agent Chat",
 			action: () =>
 				vscode.postMessage({
@@ -161,7 +201,12 @@ export function OrchestrationFeature(): JSX.Element {
 					payload: { source: "agent-chat" },
 				}),
 		};
-	}, [snapshot.degradedReasons]);
+	}, [
+		snapshot.activeProvider,
+		snapshot.cloudProviderCount,
+		snapshot.cloudProviderRegistryAvailable,
+		snapshot.degradedReasons,
+	]);
 
 	let content: JSX.Element;
 	if (isLoading) {

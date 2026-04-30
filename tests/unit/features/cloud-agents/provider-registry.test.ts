@@ -125,4 +125,15 @@ describe("ProviderRegistry", () => {
 		expect(registry.getActive()).toBeUndefined();
 		expect(configStore.clearActiveProvider).toHaveBeenCalled();
 	});
+
+	it("emits change events when providers or active selection change", async () => {
+		const listener = vi.fn();
+		registry.onDidChange(listener);
+
+		registry.register(createMockProvider("devin"));
+		await registry.setActive("devin");
+		await registry.clearActive();
+
+		expect(listener).toHaveBeenCalledTimes(3);
+	});
 });

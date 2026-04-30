@@ -43,9 +43,7 @@ export class OrchestrationViewProvider implements WebviewViewProvider {
 		this.disposables.push(
 			this.readModel.onDidChange(() => {
 				this.pushSnapshot().catch((error) => {
-					this.outputChannel?.appendLine(
-						`[Orchestration] snapshot push failed: ${formatError(error)}`
-					);
+					this.reportError("snapshot push", error);
 				});
 			})
 		);
@@ -57,6 +55,10 @@ export class OrchestrationViewProvider implements WebviewViewProvider {
 		_token: CancellationToken
 	): void {
 		this.view = webviewView;
+		logTelemetry(AGENT_CHAT_TELEMETRY_EVENTS.PANEL_OPENED, {
+			source: "orchestration",
+			surface: "orchestration",
+		});
 
 		webviewView.webview.options = {
 			enableScripts: true,
@@ -71,17 +73,13 @@ export class OrchestrationViewProvider implements WebviewViewProvider {
 		this.disposables.push(
 			webviewView.webview.onDidReceiveMessage((message) => {
 				this.handleWebviewMessage(message).catch((error) => {
-					this.outputChannel?.appendLine(
-						`[Orchestration] message handling failed: ${formatError(error)}`
-					);
+					this.reportError("message handling", error);
 				});
 			})
 		);
 
 		this.pushSnapshot().catch((error) => {
-			this.outputChannel?.appendLine(
-				`[Orchestration] initial snapshot failed: ${formatError(error)}`
-			);
+			this.reportError("initial snapshot", error);
 		});
 	}
 
@@ -94,9 +92,7 @@ export class OrchestrationViewProvider implements WebviewViewProvider {
 
 	refresh(): void {
 		this.pushSnapshot().catch((error) => {
-			this.outputChannel?.appendLine(
-				`[Orchestration] refresh failed: ${formatError(error)}`
-			);
+			this.reportError("refresh", error);
 		});
 	}
 
@@ -201,6 +197,8 @@ export class OrchestrationViewProvider implements WebviewViewProvider {
 			});
 			snapshot = {
 				sessions: [],
+				cloudProviderRegistryAvailable: false,
+				cloudProviderCount: 0,
 				activeProvider: undefined,
 				generatedAt: Date.now(),
 				degradedReasons: [
@@ -241,6 +239,19 @@ export class OrchestrationViewProvider implements WebviewViewProvider {
 
 	private async focusTreeView(viewId: string): Promise<void> {
 		await commands.executeCommand(`${viewId}.focus`);
+	}
+
+	private reportError(operation: string, error: unknown): void {
+		const message = formatError(error);
+		this.outputChannel?.appendLine(
+			`[Orchestration] ${operation} failed: ${message}`
+		);
+		logTelemetry(AGENT_CHAT_TELEMETRY_EVENTS.ERROR, {
+			source: "orchestration",
+			surface: "orchestration",
+			operation,
+			message,
+		});
 	}
 }
 

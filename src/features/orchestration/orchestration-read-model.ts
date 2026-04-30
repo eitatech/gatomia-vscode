@@ -48,6 +48,8 @@ export interface OrchestrationSessionProjection {
 
 export interface OrchestrationSnapshot {
 	readonly sessions: readonly OrchestrationSessionProjection[];
+	readonly cloudProviderRegistryAvailable: boolean;
+	readonly cloudProviderCount: number;
 	readonly activeProvider:
 		| {
 				readonly id: string;
@@ -127,6 +129,9 @@ export class OrchestrationReadModel {
 	async snapshot(): Promise<OrchestrationSnapshot> {
 		const sessions: OrchestrationSessionProjection[] = [];
 		const degradedReasons: string[] = [];
+		const cloudProviderRegistryAvailable =
+			this.cloudProviderRegistry !== undefined;
+		const cloudProviderCount = this.readCloudProviderCount();
 
 		const [agentChatSessions, cloudSessions] = await Promise.all([
 			this.collectAgentChatSessions(degradedReasons),
@@ -140,6 +145,8 @@ export class OrchestrationReadModel {
 
 		return {
 			sessions,
+			cloudProviderRegistryAvailable,
+			cloudProviderCount,
 			activeProvider,
 			generatedAt: this.now(),
 			degradedReasons,
@@ -223,19 +230,19 @@ export class OrchestrationReadModel {
 		  }
 		| undefined {
 		if (!this.cloudProviderRegistry) {
-			degradedReasons.push("Cloud agent providers are unavailable.");
+			degradedReasons.push(
+				"Cloud agent provider wiring is unavailable. Open Agent Chat or refresh Cloud Agents after the provider surface is restored."
+			);
 			return;
 		}
 
 		const providers = this.cloudProviderRegistry.getAll();
 		if (providers.length === 0) {
-			degradedReasons.push("No cloud agent providers are registered.");
 			return;
 		}
 
 		const activeProvider = this.cloudProviderRegistry.getActive();
 		if (!activeProvider) {
-			degradedReasons.push("No active cloud agent provider is selected.");
 			return;
 		}
 
@@ -243,6 +250,18 @@ export class OrchestrationReadModel {
 			id: activeProvider.metadata.id,
 			displayName: activeProvider.metadata.displayName,
 		};
+	}
+
+	private readCloudProviderCount(): number {
+		if (!this.cloudProviderRegistry) {
+			return 0;
+		}
+
+		try {
+			return this.cloudProviderRegistry.getAll().length;
+		} catch {
+			return 0;
+		}
 	}
 
 	private readTranscript(sessionId: string): ChatMessage[] {

@@ -94,6 +94,8 @@ describe("OrchestrationReadModel", () => {
 		const snapshot = await model.snapshot();
 
 		expect(snapshot.sessions).toHaveLength(2);
+		expect(snapshot.cloudProviderRegistryAvailable).toBe(true);
+		expect(snapshot.cloudProviderCount).toBe(1);
 		expect(snapshot.sessions[0]).toMatchObject({
 			source: "agent-chat",
 			bucket: "active",
@@ -211,8 +213,10 @@ describe("OrchestrationReadModel", () => {
 			"Cloud agent session storage is unavailable."
 		);
 		expect(snapshot.degradedReasons).toContain(
-			"Cloud agent providers are unavailable."
+			"Cloud agent provider wiring is unavailable. Open Agent Chat or refresh Cloud Agents after the provider surface is restored."
 		);
+		expect(snapshot.cloudProviderRegistryAvailable).toBe(false);
+		expect(snapshot.cloudProviderCount).toBe(0);
 	});
 
 	it("reports degraded state when cloud status reads fail or no provider is active", async () => {
@@ -245,11 +249,10 @@ describe("OrchestrationReadModel", () => {
 		const snapshot = await model.snapshot();
 
 		expect(snapshot.sessions).toEqual([]);
+		expect(snapshot.cloudProviderRegistryAvailable).toBe(true);
+		expect(snapshot.cloudProviderCount).toBe(1);
 		expect(snapshot.degradedReasons).toContain(
 			"Cloud agent status could not be read."
-		);
-		expect(snapshot.degradedReasons).toContain(
-			"No active cloud agent provider is selected."
 		);
 	});
 });

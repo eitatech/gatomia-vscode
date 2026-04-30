@@ -70,6 +70,17 @@ describe("AgentSessionStorage", () => {
 	});
 
 	describe("CRUD operations", () => {
+		it("emits change events when persisted sessions change", async () => {
+			const listener = vi.fn();
+			storage.onDidChange(listener);
+
+			await storage.create(createTestSession({ localId: "evt-1" }));
+			await storage.update("evt-1", { status: SessionStatus.RUNNING });
+			await storage.delete("evt-1");
+
+			expect(listener).toHaveBeenCalledTimes(3);
+		});
+
 		it("should create and retrieve a session by local ID", async () => {
 			const session = createTestSession({ localId: "s-1" });
 			await storage.create(session);

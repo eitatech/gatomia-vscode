@@ -50,6 +50,8 @@ describe("OrchestrationFeature", () => {
 		render(<OrchestrationFeature />);
 		postSnapshot({
 			sessions: [],
+			cloudProviderRegistryAvailable: true,
+			cloudProviderCount: 0,
 			generatedAt: Date.now(),
 			degradedReasons: ["No cloud agent providers are registered."],
 		});
@@ -83,6 +85,8 @@ describe("OrchestrationFeature", () => {
 					executionTargetLabel: "Local",
 				},
 			],
+			cloudProviderRegistryAvailable: true,
+			cloudProviderCount: 1,
 			generatedAt: Date.now(),
 			degradedReasons: [],
 		});
@@ -121,6 +125,8 @@ describe("OrchestrationFeature", () => {
 					cloudProviderId: "devin",
 				},
 			],
+			cloudProviderRegistryAvailable: true,
+			cloudProviderCount: 1,
 			activeProvider: {
 				id: "devin",
 				displayName: "Devin",
@@ -153,5 +159,45 @@ describe("OrchestrationFeature", () => {
 			type: "orchestration/open-session",
 			payload: { sessionId: "cloud-agent:1" },
 		});
+	});
+
+	it("renders no-selected-provider guidance when providers exist but none is active", async () => {
+		render(<OrchestrationFeature />);
+		postSnapshot({
+			sessions: [],
+			cloudProviderRegistryAvailable: true,
+			cloudProviderCount: 1,
+			generatedAt: Date.now(),
+			degradedReasons: [],
+		});
+
+		expect(
+			await screen.findByText("No cloud provider is selected")
+		).toBeTruthy();
+		expect(
+			await screen.findByText(
+				"Agent Chat sessions will appear here automatically. Open Cloud Agents to choose a provider before dispatching remote work."
+			)
+		).toBeTruthy();
+	});
+
+	it("renders actionable degraded guidance for failed status reads", async () => {
+		render(<OrchestrationFeature />);
+		postSnapshot({
+			sessions: [],
+			cloudProviderRegistryAvailable: true,
+			cloudProviderCount: 1,
+			generatedAt: Date.now(),
+			degradedReasons: ["Cloud agent status could not be read."],
+		});
+
+		expect(
+			await screen.findByText("Session status is temporarily unavailable")
+		).toBeTruthy();
+		expect(
+			await screen.findByText(
+				"Refresh state to retry the latest reads, or open Cloud Agents for provider-specific status while the orchestration snapshot recovers."
+			)
+		).toBeTruthy();
 	});
 });

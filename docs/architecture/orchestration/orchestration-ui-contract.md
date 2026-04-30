@@ -33,6 +33,8 @@ This contract defines the smallest bridge between the extension host and the pha
 ## Snapshot Shape
 
 - `sessions[]`: normalized session cards with `id`, `source`, `sourceSessionId`, `title`, `agentName`, `state`, `bucket`, timestamps, blocking metadata, worktree metadata, and open-session routing hints.
+- `cloudProviderRegistryAvailable`: indicates whether cloud-provider wiring is available inside the current workspace runtime.
+- `cloudProviderCount`: indicates how many cloud providers are registered so the webview can distinguish setup gaps from normal empty states.
 - `activeProvider`: current cloud provider metadata when present.
 - `generatedAt`: snapshot creation timestamp used by the UI header.
 - `degradedReasons[]`: user-facing degraded-state explanations for missing providers, unavailable storage, or failed status reads.
@@ -48,7 +50,7 @@ This contract defines the smallest bridge between the extension host and the pha
 
 - Loading state appears until the first `orchestration/snapshot` arrives.
 - Empty state explains there are no local or cloud sessions yet and offers a jump back to an existing surface.
-- Missing-provider empty states explain whether no providers are registered or no active provider is selected.
+- Missing-provider empty states explain whether no providers are registered, no provider is selected, or provider wiring is unavailable entirely.
 - Degraded state explains when cloud storage is unavailable or when local/cloud status reads fail, and points the user toward refresh plus the output channel.
 - Waiting sessions are surfaced as blocked work so they do not disappear inside the active lane.
 
