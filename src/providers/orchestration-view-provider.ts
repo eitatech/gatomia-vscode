@@ -15,6 +15,7 @@ import {
 } from "../features/agent-chat/telemetry";
 import type {
 	OrchestrationReadModel,
+	OrchestrationSnapshot,
 	OrchestrationSessionProjection,
 } from "../features/orchestration/orchestration-read-model";
 import { getWebviewContent } from "../utils/get-webview-content";
@@ -121,6 +122,9 @@ export class OrchestrationViewProvider implements WebviewViewProvider {
 				await this.pushSnapshot();
 				return;
 			case "orchestration/refresh":
+				logTelemetry("orchestration.refresh.requested", {
+					surface: "orchestration",
+				});
 				await this.focusTreeView("gatomia.views.cloudAgents").catch(() => {
 					// best-effort
 				});
@@ -150,6 +154,9 @@ export class OrchestrationViewProvider implements WebviewViewProvider {
 			case "orchestration/open-existing-surface": {
 				const source = (message.payload as { source?: string } | undefined)
 					?.source;
+				logTelemetry("orchestration.surface.open-existing", {
+					source: source ?? "unknown",
+				});
 				if (source === "cloud-agent") {
 					await this.focusTreeView("gatomia.views.cloudAgents").catch(() => {
 						// best-effort
@@ -166,6 +173,9 @@ export class OrchestrationViewProvider implements WebviewViewProvider {
 			case "orchestration/open-external": {
 				const url = (message.payload as { url?: string } | undefined)?.url;
 				if (url) {
+					logTelemetry("orchestration.external.opened", {
+						surface: "orchestration",
+					});
 					await env.openExternal(Uri.parse(url));
 				}
 				return;
@@ -179,7 +189,25 @@ export class OrchestrationViewProvider implements WebviewViewProvider {
 		if (!this.view) {
 			return;
 		}
-		const snapshot = await this.readModel.snapshot();
+		let snapshot: OrchestrationSnapshot;
+		try {
+			snapshot = await this.readModel.snapshot();
+		} catch (error) {
+			this.outputChannel?.appendLine(
+				`[Orchestration] snapshot read failed: ${formatError(error)}`
+			);
+			logTelemetry("orchestration.snapshot.failed", {
+				surface: "orchestration",
+			});
+			snapshot = {
+				sessions: [],
+				activeProvider: undefined,
+				generatedAt: Date.now(),
+				degradedReasons: [
+					"Failed to read orchestration status. Refresh the view or check the output channel.",
+				],
+			};
+		}
 		await this.view.webview.postMessage({
 			type: "orchestration/snapshot",
 			payload: snapshot,

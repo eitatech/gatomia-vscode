@@ -8,6 +8,7 @@
  * @see specs/016-multi-provider-agents/plan.md
  */
 
+import { EventEmitter, type Event } from "vscode";
 import type { CloudAgentProvider } from "./cloud-agent-provider";
 import { logInfo, logError } from "./logging";
 import type { ProviderConfigStore } from "./provider-config-store";
@@ -26,6 +27,8 @@ export class ProviderRegistry {
 	private readonly providers = new Map<string, CloudAgentProvider>();
 	private readonly configStore: ProviderConfigStore;
 	private activeProviderId: string | undefined;
+	private readonly _onDidChange = new EventEmitter<void>();
+	readonly onDidChange: Event<void> = this._onDidChange.event;
 
 	constructor(configStore: ProviderConfigStore) {
 		this.configStore = configStore;
@@ -42,6 +45,7 @@ export class ProviderRegistry {
 		}
 		this.providers.set(id, provider);
 		logInfo(`Provider registered: ${id}`);
+		this._onDidChange.fire();
 	}
 
 	/**
@@ -83,6 +87,7 @@ export class ProviderRegistry {
 		this.activeProviderId = id;
 		await this.configStore.setActiveProvider(id);
 		logInfo(`Active provider set to: ${id}`);
+		this._onDidChange.fire();
 	}
 
 	/**
@@ -92,6 +97,7 @@ export class ProviderRegistry {
 		this.activeProviderId = undefined;
 		await this.configStore.clearActiveProvider();
 		logInfo("Active provider cleared");
+		this._onDidChange.fire();
 	}
 
 	/**
@@ -103,8 +109,14 @@ export class ProviderRegistry {
 		if (storedId && this.providers.has(storedId)) {
 			this.activeProviderId = storedId;
 			logInfo(`Active provider restored: ${storedId}`);
+			this._onDidChange.fire();
 		} else if (storedId) {
 			logError(`Stored active provider "${storedId}" not found in registry`);
+			this._onDidChange.fire();
 		}
+	}
+
+	dispose(): void {
+		this._onDidChange.dispose();
 	}
 }

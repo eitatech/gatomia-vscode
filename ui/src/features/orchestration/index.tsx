@@ -32,6 +32,13 @@ interface Snapshot {
 	degradedReasons: string[];
 }
 
+interface EmptyStateConfig {
+	title: string;
+	description: string;
+	actionLabel?: string;
+	action?: () => void;
+}
+
 const EMPTY_SNAPSHOT: Snapshot = {
 	sessions: [],
 	generatedAt: 0,
@@ -90,6 +97,72 @@ export function OrchestrationFeature(): JSX.Element {
 		[snapshot.sessions]
 	);
 
+	const emptyState = useMemo<EmptyStateConfig>(() => {
+		if (
+			snapshot.degradedReasons.some((reason) =>
+				reason.includes("No cloud agent providers are registered")
+			)
+		) {
+			return {
+				title: "Connect a cloud provider",
+				description:
+					"No cloud agent providers are registered yet. Open Cloud Agents to configure one, or start a local agent chat session instead.",
+				actionLabel: "Open Cloud Agents",
+				action: () =>
+					vscode.postMessage({
+						type: "orchestration/open-existing-surface",
+						payload: { source: "cloud-agent" },
+					}),
+			};
+		}
+
+		if (
+			snapshot.degradedReasons.some((reason) =>
+				reason.includes("No active cloud agent provider is selected")
+			)
+		) {
+			return {
+				title: "Select an active provider",
+				description:
+					"The orchestration view can still show local sessions, but cloud status will stay empty until you select a provider in Cloud Agents.",
+				actionLabel: "Open Cloud Agents",
+				action: () =>
+					vscode.postMessage({
+						type: "orchestration/open-existing-surface",
+						payload: { source: "cloud-agent" },
+					}),
+			};
+		}
+
+		if (
+			snapshot.degradedReasons.some(
+				(reason) =>
+					reason.includes("could not be read") ||
+					reason.includes("Failed to read orchestration status")
+			)
+		) {
+			return {
+				title: "Status feed unavailable",
+				description:
+					"Some orchestration status reads failed. Refresh the view to retry, then inspect the output channel if the problem persists.",
+				actionLabel: "Refresh state",
+				action: () => vscode.postMessage({ type: "orchestration/refresh" }),
+			};
+		}
+
+		return {
+			title: "No running or recent sessions",
+			description:
+				"Start an agent chat or dispatch a cloud session to see orchestration progress here.",
+			actionLabel: "Open Agent Chat",
+			action: () =>
+				vscode.postMessage({
+					type: "orchestration/open-existing-surface",
+					payload: { source: "agent-chat" },
+				}),
+		};
+	}, [snapshot.degradedReasons]);
+
 	let content: JSX.Element;
 	if (isLoading) {
 		content = (
@@ -100,11 +173,19 @@ export function OrchestrationFeature(): JSX.Element {
 	} else if (snapshot.sessions.length === 0) {
 		content = (
 			<div className="rounded-xl border border-[var(--vscode-panel-border)] border-dashed px-4 py-8 text-center">
-				<p className="font-medium text-base">No running or recent sessions</p>
+				<p className="font-medium text-base">{emptyState.title}</p>
 				<p className="mt-2 text-[var(--vscode-descriptionForeground)] text-sm">
-					Start an agent chat or dispatch a cloud session to see orchestration
-					progress here.
+					{emptyState.description}
 				</p>
+				{emptyState.action && emptyState.actionLabel ? (
+					<button
+						className="mt-4 rounded-md border border-[var(--vscode-button-border)] bg-[var(--vscode-button-background)] px-3 py-2 text-[var(--vscode-button-foreground)] text-sm"
+						onClick={emptyState.action}
+						type="button"
+					>
+						{emptyState.actionLabel}
+					</button>
+				) : null}
 			</div>
 		);
 	} else {
@@ -155,6 +236,9 @@ export function OrchestrationFeature(): JSX.Element {
 								Active provider:{" "}
 								{snapshot.activeProvider?.displayName ?? "none"}
 							</p>
+							<p className="mt-1 text-[var(--vscode-descriptionForeground)] text-xs">
+								Last updated {formatTimestamp(snapshot.generatedAt)}
+							</p>
 						</div>
 						<div className="flex flex-wrap gap-2">
 							<button
@@ -194,7 +278,10 @@ export function OrchestrationFeature(): JSX.Element {
 					</div>
 					{snapshot.degradedReasons.length > 0 ? (
 						<div className="mt-3 rounded-lg border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-inputValidation-warningBackground)]/30 px-3 py-2 text-sm">
-							{snapshot.degradedReasons.join(" ")}
+							<p className="font-medium">Status degraded</p>
+							<p className="mt-1 text-[var(--vscode-descriptionForeground)]">
+								{snapshot.degradedReasons.join(" ")}
+							</p>
 						</div>
 					) : null}
 					<p className="mt-3 text-[var(--vscode-descriptionForeground)] text-xs">

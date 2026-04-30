@@ -28,11 +28,13 @@ This phase delivers the first end-to-end orchestration prototype for GatomIA by 
   - Note: completed on 2026-04-30 by wiring the existing orchestration webview provider into the extension bootstrap, adding a simple four-lane card UI in `ui/src/features/orchestration/index.tsx`, and fixing cloud-session navigation so the prototype can jump back to the Cloud Agents surface instead of only refreshing state.
   - Validation: re-verified on 2026-04-30 with `tests/unit/webview/cloud-agent-progress-view.test.tsx` and `npm run check`.
 
-- [ ] Connect orchestration events, telemetry, and empty states so the prototype behaves like a real product surface:
+- [x] Connect orchestration events, telemetry, and empty states so the prototype behaves like a real product surface:
   - Reuse existing event emitters, output channels, and telemetry helpers before adding new instrumentation paths
   - Make tree updates and orchestration view updates respond to session-store, registry, and cloud-provider changes without manual reloads where possible
   - Add actionable empty, loading, and degraded states that explain whether there are no sessions, missing providers, or failed status reads
   - Write implementation notes in `docs/architecture/orchestration/orchestration-ui-contract.md` with YAML front matter and wiki-links to `[[Running-Agents-Prototype]]`
+  - Note: completed on 2026-04-30 by wiring orchestration refreshes to existing `AgentSessionStorage` and `ProviderRegistry` change events, replacing the prototype's timer-based provider refresh path, and upgrading the orchestration webview with actionable no-session, missing-provider, and degraded-state messaging.
+  - Validation: verified on 2026-04-30 with `tests/unit/features/orchestration/orchestration-read-model.test.ts`, `tests/unit/webview/cloud-agent-progress-view.test.tsx`, and `npm run check`.
 
 - [ ] Write test coverage for the orchestration prototype behavior:
   - Add or update unit tests for the normalized orchestration read model, lifecycle grouping, and any new state selectors or adapters

@@ -8,6 +8,7 @@
  * @see specs/016-multi-provider-agents/data-model.md
  */
 
+import { EventEmitter, type Event } from "vscode";
 import { logInfo, logDebug } from "./logging";
 import type { Memento } from "./provider-config-store";
 import {
@@ -37,6 +38,8 @@ const SESSIONS_KEY = "gatomia.cloudAgent.sessions";
  */
 export class AgentSessionStorage {
 	private readonly workspaceState: Memento;
+	private readonly _onDidChange = new EventEmitter<void>();
+	readonly onDidChange: Event<void> = this._onDidChange.event;
 
 	constructor(workspaceState: Memento) {
 		this.workspaceState = workspaceState;
@@ -193,6 +196,11 @@ export class AgentSessionStorage {
 
 	private async persist(sessions: AgentSession[]): Promise<void> {
 		await this.workspaceState.update(SESSIONS_KEY, sessions);
+		this._onDidChange.fire();
+	}
+
+	dispose(): void {
+		this._onDidChange.dispose();
 	}
 }
 

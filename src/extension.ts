@@ -153,6 +153,8 @@ interface CloudAgentsRuntime {
 	registry: import("./features/cloud-agents/provider-registry").ProviderRegistry;
 	sessionStorage: import("./features/cloud-agents/agent-session-storage").AgentSessionStorage;
 	pollingService: import("./features/cloud-agents/agent-polling-service").AgentPollingService;
+	onSessionsChanged: (listener: () => void) => { dispose(): void };
+	onProviderChanged: (listener: () => void) => { dispose(): void };
 }
 
 let cloudAgentsRuntime: CloudAgentsRuntime | null = null;
@@ -2665,7 +2667,13 @@ async function bootstrapCloudAgents(context: ExtensionContext): Promise<void> {
 		await progressProvider.updateContextKeys();
 
 		const pollingService = new AgentPollingService(registry, sessionStorage);
-		cloudAgentsRuntime = { registry, sessionStorage, pollingService };
+		cloudAgentsRuntime = {
+			registry,
+			sessionStorage,
+			pollingService,
+			onSessionsChanged: (listener) => sessionStorage.onDidChange(listener),
+			onProviderChanged: (listener) => registry.onDidChange(listener),
+		};
 		const cleanupService = new CloudCleanup(sessionStorage);
 		await cleanupService.cleanup();
 
@@ -2695,6 +2703,18 @@ async function bootstrapCloudAgents(context: ExtensionContext): Promise<void> {
 		pollingService.setOnUpdated(() => {
 			progressProvider.refresh();
 		});
+
+		context.subscriptions.push(
+			sessionStorage.onDidChange(() => {
+				progressProvider.refresh();
+			}),
+			registry.onDidChange(() => {
+				progressProvider.refresh();
+				progressProvider.updateContextKeys().catch(() => {
+					// best-effort
+				});
+			})
+		);
 
 		if (registry.getActive() && activeSessions.length > 0) {
 			pollingService.start(30_000);
@@ -2748,16 +2768,10 @@ async function bootstrapOrchestrationPrototype(
 		cloudProviderRegistry: cloudAgentsRuntime?.registry,
 		agentChatStoreChangeEvent: agentChatStore.onDidChangeManifest,
 		onCloudSessionsChanged: cloudAgentsRuntime
-			? (listener) =>
-					cloudAgentsRuntime.pollingService.onSessionUpdated(listener)
+			? (listener) => cloudAgentsRuntime.onSessionsChanged(listener)
 			: undefined,
 		onCloudProviderChanged: cloudAgentsRuntime
-			? (listener) => {
-					const interval = setInterval(listener, 30_000);
-					return {
-						dispose: () => clearInterval(interval),
-					};
-				}
+			? (listener) => cloudAgentsRuntime.onProviderChanged(listener)
 			: undefined,
 	});
 

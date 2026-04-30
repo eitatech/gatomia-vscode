@@ -129,23 +129,18 @@ export class OrchestrationReadModel {
 		const degradedReasons: string[] = [];
 
 		const [agentChatSessions, cloudSessions] = await Promise.all([
-			this.collectAgentChatSessions(),
+			this.collectAgentChatSessions(degradedReasons),
 			this.collectCloudSessions(degradedReasons),
 		]);
 
 		sessions.push(...agentChatSessions, ...cloudSessions);
 		sessions.sort(compareSessions);
 
-		const activeProvider = this.cloudProviderRegistry?.getActive();
+		const activeProvider = this.readActiveProvider(degradedReasons);
 
 		return {
 			sessions,
-			activeProvider: activeProvider
-				? {
-						id: activeProvider.metadata.id,
-						displayName: activeProvider.metadata.displayName,
-					}
-				: undefined,
+			activeProvider,
 			generatedAt: this.now(),
 			degradedReasons,
 		};
@@ -173,13 +168,20 @@ export class OrchestrationReadModel {
 		}
 	}
 
-	private async collectAgentChatSessions(): Promise<
-		OrchestrationSessionProjection[]
-	> {
-		const [active, recent] = await Promise.all([
-			this.store.listActive(),
-			this.store.listRecent(),
-		]);
+	private async collectAgentChatSessions(
+		degradedReasons: string[]
+	): Promise<OrchestrationSessionProjection[]> {
+		let active: AgentChatSession[] = [];
+		let recent: AgentChatSession[] = [];
+		try {
+			[active, recent] = await Promise.all([
+				this.store.listActive(),
+				this.store.listRecent(),
+			]);
+		} catch {
+			degradedReasons.push("Local agent session state could not be read.");
+			return [];
+		}
 		const byId = new Map<string, AgentChatSession>();
 		for (const session of [...active, ...recent]) {
 			byId.set(session.id, session);
@@ -202,10 +204,45 @@ export class OrchestrationReadModel {
 			degradedReasons.push("Cloud agent session storage is unavailable.");
 			return [];
 		}
-		const sessions = await this.cloudSessionStorage.getAll();
+		let sessions: AgentSession[] = [];
+		try {
+			sessions = await this.cloudSessionStorage.getAll();
+		} catch {
+			degradedReasons.push("Cloud agent status could not be read.");
+			return [];
+		}
 		return sessions.map((session) =>
 			toCloudProjection(session, this.cloudProviderRegistry)
 		);
+	}
+
+	private readActiveProvider(degradedReasons: string[]):
+		| {
+				readonly id: string;
+				readonly displayName: string;
+		  }
+		| undefined {
+		if (!this.cloudProviderRegistry) {
+			degradedReasons.push("Cloud agent providers are unavailable.");
+			return;
+		}
+
+		const providers = this.cloudProviderRegistry.getAll();
+		if (providers.length === 0) {
+			degradedReasons.push("No cloud agent providers are registered.");
+			return;
+		}
+
+		const activeProvider = this.cloudProviderRegistry.getActive();
+		if (!activeProvider) {
+			degradedReasons.push("No active cloud agent provider is selected.");
+			return;
+		}
+
+		return {
+			id: activeProvider.metadata.id,
+			displayName: activeProvider.metadata.displayName,
+		};
 	}
 
 	private readTranscript(sessionId: string): ChatMessage[] {

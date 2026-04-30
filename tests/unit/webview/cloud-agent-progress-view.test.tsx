@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { OrchestrationFeature } from "../../../ui/src/features/orchestration";
 
+const NO_PROVIDERS_TEXT = /No cloud agent providers are registered yet/i;
+
 vi.mock("../../../ui/src/bridge/vscode", () => ({
 	vscode: {
 		postMessage: vi.fn(),
@@ -41,6 +43,24 @@ describe("OrchestrationFeature", () => {
 		expect(screen.getByText("Loading orchestration state...")).toBeTruthy();
 		expect(fakeVscode.postMessage).toHaveBeenCalledWith({
 			type: "orchestration/ready",
+		});
+	});
+
+	it("renders provider-specific empty state guidance", async () => {
+		render(<OrchestrationFeature />);
+		postSnapshot({
+			sessions: [],
+			generatedAt: Date.now(),
+			degradedReasons: ["No cloud agent providers are registered."],
+		});
+
+		expect(await screen.findByText("Connect a cloud provider")).toBeTruthy();
+		expect(await screen.findByText(NO_PROVIDERS_TEXT)).toBeTruthy();
+
+		fireEvent.click(screen.getAllByText("Open Cloud Agents")[1]);
+		expect(fakeVscode.postMessage).toHaveBeenCalledWith({
+			type: "orchestration/open-existing-surface",
+			payload: { source: "cloud-agent" },
 		});
 	});
 
@@ -112,6 +132,7 @@ describe("OrchestrationFeature", () => {
 		expect(
 			await screen.findByText("Cloud agent session storage is unavailable.")
 		).toBeTruthy();
+		expect(await screen.findByText("Status degraded")).toBeTruthy();
 		expect(await screen.findByText("Open Cloud Agents")).toBeTruthy();
 		expect(await screen.findByText("Open session")).toBeTruthy();
 		expect(await screen.findByText("Open external")).toBeTruthy();

@@ -79,6 +79,7 @@ describe("OrchestrationReadModel", () => {
 					]),
 			} as unknown as AgentSessionStorage,
 			cloudProviderRegistry: {
+				getAll: () => [{ metadata: { id: "devin", displayName: "Devin" } }],
 				getActive: () => ({
 					metadata: { id: "devin", displayName: "Devin" },
 				}),
@@ -208,6 +209,47 @@ describe("OrchestrationReadModel", () => {
 		expect(snapshot.sessions).toEqual([]);
 		expect(snapshot.degradedReasons).toContain(
 			"Cloud agent session storage is unavailable."
+		);
+		expect(snapshot.degradedReasons).toContain(
+			"Cloud agent providers are unavailable."
+		);
+	});
+
+	it("reports degraded state when cloud status reads fail or no provider is active", async () => {
+		const model = new OrchestrationReadModel({
+			store: {
+				listActive: () => Promise.resolve([]),
+				listRecent: () => Promise.resolve([]),
+				workspaceState: {
+					get: () => {
+						return;
+					},
+				},
+			} as unknown as AgentChatSessionStore,
+			registry: {
+				onDidChange: new EventEmitter<void>().event,
+				listActive: () => [],
+				listRecent: () => [],
+			} as unknown as AgentChatRegistry,
+			agentChatStoreChangeEvent: new EventEmitter<unknown>().event,
+			cloudSessionStorage: {
+				getAll: () => Promise.reject(new Error("boom")),
+			} as unknown as AgentSessionStorage,
+			cloudProviderRegistry: {
+				getAll: () => [{ metadata: { id: "devin", displayName: "Devin" } }],
+				getActive: () => null,
+				get: () => null,
+			} as unknown as ProviderRegistry,
+		});
+
+		const snapshot = await model.snapshot();
+
+		expect(snapshot.sessions).toEqual([]);
+		expect(snapshot.degradedReasons).toContain(
+			"Cloud agent status could not be read."
+		);
+		expect(snapshot.degradedReasons).toContain(
+			"No active cloud agent provider is selected."
 		);
 	});
 });
