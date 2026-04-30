@@ -43,8 +43,10 @@ This phase delivers the first end-to-end orchestration prototype for GatomIA by 
   - Note: completed on 2026-04-30 by adding `tests/unit/providers/orchestration-view-provider.test.ts` to exercise snapshot delivery, bridge actions, and degraded fallback behavior without creating a separate orchestration harness, then re-verifying the existing orchestration read-model and webview suites.
   - Validation: verified on 2026-04-30 with `npm test -- tests/unit/features/orchestration/orchestration-read-model.test.ts`, `npm test -- tests/unit/webview/cloud-agent-progress-view.test.tsx`, `npm test -- tests/unit/providers/orchestration-view-provider.test.ts`, and `npm run check`.
 
-- [ ] Run the orchestration quality gates and fix failures until the prototype is working end-to-end:
+- [x] Run the orchestration quality gates and fix failures until the prototype is working end-to-end:
   - Run the relevant targeted tests for orchestration changes first
   - Run `npm run check`
   - Run the full affected test command if targeted tests expose regressions that require broader validation
   - Verify the extension can surface the new orchestration prototype without breaking the existing Running Agents and Cloud Agents views
+  - Note: completed on 2026-04-30 by re-running the orchestration-targeted suites plus adjacent Running Agents, Agent Chat, and Cloud Agent regression coverage; no fixes were required because all checks passed on the first attempt.
+  - Validation: verified on 2026-04-30 with `npm test -- tests/unit/features/orchestration/orchestration-read-model.test.ts`, `npm test -- tests/unit/webview/cloud-agent-progress-view.test.tsx`, `npm test -- tests/unit/providers/orchestration-view-provider.test.ts`, `npm test -- tests/unit/providers/running-agents-tree-provider.test.ts`, `npm test -- tests/unit/providers/agent-chat-view-provider.test.ts`, `npm test -- tests/unit/webview/cloud-agent-store.test.ts`, and `npm run check`.
