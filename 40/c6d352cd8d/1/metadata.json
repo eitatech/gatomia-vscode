@@ -1,0 +1,48 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "40c6d352cd8d",
+  "session_id": "ses_21fd70ff8ffe6lW2mYU7K4vx38",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-30T20:57:44.692727Z",
+  "branch": "018-agent-chat-panel",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/architecture/design-system/design-system-audit.md"
+  ],
+  "agent": "OpenCode",
+  "model": "gpt-5.4",
+  "turn_id": "0eecc7fe8c4e",
+  "checkpoint_transcript_start": 10,
+  "transcript_lines_at_start": 10,
+  "token_usage": {
+    "input_tokens": 35446,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 453376,
+    "output_tokens": 1534,
+    "api_call_count": 8
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-30T20:57:44.688287Z",
+    "agent_lines": 270,
+    "agent_removed": 0,
+    "human_added": 35,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 305,
+    "total_lines_changed": 305,
+    "agent_percentage": 88.52459016393442,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
