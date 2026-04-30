@@ -22,10 +22,11 @@ This phase creates the reusable visual and interaction foundation for the redesi
   - Preserve existing behavior while improving visual hierarchy, scannability, and state feedback
   - Completed 2026-04-30: refactored the orchestration prototype to use shared panel, metric, badge, empty-state, and toolbar primitives; updated the Hooks list and row states to the same workflow foundation so status semantics and grouped sections now match across both surfaces without changing their behaviors.
 
-- [ ] Document the design system in structured markdown for future feature phases:
+- [x] Document the design system in structured markdown for future feature phases:
   - Create `docs/architecture/design-system/design-system-foundations.md` with YAML front matter and wiki-links to `[[Design-System-Audit]]` and `[[Workflow-Interaction-Patterns]]`
   - Create `docs/architecture/design-system/workflow-interaction-patterns.md` describing cards, flows, boards, inspector panels, and task-state visuals in a way later phases can directly reuse
   - Include examples of how orchestration, hooks, and Kanban should share status semantics and action affordances
+  - Completed 2026-04-30: documented the implemented workflow tokens and shared primitives in `docs/architecture/design-system/design-system-foundations.md`, and captured reusable cards, lists, boards, flows, inspector, state, and action patterns in `docs/architecture/design-system/workflow-interaction-patterns.md` so later orchestration and Kanban phases can extend the same status semantics and affordance model.
 
 - [ ] Write tests for the new shared UI foundations:
   - Add focused component tests for the new shared primitives and any refactored state badge logic
