@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "7e7445cee9fd",
+  "strategy": "manual-commit",
+  "branch": "018-agent-chat-panel",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "tests/unit/webview/hooks-view/hook-form.test.tsx",
+    "ui/src/features/hooks-view/components/hook-form.tsx",
+    "ui/src/features/hooks-view/components/trigger-action-selector.tsx",
+    "ui/src/features/hooks-view/types.ts"
+  ],
+  "sessions": [
+    {
+      "metadata": "/7e/7445cee9fd/0/metadata.json",
+      "transcript": "/7e/7445cee9fd/0/full.jsonl",
+      "content_hash": "/7e/7445cee9fd/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
