@@ -26,7 +26,7 @@ This phase simplifies the current hooks architecture into a clearer execution-fl
   - Ensure the UI language matches the new execution-flow model and remains understandable to engineers who are not already familiar with the current internal terminology
   - **Notes**: Added the new `EventSource`, `Condition`, and `Schedule` models to `ui/src/features/hooks-view/types.ts`. Rebuilt `TriggerActionSelector` inside the UI form to support specifying an event source mapping, schedule options, and fallback mechanisms for the legacy `TriggerCondition` field.
 
-- [ ] Create structured documentation for the new hook system:
+- [x] Create structured documentation for the new hook system:
   - Write `docs/architecture/hooks/trigger-model.md` and `docs/architecture/hooks/schedule-model.md` with YAML front matter and wiki-links back to `[[Hook-Execution-Model]]`
   - Write `docs/architecture/hooks/hook-composer-ux.md` describing how users create and reason about hooks, triggers, and schedules in the redesigned UI
 
