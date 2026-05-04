@@ -8,8 +8,8 @@
     "title": "Maestro Playbook task execution instructions",
     "version": "1.14.30",
     "summary": {
-      "additions": 228,
-      "deletions": 0,
+      "additions": 171,
+      "deletions": 1,
       "files": 4
     },
     "permission": [
@@ -31,7 +31,7 @@
     ],
     "time": {
       "created": 1777908778398,
-      "updated": 1777909018798
+      "updated": 1777909062822
     }
   },
   "messages": [
@@ -48,6 +48,13 @@
         },
         "summary": {
           "diffs": [
+            {
+              "file": "Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md",
+              "patch": "Index: Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n===================================================================\n--- Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\t\n+++ Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\t\n@@ -1,40 +1,40 @@\n # Phase 03: Hook and Trigger Engine Refactor\n \n This phase simplifies the current hooks architecture into a clearer execution-flow engine that can model hooks, triggers, and schedules without duplicated concepts or fragmented UI rules. It matters because the existing hooks system already has useful behavior and persistence, but the project now needs a flexible foundation that can react to execution flows, code changes, and future scheduling rules without piling on more ad hoc configuration paths.\n \n ## Tasks\n \n - [x] Audit and model the current hook system before refactoring it:\n   - Inspect `src/features/hooks/`, the hook providers, and the hooks webview components to identify overlap between trigger configuration, action configuration, validation, execution, and logging\n   - Reuse existing persistence and type definitions when viable; only introduce new abstractions if they eliminate concrete duplication or ambiguity\n   - Capture the target architecture in `docs/architecture/hooks/hook-execution-model.md` with YAML front matter and wiki-links to `[[Trigger-Model]]`, `[[Schedule-Model]]`, and `[[Hook-Composer-UX]]`\n \n - [x] Refactor the backend hook model into a clearer execution-flow contract:\n   - Introduce a normalized domain model that separates event sources, conditions, schedules, and actions while preserving migration from the current stored hook shape\n   - Extend trigger support so future phases can react to execution-flow events, repository or file-code changes, and explicit manual triggers without rewriting the executor again\n   - Preserve backward compatibility for existing stored hooks only where necessary for current workspace state migration\n   - Add telemetry and output-channel logging for evaluation, execution, skip reasons, and failure reasons\n \n-- [ ] Refactor hook execution and validation around the new model:\n+- [x] Refactor hook execution and validation around the new model:\n   - Reuse `HookManager`, `HookExecutor`, `TriggerRegistry`, and related services where possible before creating replacement files\n   - Consolidate validation so trigger, schedule, and action errors are surfaced consistently in one place\n   - Make room for schedule stubs or interfaces even if full scheduler execution lands in a later phase, so the model is ready now without overbuilding\n \n - [ ] Redesign the hooks configuration UI around the simplified model:\n   - Reuse current hooks-view patterns, selector components, and argument-template editing where they still fit\n   - Replace confusing or redundant configuration paths with a clearer composition flow for event source, conditions, timing, and actions\n   - Ensure the UI language matches the new execution-flow model and remains understandable to engineers who are not already familiar with the current internal terminology\n \n - [ ] Create structured documentation for the new hook system:\n   - Write `docs/architecture/hooks/trigger-model.md` and `docs/architecture/hooks/schedule-model.md` with YAML front matter and wiki-links back to `[[Hook-Execution-Model]]`\n   - Write `docs/architecture/hooks/hook-composer-ux.md` describing how users create and reason about hooks, triggers, and schedules in the redesigned UI\n \n - [ ] Write tests for the refactored hook engine and UI:\n   - Add or update unit tests for migrations, validation, trigger evaluation, and execution logging\n   - Add UI tests that cover the simplified configuration flow and key validation/error states\n   - Prefer extending current hook provider and component test suites before introducing new fixtures\n \n - [ ] Run the hook-system quality gates and fix failures:\n   - Run targeted hook-related tests first\n   - Run `npm run check`\n   - Verify existing hook import, export, enable, disable, and execution-log workflows still function after the refactor\n",
+              "additions": 1,
+              "deletions": 1,
+              "status": "modified"
+            },
             {
               "file": "src/features/hooks/hook-executor.ts",
               "patch": "Index: src/features/hooks/hook-executor.ts\n===================================================================\n--- src/features/hooks/hook-executor.ts\t\n+++ src/features/hooks/hook-executor.ts\t\n@@ -1,1664 +1,1735 @@\n /**\n  * Hook Executor Service\n  *\n  * Orchestrates the execution of hooks triggered by various events in the system.\n  * Handles validation, context building, action execution, error handling, and logging.\n  *\n  * Responsibilities:\n  * - Execute hooks triggered by spec lifecycle, MCP server, or custom events\n  * - Build template contexts from trigger events\n  * - Validate hooks before execution (agent availability, MCP server availability)\n  * - Execute actions (agent prompts, MCP tools, Git operations, GitHub operations)\n  * - Handle execution errors with user notifications and retry options\n  * - Manage execution chains (hook triggers another hook)\n  * - Prevent circular dependencies\n  * - Log all executions with comprehensive context\n  * - Emit execution events for external listeners\n  *\n  * @see specs/011-custom-agent-hooks/data-model.md\n  * @see src/features/hooks/hook-manager.ts\n  */\n \n import {\n \tEventEmitter,\n \ttype Event,\n \ttype OutputChannel,\n \textensions,\n \twindow,\n \tcommands,\n \tworkspace,\n \tenv,\n } from \"vscode\";\n import { randomUUID } from \"node:crypto\";\n import { spawn } from \"node:child_process\";\n import type { HookManager } from \"./hook-manager\";\n import type { TriggerRegistry } from \"./trigger-registry\";\n import type { AgentRegistry } from \"./agent-registry\";\n import { sendPromptToChat } from \"../../utils/chat-prompt-runner\";\n import { AgentActionExecutor } from \"./actions/agent-action\";\n import { GitActionExecutor } from \"./actions/git-action\";\n import { GitHubActionExecutor } from \"./actions/github-action\";\n import { MCPActionExecutor } from \"./actions/mcp-action\";\n import { ACPActionExecutor } from \"./actions/acp-action\";\n import { MCPClientService } from \"./services/mcp-client\";\n import { MCPParameterResolver } from \"./services/mcp-parameter-resolver\";\n import { MCPExecutionPool } from \"./services/mcp-execution-pool\";\n import type { IMCPDiscoveryService } from \"./services/mcp-contracts\";\n import {\n \tTemplateVariableParser,\n \ttype TemplateContext as ParserTemplateContext,\n } from \"./template-variable-parser\";\n import type {\n \tHook,\n \tExecutionContext,\n \tHookExecutionLog,\n \tAgentActionParams,\n \tGitActionParams,\n \tGitHubActionParams,\n \tMCPActionParams,\n \tCustomActionParams,\n \tACPActionParams,\n \tOperationType,\n \tTriggerEvent,\n } from \"./types\";\n import {\n \tMAX_CHAIN_DEPTH,\n \tMAX_EXECUTION_LOGS,\n \tACTION_TIMEOUT_MS,\n } from \"./types\";\n \n /**\n  * Regex pattern for extracting feature name from branch (NNN-feature-name)\n  */\n const FEATURE_NAME_PATTERN = /^\\d+-(.+)$/;\n \n /**\n  * Regex pattern for extracting agent name from agentId (format: \"local:agent-name\")\n  * Matches the AGENT_ID_PREFIX.FILE constant which is \"local\"\n  */\n const AGENT_ID_PREFIX_PATTERN = /^local:/;\n \n /**\n  * Regex patterns for parsing Git remote URLs\n  */\n const GIT_HTTPS_REMOTE_PATTERN = /github\\.com\\/([^/]+)\\/([^/.]+)(\\.git)?$/;\n const GIT_SSH_REMOTE_PATTERN = /github\\.com:([^/]+)\\/([^/.]+)(\\.git)?$/;\n \n /**\n  * ExecutionStatus - Status of hook execution\n  */\n export type ExecutionStatus = \"success\" | \"failure\" | \"skipped\" | \"timeout\";\n \n /**\n  * ExecutionError - Error during hook execution\n  */\n export interface ExecutionError {\n \tmessage: string;\n \tcode: string;\n \tdetails?: unknown;\n }\n \n /**\n  * ExecutionResult - Result of hook execution\n  */\n export interface ExecutionResult {\n \thookId: string;\n \thookName: string;\n \tstatus: ExecutionStatus;\n \tduration?: number;\n \terror?: ExecutionError;\n }\n \n /**\n  * ExecutionEvent - Event emitted during hook execution\n  */\n export interface ExecutionEvent {\n \thook: Hook;\n \tcontext: ExecutionContext;\n \tresult?: ExecutionResult;\n }\n \n /**\n  * Custom error classes\n  */\n export class CircularDependencyError extends Error {\n \tconstructor(message: string) {\n \t\tsuper(message);\n \t\tthis.name = \"CircularDependencyError\";\n \t}\n }\n \n export class MaxDepthExceededError extends Error {\n \tconstructor(message: string) {\n \t\tsuper(message);\n \t\tthis.name = \"MaxDepthExceededError\";\n \t}\n }\n \n export class ExecutionTimeoutError extends Error {\n \tconstructor(message: string) {\n \t\tsuper(message);\n \t\tthis.name = \"ExecutionTimeoutError\";\n \t}\n }\n \n /**\n  * HookExecutor - Core hook execution engine\n  *\n  * Executes hooks when triggered, manages execution context,\n  * prevents circular dependencies, and logs execution history.\n  */\n export class HookExecutor {\n \tprivate readonly hookManager: HookManager;\n \tprivate readonly triggerRegistry: TriggerRegistry;\n \tprivate readonly agentRegistry: AgentRegistry;\n \tprivate readonly outputChannel: OutputChannel;\n \tprivate readonly agentExecutor: AgentActionExecutor;\n \tprivate readonly gitExecutor: GitActionExecutor;\n \tprivate readonly githubExecutor: GitHubActionExecutor;\n \tprivate readonly mcpExecutor: MCPActionExecutor;\n \tprivate readonly templateParser: TemplateVariableParser;\n \tprivate executionLogs: HookExecutionLog[] = [];\n \n \t// Event emitters\n \tprivate readonly _onExecutionStarted = new EventEmitter<ExecutionEvent>();\n \tprivate readonly _onExecutionCompleted = new EventEmitter<ExecutionEvent>();\n \tprivate readonly _onExecutionFailed = new EventEmitter<ExecutionEvent>();\n \n \t// Public events\n \treadonly onExecutionStarted: Event<ExecutionEvent> =\n \t\tthis._onExecutionStarted.event;\n \treadonly onExecutionCompleted: Event<ExecutionEvent> =\n \t\tthis._onExecutionCompleted.event;\n \treadonly onExecutionFailed: Event<ExecutionEvent> =\n \t\tthis._onExecutionFailed.event;\n \n \t// biome-ignore lint/nursery/useMaxParams: Dependency injection pattern requires multiple constructor parameters\n \tconstructor(\n \t\thookManager: HookManager,\n \t\ttriggerRegistry: TriggerRegistry,\n \t\toutputChannel: OutputChannel,\n \t\tmcpDiscoveryService: IMCPDiscoveryService,\n \t\tagentRegistry: AgentRegistry\n \t) {\n \t\tthis.hookManager = hookManager;\n \t\tthis.triggerRegistry = triggerRegistry;\n \t\tthis.outputChannel = outputChannel;\n \t\tthis.agentRegistry = agentRegistry;\n \t\tthis.agentExecutor = new AgentActionExecutor();\n \t\tthis.gitExecutor = new GitActionExecutor();\n \t\tthis.githubExecutor = new GitHubActionExecutor();\n \t\tthis.templateParser = new TemplateVariableParser();\n \n \t\t// Initialize MCP executor with all required services\n \t\tconst clientService = new MCPClientService(mcpDiscoveryService);\n \t\tconst parameterResolver = new MCPParameterResolver();\n \t\tconst executionPool = new MCPExecutionPool(5); // Concurrency limit of 5\n \n \t\tthis.mcpExecutor = new MCPActionExecutor({\n \t\t\tdiscoveryService: mcpDiscoveryService,\n \t\t\tclientService,\n \t\t\tparameterResolver,\n \t\t\texecutionPool,\n \t\t\tlogger: {\n \t\t\t\tlog: (...args: unknown[]) =>\n \t\t\t\t\toutputChannel.appendLine(args.map(String).join(\" \")),\n \t\t\t\twarn: (...args: unknown[]) =>\n \t\t\t\t\toutputChannel.appendLine(`[warn] ${args.map(String).join(\" \")}`),\n \t\t\t},\n \t\t});\n \t}\n \n \t/**\n \t * Initialize the hook executor\n \t * Subscribes to trigger events\n \t */\n \tinitialize(): void {\n \t\t// Subscribe to trigger events\n \t\tthis.triggerRegistry.onTrigger(async (event) => {\n \t\t\tconst timing = event.timing || \"after\";\n \t\t\tawait this.executeHooksForTrigger(\n \t\t\t\tevent.agent,\n \t\t\t\tevent.operation,\n \t\t\t\ttiming,\n \t\t\t\tevent\n \t\t\t);\n \t\t});\n \n \t\tthis.outputChannel.appendLine(\"[HookExecutor] Initialized\");\n \t}\n \n \t/**\n \t * Dispose of resources\n \t */\n \tdispose(): void {\n \t\tthis._onExecutionStarted.dispose();\n \t\tthis._onExecutionCompleted.dispose();\n \t\tthis._onExecutionFailed.dispose();\n \t\tthis.outputChannel.appendLine(\"[HookExecutor] Disposed\");\n \t}\n \n \t/**\n \t * Execute a single hook\n \t * T087: Prevent execution of invalid hooks\n \t */\n \t// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: The hook pipeline coordinates validation, execution, logging, and retries within a single flow.\n \tasync executeHook(\n \t\thook: Hook,\n \t\tcontext?: ExecutionContext,\n \t\ttriggerEvent?: TriggerEvent\n \t): Promise<ExecutionResult> {\n \t\tconst startTime = Date.now();\n \n \t\t// Check if hook is enabled\n \t\tif (!hook.enabled) {\n \t\t\tthis.outputChannel.appendLine(\n \t\t\t\t`[HookExecutor] Skipping disabled hook: ${hook.name} (${hook.id})`\n \t\t\t);\n \n \t\t\treturn {\n \t\t\t\thookId: hook.id,\n \t\t\t\thookName: hook.name,\n \t\t\t\tstatus: \"skipped\",\n \t\t\t\tduration: Date.now() - startTime,\n \t\t\t};\n \t\t}\n \n \t\t// T087: Validate MCP hooks before execution\n \t\tif (hook.action.type === \"mcp\") {\n \t\t\ttry {\n \t\t\t\tconst validation = await this.hookManager.validateHook(hook);\n \t\t\t\tif (!validation.valid) {\n \t\t\t\t\tconst errorMessages = validation.errors\n \t\t\t\t\t\t.map((e) => `${e.field}: ${e.message}`)\n \t\t\t\t\t\t.join(\", \");\n \n \t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t`[HookExecutor] Skipping invalid MCP hook: ${hook.name} - ${errorMessages}`\n \t\t\t\t\t);\n \n \t\t\t\t\t// T088-T089: Show error notification with actions\n \t\t\t\t\tconst mcpParams = hook.action.parameters as MCPActionParams;\n \t\t\t\t\tconst action = await window.showErrorMessage(\n \t\t\t\t\t\t`Hook \"${hook.name}\" has invalid MCP configuration: ${validation.errors[0]?.message ?? \"Unknown error\"}`,\n \t\t\t\t\t\t\"Update Hook\",\n \t\t\t\t\t\t\"Remove Hook\",\n \t\t\t\t\t\t\"Cancel\"\n \t\t\t\t\t);\n \n \t\t\t\t\tif (action === \"Update Hook\") {\n \t\t\t\t\t\t// Trigger hook edit (command will be implemented in hook view)\n \t\t\t\t\t\tawait commands.executeCommand(\"gatomia.hooks.editHook\", hook.id);\n \t\t\t\t\t} else if (action === \"Remove Hook\") {\n \t\t\t\t\t\tawait this.hookManager.deleteHook(hook.id);\n \t\t\t\t\t\twindow.showInformationMessage(`Hook \"${hook.name}\" removed`);\n \t\t\t\t\t}\n \n \t\t\t\t\treturn {\n \t\t\t\t\t\thookId: hook.id,\n \t\t\t\t\t\thookName: hook.name,\n \t\t\t\t\t\tstatus: \"skipped\",\n \t\t\t\t\t\tduration: Date.now() - startTime,\n \t\t\t\t\t\terror: {\n \t\t\t\t\t\t\tmessage: errorMessages,\n \t\t\t\t\t\t\tcode: \"InvalidMCPConfiguration\",\n \t\t\t\t\t\t},\n \t\t\t\t\t};\n \t\t\t\t}\n \t\t\t} catch (error) {\n \t\t\t\t// Graceful degradation - log error and continue\n \t\t\t\tconst err = error as Error;\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Warning: Failed to validate MCP hook: ${err.message}`\n \t\t\t\t);\n \t\t\t}\n \t\t}\n \n \t\t// T081: Check agent availability before execution for custom hooks\n \t\tif (hook.action.type === \"custom\") {\n \t\t\tconst customParams = hook.action.parameters as CustomActionParams;\n \t\t\tconst agentId = customParams.agentId || customParams.agentName;\n \n \t\t\tif (agentId && this.agentRegistry) {\n \t\t\t\ttry {\n \t\t\t\t\t// Check agent availability\n \t\t\t\t\tconst availability =\n \t\t\t\t\t\tawait this.agentRegistry.checkAgentAvailability(agentId);\n \n \t\t\t\t\tif (!availability.available) {\n \t\t\t\t\t\t// Determine reason text\n \t\t\t\t\t\tlet reasonText: string;\n \t\t\t\t\t\tif (availability.reason === \"FILE_DELETED\") {\n \t\t\t\t\t\t\treasonText = \"agent file was deleted\";\n \t\t\t\t\t\t} else if (availability.reason === \"EXTENSION_UNINSTALLED\") {\n \t\t\t\t\t\t\treasonText = \"extension is uninstalled\";\n \t\t\t\t\t\t} else {\n \t\t\t\t\t\t\treasonText = \"agent is unavailable\";\n \t\t\t\t\t\t}\n \n \t\t\t\t\t\tconst errorMessage = `Agent \"${agentId}\" is not available: ${reasonText}`;\n \n \t\t\t\t\t\t// T082: Log detailed error information\n \t\t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t\t`[HookExecutor] Agent unavailable - Hook: ${hook.name} (${hook.id})`\n \t\t\t\t\t\t);\n \t\t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t\t`[HookExecutor] Agent ID: ${agentId}, Reason: ${availability.reason}`\n \t\t\t\t\t\t);\n \t\t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t\t`[HookExecutor] Trigger: ${hook.trigger.agent}.${hook.trigger.operation} (${hook.trigger.timing})`\n \t\t\t\t\t\t);\n \n \t\t\t\t\t\t// Emit execution failed event\n \t\t\t\t\t\tconst errorResult: ExecutionResult = {\n \t\t\t\t\t\t\thookId: hook.id,\n \t\t\t\t\t\t\thookName: hook.name,\n \t\t\t\t\t\t\tstatus: \"failure\",\n \t\t\t\t\t\t\tduration: Date.now() - startTime,\n \t\t\t\t\t\t\terror: {\n \t\t\t\t\t\t\t\tmessage: errorMessage,\n \t\t\t\t\t\t\t\tcode: \"AgentUnavailable\",\n \t\t\t\t\t\t\t\tdetails: {\n \t\t\t\t\t\t\t\t\tagentId,\n \t\t\t\t\t\t\t\t\treason: availability.reason,\n \t\t\t\t\t\t\t\t\tcheckedAt: availability.checkedAt,\n \t\t\t\t\t\t\t\t},\n \t\t\t\t\t\t\t},\n \t\t\t\t\t\t};\n \n \t\t\t\t\t\tthis._onExecutionFailed.fire({\n \t\t\t\t\t\t\thook,\n \t\t\t\t\t\t\tcontext: context || this.createExecutionContext(),\n \t\t\t\t\t\t\tresult: errorResult,\n \t\t\t\t\t\t});\n \n \t\t\t\t\t\t// Show error notification with retry option\n \t\t\t\t\t\tconst action = await window.showErrorMessage(\n \t\t\t\t\t\t\t`Hook \"${hook.name}\" failed: ${errorMessage}`,\n \t\t\t\t\t\t\t\"Retry\",\n \t\t\t\t\t\t\t\"Update Hook\",\n \t\t\t\t\t\t\t\"Cancel\"\n \t\t\t\t\t\t);\n \n \t\t\t\t\t\tif (action === \"Retry\") {\n \t\t\t\t\t\t\t// Retry execution\n \t\t\t\t\t\t\treturn await this.executeHook(hook, context, triggerEvent);\n \t\t\t\t\t\t}\n \t\t\t\t\t\tif (action === \"Update Hook\") {\n \t\t\t\t\t\t\tawait commands.executeCommand(\"gatomia.hooks.editHook\", hook.id);\n \t\t\t\t\t\t}\n \n \t\t\t\t\t\treturn errorResult;\n \t\t\t\t\t}\n \t\t\t\t} catch (error) {\n \t\t\t\t\t// Graceful degradation - log error and continue\n \t\t\t\t\tconst err = error as Error;\n \t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t`[HookExecutor] Warning: Failed to check agent availability: ${err.message}`\n \t\t\t\t\t);\n \t\t\t\t}\n \t\t\t}\n \t\t}\n \n \t\t// Create or use existing context\n \t\tconst execContext = context || this.createExecutionContext();\n \n \t\ttry {\n \t\t\t// Check for circular dependency\n \t\t\tif (this.isCircularDependency(hook.id, execContext)) {\n \t\t\t\tthrow new CircularDependencyError(\n \t\t\t\t\t`Circular dependency detected: ${hook.name}`\n \t\t\t\t);\n \t\t\t}\n \n \t\t\t// Check max depth\n \t\t\tif (this.isMaxDepthExceeded(execContext)) {\n \t\t\t\tthrow new MaxDepthExceededError(\n \t\t\t\t\t`Maximum chain depth (${MAX_CHAIN_DEPTH}) exceeded`\n \t\t\t\t);\n \t\t\t}\n \n+\t\t\t// Evaluate conditions before proceeding\n+\t\t\tconst conditionsMet = await this.evaluateConditions(hook, execContext);\n+\t\t\tif (!conditionsMet) {\n+\t\t\t\tthis.outputChannel.appendLine(\n+\t\t\t\t\t`[HookExecutor] Conditions not met, skipping hook: ${hook.name} (${hook.id})`\n+\t\t\t\t);\n+\t\t\t\treturn {\n+\t\t\t\t\thookId: hook.id,\n+\t\t\t\t\thookName: hook.name,\n+\t\t\t\t\tstatus: \"skipped\",\n+\t\t\t\t\tduration: Date.now() - startTime,\n+\t\t\t\t};\n+\t\t\t}\n+\n \t\t\t// Add hook to executed set\n \t\t\texecContext.executedHooks.add(hook.id);\n \t\t\texecContext.chainDepth += 1;\n \n \t\t\t// Build template context\n \t\t\t// Extract trigger type from hook's trigger configuration\n \t\t\tconst triggerOperation =\n \t\t\t\thook.trigger?.operation || triggerEvent?.operation || \"unknown\";\n \t\t\tconst templateContext = await this.buildTemplateContext(\n \t\t\t\ttriggerOperation,\n \t\t\t\tundefined,\n \t\t\t\ttriggerEvent\n \t\t\t);\n \n+\t\t\t// Handle scheduling before execution\n+\t\t\tif (hook.schedule && hook.schedule.type !== \"immediate\") {\n+\t\t\t\t// Stub: future phases will hand off to a real scheduler service\n+\t\t\t\tthis.outputChannel.appendLine(\n+\t\t\t\t\t`[HookExecutor] Hook ${hook.name} scheduled for ${hook.schedule.type} execution. (Scheduler stub)`\n+\t\t\t\t);\n+\n+\t\t\t\t// For now, if delayed, we wait\n+\t\t\t\tif (hook.schedule.type === \"delayed\" && hook.schedule.delayMs) {\n+\t\t\t\t\tthis.outputChannel.appendLine(\n+\t\t\t\t\t\t`[HookExecutor] Delaying execution by ${hook.schedule.delayMs}ms`\n+\t\t\t\t\t);\n+\t\t\t\t\tawait new Promise((resolve) =>\n+\t\t\t\t\t\tsetTimeout(resolve, hook.schedule.delayMs)\n+\t\t\t\t\t);\n+\t\t\t\t} else {\n+\t\t\t\t\treturn {\n+\t\t\t\t\t\thookId: hook.id,\n+\t\t\t\t\t\thookName: hook.name,\n+\t\t\t\t\t\tstatus: \"skipped\",\n+\t\t\t\t\t\tduration: Date.now() - startTime,\n+\t\t\t\t\t};\n+\t\t\t\t}\n+\t\t\t}\n+\n \t\t\t// Emit execution started event\n \t\t\tthis._onExecutionStarted.fire({\n \t\t\t\thook,\n \t\t\t\tcontext: execContext,\n \t\t\t});\n \n \t\t\tthis.outputChannel.appendLine(\n \t\t\t\t`[HookExecutor] Executing hook: ${hook.name} (${hook.id})`\n \t\t\t);\n \n \t\t\t// Execute action based on type\n \t\t\tlet actionResult: { success: boolean; error?: Error };\n \n \t\t\t// T074: Add detailed logging for MCP actions\n \t\t\tif (hook.action.type === \"mcp\") {\n \t\t\t\tconst mcpParams = hook.action.parameters as MCPActionParams;\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] MCP Action: ${mcpParams.serverId}/${mcpParams.toolName}`\n \t\t\t\t);\n \t\t\t}\n \n \t\t\tswitch (hook.action.type) {\n \t\t\t\tcase \"agent\": {\n \t\t\t\t\t// Expand templates in command\n \t\t\t\t\tconst agentParams = hook.action.parameters as AgentActionParams;\n \t\t\t\t\tconst command = this.expandTemplate(\n \t\t\t\t\t\tagentParams.command,\n \t\t\t\t\t\ttemplateContext\n \t\t\t\t\t);\n \n \t\t\t\t\t// Execute with timeout\n \t\t\t\t\tactionResult = await this.executeWithTimeout(\n \t\t\t\t\t\t() =>\n \t\t\t\t\t\t\tthis.agentExecutor.execute({\n \t\t\t\t\t\t\t\tcommand,\n \t\t\t\t\t\t\t}),\n \t\t\t\t\t\tACTION_TIMEOUT_MS\n \t\t\t\t\t);\n \t\t\t\t\tbreak;\n \t\t\t\t}\n \t\t\t\tcase \"git\": {\n \t\t\t\t\tconst gitParams = hook.action.parameters as GitActionParams;\n \t\t\t\t\tactionResult = await this.executeWithTimeout(\n \t\t\t\t\t\t() => this.gitExecutor.execute(gitParams, templateContext),\n \t\t\t\t\t\tACTION_TIMEOUT_MS\n \t\t\t\t\t);\n \t\t\t\t\tbreak;\n \t\t\t\t}\n \t\t\t\tcase \"github\": {\n \t\t\t\t\tconst githubParams = hook.action.parameters as GitHubActionParams;\n \t\t\t\t\tactionResult = await this.executeWithTimeout(\n \t\t\t\t\t\t() => this.githubExecutor.execute(githubParams, templateContext),\n \t\t\t\t\t\tACTION_TIMEOUT_MS\n \t\t\t\t\t);\n \t\t\t\t\tbreak;\n \t\t\t\t}\n \t\t\t\tcase \"mcp\": {\n \t\t\t\t\tconst mcpParams = hook.action.parameters as MCPActionParams;\n \t\t\t\t\tactionResult = await this.executeWithTimeout(\n \t\t\t\t\t\t() => this.mcpExecutor.execute(mcpParams, templateContext),\n \t\t\t\t\t\tACTION_TIMEOUT_MS\n \t\t\t\t\t);\n \t\t\t\t\tbreak;\n \t\t\t\t}\n \t\t\t\tcase \"custom\": {\n \t\t\t\t\tconst customParams = hook.action.parameters as CustomActionParams;\n \n \t\t\t\t\t// Determine agent type (override or default from registry)\n \t\t\t\t\tlet agentType = customParams.agentType;\n \t\t\t\t\tif (!agentType && customParams.agentId) {\n \t\t\t\t\t\tconst agent = this.agentRegistry.getAgentById(customParams.agentId);\n \t\t\t\t\t\tagentType = agent?.type;\n \t\t\t\t\t}\n \n \t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t`[HookExecutor] Custom action - Agent type: ${agentType || \"unknown\"}`\n \t\t\t\t\t);\n \n \t\t\t\t\t// Route based on agent type\n \t\t\t\t\tif (agentType === \"local\") {\n \t\t\t\t\t\tactionResult = await this.executeWithTimeout(\n \t\t\t\t\t\t\t() => this.executeLocalAgent(customParams, templateContext),\n \t\t\t\t\t\t\tACTION_TIMEOUT_MS\n \t\t\t\t\t\t);\n \t\t\t\t\t} else if (agentType === \"background\") {\n \t\t\t\t\t\tactionResult = await this.executeWithTimeout(\n \t\t\t\t\t\t\t() => this.executeBackgroundAgent(customParams, templateContext),\n \t\t\t\t\t\t\tACTION_TIMEOUT_MS\n \t\t\t\t\t\t);\n \t\t\t\t\t} else {\n \t\t\t\t\t\tthrow new Error(\n \t\t\t\t\t\t\t`Unknown agent type: ${agentType}. Agent ID: ${customParams.agentId}`\n \t\t\t\t\t\t);\n \t\t\t\t\t}\n \t\t\t\t\tbreak;\n \t\t\t\t}\n \n \t\t\t\tcase \"acp\": {\n \t\t\t\t\tconst acpParams = hook.action.parameters as ACPActionParams;\n \t\t\t\t\tconst acpExecutor = new ACPActionExecutor({\n \t\t\t\t\t\ttimeoutMs: ACTION_TIMEOUT_MS,\n \t\t\t\t\t});\n \t\t\t\t\ttry {\n \t\t\t\t\t\tconst acpResult = await acpExecutor.execute(\n \t\t\t\t\t\t\tacpParams,\n \t\t\t\t\t\t\ttemplateContext\n \t\t\t\t\t\t);\n \t\t\t\t\t\ttemplateContext.acpAgentOutput = acpResult.output;\n \t\t\t\t\t\tactionResult = { success: true };\n \t\t\t\t\t} catch (err) {\n \t\t\t\t\t\tactionResult = {\n \t\t\t\t\t\t\tsuccess: false,\n \t\t\t\t\t\t\terror: err instanceof Error ? err : new Error(String(err)),\n \t\t\t\t\t\t};\n \t\t\t\t\t}\n \t\t\t\t\tbreak;\n \t\t\t\t}\n \n \t\t\t\tdefault:\n \t\t\t\t\tthrow new Error(`Unsupported action type: ${hook.action.type}`);\n \t\t\t}\n \n \t\t\tconst duration = Date.now() - startTime;\n \n \t\t\t// Create execution result\n \t\t\tconst result: ExecutionResult = {\n \t\t\t\thookId: hook.id,\n \t\t\t\thookName: hook.name,\n \t\t\t\tstatus: actionResult.success ? \"success\" : \"failure\",\n \t\t\t\tduration,\n \t\t\t\terror: actionResult.error\n \t\t\t\t\t? {\n \t\t\t\t\t\t\tmessage: actionResult.error.message,\n \t\t\t\t\t\t\tcode: actionResult.error.name || \"UnknownError\",\n \t\t\t\t\t\t\tdetails: actionResult.error,\n \t\t\t\t\t\t}\n \t\t\t\t\t: undefined,\n \t\t\t};\n \n \t\t\t// Record execution log\n \t\t\tthis.recordExecutionLog({\n \t\t\t\tid: randomUUID(),\n \t\t\t\thookId: hook.id,\n \t\t\t\texecutionId: execContext.executionId,\n \t\t\t\tchainDepth: execContext.chainDepth,\n \t\t\t\ttriggeredAt: startTime,\n \t\t\t\tcompletedAt: Date.now(),\n \t\t\t\tduration,\n \t\t\t\tstatus: result.status,\n \t\t\t\terror: result.error,\n \t\t\t\tcontextSnapshot: templateContext,\n \t\t\t});\n \n \t\t\t// Emit appropriate event\n \t\t\tif (result.status === \"success\") {\n \t\t\t\tthis._onExecutionCompleted.fire({\n \t\t\t\t\thook,\n \t\t\t\t\tcontext: execContext,\n \t\t\t\t\tresult,\n \t\t\t\t});\n \n \t\t\t\t// T076: Show success notification for MCP actions\n \t\t\t\tif (hook.action.type === \"mcp\") {\n \t\t\t\t\tconst mcpParams = hook.action.parameters as MCPActionParams;\n \t\t\t\t\twindow.showInformationMessage(\n \t\t\t\t\t\t`MCP Tool \"${mcpParams.toolName}\" executed successfully (${duration}ms)`\n \t\t\t\t\t);\n \t\t\t\t}\n \n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] ✓ Hook execution success: ${hook.name} (${duration}ms)`\n \t\t\t\t);\n \t\t\t} else {\n \t\t\t\t// T084: Enhanced failure logging with full context\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\"[HookExecutor] ==================== HOOK EXECUTION FAILURE ====================\"\n \t\t\t\t);\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Hook: ${hook.name} (${hook.id})`\n \t\t\t\t);\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Trigger: ${hook.trigger ? `${hook.trigger.agent}.${hook.trigger.operation} (${hook.trigger.timing})` : hook.events?.map((e) => e.type).join(\", \")}`\n \t\t\t\t);\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Action Type: ${hook.action.type}`\n \t\t\t\t);\n \n \t\t\t\t// Add action-specific context\n \t\t\t\tif (hook.action.type === \"custom\") {\n \t\t\t\t\tconst customParams = hook.action.parameters as CustomActionParams;\n \t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t`[HookExecutor] Agent ID: ${customParams.agentId || customParams.agentName || \"unknown\"}`\n \t\t\t\t\t);\n \t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t`[HookExecutor] Agent Type: ${customParams.agentType || \"unknown\"}`\n \t\t\t\t\t);\n \t\t\t\t} else if (hook.action.type === \"mcp\") {\n \t\t\t\t\tconst mcpParams = hook.action.parameters as MCPActionParams;\n \t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t`[HookExecutor] MCP Server: ${mcpParams.serverId}`\n \t\t\t\t\t);\n \t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t`[HookExecutor] MCP Tool: ${mcpParams.toolName}`\n \t\t\t\t\t);\n \t\t\t\t}\n \n \t\t\t\tif (result.error) {\n \t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t`[HookExecutor] Error Code: ${result.error.code}`\n \t\t\t\t\t);\n \t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t`[HookExecutor] Error Message: ${result.error.message}`\n \t\t\t\t\t);\n \n \t\t\t\t\t// Log stack trace if available in details\n \t\t\t\t\tconst errorDetails = result.error.details as any;\n \t\t\t\t\tif (errorDetails?.stack) {\n \t\t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t\t`[HookExecutor] Stack Trace:\\n${errorDetails.stack}`\n \t\t\t\t\t\t);\n \t\t\t\t\t}\n \t\t\t\t}\n \n \t\t\t\tthis.outputChannel.appendLine(`[HookExecutor] Duration: ${duration}ms`);\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Execution ID: ${execContext.executionId}`\n \t\t\t\t);\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Chain Depth: ${execContext.chainDepth}`\n \t\t\t\t);\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\"[HookExecutor] ================================================================\"\n \t\t\t\t);\n \n \t\t\t\tthis._onExecutionFailed.fire({\n \t\t\t\t\thook,\n \t\t\t\t\tcontext: execContext,\n \t\t\t\t\tresult,\n \t\t\t\t});\n \n \t\t\t\t// T077: Show error notification for MCP actions\n \t\t\t\tif (hook.action.type === \"mcp\") {\n \t\t\t\t\tconst mcpParams = hook.action.parameters as MCPActionParams;\n \t\t\t\t\tconst errorMsg = result.error?.message ?? \"Unknown error\";\n \t\t\t\t\twindow.showErrorMessage(\n \t\t\t\t\t\t`MCP Tool \"${mcpParams.toolName}\" failed: ${errorMsg}`\n \t\t\t\t\t);\n \t\t\t\t}\n \t\t\t}\n \n \t\t\treturn result;\n \t\t} catch (error) {\n \t\t\tconst duration = Date.now() - startTime;\n \t\t\tconst err = error as Error;\n \n \t\t\t// T084: Enhanced error logging with full context\n \t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\"[HookExecutor] ==================== HOOK EXECUTION ERROR ====================\"\n \t\t\t);\n \t\t\tthis.outputChannel.appendLine(\n \t\t\t\t`[HookExecutor] Hook: ${hook.name} (${hook.id})`\n \t\t\t);\n \t\t\tthis.outputChannel.appendLine(\n \t\t\t\t`[HookExecutor] Trigger: ${hook.trigger ? `${hook.trigger.agent}.${hook.trigger.operation} (${hook.trigger.timing})` : hook.events?.map((e) => e.type).join(\", \")}`\n \t\t\t);\n \t\t\tthis.outputChannel.appendLine(\n \t\t\t\t`[HookExecutor] Action Type: ${hook.action.type}`\n \t\t\t);\n \n \t\t\t// Add action-specific context\n \t\t\tif (hook.action.type === \"custom\") {\n \t\t\t\tconst customParams = hook.action.parameters as CustomActionParams;\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Agent ID: ${customParams.agentId || customParams.agentName || \"unknown\"}`\n \t\t\t\t);\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Agent Type: ${customParams.agentType || \"unknown\"}`\n \t\t\t\t);\n \t\t\t} else if (hook.action.type === \"mcp\") {\n \t\t\t\tconst mcpParams = hook.action.parameters as MCPActionParams;\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] MCP Server: ${mcpParams.serverId}`\n \t\t\t\t);\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] MCP Tool: ${mcpParams.toolName}`\n \t\t\t\t);\n \t\t\t}\n \n \t\t\tthis.outputChannel.appendLine(`[HookExecutor] Error: ${err.name}`);\n \t\t\tthis.outputChannel.appendLine(`[HookExecutor] Message: ${err.message}`);\n \n \t\t\t// Include stack trace for debugging\n \t\t\tif (err.stack) {\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Stack Trace:\\n${err.stack}`\n \t\t\t\t);\n \t\t\t}\n \n \t\t\tthis.outputChannel.appendLine(`[HookExecutor] Duration: ${duration}ms`);\n \t\t\tthis.outputChannel.appendLine(\n \t\t\t\t`[HookExecutor] Execution ID: ${execContext.executionId}`\n \t\t\t);\n \t\t\tthis.outputChannel.appendLine(\n \t\t\t\t`[HookExecutor] Chain Depth: ${execContext.chainDepth}`\n \t\t\t);\n \t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\"[HookExecutor] ================================================================\"\n \t\t\t);\n \n \t\t\tconst result: ExecutionResult = {\n \t\t\t\thookId: hook.id,\n \t\t\t\thookName: hook.name,\n \t\t\t\tstatus: \"failure\",\n \t\t\t\tduration,\n \t\t\t\terror: {\n \t\t\t\t\tmessage: err.message,\n \t\t\t\t\tcode: err.name || \"UnknownError\",\n \t\t\t\t\tdetails: err,\n \t\t\t\t},\n \t\t\t};\n \n \t\t\t// Record execution log\n \t\t\tthis.recordExecutionLog({\n \t\t\t\tid: randomUUID(),\n \t\t\t\thookId: hook.id,\n \t\t\t\texecutionId: execContext.executionId,\n \t\t\t\tchainDepth: execContext.chainDepth,\n \t\t\t\ttriggeredAt: startTime,\n \t\t\t\tcompletedAt: Date.now(),\n \t\t\t\tduration,\n \t\t\t\tstatus: \"failure\",\n \t\t\t\terror: result.error,\n \t\t\t\tcontextSnapshot: {}, // Empty context on early failure\n \t\t\t});\n \n \t\t\t// Emit failed event\n \t\t\tthis._onExecutionFailed.fire({\n \t\t\t\thook,\n \t\t\t\tcontext: execContext,\n \t\t\t\tresult,\n \t\t\t});\n \n \t\t\treturn result;\n \t\t}\n \t}\n \n \t/**\n \t * Execute all hooks matching a trigger\n \t */\n \tasync executeHooksForTrigger(\n \t\tagent: string,\n \t\toperation: string,\n \t\ttiming: \"before\" | \"after\" = \"after\",\n \t\ttriggerEvent?: TriggerEvent\n \t): Promise<ExecutionResult[]> {\n \t\tthis.outputChannel.appendLine(\n \t\t\t`[HookExecutor] Executing hooks for trigger: ${agent}.${operation} (${timing})`\n \t\t);\n \n \t\t// Get all enabled hooks matching trigger and timing\n \t\tconst allHooks = await this.hookManager.getAllHooks();\n \t\tconst matchingHooks = allHooks\n \t\t\t.filter((h) => {\n \t\t\t\tif (!h.enabled) {\n \t\t\t\t\treturn false;\n \t\t\t\t}\n \t\t\t\tif (h.trigger) {\n \t\t\t\t\treturn (\n \t\t\t\t\t\th.trigger.agent === agent &&\n \t\t\t\t\t\th.trigger.operation === operation &&\n \t\t\t\t\t\th.trigger.timing === timing\n \t\t\t\t\t);\n \t\t\t\t}\n \t\t\t\tif (h.events) {\n \t\t\t\t\treturn h.events.some(\n \t\t\t\t\t\t(e) =>\n \t\t\t\t\t\t\te.type === \"agent-operation\" &&\n \t\t\t\t\t\t\te.agent === agent &&\n \t\t\t\t\t\t\te.operation === operation &&\n \t\t\t\t\t\t\te.timing === timing\n \t\t\t\t\t);\n \t\t\t\t}\n \t\t\t\treturn false;\n \t\t\t})\n \t\t\t.sort((a, b) => a.createdAt - b.createdAt); // Deterministic order\n \n \t\tif (matchingHooks.length === 0) {\n \t\t\tthis.outputChannel.appendLine(\n \t\t\t\t`[HookExecutor] No enabled hooks found for trigger: ${agent}.${operation} (${timing})`\n \t\t\t);\n \t\t\treturn [];\n \t\t}\n \n \t\t// Create shared execution context\n \t\tconst context = this.createExecutionContext();\n \n \t\t// Execute hooks based on waitForCompletion setting\n \t\tconst results: ExecutionResult[] = [];\n \t\tfor (const hook of matchingHooks) {\n \t\t\tconst isBlocking =\n \t\t\t\ttiming === \"before\" &&\n \t\t\t\t(hook.trigger?.waitForCompletion ||\n \t\t\t\t\thook.events?.some(\n \t\t\t\t\t\t(e) =>\n \t\t\t\t\t\t\te.type === \"agent-operation\" &&\n \t\t\t\t\t\t\te.agent === agent &&\n \t\t\t\t\t\t\te.operation === operation &&\n \t\t\t\t\t\t\te.waitForCompletion\n \t\t\t\t\t));\n \n \t\t\tif (isBlocking) {\n \t\t\t\t// Blocking execution: wait for hook to complete\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Executing blocking before hook: ${hook.name}`\n \t\t\t\t);\n \t\t\t\tconst result = await this.executeHook(hook, context, triggerEvent);\n \t\t\t\tresults.push(result);\n \t\t\t} else {\n \t\t\t\t// Non-blocking execution: execute in parallel\n \t\t\t\tconst result = await this.executeHook(hook, context, triggerEvent);\n \t\t\t\tresults.push(result);\n \t\t\t}\n \t\t}\n \n \t\tthis.outputChannel.appendLine(\n \t\t\t`[HookExecutor] Executed ${results.length} hooks for trigger: ${agent}.${operation} (${timing})`\n \t\t);\n \n \t\treturn results;\n \t}\n \n \t/**\n \t * Create a new execution context\n \t */\n \tcreateExecutionContext(): ExecutionContext {\n \t\treturn {\n \t\t\texecutionId: randomUUID(),\n \t\t\tchainDepth: 0,\n \t\t\texecutedHooks: new Set<string>(),\n \t\t\tstartedAt: Date.now(),\n \t\t};\n \t}\n \n \t/**\n \t * Check if executing a hook would create a circular dependency\n \t */\n \tisCircularDependency(hookId: string, context: ExecutionContext): boolean {\n \t\treturn context.executedHooks.has(hookId);\n \t}\n \n \t/**\n \t * Check if max chain depth has been exceeded\n \t */\n \tisMaxDepthExceeded(context: ExecutionContext): boolean {\n \t\treturn context.chainDepth >= MAX_CHAIN_DEPTH;\n \t}\n \n \t/**\n+\t * Evaluate conditions for a hook\n+\t */\n+\tasync evaluateConditions(\n+\t\thook: Hook,\n+\t\tcontext: ExecutionContext\n+\t): Promise<boolean> {\n+\t\tif (!hook.conditions || hook.conditions.length === 0) {\n+\t\t\treturn true;\n+\t\t}\n+\n+\t\tfor (const condition of hook.conditions) {\n+\t\t\t// Stub implementation for future condition evaluators\n+\t\t\tthis.outputChannel.appendLine(\n+\t\t\t\t`[HookExecutor] Evaluating condition: ${condition.type}`\n+\t\t\t);\n+\n+\t\t\t// If we need strict checking, we could implement basic types here\n+\t\t\tif (\n+\t\t\t\tcondition.type === \"branch\" ||\n+\t\t\t\tcondition.type === \"file-exists\" ||\n+\t\t\t\tcondition.type === \"custom\"\n+\t\t\t) {\n+\t\t\t\t// To be implemented completely in a later phase.\n+\t\t\t\t// Currently returns true so we don't break existing flows.\n+\t\t\t\tawait Promise.resolve();\n+\t\t\t}\n+\t\t}\n+\n+\t\treturn true;\n+\t}\n+\n+\t/**\n \t * Build template context with runtime variables\n \t */\n \tasync buildTemplateContext(\n \t\ttriggerOperation: string,\n \t\ttriggerData?: Record<string, unknown>,\n \t\ttriggerEvent?: TriggerEvent\n \t): Promise<ParserTemplateContext> {\n \t\ttry {\n \t\t\tconst gitContext = await this.buildGitContext();\n \t\t\tconst workspacePath = workspace.workspaceFolders?.[0]?.uri.fsPath || \"\";\n \n \t\t\t// Build base context with standard variables\n \t\t\tconst baseContext: ParserTemplateContext = {\n \t\t\t\ttimestamp: new Date().toISOString(),\n \t\t\t\ttriggerType: triggerOperation as OperationType,\n \t\t\t\t...gitContext,\n \t\t\t\tworkspacePath,\n \t\t\t};\n \n \t\t\t// Add trigger-specific data if available\n \t\t\tif (triggerData) {\n \t\t\t\tthis.enrichContextWithTriggerData(baseContext, triggerData);\n \t\t\t}\n \n \t\t\t// Add output capture variables\n \t\t\tif (triggerEvent) {\n \t\t\t\tawait this.addOutputVariables(baseContext, triggerEvent);\n \t\t\t}\n \n \t\t\treturn baseContext;\n \t\t} catch (error) {\n \t\t\tthis.outputChannel.appendLine(\n \t\t\t\t`[HookExecutor] Warning: Failed to build template context: ${error}`\n \t\t\t);\n \n \t\t\t// Return minimal context on error\n \t\t\treturn this.buildMinimalContext(triggerOperation);\n \t\t}\n \t}\n \n \t/**\n \t * Build Git-related context variables\n \t */\n \tprivate async buildGitContext(): Promise<Partial<ParserTemplateContext>> {\n \t\tconst gitExtension = extensions.getExtension(\"vscode.git\");\n \t\tconst git = gitExtension?.exports.getAPI(1);\n \t\tconst repository = git?.repositories[0];\n \n \t\tif (!repository) {\n \t\t\treturn {};\n \t\t}\n \n \t\tconst branch = repository.state.HEAD?.name;\n \t\tconst user = await repository.getConfig(\"user.name\");\n \t\tconst feature = branch ? this.extractFeatureName(branch) : undefined;\n \n \t\t// Extract repository info from remote URL\n \t\tconst remoteUrl = await repository.getConfig(\"remote.origin.url\");\n \t\tconst repoInfo = this.parseGitRemoteUrl(remoteUrl || \"\");\n \n \t\treturn {\n \t\t\tbranch,\n \t\t\tuser,\n \t\t\tfeature,\n \t\t\trepoOwner: repoInfo.owner,\n \t\t\trepoName: repoInfo.name,\n \t\t};\n \t}\n \n \t/**\n \t * Enrich context with trigger-specific data\n \t */\n \tprivate enrichContextWithTriggerData(\n \t\tcontext: ParserTemplateContext,\n \t\ttriggerData: Record<string, unknown>\n \t): void {\n \t\t// Spec-related variables\n \t\tthis.addSpecVariables(context, triggerData);\n \n \t\t// Spec artifact variables\n \t\tthis.addArtifactVariables(context, triggerData);\n \n \t\t// Agent metadata\n \t\tthis.addAgentMetadata(context, triggerData);\n \t}\n \n \t/**\n \t * Add spec-related variables to context\n \t */\n \tprivate addSpecVariables(\n \t\tcontext: ParserTemplateContext,\n \t\tdata: Record<string, unknown>\n \t): void {\n \t\tconst specFields = [\n \t\t\t\"specId\",\n \t\t\t\"specPath\",\n \t\t\t\"oldStatus\",\n \t\t\t\"newStatus\",\n \t\t\t\"changeAuthor\",\n \t\t] as const;\n \n \t\tfor (const field of specFields) {\n \t\t\tif (data[field]) {\n \t\t\t\tcontext[field] = data[field] as string;\n \t\t\t}\n \t\t}\n \t}\n \n \t/**\n \t * Add spec artifact variables to context\n \t */\n \tprivate addArtifactVariables(\n \t\tcontext: ParserTemplateContext,\n \t\tdata: Record<string, unknown>\n \t): void {\n \t\tconst artifactFields = [\"useCaseId\", \"taskId\", \"requirementId\"] as const;\n \n \t\tfor (const field of artifactFields) {\n \t\t\tif (data[field]) {\n \t\t\t\tcontext[field] = data[field] as string;\n \t\t\t}\n \t\t}\n \t}\n \n \t/**\n \t * Add agent metadata to context\n \t */\n \tprivate addAgentMetadata(\n \t\tcontext: ParserTemplateContext,\n \t\tdata: Record<string, unknown>\n \t): void {\n \t\tif (data.agentId) {\n \t\t\tcontext.agentId = data.agentId as string;\n \t\t}\n \t\tif (data.agentType) {\n \t\t\tcontext.agentType = data.agentType as string;\n \t\t}\n \t}\n \n \t/**\n \t * Build minimal fallback context\n \t */\n \tprivate buildMinimalContext(triggerOperation: string): ParserTemplateContext {\n \t\treturn {\n \t\t\ttimestamp: new Date().toISOString(),\n \t\t\ttriggerType: triggerOperation as OperationType,\n \t\t\tworkspacePath: workspace.workspaceFolders?.[0]?.uri.fsPath || \"\",\n \t\t};\n \t}\n \n \t/**\n \t * Add output capture variables to context\n \t */\n \tprivate async addOutputVariables(\n \t\tcontext: ParserTemplateContext,\n \t\tevent: TriggerEvent\n \t): Promise<void> {\n \t\t// 1. Add clipboard content\n \t\ttry {\n \t\t\tconst clipboardText = await env.clipboard.readText();\n \t\t\tcontext.clipboardContent = clipboardText;\n \t\t\tthis.outputChannel.appendLine(\n \t\t\t\t`[HookExecutor] Captured clipboard content (${clipboardText.length} chars)`\n \t\t\t);\n \t\t} catch (error) {\n \t\t\tthis.outputChannel.appendLine(\n \t\t\t\t`[HookExecutor] Failed to read clipboard: ${error}`\n \t\t\t);\n \t\t\tcontext.clipboardContent = \"\";\n \t\t}\n \n \t\t// 2. Add agent output from file (if available)\n \t\tif (event.outputPath) {\n \t\t\ttry {\n \t\t\t\tconst { promises: fs } = await import(\"node:fs\");\n \t\t\t\tconst content = await fs.readFile(event.outputPath, \"utf-8\");\n \t\t\t\tcontext.agentOutput = content;\n \t\t\t\tcontext.outputPath = event.outputPath;\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Captured agent output from file: ${event.outputPath} (${content.length} chars)`\n \t\t\t\t);\n \t\t\t} catch (error) {\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Failed to read output file ${event.outputPath}: ${error}`\n \t\t\t\t);\n \t\t\t\tcontext.agentOutput = \"\";\n \t\t\t}\n \t\t} else if (event.outputContent) {\n \t\t\t// Use pre-loaded content if provided\n \t\t\tcontext.agentOutput = event.outputContent;\n \t\t\tthis.outputChannel.appendLine(\n \t\t\t\t`[HookExecutor] Using pre-loaded agent output (${event.outputContent.length} chars)`\n \t\t\t);\n \t\t} else {\n \t\t\t// No output available\n \t\t\tcontext.agentOutput = \"\";\n \t\t}\n \t}\n \n \t/**\n \t * Parse Git remote URL to extract owner and repo name\n \t * Supports both HTTPS and SSH formats\n \t */\n \tprivate parseGitRemoteUrl(url: string): { owner: string; name: string } {\n \t\t// HTTPS: https://github.com/owner/repo.git\n \t\tconst httpsMatch = url.match(GIT_HTTPS_REMOTE_PATTERN);\n \t\tif (httpsMatch) {\n \t\t\treturn { owner: httpsMatch[1], name: httpsMatch[2] };\n \t\t}\n \n \t\t// SSH: git@github.com:owner/repo.git\n \t\tconst sshMatch = url.match(GIT_SSH_REMOTE_PATTERN);\n \t\tif (sshMatch) {\n \t\t\treturn { owner: sshMatch[1], name: sshMatch[2] };\n \t\t}\n \n \t\treturn { owner: \"\", name: \"\" };\n \t}\n \n \t/**\n \t * Extract feature name from branch name\n \t * Pattern: NNN-feature-name → 'feature-name'\n \t */\n \tprivate extractFeatureName(branch: string): string | undefined {\n \t\tconst match = branch.match(FEATURE_NAME_PATTERN);\n \t\treturn match ? match[1] : undefined;\n \t}\n \n \t/**\n \t * Expand template variables in a string\n \t * Uses TemplateVariableParser to replace $variable with values from context\n \t */\n \texpandTemplate(template: string, context: ParserTemplateContext): string {\n \t\t// Log template expansion for debugging\n \t\tthis.outputChannel.appendLine(\n \t\t\t`[HookExecutor] Expanding template: \"${template}\"`\n \t\t);\n \n \t\t// Extract and log variables found\n \t\tconst variables = this.templateParser.extractVariables(template);\n \t\tthis.outputChannel.appendLine(\n \t\t\t`[HookExecutor] Variables found: ${variables.length > 0 ? variables.join(\", \") : \"(none)\"}`\n \t\t);\n \n \t\t// Log context values for found variables\n \t\tif (variables.length > 0) {\n \t\t\tconst contextValues = variables\n \t\t\t\t.map((varName) => {\n \t\t\t\t\tconst value = context[varName];\n \t\t\t\t\treturn `${varName}=${value !== undefined ? JSON.stringify(value) : \"(undefined)\"}`;\n \t\t\t\t})\n \t\t\t\t.join(\", \");\n \t\t\tthis.outputChannel.appendLine(\n \t\t\t\t`[HookExecutor] Context values: ${contextValues}`\n \t\t\t);\n \t\t}\n \n \t\t// Perform substitution\n \t\tconst result = this.templateParser.substitute(template, context);\n \n \t\t// Log final result\n \t\tthis.outputChannel.appendLine(`[HookExecutor] Result: \"${result}\"`);\n \n \t\treturn result;\n \t}\n \n \t/**\n \t * Execute a function with timeout\n \t */\n \tprivate executeWithTimeout<T>(\n \t\tfn: () => Promise<T>,\n \t\ttimeoutMs: number\n \t): Promise<T> {\n \t\treturn new Promise((resolve, reject) => {\n \t\t\tconst timer = setTimeout(() => {\n \t\t\t\treject(\n \t\t\t\t\tnew ExecutionTimeoutError(`Execution timed out after ${timeoutMs}ms`)\n \t\t\t\t);\n \t\t\t}, timeoutMs);\n \n \t\t\tfn()\n \t\t\t\t.then((result) => {\n \t\t\t\t\tclearTimeout(timer);\n \t\t\t\t\tresolve(result);\n \t\t\t\t})\n \t\t\t\t.catch((error) => {\n \t\t\t\t\tclearTimeout(timer);\n \t\t\t\t\treject(error);\n \t\t\t\t});\n \t\t});\n \t}\n \n \t/**\n \t * Record an execution log\n \t */\n \tprivate recordExecutionLog(log: HookExecutionLog): void {\n \t\tthis.executionLogs.push(log);\n \n \t\t// Prune old logs (FIFO)\n \t\tif (this.executionLogs.length > MAX_EXECUTION_LOGS) {\n \t\t\tthis.executionLogs.shift();\n \t\t}\n \t}\n \n \t/**\n \t * Get all execution logs\n \t */\n \tgetExecutionLogs(): HookExecutionLog[] {\n \t\treturn [...this.executionLogs]; // Return copy\n \t}\n \n \t/**\n \t * Get execution logs for a specific hook\n \t */\n \tgetExecutionLogsForHook(hookId: string): HookExecutionLog[] {\n \t\treturn this.executionLogs.filter((log) => log.hookId === hookId);\n \t}\n \n \t/**\n \t * Clear all execution logs\n \t */\n \tclearExecutionLogs(): void {\n \t\tthis.executionLogs = [];\n \t\tthis.outputChannel.appendLine(\"[HookExecutor] Execution logs cleared\");\n \t}\n \n \t/**\n \t * Execute a local agent (in-process via sendPromptToChat)\n \t * T053: Implement local agent execution path\n \t */\n \tprivate executeLocalAgent(\n \t\tparams: CustomActionParams,\n \t\ttemplateContext: ParserTemplateContext\n \t): Promise<{ success: boolean; error?: Error }> {\n \t\tthis.outputChannel.appendLine(\n \t\t\t`[HookExecutor] Executing local agent: ${params.agentId}`\n \t\t);\n \n \t\treturn (async () => {\n \t\t\ttry {\n \t\t\t\t// Extract agent name from agentId (format: \"local:agent-name\")\n \t\t\t\tconst agentName =\n \t\t\t\t\tparams.agentId?.replace(AGENT_ID_PREFIX_PATTERN, \"\") ||\n \t\t\t\t\tparams.agentName;\n \t\t\t\tif (!agentName) {\n \t\t\t\t\tthrow new Error(\"Agent name is required for local execution\");\n \t\t\t\t}\n \n \t\t\t\t// Read the agent file from .github/agents/\n \t\t\t\tconst { promises: fs } = await import(\"node:fs\");\n \t\t\t\tconst { join } = await import(\"node:path\");\n \n \t\t\t\tconst workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;\n \t\t\t\tif (!workspaceRoot) {\n \t\t\t\t\tthrow new Error(\"No workspace folder found\");\n \t\t\t\t}\n \n \t\t\t\tconst agentFilePath = join(\n \t\t\t\t\tworkspaceRoot,\n \t\t\t\t\t\".github\",\n \t\t\t\t\t\"agents\",\n \t\t\t\t\t`${agentName}.agent.md`\n \t\t\t\t);\n \n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Reading agent file: ${agentFilePath}`\n \t\t\t\t);\n \n \t\t\t\tconst agentContent = await fs.readFile(agentFilePath, \"utf-8\");\n \n \t\t\t\t// Expand template variables in prompt and arguments\n \t\t\t\tconst userPrompt = params.prompt\n \t\t\t\t\t? this.expandTemplate(params.prompt, templateContext)\n \t\t\t\t\t: \"\";\n \t\t\t\tconst userArgs = params.arguments\n \t\t\t\t\t? this.expandTemplate(params.arguments, templateContext)\n \t\t\t\t\t: \"\";\n \n \t\t\t\t// Combine agent content with user input\n \t\t\t\t// Format: Agent content + user prompt + arguments\n \t\t\t\tlet finalPrompt = agentContent;\n \t\t\t\tif (userPrompt) {\n \t\t\t\t\tfinalPrompt += `\\n\\n${userPrompt}`;\n \t\t\t\t}\n \t\t\t\tif (userArgs) {\n \t\t\t\t\tfinalPrompt += `\\n\\nArguments: ${userArgs}`;\n \t\t\t\t}\n \n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Sending agent prompt to Copilot Chat (length: ${finalPrompt.length} chars)`\n \t\t\t\t);\n \n \t\t\t\t// Send prompt to GitHub Copilot Chat (in-process execution)\n \t\t\t\tawait sendPromptToChat(finalPrompt);\n \n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\"[HookExecutor] Local agent execution completed successfully\"\n \t\t\t\t);\n \n \t\t\t\treturn { success: true };\n \t\t\t} catch (error) {\n \t\t\t\tconst err = error as Error;\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Local agent execution failed: ${err.message}`\n \t\t\t\t);\n \t\t\t\treturn { success: false, error: err };\n \t\t\t}\n \t\t})();\n \t}\n \n \t/**\n \t * Execute a background agent (external CLI process)\n \t * T054: Implement background agent execution path\n \t */\n \tprivate executeBackgroundAgent(\n \t\tparams: CustomActionParams,\n \t\ttemplateContext: ParserTemplateContext\n \t): Promise<{ success: boolean; error?: Error }> {\n \t\tthis.outputChannel.appendLine(\n \t\t\t`[HookExecutor] Executing background agent: ${params.agentId}`\n \t\t);\n \n \t\treturn (async () => {\n \t\t\ttry {\n \t\t\t\t// Extract agent name from agentId (format: \"local:agent-name\")\n \t\t\t\tconst agentName =\n \t\t\t\t\tparams.agentId?.replace(AGENT_ID_PREFIX_PATTERN, \"\") ||\n \t\t\t\t\tparams.agentName;\n \t\t\t\tif (!agentName) {\n \t\t\t\t\tthrow new Error(\"Agent name is required for background execution\");\n \t\t\t\t}\n \n \t\t\t\t// Read the agent file from .github/agents/\n \t\t\t\tconst { promises: fs } = await import(\"node:fs\");\n \t\t\t\tconst { join } = await import(\"node:path\");\n \n \t\t\t\tconst workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;\n \t\t\t\tif (!workspaceRoot) {\n \t\t\t\t\tthrow new Error(\"No workspace folder found\");\n \t\t\t\t}\n \n \t\t\t\tconst agentFilePath = join(\n \t\t\t\t\tworkspaceRoot,\n \t\t\t\t\t\".github\",\n \t\t\t\t\t\"agents\",\n \t\t\t\t\t`${agentName}.agent.md`\n \t\t\t\t);\n \n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Reading agent file: ${agentFilePath}`\n \t\t\t\t);\n \n \t\t\t\t// Verify agent file exists\n \t\t\t\tawait fs.access(agentFilePath);\n \n \t\t\t\t// Expand template variables in prompt and arguments\n \t\t\t\tconst userPrompt = params.prompt\n \t\t\t\t\t? this.expandTemplate(params.prompt, templateContext)\n \t\t\t\t\t: \"\";\n \t\t\t\tconst userArgs = params.arguments\n \t\t\t\t\t? this.expandTemplate(params.arguments, templateContext)\n \t\t\t\t\t: \"\";\n \n \t\t\t\t// Build the gh copilot command with CLI options\n \t\t\t\tconst commandArgs = this.buildCopilotCliArgs(\n \t\t\t\t\tparams,\n \t\t\t\t\tagentFilePath,\n \t\t\t\t\tuserPrompt,\n \t\t\t\t\tuserArgs\n \t\t\t\t);\n \n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Executing: gh ${commandArgs.slice(1).join(\" \")}`\n \t\t\t\t);\n \n \t\t\t\t// Execute gh copilot command\n \t\t\t\tconst proc = spawn(\"gh\", commandArgs, {\n \t\t\t\t\tcwd: workspaceRoot,\n \t\t\t\t\tshell: true,\n \t\t\t\t});\n \n \t\t\t\treturn new Promise((resolve) => {\n \t\t\t\t\tlet stdout = \"\";\n \t\t\t\t\tlet stderr = \"\";\n \n \t\t\t\t\tproc.stdout.on(\"data\", (data: Buffer) => {\n \t\t\t\t\t\tconst text = data.toString();\n \t\t\t\t\t\tstdout += text;\n \t\t\t\t\t\tthis.outputChannel.append(text);\n \t\t\t\t\t});\n \n \t\t\t\t\tproc.stderr.on(\"data\", (data: Buffer) => {\n \t\t\t\t\t\tconst text = data.toString();\n \t\t\t\t\t\tstderr += text;\n \t\t\t\t\t\tthis.outputChannel.append(text);\n \t\t\t\t\t});\n \n \t\t\t\t\tproc.on(\"exit\", (code: number | null) => {\n \t\t\t\t\t\tif (code === 0) {\n \t\t\t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t\t\t\"[HookExecutor] Background agent execution completed successfully\"\n \t\t\t\t\t\t\t);\n \t\t\t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t\t\t`[HookExecutor] Output: ${stdout.trim()}`\n \t\t\t\t\t\t\t);\n \t\t\t\t\t\t\tresolve({ success: true });\n \t\t\t\t\t\t} else {\n \t\t\t\t\t\t\tconst error = new Error(\n \t\t\t\t\t\t\t\t`Background agent failed with exit code ${code}: ${stderr.trim()}`\n \t\t\t\t\t\t\t);\n \t\t\t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t\t\t`[HookExecutor] Background agent execution failed: ${error.message}`\n \t\t\t\t\t\t\t);\n \t\t\t\t\t\t\tresolve({ success: false, error });\n \t\t\t\t\t\t}\n \t\t\t\t\t});\n \n \t\t\t\t\tproc.on(\"error\", (error: Error) => {\n \t\t\t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t\t\t`[HookExecutor] Background agent execution error: ${error.message}`\n \t\t\t\t\t\t);\n \t\t\t\t\t\t// Check if it's a \"command not found\" error\n \t\t\t\t\t\tif (error.message.includes(\"ENOENT\")) {\n \t\t\t\t\t\t\tconst enhancedError = new Error(\n \t\t\t\t\t\t\t\t\"GitHub CLI (gh) not found. Please install it: https://cli.github.com/\"\n \t\t\t\t\t\t\t);\n \t\t\t\t\t\t\tresolve({ success: false, error: enhancedError });\n \t\t\t\t\t\t} else {\n \t\t\t\t\t\t\tresolve({ success: false, error });\n \t\t\t\t\t\t}\n \t\t\t\t\t});\n \t\t\t\t});\n \t\t\t} catch (error) {\n \t\t\t\tconst err = error as Error;\n \t\t\t\tthis.outputChannel.appendLine(\n \t\t\t\t\t`[HookExecutor] Background agent execution failed: ${err.message}`\n \t\t\t\t);\n \t\t\t\treturn { success: false, error: err };\n \t\t\t}\n \t\t})();\n \t}\n \n \t/**\n \t * Build GitHub Copilot CLI arguments with all supported options\n \t */\n \tprivate buildCopilotCliArgs(\n \t\tparams: CustomActionParams,\n \t\tagentFilePath: string,\n \t\tuserPrompt: string,\n \t\tuserArgs: string\n \t): string[] {\n \t\tconst args = [\"copilot\", \"-p\"];\n \n \t\t// Start with prompt\n \t\tif (userPrompt) {\n \t\t\targs.push(userPrompt);\n \t\t}\n \n \t\t// Add agent file\n \t\targs.push(\"--agent\", agentFilePath);\n \n \t\t// Add user arguments\n \t\tif (userArgs) {\n \t\t\targs.push(userArgs);\n \t\t}\n \n \t\t// Add CLI options if provided\n \t\tconst opts = params.cliOptions;\n \t\tif (!opts) {\n \t\t\treturn args;\n \t\t}\n \n \t\t// Combined flags (--allow-all / --yolo)\n \t\tif (opts.allowAll) {\n \t\t\targs.push(\"--allow-all\");\n \t\t\treturn args; // No need to add individual permissions\n \t\t}\n \n \t\t// Add all option groups\n \t\tthis.addPathOptions(args, opts);\n \t\tthis.addToolPermissions(args, opts);\n \t\tthis.addUrlPermissions(args, opts);\n \t\tthis.addGithubMcpOptions(args, opts);\n \t\tthis.addMcpServerOptions(args, opts);\n \t\tthis.addExecutionOptions(args, opts);\n \t\tthis.addOutputOptions(args, opts);\n \t\tthis.addSessionOptions(args, opts);\n \t\tthis.addConfigOptions(args, opts);\n \n \t\treturn args;\n \t}\n \n \tprivate addPathOptions(\n \t\targs: string[],\n \t\topts: NonNullable<CustomActionParams[\"cliOptions\"]>\n \t): void {\n \t\tif (opts.addDir) {\n \t\t\tfor (const dir of opts.addDir) {\n \t\t\t\targs.push(\"--add-dir\", dir);\n \t\t\t}\n \t\t}\n \t\tif (opts.allowAllPaths) {\n \t\t\targs.push(\"--allow-all-paths\");\n \t\t}\n \t\tif (opts.disallowTempDir) {\n \t\t\targs.push(\"--disallow-temp-dir\");\n \t\t}\n \t}\n \n \tprivate addToolPermissions(\n \t\targs: string[],\n \t\topts: NonNullable<CustomActionParams[\"cliOptions\"]>\n \t): void {\n \t\tif (opts.allowAllTools) {\n \t\t\targs.push(\"--allow-all-tools\");\n \t\t}\n \t\tif (opts.allowTool) {\n \t\t\targs.push(\"--allow-tool\", ...opts.allowTool);\n \t\t}\n \t\tif (opts.availableTools) {\n \t\t\targs.push(\"--available-tools\", ...opts.availableTools);\n \t\t}\n \t\tif (opts.excludedTools) {\n \t\t\targs.push(\"--excluded-tools\", ...opts.excludedTools);\n \t\t}\n \t\tif (opts.denyTool) {\n \t\t\targs.push(\"--deny-tool\", ...opts.denyTool);\n \t\t}\n \t}\n \n \tprivate addUrlPermissions(\n \t\targs: string[],\n \t\topts: NonNullable<CustomActionParams[\"cliOptions\"]>\n \t): void {\n \t\tif (opts.allowAllUrls) {\n \t\t\targs.push(\"--allow-all-urls\");\n \t\t}\n \t\tif (opts.allowUrl) {\n \t\t\targs.push(\"--allow-url\", ...opts.allowUrl);\n \t\t}\n \t\tif (opts.denyUrl) {\n \t\t\targs.push(\"--deny-url\", ...opts.denyUrl);\n \t\t}\n \t}\n \n \tprivate addGithubMcpOptions(\n \t\targs: string[],\n \t\topts: NonNullable<CustomActionParams[\"cliOptions\"]>\n \t): void {\n \t\tif (opts.enableAllGithubMcpTools) {\n \t\t\targs.push(\"--enable-all-github-mcp-tools\");\n \t\t}\n \t\tif (opts.addGithubMcpTool) {\n \t\t\tfor (const tool of opts.addGithubMcpTool) {\n \t\t\t\targs.push(\"--add-github-mcp-tool\", tool);\n \t\t\t}\n \t\t}\n \t\tif (opts.addGithubMcpToolset) {\n \t\t\tfor (const toolset of opts.addGithubMcpToolset) {\n \t\t\t\targs.push(\"--add-github-mcp-toolset\", toolset);\n \t\t\t}\n \t\t}\n \t}\n \n \tprivate addMcpServerOptions(\n \t\targs: string[],\n \t\topts: NonNullable<CustomActionParams[\"cliOptions\"]>\n \t): void {\n \t\tif (opts.additionalMcpConfig) {\n \t\t\tfor (const config of opts.additionalMcpConfig) {\n \t\t\t\targs.push(\"--additional-mcp-config\", config);\n \t\t\t}\n \t\t}\n \t\tif (opts.disableBuiltinMcps) {\n \t\t\targs.push(\"--disable-builtin-mcps\");\n \t\t}\n \t\tif (opts.disableMcpServer) {\n \t\t\tfor (const server of opts.disableMcpServer) {\n \t\t\t\targs.push(\"--disable-mcp-server\", server);\n \t\t\t}\n \t\t}\n \t}\n \n \tprivate addExecutionOptions(\n \t\targs: string[],\n \t\topts: NonNullable<CustomActionParams[\"cliOptions\"]>\n \t): void {\n \t\tif (opts.agent) {\n \t\t\targs.push(\"--agent\", opts.agent);\n \t\t}\n \t\tif (opts.modelId) {\n \t\t\targs.push(\"--model\", opts.modelId);\n \t\t}\n \t\tif (opts.noAskUser) {\n \t\t\targs.push(\"--no-ask-user\");\n \t\t}\n \t\tif (opts.disableParallelToolsExecution) {\n \t\t\targs.push(\"--disable-parallel-tools-execution\");\n \t\t}\n \t\tif (opts.noCustomInstructions) {\n \t\t\targs.push(\"--no-custom-instructions\");\n \t\t}\n \t}\n \n \tprivate addOutputOptions(\n \t\targs: string[],\n \t\topts: NonNullable<CustomActionParams[\"cliOptions\"]>\n \t): void {\n \t\tif (opts.silent) {\n \t\t\targs.push(\"--silent\");\n \t\t}\n \t\tif (opts.logLevel) {\n \t\t\targs.push(\"--log-level\", opts.logLevel);\n \t\t}\n \t\tif (opts.logDir) {\n \t\t\targs.push(\"--log-dir\", opts.logDir);\n \t\t}\n \t\tif (opts.noColor) {\n \t\t\targs.push(\"--no-color\");\n \t\t}\n \t\tif (opts.plainDiff) {\n \t\t\targs.push(\"--plain-diff\");\n \t\t}\n \t\tif (opts.screenReader) {\n \t\t\targs.push(\"--screen-reader\");\n \t\t}\n \t\tif (opts.stream) {\n \t\t\targs.push(\"--stream\", opts.stream);\n \t\t}\n \t}\n \n \tprivate addSessionOptions(\n \t\targs: string[],\n \t\topts: NonNullable<CustomActionParams[\"cliOptions\"]>\n \t): void {\n \t\tif (opts.resume) {\n \t\t\tif (typeof opts.resume === \"string\") {\n \t\t\t\targs.push(\"--resume\", opts.resume);\n \t\t\t} else {\n \t\t\t\targs.push(\"--resume\");\n \t\t\t}\n \t\t}\n \t\tif (opts.continue) {\n \t\t\targs.push(\"--continue\");\n \t\t}\n \t\tif (opts.share) {\n \t\t\tif (typeof opts.share === \"string\") {\n \t\t\t\targs.push(\"--share\", opts.share);\n \t\t\t} else {\n \t\t\t\targs.push(\"--share\");\n \t\t\t}\n \t\t}\n \t\tif (opts.shareGist) {\n \t\t\targs.push(\"--share-gist\");\n \t\t}\n \t}\n \n \tprivate addConfigOptions(\n \t\targs: string[],\n \t\topts: NonNullable<CustomActionParams[\"cliOptions\"]>\n \t): void {\n \t\tif (opts.configDir) {\n \t\t\targs.push(\"--config-dir\", opts.configDir);\n \t\t}\n \t\tif (opts.banner) {\n \t\t\targs.push(\"--banner\");\n \t\t}\n \t\tif (opts.noAutoUpdate) {\n \t\t\targs.push(\"--no-auto-update\");\n \t\t}\n \t}\n }\n",
@@ -68,13 +75,6 @@
               "additions": 51,
               "deletions": 0,
               "status": "modified"
-            },
-            {
-              "file": "update_types.patch",
-              "patch": "Index: update_types.patch\n===================================================================\n--- update_types.patch\t\n+++ update_types.patch\t\n@@ -0,0 +1,58 @@\n+--- src/features/hooks/types.ts\n++++ src/features/hooks/types.ts\n+@@ -629,6 +629,9 @@\n+ \t\thook.name.length <= MAX_HOOK_NAME_LENGTH &&\n+ \t\ttypeof hook.enabled === \"boolean\" &&\n+ \t\t(hook.trigger === undefined || isValidTrigger(hook.trigger)) &&\n++\t\t(hook.events === undefined || (Array.isArray(hook.events) && hook.events.every(isValidEventSource))) &&\n++\t\t(hook.conditions === undefined || (Array.isArray(hook.conditions) && hook.conditions.every(isValidCondition))) &&\n++\t\t(hook.schedule === undefined || isValidSchedule(hook.schedule)) &&\n+ \t\tisValidAction(hook.action) &&\n+ \t\ttypeof hook.createdAt === \"number\" &&\n+ \t\ttypeof hook.modifiedAt === \"number\" &&\n+@@ -660,6 +663,47 @@\n+ }\n+ \n+ /**\n++ * Validate event source\n++ */\n++export function isValidEventSource(obj: unknown): obj is EventSource {\n++\tif (typeof obj !== \"object\" || obj === null) {\n++\t\treturn false;\n++\t}\n++\tconst event = obj as EventSource;\n++\tconst validTypes: EventSourceType[] = [\"agent-operation\", \"execution-flow\", \"repository\", \"file-change\", \"manual\"];\n++\tif (!validTypes.includes(event.type)) {\n++\t\treturn false;\n++\t}\n++\treturn true;\n++}\n++\n++/**\n++ * Validate condition\n++ */\n++export function isValidCondition(obj: unknown): obj is Condition {\n++\tif (typeof obj !== \"object\" || obj === null) {\n++\t\treturn false;\n++\t}\n++\tconst condition = obj as Condition;\n++\tconst validTypes = [\"branch\", \"file-exists\", \"custom\"];\n++\treturn validTypes.includes(condition.type);\n++}\n++\n++/**\n++ * Validate schedule\n++ */\n++export function isValidSchedule(obj: unknown): obj is Schedule {\n++\tif (typeof obj !== \"object\" || obj === null) {\n++\t\treturn false;\n++\t}\n++\tconst schedule = obj as Schedule;\n++\tconst validTypes = [\"immediate\", \"delayed\", \"cron\"];\n++\treturn validTypes.includes(schedule.type);\n++}\n++\n++/**\n+  * Validate action config\n+  */\n+ export function isValidAction(obj: unknown): obj is ActionConfig {\n",
-              "additions": 58,
-              "deletions": 0,
-              "status": "added"
             }
           ]
         },
@@ -3229,19 +3229,22 @@
         },
         "cost": 0,
         "tokens": {
-          "input": 0,
-          "output": 0,
+          "total": 82654,
+          "input": 4124,
+          "output": 112,
           "reasoning": 0,
           "cache": {
-            "read": 0,
-            "write": 0
+            "write": 0,
+            "read": 78418
           }
         },
         "modelID": "gemini-3.1-pro-preview",
         "providerID": "github-copilot",
         "time": {
-          "created": 1777909018461
+          "created": 1777909018461,
+          "completed": 1777909030443
         },
+        "finish": "tool-calls",
         "id": "msg_df3a2af5d001lATpa3se7RH78k",
         "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5"
       },
@@ -3274,17 +3277,22 @@
           "tool": "bash",
           "callID": "call_MHxaNktuZ2FvbTk4dTQwNlNYQ24",
           "state": {
-            "metadata": {
-              "output": "Checked 3 files in 367ms. No fixes applied.\n",
-              "description": "Commit changes"
-            },
-            "status": "running",
+            "status": "completed",
             "input": {
               "command": "git add src/features/hooks/hook-executor.ts src/features/hooks/hook-manager.ts src/features/hooks/types.ts && git commit -m \"MAESTRO: Refactor hook execution and validation around the new model\" -m \"- Consolidate validation for events, conditions, schedule, and actions in HookManager\n- Add evaluateConditions and schedule handling to HookExecutor to make room for schedule stubs\n- Add new type validation helpers in types.ts\"",
               "description": "Commit changes"
             },
+            "output": "Checked 3 files in 367ms. No fixes applied.\n[018-agent-chat-panel dcc32fc] MAESTRO: Refactor hook execution and validation around the new model\n 3 files changed, 170 insertions(+)\n",
+            "metadata": {
+              "output": "Checked 3 files in 367ms. No fixes applied.\n[018-agent-chat-panel dcc32fc] MAESTRO: Refactor hook execution and validation around the new model\n 3 files changed, 170 insertions(+)\n",
+              "exit": 0,
+              "description": "Commit changes",
+              "truncated": false
+            },
+            "title": "Commit changes",
             "time": {
-              "start": 1777909024457
+              "start": 1777909030042,
+              "end": 1777909030045
             }
           },
           "metadata": {
@@ -3295,6 +3303,565 @@
           "id": "prt_df3a2c2dc001AQaof6EVYLYnt6",
           "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
           "messageID": "msg_df3a2af5d001lATpa3se7RH78k"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "86088de48a93456c9f46559514f3fb03b67a1709",
+          "type": "step-finish",
+          "tokens": {
+            "total": 82654,
+            "input": 4124,
+            "output": 112,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 78418
+            }
+          },
+          "cost": 0,
+          "id": "prt_df3a2dc9d002YJ7ihbkBvw19qE",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a2af5d001lATpa3se7RH78k"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_df39f06a3001RojCvcHns6YH4l",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/Users/t798157/Projects/lab/gatomia-vscode",
+          "root": "/Users/t798157/Projects/lab/gatomia-vscode"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 82969,
+          "input": 27846,
+          "output": 256,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 54867
+          }
+        },
+        "modelID": "gemini-3.1-pro-preview",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1777909030446,
+          "completed": 1777909036725
+        },
+        "finish": "tool-calls",
+        "id": "msg_df3a2de2e001cu94Tv5F4BNLHF",
+        "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5"
+      },
+      "parts": [
+        {
+          "snapshot": "86088de48a93456c9f46559514f3fb03b67a1709",
+          "type": "step-start",
+          "id": "prt_df3a2f4e4001j7jGxCG8ZmH30E",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a2de2e001cu94Tv5F4BNLHF"
+        },
+        {
+          "type": "reasoning",
+          "text": "**Completing Task Checklist**\n\nI'm now verifying the completion of the task outlined in GATOMIA-ORCHESTRATION-03.md, ensuring all sub-items are marked as done.\n\n",
+          "time": {
+            "start": 1777909036263,
+            "end": 1777909036265
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "REDACTED/REDACTED/REDACTED/MJawAhOxLQIp4OTTZB/REDACTED/qoFOGdmvQxPJJAelK0lB+koZ/REDACTED/+qdMxISCBIFX/7tKy/r7g+YXVE3yGBBGdaXyZXHMgPVgrVw3egyaU39O6b/JrD1RrjKvAwOAkoK++bZDv/REDACTED/REDACTED/PeL/REDACTED"
+            }
+          },
+          "id": "prt_df3a2f4e70013Yl2caH24JLLzp",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a2de2e001cu94Tv5F4BNLHF"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "call_MHxYck05OGFRYkdiU1FWZ21xSTQ",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md",
+              "newString": "- [x] Refactor hook execution and validation around the new model:\n  - Reuse `HookManager`, `HookExecutor`, `TriggerRegistry`, and related services where possible before creating replacement files\n  - Consolidate validation so trigger, schedule, and action errors are surfaced consistently in one place\n  - Make room for schedule stubs or interfaces even if full scheduler execution lands in a later phase, so the model is ready now without overbuilding",
+              "oldString": "- [ ] Refactor hook execution and validation around the new model:\n  - Reuse `HookManager`, `HookExecutor`, `TriggerRegistry`, and related services where possible before creating replacement files\n  - Consolidate validation so trigger, schedule, and action errors are surfaced consistently in one place\n  - Make room for schedule stubs or interfaces even if full scheduler execution lands in a later phase, so the model is ready now without overbuilding"
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n===================================================================\n--- /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n+++ /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n@@ -14,9 +14,9 @@\n   - Extend trigger support so future phases can react to execution-flow events, repository or file-code changes, and explicit manual triggers without rewriting the executor again\n   - Preserve backward compatibility for existing stored hooks only where necessary for current workspace state migration\n   - Add telemetry and output-channel logging for evaluation, execution, skip reasons, and failure reasons\n \n-- [ ] Refactor hook execution and validation around the new model:\n+- [x] Refactor hook execution and validation around the new model:\n   - Reuse `HookManager`, `HookExecutor`, `TriggerRegistry`, and related services where possible before creating replacement files\n   - Consolidate validation so trigger, schedule, and action errors are surfaced consistently in one place\n   - Make room for schedule stubs or interfaces even if full scheduler execution lands in a later phase, so the model is ready now without overbuilding\n \n",
+              "filediff": {
+                "file": "/Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md",
+                "patch": "Index: /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n===================================================================\n--- /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n+++ /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n@@ -14,9 +14,9 @@\n   - Extend trigger support so future phases can react to execution-flow events, repository or file-code changes, and explicit manual triggers without rewriting the executor again\n   - Preserve backward compatibility for existing stored hooks only where necessary for current workspace state migration\n   - Add telemetry and output-channel logging for evaluation, execution, skip reasons, and failure reasons\n \n-- [ ] Refactor hook execution and validation around the new model:\n+- [x] Refactor hook execution and validation around the new model:\n   - Reuse `HookManager`, `HookExecutor`, `TriggerRegistry`, and related services where possible before creating replacement files\n   - Consolidate validation so trigger, schedule, and action errors are surfaced consistently in one place\n   - Make room for schedule stubs or interfaces even if full scheduler execution lands in a later phase, so the model is ready now without overbuilding\n \n",
+                "additions": 1,
+                "deletions": 1
+              },
+              "truncated": false
+            },
+            "title": "Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md",
+            "time": {
+              "start": 1777909036279,
+              "end": 1777909036281
+            }
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "REDACTED/REDACTED/REDACTED/MJawAhOxLQIp4OTTZB/REDACTED/qoFOGdmvQxPJJAelK0lB+koZ/REDACTED/+qdMxISCBIFX/7tKy/r7g+YXVE3yGBBGdaXyZXHMgPVgrVw3egyaU39O6b/JrD1RrjKvAwOAkoK++bZDv/REDACTED/REDACTED/PeL/REDACTED"
+            }
+          },
+          "id": "prt_df3a2f4ec0011ngsklxzTAvD8x",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a2de2e001cu94Tv5F4BNLHF"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "6a9ca38ebd8de496d91a2aae681eb71089126c83",
+          "type": "step-finish",
+          "tokens": {
+            "total": 82969,
+            "input": 27846,
+            "output": 256,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 54867
+            }
+          },
+          "cost": 0,
+          "id": "prt_df3a2f4fa001CRDnP9Ft9Q7pRe",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a2de2e001cu94Tv5F4BNLHF"
+        },
+        {
+          "type": "patch",
+          "hash": "86088de48a93456c9f46559514f3fb03b67a1709",
+          "files": [
+            "/Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md"
+          ],
+          "id": "prt_df3a2f6b4001rHpjm3c1Pc23SS",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a2de2e001cu94Tv5F4BNLHF"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_df39f06a3001RojCvcHns6YH4l",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/Users/t798157/Projects/lab/gatomia-vscode",
+          "root": "/Users/t798157/Projects/lab/gatomia-vscode"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 83051,
+          "input": 4640,
+          "output": 78,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 78333
+          }
+        },
+        "modelID": "gemini-3.1-pro-preview",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1777909036727,
+          "completed": 1777909047032
+        },
+        "finish": "tool-calls",
+        "id": "msg_df3a2f6b7001rIuV6HRsQxtZu9",
+        "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5"
+      },
+      "parts": [
+        {
+          "snapshot": "6a9ca38ebd8de496d91a2aae681eb71089126c83",
+          "type": "step-start",
+          "id": "prt_df3a308e80012SFsQIBa6fZoHo",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a2f6b7001rIuV6HRsQxtZu9"
+        },
+        {
+          "type": "reasoning",
+          "text": "**Committing Playbook Update**\n\nI'm focusing on finalizing the playbook changes. I believe it's time to push these updates live.\n\n",
+          "time": {
+            "start": 1777909041388,
+            "end": 1777909041392
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "REDACTED/REDACTED/REDACTED/EhfpTOlplZSCu/REDACTED/YGs0bUd7U3l/PcQk/j/rdhzhXuDdR/yElmoeaVFxkKfhXraxakm0k/J/REDACTED/REDACTED/kNgHkJq5ncRHLjUt/REDACTED/oQ1"
+            }
+          },
+          "id": "prt_df3a308ec001L9BpLYSONyR8j1",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a2f6b7001rIuV6HRsQxtZu9"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_MHx1dHBWR1ZEMUJkYTNVTnNXbDA",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git add \"Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\" && git commit -m \"MAESTRO: Mark hook execution refactor as complete in orchestration playbook\"",
+              "description": "Commit playbook checkoff"
+            },
+            "output": "Checked 0 files in 303ms. No fixes applied.\n[018-agent-chat-panel e825715] MAESTRO: Mark hook execution refactor as complete in orchestration playbook\n 1 file changed, 1 insertion(+), 1 deletion(-)\n",
+            "metadata": {
+              "output": "Checked 0 files in 303ms. No fixes applied.\n[018-agent-chat-panel e825715] MAESTRO: Mark hook execution refactor as complete in orchestration playbook\n 1 file changed, 1 insertion(+), 1 deletion(-)\n",
+              "exit": 0,
+              "description": "Commit playbook checkoff",
+              "truncated": false
+            },
+            "title": "Commit playbook checkoff",
+            "time": {
+              "start": 1777909046636,
+              "end": 1777909046638
+            }
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "REDACTED/REDACTED/REDACTED/EhfpTOlplZSCu/REDACTED/YGs0bUd7U3l/PcQk/j/rdhzhXuDdR/yElmoeaVFxkKfhXraxakm0k/J/REDACTED/REDACTED/kNgHkJq5ncRHLjUt/REDACTED/oQ1"
+            }
+          },
+          "id": "prt_df3a308f2001huEScnVYiOJXp5",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a2f6b7001rIuV6HRsQxtZu9"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "6a9ca38ebd8de496d91a2aae681eb71089126c83",
+          "type": "step-finish",
+          "tokens": {
+            "total": 83051,
+            "input": 4640,
+            "output": 78,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 78333
+            }
+          },
+          "cost": 0,
+          "id": "prt_df3a31d6f0016rbo77iTucR63X",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a2f6b7001rIuV6HRsQxtZu9"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_df39f06a3001RojCvcHns6YH4l",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/Users/t798157/Projects/lab/gatomia-vscode",
+          "root": "/Users/t798157/Projects/lab/gatomia-vscode"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 83126,
+          "input": 4818,
+          "output": 11,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 78297
+          }
+        },
+        "modelID": "gemini-3.1-pro-preview",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1777909047036,
+          "completed": 1777909057862
+        },
+        "finish": "tool-calls",
+        "id": "msg_df3a31efc001CAcFYs9G0PrABu",
+        "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5"
+      },
+      "parts": [
+        {
+          "snapshot": "6a9ca38ebd8de496d91a2aae681eb71089126c83",
+          "type": "step-start",
+          "id": "prt_df3a3307d001VN0N9q5dEt5edP",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a31efc001CAcFYs9G0PrABu"
+        },
+        {
+          "type": "reasoning",
+          "text": "**Pushing code updates**\n\nI'm excited to finally commit these latest changes. The code is looking solid, and I'm ready to push it to GitHub for review and integration.\n\n",
+          "time": {
+            "start": 1777909051524,
+            "end": 1777909051527
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "REDACTED/PaXDE/REDACTED/EjwslG0j74y2GiJWvWAxhZwMj/j3SUKaG/REDACTED/bs2ywhb4SvC/nJkG4vlvsXBp2NNGkfzAhv/REDACTED/REDACTED/REDACTED/sBMlzY69QDpGNJcDK/REDACTED/REDACTED"
+            }
+          },
+          "id": "prt_df3a33084001o39Cx95yRs0Hu9",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a31efc001CAcFYs9G0PrABu"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_MHwzR3Z2VUhFUE9vcmtuV2pibXg",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git push",
+              "description": "Push changes"
+            },
+            "output": "[entire] Pushing entire/checkpoints/v1 to origin..... done\nremote: \nremote: GitHub found 2 vulnerabilities on eitatech/gatomia-vscode's default branch (2 moderate). To find out more, visit:        \nremote:      https://github.com/eitatech/gatomia-vscode/security/dependabot        \nremote: \nTo github.com:eitatech/gatomia-vscode.git\n   8aafab2..e825715  018-agent-chat-panel -> 018-agent-chat-panel\n",
+            "metadata": {
+              "output": "[entire] Pushing entire/checkpoints/v1 to origin..... done\nremote: \nremote: GitHub found 2 vulnerabilities on eitatech/gatomia-vscode's default branch (2 moderate). To find out more, visit:        \nremote:      https://github.com/eitatech/gatomia-vscode/security/dependabot        \nremote: \nTo github.com:eitatech/gatomia-vscode.git\n   8aafab2..e825715  018-agent-chat-panel -> 018-agent-chat-panel\n",
+              "exit": 0,
+              "description": "Push changes",
+              "truncated": false
+            },
+            "title": "Push changes",
+            "time": {
+              "start": 1777909057418,
+              "end": 1777909057425
+            }
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "REDACTED/PaXDE/REDACTED/EjwslG0j74y2GiJWvWAxhZwMj/j3SUKaG/REDACTED/bs2ywhb4SvC/nJkG4vlvsXBp2NNGkfzAhv/REDACTED/REDACTED/REDACTED/sBMlzY69QDpGNJcDK/REDACTED/REDACTED"
+            }
+          },
+          "id": "prt_df3a33088001E9i96B8atKp970",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a31efc001CAcFYs9G0PrABu"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "6a9ca38ebd8de496d91a2aae681eb71089126c83",
+          "type": "step-finish",
+          "tokens": {
+            "total": 83126,
+            "input": 4818,
+            "output": 11,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 78297
+            }
+          },
+          "cost": 0,
+          "id": "prt_df3a34793001Vim3sgYRyzzL3G",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a31efc001CAcFYs9G0PrABu"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_df39f06a3001RojCvcHns6YH4l",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/Users/t798157/Projects/lab/gatomia-vscode",
+          "root": "/Users/t798157/Projects/lab/gatomia-vscode"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 83280,
+          "input": 5003,
+          "output": 18,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 78259
+          }
+        },
+        "modelID": "gemini-3.1-pro-preview",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1777909057868,
+          "completed": 1777909062481
+        },
+        "finish": "tool-calls",
+        "id": "msg_df3a3494c001SPhj2kJIGAR2KT",
+        "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5"
+      },
+      "parts": [
+        {
+          "snapshot": "6a9ca38ebd8de496d91a2aae681eb71089126c83",
+          "type": "step-start",
+          "id": "prt_df3a35956001AMbFCZsqXdMti9",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a3494c001SPhj2kJIGAR2KT"
+        },
+        {
+          "type": "reasoning",
+          "text": "**Finalizing analysis, pushing updates.**\n\nMy current focus is on completing the final response, incorporating the synopsis after processing a single image. I've pushed the necessary changes, though no images were actually analyzed as part of this task.\n\n",
+          "time": {
+            "start": 1777909061977,
+            "end": 1777909061978
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "BmxVa/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/ZbVQNco+wV/REDACTED"
+            }
+          },
+          "id": "prt_df3a35959001ZdQfI2UyqOwhuP",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a3494c001SPhj2kJIGAR2KT"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_MHxCOE9GY3JvMWVrZHhUejNqUDY",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "rm update_types.patch",
+              "description": "Cleanup untracked file"
+            },
+            "output": "(no output)",
+            "metadata": {
+              "output": "(no output)",
+              "exit": 0,
+              "description": "Cleanup untracked file",
+              "truncated": false
+            },
+            "title": "Cleanup untracked file",
+            "time": {
+              "start": 1777909061992,
+              "end": 1777909062020
+            }
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "BmxVa/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/ZbVQNco+wV/REDACTED"
+            }
+          },
+          "id": "prt_df3a3595c001fVf1ahqmnosfAr",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a3494c001SPhj2kJIGAR2KT"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "e24c1a3a16d4151f5fcfa074038c1ac7aff3bec8",
+          "type": "step-finish",
+          "tokens": {
+            "total": 83280,
+            "input": 5003,
+            "output": 18,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 78259
+            }
+          },
+          "cost": 0,
+          "id": "prt_df3a35985001rptuUgdVkjbm8O",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a3494c001SPhj2kJIGAR2KT"
+        },
+        {
+          "type": "patch",
+          "hash": "6a9ca38ebd8de496d91a2aae681eb71089126c83",
+          "files": [
+            "/Users/t798157/Projects/lab/gatomia-vscode/update_types.patch"
+          ],
+          "id": "prt_df3a35b50001hEZLqRk1eWtZss",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a3494c001SPhj2kJIGAR2KT"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_df39f06a3001RojCvcHns6YH4l",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/Users/t798157/Projects/lab/gatomia-vscode",
+          "root": "/Users/t798157/Projects/lab/gatomia-vscode"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 83526,
+          "input": 5094,
+          "output": 242,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 78190
+          }
+        },
+        "modelID": "gemini-3.1-pro-preview",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1777909062483,
+          "completed": 1777909069889
+        },
+        "finish": "stop",
+        "id": "msg_df3a35b53001L95VyMvrafNhav",
+        "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5"
+      },
+      "parts": [
+        {
+          "snapshot": "e24c1a3a16d4151f5fcfa074038c1ac7aff3bec8",
+          "type": "step-start",
+          "id": "prt_df3a3764b001nYyol2CeQTXhe2",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a35b53001L95VyMvrafNhav"
+        },
+        {
+          "type": "reasoning",
+          "text": "**Completing Thought Synthesis**\n\nI'm nearing completion on the thought synthesis. The current focus is on consolidating the remaining ideas and preparing them for a final output.\n\n",
+          "time": {
+            "start": 1777909069393,
+            "end": 1777909069397
+          },
+          "id": "prt_df3a37651001PrvfM0phVxzbVs",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a35b53001L95VyMvrafNhav"
+        },
+        {
+          "type": "text",
+          "text": "Refactored hook validation and execution logic to fully support the new execution-flow model.\n\nI consolidated validation by creating helper functions `isValidEventSource`, `isValidCondition`, and `isValidSchedule` in `types.ts`. These are now integrated directly into `isValidHook`. In `HookManager`, the validation logic was updated to systematically check `events`, `conditions`, and `schedule` configurations, returning specific error messages if any validation fails.\n\nIn `HookExecutor`, I updated the `executeHook` flow to check and validate `hook.conditions` using a newly added `evaluateConditions()` method. If the conditions are not met, the hook is gracefully skipped. I also incorporated schedule stubs, ensuring that delayed operations (`hook.schedule.type === \"delayed\"`) wait properly and `cron` tasks are stubbed so the orchestration logic is correctly staged for the future scheduler phase.\n\nTests were executed and all hooks tests passed successfully. Changes have been committed and pushed to the repository, and the relevant task inside `GATOMIA-ORCHESTRATION-03.md` was checked off.\n\n(I analyzed 0 images in preparation for solving this task.)",
+          "time": {
+            "start": 1777909069400,
+            "end": 1777909069409
+          },
+          "id": "prt_df3a37658001lxFvjh06rNqAsh",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a35b53001L95VyMvrafNhav"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "e24c1a3a16d4151f5fcfa074038c1ac7aff3bec8",
+          "type": "step-finish",
+          "tokens": {
+            "total": 83526,
+            "input": 5094,
+            "output": 242,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 78190
+            }
+          },
+          "cost": 0,
+          "id": "prt_df3a37664001TWiv6Im2F01T06",
+          "sessionID": "ses_20c60fa61ffezB5f8XVqh2b1N5",
+          "messageID": "msg_df3a35b53001L95VyMvrafNhav"
         }
       ]
     }
