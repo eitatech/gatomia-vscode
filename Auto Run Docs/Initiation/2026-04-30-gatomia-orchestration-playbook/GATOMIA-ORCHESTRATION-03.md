@@ -15,7 +15,7 @@ This phase simplifies the current hooks architecture into a clearer execution-fl
   - Preserve backward compatibility for existing stored hooks only where necessary for current workspace state migration
   - Add telemetry and output-channel logging for evaluation, execution, skip reasons, and failure reasons
 
-- [ ] Refactor hook execution and validation around the new model:
+- [x] Refactor hook execution and validation around the new model:
   - Reuse `HookManager`, `HookExecutor`, `TriggerRegistry`, and related services where possible before creating replacement files
   - Consolidate validation so trigger, schedule, and action errors are surfaced consistently in one place
   - Make room for schedule stubs or interfaces even if full scheduler execution lands in a later phase, so the model is ready now without overbuilding
