@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "5e5b6dc5b74e",
+  "strategy": "manual-commit",
+  "branch": "018-agent-chat-panel",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-04.md",
+    "src/extension.ts",
+    "src/features/hooks/hook-executor.ts",
+    "src/features/tasks/openspec-task-provider.ts",
+    "src/features/tasks/speckit-task-provider.ts",
+    "src/features/tasks/task-service.ts",
+    "src/providers/hooks-explorer-provider.ts",
+    "src/providers/orchestration-view-provider.ts"
+  ],
+  "sessions": [
+    {
+      "metadata": "/5e/5b6dc5b74e/0/metadata.json",
+      "transcript": "/5e/5b6dc5b74e/0/full.jsonl",
+      "content_hash": "/5e/5b6dc5b74e/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 396924,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1659757,
+    "output_tokens": 3231,
+    "api_call_count": 43
+  }
+}
