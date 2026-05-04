@@ -28,9 +28,10 @@ This phase creates the reusable visual and interaction foundation for the redesi
   - Include examples of how orchestration, hooks, and Kanban should share status semantics and action affordances
   - Completed 2026-04-30: documented the implemented workflow tokens and shared primitives in `docs/architecture/design-system/design-system-foundations.md`, and captured reusable cards, lists, boards, flows, inspector, state, and action patterns in `docs/architecture/design-system/workflow-interaction-patterns.md` so later orchestration and Kanban phases can extend the same status semantics and affordance model.
 
-- [ ] Write tests for the new shared UI foundations:
+- [x] Write tests for the new shared UI foundations:
   - Add focused component tests for the new shared primitives and any refactored state badge logic
   - Extend existing webview tests where possible instead of creating parallel test infrastructure
+  - Completed 2026-05-04: Added component tests for `action-toolbar`, `empty-state`, `metric-row`, `panel-section`, and `status-badge` in `ui/tests/unit/components/workflow`.
 
 - [ ] Run validation for the design-system phase and fix issues:
   - Run targeted UI tests for the affected components and pages
