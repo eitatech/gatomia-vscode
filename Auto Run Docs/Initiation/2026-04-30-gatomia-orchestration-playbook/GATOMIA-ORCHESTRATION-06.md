@@ -24,7 +24,7 @@ This phase turns the normalized task model into a visual Kanban board where engi
   - Keep the first version explicit and observable: every autonomous action should produce visible task-state changes and traceable logs rather than hidden background behavior
   - Document the behavior in `docs/architecture/board/autonomous-agent-loop.md` with YAML front matter and wiki-links to `[[Kanban-Board-Model]]`
 
-- [ ] Document the board UX for future product evolution:
+- [x] Document the board UX for future product evolution:
   - Create `docs/architecture/board/task-card-design.md` with YAML front matter and wiki-links to `[[Kanban-Board-Model]]` and `[[Autonomous-Agent-Loop]]`
   - Describe how engineers interpret agent ownership, progress, blockers, retries, and completion in the board interface
 
