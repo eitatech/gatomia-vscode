@@ -20,10 +20,11 @@ This phase simplifies the current hooks architecture into a clearer execution-fl
   - Consolidate validation so trigger, schedule, and action errors are surfaced consistently in one place
   - Make room for schedule stubs or interfaces even if full scheduler execution lands in a later phase, so the model is ready now without overbuilding
 
-- [ ] Redesign the hooks configuration UI around the simplified model:
+- [x] Redesign the hooks configuration UI around the simplified model:
   - Reuse current hooks-view patterns, selector components, and argument-template editing where they still fit
   - Replace confusing or redundant configuration paths with a clearer composition flow for event source, conditions, timing, and actions
   - Ensure the UI language matches the new execution-flow model and remains understandable to engineers who are not already familiar with the current internal terminology
+  - **Notes**: Added the new `EventSource`, `Condition`, and `Schedule` models to `ui/src/features/hooks-view/types.ts`. Rebuilt `TriggerActionSelector` inside the UI form to support specifying an event source mapping, schedule options, and fallback mechanisms for the legacy `TriggerCondition` field.
 
 - [ ] Create structured documentation for the new hook system:
   - Write `docs/architecture/hooks/trigger-model.md` and `docs/architecture/hooks/schedule-model.md` with YAML front matter and wiki-links back to `[[Hook-Execution-Model]]`
