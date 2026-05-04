@@ -1,17 +1,45 @@
 import { randomUUID } from "node:crypto";
-import type { OutputChannel } from "vscode";
+import type { Disposable, OutputChannel } from "vscode";
+import type {
+	FlushAction,
+	PendingWrite,
+	PendingWritesListener,
+} from "../../features/agent-chat/pending-writes-store";
 import {
 	AcpClient,
+	type AcpSessionEventListener,
 	type PermissionMode,
 	type PermissionPrompter,
 } from "./acp-client";
 import type { AcpProviderRegistry } from "./acp-provider-registry";
-import type { SessionMode } from "./types";
+import type {
+	AcpProviderDescriptor,
+	AcpSessionModelState,
+	SessionMode,
+} from "./types";
 
 export interface AcpSessionContext {
 	mode: SessionMode;
 	specId?: string;
+	/**
+	 * Optional working directory. When present, the manager keys its cached
+	 * `AcpClient` instances by `(providerId, cwd)` so two concurrent sessions
+	 * that run in different worktrees get isolated subprocesses (F1
+	 * remediation). Omit to reuse the manager's constructor cwd (default
+	 * behavior — backward compatible).
+	 */
+	cwd?: string;
 }
+
+/**
+ * Resolver invoked the first time a descriptor whose `spawnCommand === "npx"`
+ * is about to spawn a fresh subprocess. Returning `false` aborts the spawn and
+ * causes `send()` to reject. The result is cached per `(providerId, cwd)`.
+ */
+export type BeforeSpawnHook = (
+	descriptor: AcpProviderDescriptor,
+	context: { cwd: string }
+) => Promise<boolean>;
 
 export interface AcpSessionManagerOptions {
 	registry: AcpProviderRegistry;
@@ -21,6 +49,17 @@ export interface AcpSessionManagerOptions {
 	permissionDefault?: PermissionMode;
 	/** Interactive resolver used when `permissionDefault` is `"ask"`. */
 	promptForPermission?: PermissionPrompter;
+	/**
+	 * Optional consent hook used to gate `npx -y <package>` spawns. The hook
+	 * is only invoked for descriptors whose `spawnCommand` is `"npx"`.
+	 */
+	beforeSpawn?: BeforeSpawnHook;
+	/**
+	 * Forwarded to every spawned {@link AcpClient}. Enables the
+	 * buffer-then-apply flow for `writeTextFile` so the user can review
+	 * file changes before they hit disk (Phase 4 redesign).
+	 */
+	bufferFileWrites?: boolean;
 }
 
 /**
@@ -37,9 +76,21 @@ export class AcpSessionManager {
 	private readonly registry: AcpProviderRegistry;
 	private readonly output: OutputChannel;
 	private readonly cwd: string;
-	private readonly permissionDefault: PermissionMode | undefined;
+	private permissionDefault: PermissionMode | undefined;
 	private readonly promptForPermission: PermissionPrompter | undefined;
+	private readonly beforeSpawn: BeforeSpawnHook | undefined;
+	private readonly bufferFileWrites: boolean;
+	/**
+	 * Cached clients keyed by `${providerId}::${cwd}` (F1 remediation) so two
+	 * concurrent worktree sessions for the same provider never share a
+	 * subprocess.
+	 */
 	private readonly clients = new Map<string, AcpClient>();
+	/**
+	 * Set of `(providerId, cwd)` keys for which the user has already accepted
+	 * an `npx -y` spawn. Prevents re-prompting on every call.
+	 */
+	private readonly consentedSpawns = new Set<string>();
 
 	constructor(options: AcpSessionManagerOptions) {
 		this.registry = options.registry;
@@ -47,6 +98,59 @@ export class AcpSessionManager {
 		this.cwd = options.cwd;
 		this.permissionDefault = options.permissionDefault;
 		this.promptForPermission = options.promptForPermission;
+		this.beforeSpawn = options.beforeSpawn;
+		this.bufferFileWrites = options.bufferFileWrites ?? false;
+	}
+
+	/**
+	 * Update the permission strategy at runtime. Propagates the new mode
+	 * to every cached {@link AcpClient} so subsequent tool-call permission
+	 * requests honour the change without requiring a child-process recycle
+	 * or extension reload.
+	 */
+	setPermissionDefault(mode: PermissionMode): void {
+		if (this.permissionDefault === mode) {
+			return;
+		}
+		this.permissionDefault = mode;
+		for (const client of this.clients.values()) {
+			client.setPermissionDefault(mode);
+		}
+		this.output.appendLine(
+			`[ACP] permissionDefault propagated to ${this.clients.size} client(s): ${mode}`
+		);
+	}
+
+	/**
+	 * Subscribe to the pending file-write buffer kept by the
+	 * `(providerId, cwd)` ACP client. Returns a disposable; the listener
+	 * is invoked synchronously with the current snapshot on attach
+	 * (mirrors the underlying store contract).
+	 */
+	subscribePendingWrites(
+		providerId: string,
+		cwd: string | undefined,
+		listener: PendingWritesListener
+	): Disposable {
+		const client = this.ensureClient(providerId, cwd ?? this.cwd);
+		return client.subscribePendingWrites(listener);
+	}
+
+	/**
+	 * Settle pending writes on the matching client. The store rejects
+	 * the underlying agent promises which then either persist the file
+	 * (on accept) or surface the rejection to the agent.
+	 */
+	flushPendingWrites(
+		providerId: string,
+		cwd: string | undefined,
+		action: FlushAction
+	): readonly PendingWrite[] {
+		const client = this.findClient(providerId, cwd ?? this.cwd);
+		if (!client) {
+			return [];
+		}
+		return client.flushPendingWrites(action);
 	}
 
 	async send(
@@ -54,18 +158,182 @@ export class AcpSessionManager {
 		prompt: string,
 		context: AcpSessionContext
 	): Promise<void> {
-		const client = this.ensureClient(providerId);
+		const cwd = this.resolveCwd(context);
+		await this.ensureSpawnConsent(providerId, cwd);
+		const client = this.ensureClient(providerId, cwd);
 		const sessionKey = resolveSessionKey(context);
 		await client.sendPrompt(sessionKey, prompt);
 	}
 
-	async cancel(providerId: string, context: AcpSessionContext): Promise<void> {
-		const client = this.clients.get(providerId);
+	/**
+	 * Variant of {@link send} that takes a caller-supplied session id directly,
+	 * skipping the {@link SessionMode} → key mapping. Used by `AcpChatRunner`
+	 * which mints its own ids via {@link deriveAcpSessionId}.
+	 */
+	async sendPromptDirect(
+		providerId: string,
+		cwd: string | undefined,
+		sessionId: string,
+		prompt: string
+	): Promise<void> {
+		const resolvedCwd = cwd ?? this.cwd;
+		await this.ensureSpawnConsent(providerId, resolvedCwd);
+		const client = this.ensureClient(providerId, resolvedCwd);
+		await client.sendPrompt(sessionId, prompt);
+	}
+
+	/**
+	 * Variant of {@link cancel} that targets a caller-supplied session id
+	 * directly. Pair with {@link sendPromptDirect}.
+	 */
+	async cancelDirect(
+		providerId: string,
+		cwd: string | undefined,
+		sessionId: string
+	): Promise<void> {
+		const client = this.findClient(providerId, cwd ?? this.cwd);
 		if (!client) {
+			return;
+		}
+		await client.cancel(sessionId);
+	}
+
+	private async ensureSpawnConsent(
+		providerId: string,
+		cwd: string
+	): Promise<void> {
+		if (!this.beforeSpawn) {
+			return;
+		}
+		const key = this.clientKey(providerId, cwd);
+		// A pre-existing client means we already spawned (or are spawning) the
+		// process for this key — no consent prompt needed.
+		if (this.clients.has(key) || this.consentedSpawns.has(key)) {
+			return;
+		}
+		const descriptor = this.registry.get(providerId);
+		if (!descriptor || descriptor.spawnCommand !== "npx") {
+			return;
+		}
+		const consented = await this.beforeSpawn(descriptor, { cwd });
+		if (!consented) {
+			throw new Error(
+				`[ACP] user declined npx spawn for provider '${providerId}'`
+			);
+		}
+		this.consentedSpawns.add(key);
+	}
+
+	async cancel(providerId: string, context: AcpSessionContext): Promise<void> {
+		const client = this.findClient(providerId, this.resolveCwd(context));
+		if (!client) {
+			return;
+		}
+		// per-prompt keys are fresh UUIDs, so deriving a new key here would never
+		// match any tracked session. Fall back to the client's last-used key
+		// (which is what the user most recently interacted with).
+		if (context.mode === "per-prompt") {
+			const lastKey = client.getLastSessionKey();
+			if (!lastKey) {
+				return;
+			}
+			await client.cancel(lastKey);
 			return;
 		}
 		const sessionKey = resolveSessionKey(context);
 		await client.cancel(sessionKey);
+	}
+
+	/**
+	 * Cancels every active session for the provider across all cached cwd
+	 * variants. Useful for a UI-level "cancel active ACP session" action where
+	 * the exact session key is not known (e.g. per-prompt or per-spec modes).
+	 */
+	async cancelAll(providerId: string): Promise<void> {
+		const prefix = `${providerId}::`;
+		const matches: AcpClient[] = [];
+		for (const [key, client] of this.clients.entries()) {
+			if (key.startsWith(prefix)) {
+				matches.push(client);
+			}
+		}
+		for (const client of matches) {
+			await client.cancelAll();
+		}
+	}
+
+	/**
+	 * Subscribe to structured events emitted by the underlying {@link AcpClient}
+	 * for a given session. The manager resolves the correct client via the
+	 * `(providerId, cwd)` pair and forwards the subscription.
+	 */
+	subscribe(
+		providerId: string,
+		cwd: string | undefined,
+		sessionId: string,
+		listener: AcpSessionEventListener
+	): Disposable {
+		const client = this.ensureClient(providerId, cwd ?? this.cwd);
+		return client.subscribeSession(sessionId, listener);
+	}
+
+	/**
+	 * Returns the latest {@link AcpSessionModelState} captured for an
+	 * ACP session, or `undefined` when the agent did not surface any
+	 * model information. Used by the host to initialise the model chip
+	 * shown in the panel toolbar without having to subscribe to events.
+	 */
+	getSessionModels(
+		providerId: string,
+		cwd: string | undefined,
+		sessionId: string
+	): AcpSessionModelState | undefined {
+		const client = this.findClient(providerId, cwd ?? this.cwd);
+		if (!client) {
+			return;
+		}
+		const sessionKey = client.findSessionKeyByAcpId(sessionId) ?? sessionId;
+		return client.getSessionModels(sessionKey);
+	}
+
+	/**
+	 * Forward a `session/set_model` request to the underlying client.
+	 * Throws an `Error` containing `ACP_NOT_SUPPORTED` when the provider
+	 * does not implement the experimental method — the caller is
+	 * expected to fall back to the legacy "record model change" flow.
+	 */
+	async setSessionModel(
+		providerId: string,
+		cwd: string | undefined,
+		sessionId: string,
+		modelId: string
+	): Promise<void> {
+		const client = this.ensureClient(providerId, cwd ?? this.cwd);
+		const sessionKey = client.findSessionKeyByAcpId(sessionId) ?? sessionId;
+		await client.setSessionModel(sessionKey, modelId);
+	}
+
+	/**
+	 * Spawn the provider's CLI (if not already running) and read its
+	 * model catalogue via a probe `newSession` call. Reuses the cached
+	 * `AcpClient` so subsequent prompts to the same `(providerId, cwd)`
+	 * tuple do not double-spawn.
+	 *
+	 * Honours the same `npx` consent gate as {@link send} so the user
+	 * still sees the consent dialog before the discovery flow downloads
+	 * a remote provider.
+	 *
+	 * Returns `undefined` when the agent does not surface a `models`
+	 * payload — callers fall back to the static catalog.
+	 */
+	async probeProviderModels(
+		providerId: string,
+		cwd?: string
+	): Promise<AcpSessionModelState | undefined> {
+		const resolvedCwd = cwd ?? this.cwd;
+		await this.ensureSpawnConsent(providerId, resolvedCwd);
+		const client = this.ensureClient(providerId, resolvedCwd);
+		return client.probeAvailableModels();
 	}
 
 	dispose(): void {
@@ -81,8 +349,21 @@ export class AcpSessionManager {
 		this.clients.clear();
 	}
 
-	private ensureClient(providerId: string): AcpClient {
-		const existing = this.clients.get(providerId);
+	private resolveCwd(context: AcpSessionContext): string {
+		return context.cwd ?? this.cwd;
+	}
+
+	private clientKey(providerId: string, cwd: string): string {
+		return `${providerId}::${cwd}`;
+	}
+
+	private findClient(providerId: string, cwd: string): AcpClient | undefined {
+		return this.clients.get(this.clientKey(providerId, cwd));
+	}
+
+	private ensureClient(providerId: string, cwd: string): AcpClient {
+		const key = this.clientKey(providerId, cwd);
+		const existing = this.clients.get(key);
 		if (existing) {
 			return existing;
 		}
@@ -92,12 +373,13 @@ export class AcpSessionManager {
 		}
 		const client = new AcpClient({
 			descriptor,
-			cwd: this.cwd,
+			cwd,
 			output: this.output,
 			permissionDefault: this.permissionDefault,
 			promptForPermission: this.promptForPermission,
+			bufferFileWrites: this.bufferFileWrites,
 		});
-		this.clients.set(providerId, client);
+		this.clients.set(key, client);
 		return client;
 	}
 }

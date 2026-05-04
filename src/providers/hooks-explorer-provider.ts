@@ -130,8 +130,8 @@ export class HooksExplorerProvider implements TreeDataProvider<HookTreeItem> {
 }
 
 export class HookTreeItem extends TreeItem {
-	readonly hookId?: string;
-	readonly groupType?: ActionType;
+	hookId?: string;
+	groupType?: ActionType;
 
 	private constructor(
 		label: string,

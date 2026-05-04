@@ -157,6 +157,38 @@ describe("DependencyChecker", () => {
 			expect(result.gatomiaCli).toHaveProperty("version");
 		});
 
+		it("should include a prerequisites block with node/python/uv", async () => {
+			const result = await dependencyChecker.checkAll();
+
+			expect(result).toHaveProperty("prerequisites");
+			expect(result.prerequisites).toBeDefined();
+			expect(result.prerequisites).toHaveProperty("node");
+			expect(result.prerequisites).toHaveProperty("python");
+			expect(result.prerequisites).toHaveProperty("uv");
+
+			for (const key of ["node", "python", "uv"] as const) {
+				expect(result.prerequisites?.[key]).toHaveProperty("installed");
+				expect(result.prerequisites?.[key]).toHaveProperty("version");
+				expect(typeof result.prerequisites?.[key].installed).toBe("boolean");
+			}
+		});
+
+		it("should log a combined prerequisite status line", async () => {
+			await dependencyChecker.checkAll();
+
+			const lines = vi
+				.mocked(mockOutputChannel.appendLine)
+				.mock.calls.map((call) => call[0]);
+
+			const completeLine = lines.find((line) =>
+				line.startsWith("[DependencyChecker] Check complete:")
+			);
+			expect(completeLine).toBeDefined();
+			expect(completeLine).toContain("Node=");
+			expect(completeLine).toContain("Python=");
+			expect(completeLine).toContain("UV=");
+		});
+
 		it("should set lastChecked timestamp", async () => {
 			const before = Date.now();
 			const result = await dependencyChecker.checkAll();

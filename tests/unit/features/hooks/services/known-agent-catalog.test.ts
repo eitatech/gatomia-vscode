@@ -23,8 +23,8 @@ const INSTALL_STRATEGY_PATTERN = /^(npm-global|path)$/;
 
 describe("KnownAgentCatalog", () => {
 	describe("KNOWN_AGENTS catalog", () => {
-		it("contains exactly 7 agents", () => {
-			expect(KNOWN_AGENTS).toHaveLength(7);
+		it("contains exactly 8 agents", () => {
+			expect(KNOWN_AGENTS).toHaveLength(8);
 		});
 
 		it("contains claude-acp", () => {
@@ -60,6 +60,11 @@ describe("KnownAgentCatalog", () => {
 		it("contains opencode", () => {
 			const ids = KNOWN_AGENTS.map((a) => a.id);
 			expect(ids).toContain("opencode");
+		});
+
+		it("contains junie", () => {
+			const ids = KNOWN_AGENTS.map((a) => a.id);
+			expect(ids).toContain("junie");
 		});
 
 		it("every entry has a non-empty displayName", () => {
@@ -127,6 +132,22 @@ describe("KnownAgentCatalog", () => {
 			expect(agent?.agentCommand).toContain("--acp");
 		});
 
+		it("github-copilot detects both the new unified CLI and the legacy language-server", () => {
+			// Regression: bug report — the catalog only checked for the legacy
+			// `@github/copilot-language-server` distribution, so users who
+			// installed the unified `@github/copilot` CLI (npm i -g
+			// @github/copilot, binary `copilot`, ACP via `--acp`) were
+			// incorrectly told the agent was missing.
+			const agent = KNOWN_AGENTS.find((a) => a.id === "github-copilot");
+			const targets = agent?.installChecks.map((c) => c.target) ?? [];
+			// New unified product
+			expect(targets).toContain("copilot");
+			expect(targets).toContain("@github/copilot");
+			// Legacy LSP-based distribution still recognised
+			expect(targets).toContain("copilot-language-server");
+			expect(targets).toContain("@github/copilot-language-server");
+		});
+
 		it("codex-acp uses npx @zed-industries/codex-acp as agentCommand and detects via npm-global or codex-acp binary", () => {
 			const agent = KNOWN_AGENTS.find((a) => a.id === "codex-acp");
 			// agentCommand must use the Zed ACP wrapper, not 'codex --acp'
@@ -166,6 +187,15 @@ describe("KnownAgentCatalog", () => {
 			expect(pathChecks.some((c) => c.target === "opencode")).toBe(true);
 			expect(agent?.agentCommand).toContain("opencode");
 		});
+
+		it("junie uses --acp flag and detects via 'junie' binary on PATH", () => {
+			const agent = KNOWN_AGENTS.find((a) => a.id === "junie");
+			expect(agent?.displayName).toBe("JetBrains Junie");
+			expect(agent?.agentCommand).toContain("--acp");
+			const pathChecks =
+				agent?.installChecks.filter((c) => c.strategy === "path") ?? [];
+			expect(pathChecks.some((c) => c.target === "junie")).toBe(true);
+		});
 	});
 
 	describe("getKnownAgent", () => {
@@ -182,7 +212,7 @@ describe("KnownAgentCatalog", () => {
 	});
 
 	describe("type exports", () => {
-		it("KnownAgentId covers all 7 agents", () => {
+		it("KnownAgentId covers all 8 agents", () => {
 			// Compile-time check: these assignments must type-check
 			const ids: KnownAgentId[] = [
 				"claude-acp",
@@ -192,8 +222,9 @@ describe("KnownAgentCatalog", () => {
 				"codex-acp",
 				"mistral-vibe",
 				"opencode",
+				"junie",
 			];
-			expect(ids).toHaveLength(7);
+			expect(ids).toHaveLength(8);
 		});
 
 		it("KnownAgentEntry has required fields", () => {

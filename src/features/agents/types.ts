@@ -54,7 +54,7 @@ export interface AgentCommand {
 	tool: string;
 
 	/** Optional parameter hints or schema */
-	parameters?: string;
+	parameters?: string | Record<string, unknown>[];
 }
 
 /**

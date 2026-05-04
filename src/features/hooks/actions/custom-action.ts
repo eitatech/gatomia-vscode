@@ -89,8 +89,19 @@ export class CustomActionExecutor {
 				);
 			}
 
+			// `isValidCustomParams` guarantees at least one of `agentId` or
+			// `agentName` is a non-empty string. Resolve to a single label here
+			// so the rest of the flow works with a `string` (the type system
+			// otherwise sees `string | undefined`).
+			const agentLabel = params.agentName ?? params.agentId;
+			if (!agentLabel) {
+				throw new CustomActionValidationError(
+					"Custom action parameters must include agentName or agentId"
+				);
+			}
+
 			// Validate agent name format
-			this.validateAgentName(params.agentName);
+			this.validateAgentName(agentLabel);
 
 			// Expand template variables in arguments
 			const expandedArguments = this.expandArguments(
@@ -99,10 +110,10 @@ export class CustomActionExecutor {
 			);
 
 			// Build the prompt for the custom agent
-			const prompt = this.buildAgentPrompt(params.agentName, expandedArguments);
+			const prompt = this.buildAgentPrompt(agentLabel, expandedArguments);
 
 			// Invoke the agent via chat
-			await this.invokeAgent(params.agentName, prompt);
+			await this.invokeAgent(agentLabel, prompt);
 
 			const duration = Date.now() - startTime;
 
@@ -211,7 +222,11 @@ export class CustomActionExecutor {
 			if (!isValidCustomParams(params)) {
 				return false;
 			}
-			this.validateAgentName(params.agentName);
+			const agentLabel = params.agentName ?? params.agentId;
+			if (!agentLabel) {
+				return false;
+			}
+			this.validateAgentName(agentLabel);
 			return true;
 		} catch {
 			return false;

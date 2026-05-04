@@ -18,7 +18,11 @@ import { ConfigSection } from "./components/config-section";
 import { LearningSection } from "./components/learning-section";
 import { StatusSection } from "./components/status-section";
 import { vscode } from "../../bridge/vscode";
-import type { InstallableDependency } from "./types";
+import type {
+	IdeHost,
+	InstallableDependency,
+	SystemPrerequisiteKey,
+} from "./types";
 import "./welcome.css";
 
 // T125: Error Boundary for graceful error handling
@@ -74,6 +78,7 @@ export const WelcomeScreen = () => {
 		setState,
 	} = useWelcomeStore();
 	const [isRefreshing, setIsRefreshing] = useState(false);
+	const [isInstallingAll, setIsInstallingAll] = useState(false);
 	const [dontShowOnStartup, setDontShowOnStartup] = useState(false);
 	const [loadingTimeout, setLoadingTimeout] = useState(false);
 	const contentRef = useRef<HTMLElement>(null);
@@ -130,6 +135,14 @@ export const WelcomeScreen = () => {
 				case "welcome/dependency-status":
 					// Dependency status update handled in store
 					break;
+				case "welcome/install-progress":
+					if (message.status === "started") {
+						setIsInstallingAll(true);
+					}
+					break;
+				case "welcome/install-all-finished":
+					setIsInstallingAll(false);
+					break;
 				case "welcome/diagnostic-added":
 					if (message.diagnostic) {
 						setState((prev) => ({
@@ -161,6 +174,26 @@ export const WelcomeScreen = () => {
 			vscode.postMessage({
 				type: "welcome/install-dependency",
 				dependency,
+			});
+		}
+	};
+
+	const handleInstallMissing = (dependencies: InstallableDependency[]) => {
+		if (vscode && dependencies.length > 0) {
+			setIsInstallingAll(true);
+			vscode.postMessage({
+				type: "welcome/install-missing-dependencies",
+				dependencies,
+			});
+		}
+	};
+
+	const handleInstallPrerequisite = (prerequisite: SystemPrerequisiteKey) => {
+		if (vscode) {
+			setIsInstallingAll(true);
+			vscode.postMessage({
+				type: "welcome/install-prerequisite",
+				prerequisite,
 			});
 		}
 	};
@@ -370,8 +403,12 @@ export const WelcomeScreen = () => {
 				{currentView === "setup" && state && (
 					<SetupSection
 						dependencies={state.dependencies}
+						ideHost={state.ideHost ?? ("unknown" as IdeHost)}
+						isInstallingAll={isInstallingAll}
 						isRefreshing={isRefreshing}
 						onInstallDependency={handleInstallDependency}
+						onInstallMissing={handleInstallMissing}
+						onInstallPrerequisite={handleInstallPrerequisite}
 						onNavigateNext={handleNavigateToFeatures}
 						onRefreshDependencies={handleRefreshDependencies}
 					/>
@@ -394,7 +431,9 @@ export const WelcomeScreen = () => {
 						dependencies={state.dependencies}
 						diagnostics={state.diagnostics || []}
 						extensionVersion={state.extensionVersion || "0.25.6"}
+						ideHost={state.ideHost ?? ("unknown" as IdeHost)}
 						onInstallDependency={handleInstallDependency}
+						onInstallPrerequisite={handleInstallPrerequisite}
 						onOpenExternal={handleOpenExternal}
 						vscodeVersion={state.vscodeVersion || "1.0.0"}
 					/>

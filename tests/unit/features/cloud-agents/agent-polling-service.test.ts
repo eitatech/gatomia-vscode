@@ -444,4 +444,104 @@ describe("AgentPollingService", () => {
 
 		expect(provider.pollSessions).not.toHaveBeenCalled();
 	});
+
+	// --------------------------------------------------------------------
+	// T016 — onSessionUpdated event stream (spec 018 bridge)
+	// --------------------------------------------------------------------
+
+	describe("onSessionUpdated event (T016, spec 018 bridge)", () => {
+		it("fires onSessionUpdated(localId, session) exactly once for each mutated session in a poll cycle", async () => {
+			const session = createTestSession({
+				localId: "s-evt-1",
+				status: SessionStatus.RUNNING,
+			});
+			const update: SessionUpdate = {
+				localId: "s-evt-1",
+				status: SessionStatus.COMPLETED,
+				timestamp: Date.now(),
+			};
+			const provider = createMockProvider();
+			vi.mocked(provider.pollSessions).mockResolvedValueOnce([update]);
+			const registry = createMockRegistry(provider);
+			const sessionStorage = createMockSessionStorage([session]);
+
+			const poller = new AgentPollingService(registry, sessionStorage);
+			const listener = vi.fn();
+			poller.onSessionUpdated(listener);
+
+			await poller.pollOnce();
+
+			expect(listener).toHaveBeenCalledTimes(1);
+			const [arg] = listener.mock.calls[0] as [
+				{ localId: string; session: AgentSession },
+			];
+			expect(arg.localId).toBe("s-evt-1");
+			expect(arg.session.localId).toBe("s-evt-1");
+		});
+
+		it("delivers the event to multiple subscribers", async () => {
+			const session = createTestSession({ localId: "s-multi" });
+			const update: SessionUpdate = {
+				localId: "s-multi",
+				status: SessionStatus.COMPLETED,
+				timestamp: Date.now(),
+			};
+			const provider = createMockProvider();
+			vi.mocked(provider.pollSessions).mockResolvedValueOnce([update]);
+			const registry = createMockRegistry(provider);
+			const sessionStorage = createMockSessionStorage([session]);
+
+			const poller = new AgentPollingService(registry, sessionStorage);
+			const first = vi.fn();
+			const second = vi.fn();
+			poller.onSessionUpdated(first);
+			poller.onSessionUpdated(second);
+
+			await poller.pollOnce();
+
+			expect(first).toHaveBeenCalledTimes(1);
+			expect(second).toHaveBeenCalledTimes(1);
+		});
+
+		it("does NOT fire onSessionUpdated when the poll cycle produces zero updates", async () => {
+			const session = createTestSession({ localId: "s-noop" });
+			const provider = createMockProvider();
+			vi.mocked(provider.pollSessions).mockResolvedValueOnce([]);
+			const registry = createMockRegistry(provider);
+			const sessionStorage = createMockSessionStorage([session]);
+
+			const poller = new AgentPollingService(registry, sessionStorage);
+			const listener = vi.fn();
+			poller.onSessionUpdated(listener);
+
+			await poller.pollOnce();
+
+			expect(listener).not.toHaveBeenCalled();
+		});
+
+		it("returns a Disposable that stops further event delivery", async () => {
+			const session = createTestSession({ localId: "s-disp" });
+			const update: SessionUpdate = {
+				localId: "s-disp",
+				status: SessionStatus.COMPLETED,
+				timestamp: Date.now(),
+			};
+			const provider = createMockProvider();
+			vi.mocked(provider.pollSessions)
+				.mockResolvedValueOnce([update])
+				.mockResolvedValueOnce([update]);
+			const registry = createMockRegistry(provider);
+			const sessionStorage = createMockSessionStorage([session]);
+
+			const poller = new AgentPollingService(registry, sessionStorage);
+			const listener = vi.fn();
+			const sub = poller.onSessionUpdated(listener);
+
+			await poller.pollOnce();
+			sub.dispose();
+			await poller.pollOnce();
+
+			expect(listener).toHaveBeenCalledTimes(1);
+		});
+	});
 });

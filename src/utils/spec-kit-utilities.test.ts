@@ -30,6 +30,7 @@ vi.mock("node:fs", () => ({
 
 // biome-ignore lint/performance/noNamespaceImport: Required for vitest mocking with vi.mocked()
 import * as fs from "fs";
+import type { Stats, readdirSync } from "fs";
 import {
 	parseSpecKitDirectoryName,
 	convertSlugToName,

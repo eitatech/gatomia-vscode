@@ -230,7 +230,7 @@ describe("HookViewProvider — Phase 8 known-agent handlers", () => {
 			);
 		});
 
-		it("includes all 7 known agents in the response", async () => {
+		it("includes all 8 known agents in the response", async () => {
 			await sendMessage(provider, { type: "hooks/acp-known-agents-request" });
 
 			const call = postMessage.mock.calls.find(
@@ -238,7 +238,7 @@ describe("HookViewProvider — Phase 8 known-agent handlers", () => {
 			);
 			expect(call).toBeDefined();
 			const agents = call?.[0]?.agents as unknown[];
-			expect(agents).toHaveLength(7);
+			expect(agents).toHaveLength(8);
 		});
 
 		it("marks each agent as not enabled by default (empty prefs)", async () => {

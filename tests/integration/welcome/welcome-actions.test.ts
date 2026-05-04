@@ -413,12 +413,15 @@ describe("Welcome Screen - Feature Action Execution (Integration)", () => {
 	});
 
 	describe("Feature Action State", () => {
-		it("should retrieve feature actions with correct command IDs", async () => {
+		it("should retrieve feature actions mirroring extension commands", async () => {
 			const state = await provider.getWelcomeState();
 
 			expect(state.featureActions).toBeDefined();
 			expect(Array.isArray(state.featureActions)).toBe(true);
-			expect(state.featureActions.length).toBe(10);
+			// The provider emits a comprehensive catalogue; assert the breadth
+			// without hard-coding an exact count so new commands don't break this
+			// contract every time the extension grows.
+			expect(state.featureActions.length).toBeGreaterThanOrEqual(30);
 		});
 
 		it("should have all feature actions enabled by default", async () => {
@@ -429,17 +432,24 @@ describe("Welcome Screen - Feature Action Execution (Integration)", () => {
 			}
 		});
 
-		it("should group feature actions by area", async () => {
+		it("should group feature actions across every supported area (non-ACP host)", async () => {
 			const state = await provider.getWelcomeState();
 
 			const areas = new Set(state.featureActions.map((a) => a.featureArea));
 			expect(areas).toContain("Specs");
+			expect(areas).toContain("SpecKit Workflow");
 			expect(areas).toContain("Actions");
 			expect(areas).toContain("Hooks");
 			expect(areas).toContain("Steering");
+			expect(areas).toContain("Cloud Agents");
+			expect(areas).toContain("Documentation");
+			expect(areas).toContain("Configuration");
+			// Chat Provider is ACP-only; the mocked host is "vscode" so it must
+			// NOT appear here — see the IDE-host awareness suite below.
+			expect(areas).not.toContain("Chat Provider");
 		});
 
-		it("should have correct number of actions per area", async () => {
+		it("should have at least the core entrypoints per area", async () => {
 			const state = await provider.getWelcomeState();
 
 			const actionsByArea = state.featureActions.reduce(
@@ -450,10 +460,34 @@ describe("Welcome Screen - Feature Action Execution (Integration)", () => {
 				{} as Record<string, number>
 			);
 
-			expect(actionsByArea.Specs).toBe(2);
-			expect(actionsByArea.Actions).toBe(4);
-			expect(actionsByArea.Hooks).toBe(2);
-			expect(actionsByArea.Steering).toBe(2);
+			expect(actionsByArea.Specs).toBeGreaterThanOrEqual(2);
+			expect(actionsByArea["SpecKit Workflow"]).toBeGreaterThanOrEqual(5);
+			expect(actionsByArea.Actions).toBeGreaterThanOrEqual(4);
+			expect(actionsByArea.Hooks).toBeGreaterThanOrEqual(2);
+			expect(actionsByArea.Steering).toBeGreaterThanOrEqual(2);
+			expect(actionsByArea["Cloud Agents"]).toBeGreaterThanOrEqual(2);
+			expect(actionsByArea.Documentation).toBeGreaterThanOrEqual(2);
+			expect(actionsByArea.Configuration).toBeGreaterThanOrEqual(2);
+		});
+
+		it("should surface the headline quick actions by commandId", async () => {
+			const state = await provider.getWelcomeState();
+			const commandIds = new Set(state.featureActions.map((a) => a.commandId));
+
+			// Spec lifecycle
+			expect(commandIds).toContain("gatomia.spec.create");
+			// SpecKit workflow steps
+			expect(commandIds).toContain("gatomia.speckit.specify");
+			expect(commandIds).toContain("gatomia.speckit.plan");
+			expect(commandIds).toContain("gatomia.speckit.tasks");
+			expect(commandIds).toContain("gatomia.speckit.implementation");
+			// Configuration / bootstrap
+			expect(commandIds).toContain("gatomia.settings.open");
+			expect(commandIds).toContain("gatomia.dependencies.check");
+			// Cloud agents
+			expect(commandIds).toContain("gatomia.selectProvider");
+			// Documentation
+			expect(commandIds).toContain("gatomia.help.open");
 		});
 
 		it("should include action metadata (id, label, description, icon)", async () => {
@@ -465,6 +499,42 @@ describe("Welcome Screen - Feature Action Execution (Integration)", () => {
 				expect(action.description).toBeDefined();
 				expect(action.commandId).toBeDefined();
 				expect(action.icon).toBeDefined();
+			}
+		});
+
+		it("should emit Chat Provider actions only on ACP hosts", async () => {
+			const vscodeModule = await import("vscode");
+			const originalAppName = vscodeModule.env.appName;
+
+			try {
+				// Simulate running inside Windsurf (ACP host).
+				(vscodeModule.env as { appName: string }).appName = "Windsurf";
+				const windsurfState = await provider.getWelcomeState();
+				const windsurfAreas = new Set(
+					windsurfState.featureActions.map((a) => a.featureArea)
+				);
+				expect(windsurfAreas).toContain("Chat Provider");
+
+				const chatCommands = new Set(
+					windsurfState.featureActions
+						.filter((a) => a.featureArea === "Chat Provider")
+						.map((a) => a.commandId)
+				);
+				expect(chatCommands).toContain("gatomia.acp.switchProvider");
+				expect(chatCommands).toContain("gatomia.acp.reprobeAll");
+				expect(chatCommands).toContain("gatomia.acp.showOutput");
+				expect(chatCommands).toContain("gatomia.acp.cancelActive");
+
+				// Back to non-ACP host — Chat Provider must disappear.
+				(vscodeModule.env as { appName: string }).appName =
+					"Visual Studio Code";
+				const vscodeState = await provider.getWelcomeState();
+				const vscodeAreas = new Set(
+					vscodeState.featureActions.map((a) => a.featureArea)
+				);
+				expect(vscodeAreas).not.toContain("Chat Provider");
+			} finally {
+				(vscodeModule.env as { appName: string }).appName = originalAppName;
 			}
 		});
 	});
@@ -621,7 +691,10 @@ describe("Welcome Screen - Feature Action Execution (Integration)", () => {
 			const state = await provider.getWelcomeState();
 
 			expect(state).toHaveProperty("featureActions");
-			expect(state.featureActions).toHaveLength(10);
+			// Exact count intentionally loose so adding new commands does not
+			// break the contract; see "Feature Action State" suite for the
+			// per-area breadth assertions.
+			expect(state.featureActions.length).toBeGreaterThanOrEqual(30);
 		});
 
 		it("should provide feature actions with all required properties", async () => {

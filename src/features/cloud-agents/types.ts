@@ -117,6 +117,13 @@ export interface AgentSession {
 	externalUrl?: string;
 	/** Error message if failed */
 	errorMessage?: string;
+	/**
+	 * Optional link to the Agent Chat Panel webview (spec 018) that monitors
+	 * this cloud session. Populated when the user opens the session in a chat
+	 * panel; absent otherwise. Informational — the spec 016 code paths ignore
+	 * it, spec 018's `cloud-chat-adapter.ts` reads/writes it via the store.
+	 */
+	chatPanelId?: string;
 }
 
 // ============================================================================

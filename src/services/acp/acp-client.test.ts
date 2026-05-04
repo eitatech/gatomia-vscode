@@ -8,6 +8,12 @@ import { AcpClient } from "./acp-client";
 import type { AcpProviderDescriptor } from "./types";
 
 const AUTH_REQUIRED_REGEX = /auth_required/;
+const TIMED_OUT_REGEX = /timed out/i;
+const CHILD_EXITED_REGEX = /child process exited/;
+const NEVER_RESOLVES = <T>(): Promise<T> =>
+	new Promise<T>(() => {
+		/* intentionally never settles — used to simulate a hung RPC */
+	});
 
 vi.mock("node:child_process", () => {
 	const spawnMock = vi.fn();
@@ -212,6 +218,86 @@ describe("AcpClient", () => {
 		expect(fakeProcess.kill).toHaveBeenCalled();
 	});
 
+	it("rejects with a timeout when initialize never resolves (H1)", async () => {
+		// Make initialize hang forever.
+		initializeMock.mockImplementationOnce(() => NEVER_RESOLVES());
+		const client = new AcpClient({
+			descriptor,
+			cwd: "/tmp/workspace",
+			output: makeOutputChannel(),
+			initializeTimeoutMs: 20,
+		});
+
+		await expect(client.ensureStarted()).rejects.toThrow(TIMED_OUT_REGEX);
+		// The stuck process must be killed so the next retry starts clean.
+		expect(fakeProcess.kill).toHaveBeenCalled();
+	});
+
+	it("rejects pending waiters when the child process exits unexpectedly (H1)", async () => {
+		initializeMock.mockImplementationOnce(() => NEVER_RESOLVES());
+		const client = new AcpClient({
+			descriptor,
+			cwd: "/tmp/workspace",
+			output: makeOutputChannel(),
+			initializeTimeoutMs: 10_000,
+		});
+
+		const pending = client.ensureStarted();
+		// Simulate the child process crashing while initialize is pending.
+		setImmediate(() => fakeProcess.emit("exit", 137, "SIGKILL"));
+
+		await expect(pending).rejects.toThrow(CHILD_EXITED_REGEX);
+	});
+
+	it("removes a per-prompt (once:) session entry after the turn completes (H4)", async () => {
+		newSessionMock.mockResolvedValueOnce({ sessionId: "session-once" });
+		const client = new AcpClient({
+			descriptor,
+			cwd: "/tmp/workspace",
+			output: makeOutputChannel(),
+		});
+
+		await client.sendPrompt("once:abc-123", "one-shot");
+
+		expect(client.getSessionKeys()).not.toContain("once:abc-123");
+	});
+
+	it("keeps workspace / per-spec session entries across prompts (H4)", async () => {
+		newSessionMock.mockResolvedValueOnce({ sessionId: "session-ws" });
+		const client = new AcpClient({
+			descriptor,
+			cwd: "/tmp/workspace",
+			output: makeOutputChannel(),
+		});
+
+		await client.sendPrompt("_ws_", "first");
+		await client.sendPrompt("_ws_", "second");
+
+		expect(client.getSessionKeys()).toContain("_ws_");
+		// newSession must only have been called once — the second prompt reuses it.
+		expect(newSessionMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("cancelAll cancels every tracked session regardless of mode (H3)", async () => {
+		newSessionMock
+			.mockResolvedValueOnce({ sessionId: "session-ws" })
+			.mockResolvedValueOnce({ sessionId: "session-spec" });
+		cancelMock.mockResolvedValue(undefined);
+		const client = new AcpClient({
+			descriptor,
+			cwd: "/tmp/workspace",
+			output: makeOutputChannel(),
+		});
+
+		await client.sendPrompt("_ws_", "a");
+		await client.sendPrompt("spec:001", "b");
+		await client.cancelAll();
+
+		expect(cancelMock).toHaveBeenCalledTimes(2);
+		expect(cancelMock).toHaveBeenCalledWith({ sessionId: "session-ws" });
+		expect(cancelMock).toHaveBeenCalledWith({ sessionId: "session-spec" });
+	});
+
 	it("throws a descriptive error when the session cannot be established", async () => {
 		newSessionMock.mockRejectedValueOnce(new Error("auth_required"));
 		const client = new AcpClient({
@@ -327,6 +413,582 @@ describe("AcpClient", () => {
 			const response = await invokeRequestPermission();
 
 			expect(response).toEqual({ outcome: { outcome: "cancelled" } });
+		});
+
+		describe("setPermissionDefault (hot-reload)", () => {
+			it("propagates a new mode to subsequent requestPermission calls without rebuilding the connection", async () => {
+				const client = new AcpClient({
+					descriptor,
+					cwd: "/tmp/workspace",
+					output: makeOutputChannel(),
+					permissionDefault: "ask",
+					promptForPermission: vi.fn().mockResolvedValue(null),
+				});
+				await client.ensureStarted();
+
+				// Initial mode = "ask" with a no-op prompter -> cancelled.
+				const before = await invokeRequestPermission();
+				expect(before).toEqual({ outcome: { outcome: "cancelled" } });
+
+				// Switch to allow at runtime.
+				client.setPermissionDefault("allow");
+
+				// The same handler instance must now auto-allow.
+				const after = await invokeRequestPermission();
+				expect(after).toEqual({
+					outcome: { outcome: "selected", optionId: "opt-allow" },
+				});
+			});
+
+			it("is idempotent when the new mode equals the current one", async () => {
+				const output = makeOutputChannel();
+				const client = new AcpClient({
+					descriptor,
+					cwd: "/tmp/workspace",
+					output,
+					permissionDefault: "deny",
+				});
+				await client.ensureStarted();
+
+				const appendLine = output.appendLine as unknown as ReturnType<
+					typeof vi.fn
+				>;
+				const callsForUpdate = (): number =>
+					appendLine.mock.calls.filter((args) =>
+						String(args[0]).includes("permissionDefault updated")
+					).length;
+
+				const before = callsForUpdate();
+				client.setPermissionDefault("deny");
+				const after = callsForUpdate();
+
+				expect(after).toBe(before);
+			});
+		});
+
+		describe("remembered always-decisions (per AcpClient memo)", () => {
+			const invokeWithKind = (toolKind: string): Promise<unknown> =>
+				(
+					handlerRef.current as {
+						requestPermission: (p: unknown) => Promise<unknown>;
+					}
+				).requestPermission({
+					options,
+					sessionId: "session-1",
+					toolCall: {
+						toolCallId: `tc-${Math.random()}`,
+						title: `Execute something (${toolKind})`,
+						kind: toolKind,
+					},
+				});
+
+			it("auto-applies allow_always for subsequent calls of the same kind without prompting again", async () => {
+				const prompter = vi.fn().mockResolvedValue("opt-always");
+				const client = new AcpClient({
+					descriptor,
+					cwd: "/tmp/workspace",
+					output: makeOutputChannel(),
+					permissionDefault: "ask",
+					promptForPermission: prompter,
+				});
+				await client.ensureStarted();
+
+				const first = await invokeWithKind("execute");
+				const second = await invokeWithKind("execute");
+				const third = await invokeWithKind("execute");
+
+				// User was prompted exactly once. The next two calls were
+				// auto-resolved from the memo.
+				expect(prompter).toHaveBeenCalledTimes(1);
+				expect(first).toEqual({
+					outcome: { outcome: "selected", optionId: "opt-always" },
+				});
+				expect(second).toEqual({
+					outcome: { outcome: "selected", optionId: "opt-always" },
+				});
+				expect(third).toEqual({
+					outcome: { outcome: "selected", optionId: "opt-always" },
+				});
+			});
+
+			it("does NOT cache an allow_once decision — every call still prompts", async () => {
+				const prompter = vi.fn().mockResolvedValue("opt-allow"); // allow_once
+				const client = new AcpClient({
+					descriptor,
+					cwd: "/tmp/workspace",
+					output: makeOutputChannel(),
+					permissionDefault: "ask",
+					promptForPermission: prompter,
+				});
+				await client.ensureStarted();
+
+				await invokeWithKind("execute");
+				await invokeWithKind("execute");
+
+				expect(prompter).toHaveBeenCalledTimes(2);
+			});
+
+			it("isolates the cache per tool kind", async () => {
+				const prompter = vi.fn().mockResolvedValue("opt-always");
+				const client = new AcpClient({
+					descriptor,
+					cwd: "/tmp/workspace",
+					output: makeOutputChannel(),
+					permissionDefault: "ask",
+					promptForPermission: prompter,
+				});
+				await client.ensureStarted();
+
+				await invokeWithKind("execute");
+				await invokeWithKind("read");
+
+				// Different kinds → both required prompting.
+				expect(prompter).toHaveBeenCalledTimes(2);
+
+				prompter.mockClear();
+				await invokeWithKind("execute");
+				await invokeWithKind("read");
+				// Both kinds are now memoised — no more prompts.
+				expect(prompter).not.toHaveBeenCalled();
+			});
+
+			it("does not cache when toolCall.kind is missing", async () => {
+				const prompter = vi.fn().mockResolvedValue("opt-always");
+				const client = new AcpClient({
+					descriptor,
+					cwd: "/tmp/workspace",
+					output: makeOutputChannel(),
+					permissionDefault: "ask",
+					promptForPermission: prompter,
+				});
+				await client.ensureStarted();
+
+				const handler = handlerRef.current as {
+					requestPermission: (p: unknown) => Promise<unknown>;
+				};
+				await handler.requestPermission({
+					options,
+					sessionId: "session-1",
+					toolCall: { toolCallId: "tc-1", title: "Untyped" },
+				});
+				await handler.requestPermission({
+					options,
+					sessionId: "session-1",
+					toolCall: { toolCallId: "tc-2", title: "Untyped" },
+				});
+
+				expect(prompter).toHaveBeenCalledTimes(2);
+			});
+
+			it("caches reject_always symmetrically", async () => {
+				const rejectAlwaysOptions = [
+					{
+						optionId: "opt-reject-always",
+						name: "Reject always",
+						kind: "reject_always" as const,
+					},
+					{
+						optionId: "opt-allow",
+						name: "Allow",
+						kind: "allow_once" as const,
+					},
+				];
+				const prompter = vi.fn().mockResolvedValue("opt-reject-always");
+				const client = new AcpClient({
+					descriptor,
+					cwd: "/tmp/workspace",
+					output: makeOutputChannel(),
+					permissionDefault: "ask",
+					promptForPermission: prompter,
+				});
+				await client.ensureStarted();
+
+				const handler = handlerRef.current as {
+					requestPermission: (p: unknown) => Promise<unknown>;
+				};
+				const first = await handler.requestPermission({
+					options: rejectAlwaysOptions,
+					sessionId: "session-1",
+					toolCall: { toolCallId: "tc-1", title: "Delete x", kind: "delete" },
+				});
+				const second = await handler.requestPermission({
+					options: rejectAlwaysOptions,
+					sessionId: "session-1",
+					toolCall: { toolCallId: "tc-2", title: "Delete y", kind: "delete" },
+				});
+
+				expect(prompter).toHaveBeenCalledTimes(1);
+				expect(first).toEqual({
+					outcome: { outcome: "selected", optionId: "opt-reject-always" },
+				});
+				expect(second).toEqual({
+					outcome: { outcome: "selected", optionId: "opt-reject-always" },
+				});
+			});
+		});
+	});
+
+	describe("per-session event bus (T012)", () => {
+		const invokeSessionUpdate = (params: unknown): Promise<unknown> =>
+			(
+				handlerRef.current as {
+					sessionUpdate: (p: unknown) => Promise<unknown>;
+				}
+			).sessionUpdate(params);
+
+		it("subscribeSession fans out agent_message_chunk events to the listener AND still writes to the OutputChannel (FR-022)", async () => {
+			const output = makeOutputChannel();
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output,
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "agent_message_chunk",
+					content: { type: "text", text: "hello world" },
+				},
+			});
+
+			// OutputChannel still receives the content (FR-022 regression).
+			expect(output.append).toHaveBeenCalledWith("hello world");
+
+			// Event bus listener receives the structured event.
+			expect(listener).toHaveBeenCalledTimes(1);
+			const event = listener.mock.calls[0][0] as {
+				kind: string;
+				text: string;
+				at: number;
+			};
+			expect(event.kind).toBe("agent-message-chunk");
+			expect(event.text).toBe("hello world");
+			expect(typeof event.at).toBe("number");
+		});
+
+		it("fans out tool_call and tool_call_update events with structured payloads", async () => {
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "tool_call",
+					toolCallId: "tc-1",
+					title: "Run tests",
+					status: "pending",
+				},
+			});
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "tool_call_update",
+					toolCallId: "tc-1",
+					status: "succeeded",
+				},
+			});
+
+			expect(listener).toHaveBeenCalledTimes(2);
+			const [first, second] = listener.mock.calls.map(
+				(c) => c[0] as { kind: string }
+			);
+			expect(first.kind).toBe("tool-call");
+			expect(second.kind).toBe("tool-call-update");
+		});
+
+		it("fans out agent_thought_chunk events as `agent-thought-chunk` with the text payload", async () => {
+			// Thoughts are surfaced as a separate event kind so the
+			// runner can render them in a muted "Thinking…" panel
+			// without conflating them with the agent's user-facing
+			// reply.
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "agent_thought_chunk",
+					content: { type: "text", text: "deciding…" },
+				},
+			});
+
+			expect(listener).toHaveBeenCalledTimes(1);
+			const event = listener.mock.calls[0]?.[0] as {
+				kind: string;
+				text: string;
+			};
+			expect(event.kind).toBe("agent-thought-chunk");
+			expect(event.text).toBe("deciding…");
+		});
+
+		it("fans out plan notifications as `plan-update` events with normalised entries", async () => {
+			// Plan notifications carry the full task list on every
+			// emission. The client must forward them verbatim so the
+			// runner can patch the existing `PlanChatMessage` in place.
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "plan",
+					entries: [
+						{ content: "Read repo", status: "completed" },
+						{
+							content: "Write code",
+							status: "in_progress",
+							priority: "high",
+						},
+					],
+				},
+			});
+
+			expect(listener).toHaveBeenCalledTimes(1);
+			const event = listener.mock.calls[0]?.[0] as {
+				kind: string;
+				entries: Array<{ content: string; status: string; priority?: string }>;
+			};
+			expect(event.kind).toBe("plan-update");
+			expect(event.entries).toHaveLength(2);
+			expect(event.entries[0]).toEqual({
+				content: "Read repo",
+				status: "completed",
+			});
+			expect(event.entries[1]).toEqual({
+				content: "Write code",
+				status: "in_progress",
+				priority: "high",
+			});
+		});
+
+		it("projects ACP `Diff` content into affectedFiles with computed +N/-M stats", async () => {
+			// Phase 3 plumbing: when the agent emits a `tool_call` with
+			// a `diff` content entry the host must surface the file path,
+			// language hint, and lines added / removed so the webview
+			// can render the Cursor-style card.
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "tool_call",
+					toolCallId: "tc-edit",
+					title: "Update sidebar",
+					status: "pending",
+					kind: "edit",
+					content: [
+						{
+							type: "diff",
+							path: "/repo/src/sidebar.ts",
+							oldText: "alpha\nbeta\n",
+							newText: "alpha\nbeta\ngamma\n",
+						},
+					],
+				},
+			});
+
+			expect(listener).toHaveBeenCalledTimes(1);
+			const event = listener.mock.calls[0][0] as {
+				kind: string;
+				toolKind?: string;
+				affectedFiles?: Array<{
+					path: string;
+					linesAdded: number;
+					linesRemoved: number;
+					languageId?: string;
+				}>;
+			};
+			expect(event.kind).toBe("tool-call");
+			expect(event.toolKind).toBe("edit");
+			expect(event.affectedFiles).toHaveLength(1);
+			const [file] = event.affectedFiles ?? [];
+			expect(file).toMatchObject({
+				path: "/repo/src/sidebar.ts",
+				linesAdded: 1,
+				linesRemoved: 0,
+				languageId: "typescript",
+			});
+		});
+
+		it("falls back to ToolCall.locations when no diff content is present", async () => {
+			// Some agents only ship `locations` (a "follow-along" hint
+			// that points the IDE at a file) without a full diff body.
+			// We still want to surface the file in the card so the user
+			// can scan what is being read, even if `+0 -0`.
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "tool_call",
+					toolCallId: "tc-read",
+					title: "Inspect README",
+					status: "pending",
+					kind: "read",
+					locations: [{ path: "README.md", line: 1 }],
+				},
+			});
+
+			const event = listener.mock.calls[0][0] as {
+				affectedFiles?: Array<{
+					path: string;
+					linesAdded: number;
+					linesRemoved: number;
+				}>;
+			};
+			expect(event.affectedFiles).toEqual([
+				{
+					path: "README.md",
+					linesAdded: 0,
+					linesRemoved: 0,
+					languageId: "markdown",
+				},
+			]);
+		});
+
+		it("omits affectedFiles when the tool call has no diff and no locations", async () => {
+			// Pure execute calls (e.g. `bash`) ship neither diff nor
+			// locations — the event must omit `affectedFiles` entirely
+			// so the UI falls back to the legacy compact title row.
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "tool_call",
+					toolCallId: "tc-exec",
+					title: "Run shell",
+					status: "pending",
+					kind: "execute",
+				},
+			});
+
+			const event = listener.mock.calls[0][0] as {
+				affectedFiles?: unknown;
+				toolKind?: string;
+			};
+			expect(event.affectedFiles).toBeUndefined();
+			expect(event.toolKind).toBe("execute");
+		});
+
+		it("only notifies subscribers for the matching sessionId", async () => {
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listenerA = vi.fn();
+			const listenerB = vi.fn();
+			client.subscribeSession("session-A", listenerA);
+			client.subscribeSession("session-B", listenerB);
+
+			await invokeSessionUpdate({
+				sessionId: "session-A",
+				update: {
+					sessionUpdate: "agent_message_chunk",
+					content: { type: "text", text: "for A" },
+				},
+			});
+
+			expect(listenerA).toHaveBeenCalledTimes(1);
+			expect(listenerB).not.toHaveBeenCalled();
+		});
+
+		it("supports multiple subscribers per sessionId", async () => {
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const first = vi.fn();
+			const second = vi.fn();
+			client.subscribeSession("session-1", first);
+			client.subscribeSession("session-1", second);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "agent_message_chunk",
+					content: { type: "text", text: "x" },
+				},
+			});
+
+			expect(first).toHaveBeenCalledTimes(1);
+			expect(second).toHaveBeenCalledTimes(1);
+		});
+
+		it("returns a Disposable that stops further event delivery", async () => {
+			const client = new AcpClient({
+				descriptor,
+				cwd: "/tmp/workspace",
+				output: makeOutputChannel(),
+			});
+			await client.ensureStarted();
+			const listener = vi.fn();
+			const subscription = client.subscribeSession("session-1", listener);
+
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "agent_message_chunk",
+					content: { type: "text", text: "one" },
+				},
+			});
+			subscription.dispose();
+			await invokeSessionUpdate({
+				sessionId: "session-1",
+				update: {
+					sessionUpdate: "agent_message_chunk",
+					content: { type: "text", text: "two" },
+				},
+			});
+
+			expect(listener).toHaveBeenCalledTimes(1);
 		});
 	});
 

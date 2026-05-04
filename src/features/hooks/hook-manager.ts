@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import type { IMCPDiscoveryService } from "./services/mcp-contracts";
 import type { AgentRegistry } from "./agent-registry";
 import {
+	type ActionConfig,
 	type Hook,
 	type MCPActionParams,
 	type CustomActionParams,
@@ -555,7 +556,7 @@ export class HookManager {
 	/**
 	 * Validate action parameters for specific action types
 	 */
-	private validateActionParameters(action: HookAction): ValidationError[] {
+	private validateActionParameters(action: ActionConfig): ValidationError[] {
 		if (action.type === "custom") {
 			const params = action.parameters as any;
 			if (!(params?.agentId || params?.agentName)) {

@@ -200,7 +200,12 @@ export class HookExecutor {
 			clientService,
 			parameterResolver,
 			executionPool,
-			logger: outputChannel,
+			logger: {
+				log: (...args: unknown[]) =>
+					outputChannel.appendLine(args.map(String).join(" ")),
+				warn: (...args: unknown[]) =>
+					outputChannel.appendLine(`[warn] ${args.map(String).join(" ")}`),
+			},
 		});
 	}
 

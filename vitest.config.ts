@@ -12,6 +12,15 @@ export default defineConfig({
 		],
 		setupFiles: ["./vitest.setup.ts"],
 		coverage: { reporter: ["text", "lcov", "html"], provider: "v8" },
+		// Force @tanstack/react-virtual through vite's transform pipeline so the
+		// `react` alias below actually intercepts its internal `import * as React
+		// from "react"` — otherwise `ui/node_modules/react` is loaded as a
+		// second React instance and hooks fail with "null.useReducer".
+		server: {
+			deps: {
+				inline: ["@tanstack/react-virtual"],
+			},
+		},
 	},
 	resolve: {
 		alias: {
@@ -31,6 +40,10 @@ export default defineConfig({
 				__dirname,
 				"ui/node_modules/tailwind-merge"
 			),
+			"@tanstack/react-virtual": path.resolve(
+				__dirname,
+				"ui/node_modules/@tanstack/react-virtual"
+			),
 			// Force all React imports to use the root version (testing library uses root)
 			react: path.resolve(__dirname, "node_modules/react"),
 			"react-dom": path.resolve(__dirname, "node_modules/react-dom"),
@@ -43,7 +56,7 @@ export default defineConfig({
 				"node_modules/react/jsx-dev-runtime"
 			),
 		},
-		dedupe: ["react", "react-dom"],
+		dedupe: ["react", "react-dom", "@tanstack/react-virtual"],
 	},
 	esbuild: {
 		jsx: "automatic",

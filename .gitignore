@@ -41,3 +41,9 @@ mise.toml
 .dolt/
 *.db
 .beads-credential-key
+
+# Agent Chat Panel per-session git worktrees (feature 018-agent-chat-panel).
+# Worktrees are created on demand under .gatomia/worktrees/<session-id>/ and
+# are never auto-deleted; ignore them so accidental commits of worktree
+# directories never land in the primary checkout.
+.gatomia/worktrees/

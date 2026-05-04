@@ -6,8 +6,19 @@
  *
  * Errors are actionable per FR-026: format "[Context]: [What happened]. [What to do]."
  *
+ * Routing (spec 018, T037):
+ *   - When an `ACPActionChatRouter` is registered via `setAcpActionChatRouter()`
+ *     AND its `isChatEnabled()` returns `true` (default in VS Code settings),
+ *     execution is delegated to the Agent Chat Panel runtime (`AcpChatRunner`),
+ *     preserving `OutputChannel` logs (FR-022).
+ *   - When no router is registered, or the flag is off, the legacy subprocess
+ *     path runs. This path remains reachable so `gatomia.agentChat.enabled=false`
+ *     can be used for rollout safety.
+ *
  * @see specs/001-hooks-refactor/contracts/acp-messages.ts
+ * @see specs/018-agent-chat-panel/contracts/agent-chat-panel-protocol.md
  * @feature 001-hooks-refactor Phase 6
+ * @feature 018-agent-chat-panel Phase 3 T037
  */
 
 import { spawn } from "node:child_process";
@@ -168,6 +179,50 @@ function logTelemetry(
 }
 
 // ============================================================================
+// T037 — Chat panel routing (spec 018)
+// ============================================================================
+
+/**
+ * Delegation surface for the Agent Chat Panel runtime.
+ *
+ * The extension's activation path registers an implementation backed by
+ * `AgentChatRegistry` + `AcpChatRunner` + `AgentChatSessionStore`; tests and
+ * headless contexts leave it unregistered so the legacy subprocess path runs.
+ *
+ * Implementations MUST preserve the `OutputChannel` log output emitted by the
+ * underlying `AcpClient` so hook logs remain visible (FR-022).
+ */
+export interface ACPActionChatRouter {
+	/**
+	 * Returns `true` when the chat panel should handle execution. Typically
+	 * wired to `workspace.getConfiguration('gatomia').get('agentChat.enabled', true)`.
+	 */
+	isChatEnabled(): boolean;
+	/**
+	 * Delegate the ACP task to the chat runtime. The returned value MUST have
+	 * the same shape as the legacy path so hook consumers remain agnostic.
+	 */
+	delegate(
+		params: ACPActionParams,
+		templateContext: TemplateContext,
+		options: { timeoutMs: number }
+	): Promise<ACPExecutionResult>;
+}
+
+let registeredChatRouter: ACPActionChatRouter | undefined;
+
+/**
+ * Register (or clear) the chat panel router. Clearing (passing `undefined`)
+ * restores the legacy subprocess path and is used both for deactivation and
+ * for unit tests.
+ */
+export function setAcpActionChatRouter(
+	router: ACPActionChatRouter | undefined
+): void {
+	registeredChatRouter = router;
+}
+
+// ============================================================================
 // ACPActionExecutor
 // ============================================================================
 
@@ -205,6 +260,18 @@ export class ACPActionExecutor {
 			agentCommand: params.agentCommand,
 			timeoutMs: this.timeoutMs,
 		});
+
+		// --- T037: route through Agent Chat Panel when enabled --------------
+		const router = registeredChatRouter;
+		if (router?.isChatEnabled()) {
+			logTelemetry("acp-action.execute.delegated", {
+				agentCommand: params.agentCommand,
+				timeoutMs: this.timeoutMs,
+			});
+			return router.delegate(params, templateContext, {
+				timeoutMs: this.timeoutMs,
+			});
+		}
 
 		// Expand template variables in taskInstruction
 		const expandedInstruction = _templateParser.substitute(

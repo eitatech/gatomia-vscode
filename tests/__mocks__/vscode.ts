@@ -156,6 +156,8 @@ export class TreeItem {
 	description: string | undefined;
 	command: unknown;
 	resourceUri: { fsPath: string } | undefined;
+	contextValue: string | undefined;
+	id: string | undefined;
 
 	constructor(label: string, collapsibleState: TreeItemCollapsibleState) {
 		this.label = label;

@@ -74,7 +74,7 @@ describe("SpecManager", () => {
 	it("should show an error message when deletion fails", async () => {
 		const error = new Error("Deletion failed");
 		vi.mocked(workspace.fs.delete).mockRejectedValue(error);
-		vi.mocked(window.showWarningMessage).mockResolvedValue("Delete");
+		vi.mocked(window.showWarningMessage).mockResolvedValue("Delete" as never);
 
 		await specManager.delete("spec-to-delete");
 
@@ -93,7 +93,7 @@ describe("SpecManager", () => {
 		});
 
 		it("should delete SpecKit spec from correct path", async () => {
-			vi.mocked(window.showWarningMessage).mockResolvedValue("Delete");
+			vi.mocked(window.showWarningMessage).mockResolvedValue("Delete" as never);
 
 			await specManager.delete("001-feature", "speckit");
 
@@ -111,7 +111,7 @@ describe("SpecManager", () => {
 		});
 
 		it("should delete OpenSpec spec from correct path", async () => {
-			vi.mocked(window.showWarningMessage).mockResolvedValue("Delete");
+			vi.mocked(window.showWarningMessage).mockResolvedValue("Delete" as never);
 
 			await specManager.delete("my-feature", "openspec");
 
@@ -132,7 +132,7 @@ describe("SpecManager", () => {
 		});
 
 		it("should show confirmation dialog with spec name", async () => {
-			vi.mocked(window.showWarningMessage).mockResolvedValue("Delete");
+			vi.mocked(window.showWarningMessage).mockResolvedValue("Delete" as never);
 
 			await specManager.delete("important-spec", "speckit");
 
@@ -144,7 +144,7 @@ describe("SpecManager", () => {
 		});
 
 		it("should use activeSystem when system not provided", async () => {
-			vi.mocked(window.showWarningMessage).mockResolvedValue("Delete");
+			vi.mocked(window.showWarningMessage).mockResolvedValue("Delete" as never);
 			// activeSystem defaults to "auto", which uses OpenSpec path
 
 			await specManager.delete("my-feature");
@@ -155,7 +155,7 @@ describe("SpecManager", () => {
 		});
 
 		it("should show success notification after deletion", async () => {
-			vi.mocked(window.showWarningMessage).mockResolvedValue("Delete");
+			vi.mocked(window.showWarningMessage).mockResolvedValue("Delete" as never);
 
 			await specManager.delete("001-feature", "speckit");
 
@@ -167,7 +167,7 @@ describe("SpecManager", () => {
 		it("should log error to output channel on deletion failure", async () => {
 			const error = new Error("Permission denied");
 			vi.mocked(workspace.fs.delete).mockRejectedValue(error);
-			vi.mocked(window.showWarningMessage).mockResolvedValue("Delete");
+			vi.mocked(window.showWarningMessage).mockResolvedValue("Delete" as never);
 
 			await specManager.delete("readonly-spec", "speckit");
 

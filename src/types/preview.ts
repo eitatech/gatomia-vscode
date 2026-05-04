@@ -121,4 +121,6 @@ export type PreviewWebviewMessage =
 	| { type: "preview/edit-attempt"; payload?: { reason?: string } }
 	| { type: "preview/open-in-editor" }
 	| { type: "preview/forms/submit"; payload: FormSubmissionPayload }
-	| { type: "preview/refine/submit"; payload: RefinementRequestPayload };
+	| { type: "preview/refine/submit"; payload: RefinementRequestPayload }
+	| { type: "preview/execute-task-group"; payload?: { groupName: string } }
+	| { type: "preview/open-file"; payload?: { filePath: string } };

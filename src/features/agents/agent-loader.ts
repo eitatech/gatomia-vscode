@@ -199,29 +199,27 @@ export class AgentLoader {
 			return [];
 		}
 
-		return commands
-			.map((cmd) => {
-				if (typeof cmd !== "object" || cmd === null) {
-					return null;
-				}
-
-				const command = cmd as Record<string, unknown>;
-
-				return {
-					name: String(command.name || ""),
-					description: String(command.description || ""),
-					tool: String(command.tool || ""),
-					parameters: Array.isArray(command.parameters)
-						? (command.parameters as unknown[]).map((p) => {
-								if (typeof p === "object" && p !== null) {
-									return p as Record<string, unknown>;
-								}
-								return {} as Record<string, unknown>;
-							})
-						: undefined,
-				};
-			})
-			.filter((cmd): cmd is Agentcommand => cmd !== null);
+		const result: AgentCommand[] = [];
+		for (const cmd of commands) {
+			if (typeof cmd !== "object" || cmd === null) {
+				continue;
+			}
+			const command = cmd as Record<string, unknown>;
+			result.push({
+				name: String(command.name || ""),
+				description: String(command.description || ""),
+				tool: String(command.tool || ""),
+				parameters: Array.isArray(command.parameters)
+					? (command.parameters as unknown[]).map((p) => {
+							if (typeof p === "object" && p !== null) {
+								return p as Record<string, unknown>;
+							}
+							return {} as Record<string, unknown>;
+						})
+					: undefined,
+			});
+		}
+		return result;
 	}
 
 	/**

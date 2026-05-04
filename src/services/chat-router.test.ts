@@ -292,6 +292,94 @@ describe("ChatRouter", () => {
 		expect(decision.reason).toMatch(REMOTE_REGEX);
 	});
 
+	it("does NOT block routing while onboarding.promptInstall is pending (H2)", async () => {
+		Object.defineProperty(env, "appName", {
+			value: "Windsurf",
+			configurable: true,
+		});
+		registry = new AcpProviderRegistry();
+		registry.register(
+			makeDescriptor("devin", {
+				preferredHosts: ["windsurf"],
+				probe: vi.fn().mockResolvedValue(
+					probeResult({
+						installed: false,
+						version: null,
+						authenticated: false,
+						acpSupported: false,
+						executablePath: null,
+					})
+				),
+			})
+		);
+		// Simulate a user who never clicks a button — prompt hangs forever.
+		onboarding = {
+			...onboarding,
+			promptInstall: vi.fn(
+				() =>
+					new Promise<void>(() => {
+						/* never resolves */
+					})
+			),
+		} as unknown as OnboardingService;
+		const router = new ChatRouter({
+			registry,
+			onboarding,
+			output: makeOutput(),
+		});
+
+		const decision = await Promise.race([
+			router.resolve(),
+			new Promise<"timeout">((resolve) =>
+				setTimeout(() => resolve("timeout"), 250)
+			),
+		]);
+
+		expect(decision).not.toBe("timeout");
+		expect((decision as { target: { kind: string } }).target.kind).toBe(
+			"copilot-chat"
+		);
+		expect(onboarding.promptInstall).toHaveBeenCalled();
+	});
+
+	it("does NOT block routing while onboarding.promptAuth is pending (H2)", async () => {
+		Object.defineProperty(env, "appName", {
+			value: "Windsurf",
+			configurable: true,
+		});
+		registry = new AcpProviderRegistry();
+		registry.register(
+			makeDescriptor("devin", {
+				preferredHosts: ["windsurf"],
+				probe: vi.fn().mockResolvedValue(probeResult({ authenticated: false })),
+			})
+		);
+		onboarding = {
+			...onboarding,
+			promptAuth: vi.fn(
+				() =>
+					new Promise<void>(() => {
+						/* never resolves */
+					})
+			),
+		} as unknown as OnboardingService;
+		const router = new ChatRouter({
+			registry,
+			onboarding,
+			output: makeOutput(),
+		});
+
+		const decision = await Promise.race([
+			router.resolve(),
+			new Promise<"timeout">((resolve) =>
+				setTimeout(() => resolve("timeout"), 250)
+			),
+		]);
+
+		expect(decision).not.toBe("timeout");
+		expect(onboarding.promptAuth).toHaveBeenCalled();
+	});
+
 	it("caches decisions and invalidateCache forces a new probe", async () => {
 		Object.defineProperty(env, "appName", {
 			value: "Windsurf",

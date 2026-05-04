@@ -22,7 +22,7 @@ export const geminiDescriptor: AcpProviderDescriptor = {
 	displayName: "Gemini CLI",
 	preferredHosts: ["antigravity"],
 	spawnCommand: "gemini",
-	spawnArgs: ["--experimental-acp"],
+	spawnArgs: ["--acp"],
 	envAuthVars: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
 	installUrl: "https://github.com/google-gemini/gemini-cli#installation",
 	authCommand: "gemini auth login",

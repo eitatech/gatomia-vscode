@@ -1,42 +1,48 @@
 /**
  * Setup Section Component
  * First-time setup guidance and dependency installation
+ *
+ * IDE-aware rendering driven by `computeRequirementProfile`:
+ * - Windsurf: Devin CLI required; Copilot CLI optional;
+ *   Copilot Chat + Gemini hidden (Copilot Chat not compatible).
+ * - Antigravity: Gemini CLI required; Copilot CLI optional;
+ *   Copilot Chat + Devin hidden (Copilot Chat not compatible).
+ * - VS Code & others: Copilot Chat/CLI required; Devin/Gemini hidden.
  */
 
-import type { DependencyStatus, InstallableDependency } from "../types";
+import type {
+	DependencyStatus,
+	IdeHost,
+	InstallableDependency,
+	SetupSectionProps,
+	SystemPrerequisiteKey,
+	SystemPrerequisiteStatus,
+} from "../types";
+import { computeRequirementProfile, type DepKey } from "../requirements";
 
 const GATOMIA_COPILOT_CONFIG_COMMAND =
 	"gatomia config set --llm-provider copilot --main-model gpt-4";
-
-interface SetupSectionProps {
-	dependencies: DependencyStatus;
-	onInstallDependency: (dependency: InstallableDependency) => void;
-	onRefreshDependencies: () => void;
-	onNavigateNext: () => void;
-	isRefreshing?: boolean;
-}
+const GATOMIA_CLI_DOCS_URL =
+	"https://github.com/eitatech/gatomia-cli#configuration";
 
 export const SetupSection = ({
 	dependencies,
+	ideHost,
+	isInstallingAll = false,
 	onInstallDependency,
+	onInstallMissing,
+	onInstallPrerequisite,
 	onRefreshDependencies,
 	onNavigateNext,
 	isRefreshing = false,
 }: SetupSectionProps) => {
-	// Check if all required dependencies are installed
-	const copilotReady = dependencies.copilotChat.installed;
+	const profile = computeRequirementProfile(ideHost, dependencies);
+	const visibleDeps = [...profile.required, ...profile.optional];
+	const optionalSet = new Set(profile.optional);
 	const speckitReady = dependencies.speckit.installed;
 	const openspecReady = dependencies.openspec.installed;
-	const copilotCliReady = dependencies.copilotCli.installed;
 	const gatomiaCliReady = dependencies.gatomiaCli.installed;
-
-	// At least one spec system must be installed
-	const specSystemReady = speckitReady || openspecReady;
-
-	// All requirements met
-	const gatomiaPrerequisitesMet =
-		copilotReady && copilotCliReady && specSystemReady;
-	const allRequirementsMet = gatomiaPrerequisitesMet && gatomiaCliReady;
+	const allRequirementsMet = profile.missing.length === 0;
 
 	return (
 		<div className="welcome-section">
@@ -54,17 +60,25 @@ export const SetupSection = ({
 			</div>
 
 			<p className="welcome-section-description">
-				GatomIA requires GitHub Copilot Chat, Copilot CLI, and at least one
-				specification system (SpecKit or OpenSpec). Install GatomIA CLI after
-				those prerequisites are ready.
+				{getSetupDescription(ideHost)}
 			</p>
+
+			{/* System Prerequisites (Node.js, Python, uv) */}
+			<PrerequisitesGrid
+				onInstallPrerequisite={onInstallPrerequisite}
+				prerequisites={dependencies.prerequisites}
+			/>
 
 			{/* Dependency Cards Grid */}
 			<DependenciesGrid
 				dependencies={dependencies}
-				gatomiaPrerequisitesMet={gatomiaPrerequisitesMet}
+				gatomiaCliReady={gatomiaCliReady}
+				ideHost={ideHost}
 				onInstallDependency={onInstallDependency}
+				optionalSet={optionalSet}
+				visibleDeps={visibleDeps}
 			/>
+
 			{/* Setup Guidance */}
 			<div className="welcome-subsection welcome-subsection-divider">
 				<h3 className="welcome-section-title">What You Need</h3>
@@ -77,26 +91,15 @@ export const SetupSection = ({
 						gap: "12px",
 					}}
 				>
-					<RequirementItem
-						description="Required for AI assistance"
-						met={copilotReady}
-						title="GitHub Copilot Chat"
-					/>
-					<RequirementItem
-						description="Required for Copilot provider integration"
-						met={copilotCliReady}
-						title="GitHub Copilot CLI"
-					/>
-					<RequirementItem
-						description="At least one spec system"
-						met={specSystemReady}
-						title="SpecKit or OpenSpec"
-					/>
-					<RequirementItem
-						description="Install after prerequisites are ready"
-						met={gatomiaCliReady}
-						title="GatomIA CLI"
-					/>
+					{getRequirementItems(profile, dependencies).map((item) => (
+						<RequirementItem
+							description={item.description}
+							key={item.id}
+							met={item.met}
+							optional={item.optional}
+							title={item.title}
+						/>
+					))}
 					<RequirementItem
 						description="Configure paths in next section"
 						met={true}
@@ -112,7 +115,7 @@ export const SetupSection = ({
 				speckitReady={speckitReady}
 			/>
 
-			{/* Get Started Button */}
+			{/* Primary action: Install Missing or Get Started */}
 			<div
 				className="welcome-subsection-divider"
 				style={{
@@ -130,255 +133,576 @@ export const SetupSection = ({
 						Get Started →
 					</button>
 				) : (
-					<div style={{ textAlign: "center" }}>
-						<p
-							className="welcome-section-description"
-							style={{ marginBottom: "12px" }}
-						>
-							Install required dependencies to continue
-						</p>
-						<button
-							className="welcome-button welcome-button-secondary"
-							disabled={isRefreshing}
-							onClick={onRefreshDependencies}
-							type="button"
-						>
-							{isRefreshing ? "Checking..." : "Check Again"}
-						</button>
-					</div>
+					<InstallMissingControls
+						isInstallingAll={isInstallingAll}
+						isRefreshing={isRefreshing}
+						missing={profile.missing}
+						onInstallMissing={onInstallMissing}
+						onRefreshDependencies={onRefreshDependencies}
+					/>
 				)}
 			</div>
 		</div>
 	);
 };
+
+const getSetupDescription = (ideHost: IdeHost): string => {
+	if (ideHost === "windsurf") {
+		return "GatomIA routes chat prompts to Devin CLI on Windsurf. Install Devin CLI, at least one specification system (SpecKit or OpenSpec), and GatomIA CLI. GitHub Copilot Chat/CLI are optional.";
+	}
+	if (ideHost === "antigravity") {
+		return "GatomIA routes chat prompts to Gemini CLI on Antigravity. Install Gemini CLI, at least one specification system (SpecKit or OpenSpec), and GatomIA CLI. GitHub Copilot Chat/CLI are optional.";
+	}
+	return "GatomIA requires GitHub Copilot Chat, Copilot CLI, and at least one specification system (SpecKit or OpenSpec). Install GatomIA CLI after those prerequisites are ready.";
+};
+
+interface RequirementItemData {
+	id: string;
+	title: string;
+	description: string;
+	met: boolean;
+	optional: boolean;
+}
+
+const REQUIREMENT_META: Record<DepKey, { title: string; description: string }> =
+	{
+		"copilot-chat": {
+			title: "GitHub Copilot Chat",
+			description: "GitHub Copilot Chat extension for AI assistance",
+		},
+		"copilot-cli": {
+			title: "GitHub Copilot CLI",
+			description: "Required for Copilot provider integration",
+		},
+		"devin-cli": {
+			title: "Devin CLI",
+			description: "Chat provider for Windsurf (ACP)",
+		},
+		"gemini-cli": {
+			title: "Gemini CLI",
+			description: "Chat provider for Antigravity (ACP)",
+		},
+		speckit: {
+			title: "SpecKit CLI",
+			description: "GitHub's specification framework",
+		},
+		openspec: {
+			title: "OpenSpec CLI",
+			description: "Open specification standard",
+		},
+		"gatomia-cli": {
+			title: "GatomIA CLI",
+			description: "Install after prerequisites are ready",
+		},
+	};
+
+const isDepInstalled = (dep: DepKey, deps: DependencyStatus): boolean => {
+	switch (dep) {
+		case "copilot-chat":
+			return deps.copilotChat.installed;
+		case "copilot-cli":
+			return deps.copilotCli.installed;
+		case "speckit":
+			return deps.speckit.installed;
+		case "openspec":
+			return deps.openspec.installed;
+		case "gatomia-cli":
+			return deps.gatomiaCli.installed;
+		case "devin-cli":
+			return deps.devinCli?.installed ?? false;
+		case "gemini-cli":
+			return deps.geminiCli?.installed ?? false;
+		default: {
+			const _exhaustive: never = dep;
+			return _exhaustive;
+		}
+	}
+};
+
+const getRequirementItems = (
+	profile: ReturnType<typeof computeRequirementProfile>,
+	deps: DependencyStatus
+): RequirementItemData[] => {
+	const items: RequirementItemData[] = [];
+	const speckitReady = deps.speckit.installed;
+	const openspecReady = deps.openspec.installed;
+
+	for (const dep of profile.required) {
+		if (dep === "speckit" || dep === "openspec") {
+			continue;
+		}
+		const meta = REQUIREMENT_META[dep];
+		items.push({
+			id: dep,
+			title: meta.title,
+			description: meta.description,
+			met: isDepInstalled(dep, deps),
+			optional: false,
+		});
+	}
+
+	// Collapse speckit/openspec into a single "SpecKit or OpenSpec" requirement
+	items.push({
+		id: "spec-system",
+		title: "SpecKit or OpenSpec",
+		description: "At least one spec system",
+		met: speckitReady || openspecReady,
+		optional: false,
+	});
+
+	for (const dep of profile.optional) {
+		const meta = REQUIREMENT_META[dep];
+		items.push({
+			id: `optional-${dep}`,
+			title: meta.title,
+			description: meta.description,
+			met: isDepInstalled(dep, deps),
+			optional: true,
+		});
+	}
+
+	// Re-order so gatomia-cli is last for readability
+	items.sort((a, b) => {
+		if (a.id === "gatomia-cli") {
+			return 1;
+		}
+		if (b.id === "gatomia-cli") {
+			return -1;
+		}
+		return 0;
+	});
+
+	return items;
+};
+
+interface InstallMissingControlsProps {
+	missing: InstallableDependency[];
+	isInstallingAll: boolean;
+	isRefreshing: boolean;
+	onInstallMissing: (deps: InstallableDependency[]) => void;
+	onRefreshDependencies: () => void;
+}
+
+const InstallMissingControls = ({
+	missing,
+	isInstallingAll,
+	isRefreshing,
+	onInstallMissing,
+	onRefreshDependencies,
+}: InstallMissingControlsProps) => {
+	const label = getInstallMissingLabel(missing.length, isInstallingAll);
+	return (
+		<div
+			style={{
+				display: "flex",
+				flexDirection: "column",
+				alignItems: "center",
+				gap: "12px",
+			}}
+		>
+			<button
+				aria-label={label}
+				className="welcome-button welcome-button-primary"
+				disabled={isInstallingAll || missing.length === 0}
+				onClick={() => onInstallMissing(missing)}
+				style={{ padding: "12px 32px", fontSize: "14px" }}
+				type="button"
+			>
+				{label}
+			</button>
+			<button
+				className="welcome-button welcome-button-secondary"
+				disabled={isRefreshing || isInstallingAll}
+				onClick={onRefreshDependencies}
+				type="button"
+			>
+				{isRefreshing ? "Checking..." : "Check Again"}
+			</button>
+		</div>
+	);
+};
+
+const getInstallMissingLabel = (
+	count: number,
+	isInstallingAll: boolean
+): string => {
+	if (isInstallingAll) {
+		return "Installing…";
+	}
+	if (count === 1) {
+		return "Install Missing Dependency";
+	}
+	return `Install Missing Dependencies (${count})`;
+};
+/**
+ * System Prerequisites Grid
+ *
+ * Shows installation status of the three system-level prerequisites
+ * (Node.js, Python, uv) that underpin every tool install. When a prereq
+ * is missing, the card surfaces an "Install" button that triggers the
+ * shared install terminal.
+ *
+ * The grid renders unconditionally — even when the extension hasn't yet
+ * populated `dependencies.prerequisites` (e.g. old fixtures) — so users
+ * always know that Node/Python/uv are required.
+ */
+interface PrerequisitesGridProps {
+	prerequisites:
+		| Record<SystemPrerequisiteKey, SystemPrerequisiteStatus>
+		| undefined;
+	onInstallPrerequisite: (prerequisite: SystemPrerequisiteKey) => void;
+}
+
+const PREREQUISITE_META: Record<
+	SystemPrerequisiteKey,
+	{ icon: string; title: string; description: string }
+> = {
+	node: {
+		icon: "codicon-symbol-event",
+		title: "Node.js",
+		description:
+			"Required by Copilot CLI, OpenSpec, Gemini CLI, and other npm-based tools.",
+	},
+	python: {
+		icon: "codicon-symbol-method",
+		title: "Python 3.11+",
+		description:
+			"Required by uv to install SpecKit and GatomIA CLI via `uv tool install`.",
+	},
+	uv: {
+		icon: "codicon-package",
+		title: "uv package manager",
+		description:
+			"Ultra-fast Python package installer used to install SpecKit and GatomIA CLI.",
+	},
+};
+
+const UNKNOWN_PREREQ_STATUS: SystemPrerequisiteStatus = {
+	installed: false,
+	version: null,
+};
+
+const PrerequisitesGrid = ({
+	prerequisites,
+	onInstallPrerequisite,
+}: PrerequisitesGridProps) => {
+	const keys: SystemPrerequisiteKey[] = ["node", "python", "uv"];
+	return (
+		<div className="welcome-subsection">
+			<h3 className="welcome-section-title">System Prerequisites</h3>
+			<p
+				className="welcome-section-description"
+				style={{ marginBottom: "12px" }}
+			>
+				These tools are required before installing the dependencies below.
+			</p>
+			<div className="welcome-card-grid">
+				{keys.map((key) => (
+					<PrerequisiteCard
+						key={key}
+						onInstallPrerequisite={onInstallPrerequisite}
+						prereqKey={key}
+						status={prerequisites?.[key] ?? UNKNOWN_PREREQ_STATUS}
+					/>
+				))}
+			</div>
+		</div>
+	);
+};
+
+interface PrerequisiteCardProps {
+	prereqKey: SystemPrerequisiteKey;
+	status: SystemPrerequisiteStatus;
+	onInstallPrerequisite: (prerequisite: SystemPrerequisiteKey) => void;
+}
+
+const PrerequisiteCard = ({
+	prereqKey,
+	status,
+	onInstallPrerequisite,
+}: PrerequisiteCardProps) => {
+	const meta = PREREQUISITE_META[prereqKey];
+	return (
+		<div className="welcome-card">
+			<div className="welcome-card-header">
+				<i
+					aria-hidden="true"
+					className={`codicon ${meta.icon} welcome-card-icon`}
+				/>
+				<h3 className="welcome-card-title">{meta.title}</h3>
+				<StatusBadge installed={status.installed} version={status.version} />
+			</div>
+			<p className="welcome-card-description">{meta.description}</p>
+			{!status.installed && (
+				<button
+					className="welcome-button welcome-button-primary"
+					onClick={() => onInstallPrerequisite(prereqKey)}
+					style={{ marginTop: "12px" }}
+					type="button"
+				>
+					Install {meta.title}
+				</button>
+			)}
+			{status.installed && status.version && (
+				<div
+					className="welcome-card-description"
+					style={{ marginTop: "8px", fontSize: "11px" }}
+				>
+					Version: {status.version}
+				</div>
+			)}
+		</div>
+	);
+};
+
 /**
  * Dependencies Grid Component
+ *
+ * Data-driven: renders one card per visible dependency (computed by the
+ * caller via `computeRequirementProfile`). Cards in the `optionalSet` are
+ * tagged with an "(Optional)" badge in their title.
  */
+interface DependenciesGridProps {
+	dependencies: DependencyStatus;
+	visibleDeps: DepKey[];
+	optionalSet: Set<DepKey>;
+	ideHost: IdeHost;
+	gatomiaCliReady: boolean;
+	onInstallDependency: (dep: InstallableDependency) => void;
+}
+
 const DependenciesGrid = ({
 	dependencies,
-	gatomiaPrerequisitesMet,
+	visibleDeps,
+	optionalSet,
+	ideHost,
+	gatomiaCliReady,
 	onInstallDependency,
-}: {
+}: DependenciesGridProps) => (
+	<div className="welcome-card-grid">
+		{visibleDeps.map((dep) => (
+			<DependencyCard
+				dep={dep}
+				dependencies={dependencies}
+				gatomiaCliReady={gatomiaCliReady}
+				ideHost={ideHost}
+				key={dep}
+				onInstallDependency={onInstallDependency}
+				optional={optionalSet.has(dep)}
+			/>
+		))}
+	</div>
+);
+
+interface DependencyCardProps {
+	dep: DepKey;
 	dependencies: DependencyStatus;
-	gatomiaPrerequisitesMet: boolean;
+	optional: boolean;
+	ideHost: IdeHost;
+	gatomiaCliReady: boolean;
 	onInstallDependency: (dep: InstallableDependency) => void;
-}) => {
-	const copilotReady = dependencies.copilotChat.installed;
-	const speckitReady = dependencies.speckit.installed;
-	const openspecReady = dependencies.openspec.installed;
-	const copilotCliReady = dependencies.copilotCli.installed;
-	const gatomiaCliReady = dependencies.gatomiaCli.installed;
+}
+
+interface CardMeta {
+	icon: string;
+	title: string;
+	description: string;
+	installLabel: string;
+}
+
+const CARD_META: Record<DepKey, CardMeta> = {
+	"copilot-chat": {
+		icon: "codicon-comment-discussion",
+		title: "GitHub Copilot Chat",
+		description: "AI-powered specification assistance and interactive prompts.",
+		installLabel: "Install from Marketplace",
+	},
+	"copilot-cli": {
+		icon: "codicon-terminal-bash",
+		title: "GitHub Copilot CLI",
+		description:
+			"Required to configure GatomIA CLI with Copilot as the default provider.",
+		installLabel: "Copy Install Command",
+	},
+	"devin-cli": {
+		icon: "codicon-rocket",
+		title: "Devin CLI",
+		description:
+			"Chat provider used by GatomIA when running inside Windsurf (ACP).",
+		installLabel: "Copy Install Command",
+	},
+	"gemini-cli": {
+		icon: "codicon-sparkle",
+		title: "Gemini CLI",
+		description:
+			"Chat provider used by GatomIA when running inside Antigravity (ACP).",
+		installLabel: "Copy Install Command",
+	},
+	speckit: {
+		icon: "codicon-file-text",
+		title: "SpecKit CLI",
+		description:
+			"GitHub's specification framework for structured spec management.",
+		installLabel: "Copy Install Command",
+	},
+	openspec: {
+		icon: "codicon-tools",
+		title: "OpenSpec CLI",
+		description: "Open specification standard for flexible spec workflows.",
+		installLabel: "Copy Install Command",
+	},
+	"gatomia-cli": {
+		icon: "codicon-package",
+		title: "GatomIA CLI",
+		description: "Install with uv after all prerequisites are ready.",
+		installLabel: "Copy Install Command",
+	},
+};
+
+const getDepVersion = (
+	dep: DepKey,
+	dependencies: DependencyStatus
+): string | null => {
+	switch (dep) {
+		case "copilot-chat":
+			return dependencies.copilotChat.version;
+		case "copilot-cli":
+			return dependencies.copilotCli.version;
+		case "speckit":
+			return dependencies.speckit.version;
+		case "openspec":
+			return dependencies.openspec.version;
+		case "gatomia-cli":
+			return dependencies.gatomiaCli.version;
+		case "devin-cli":
+			return dependencies.devinCli?.version ?? null;
+		case "gemini-cli":
+			return dependencies.geminiCli?.version ?? null;
+		default: {
+			const _exhaustive: never = dep;
+			return _exhaustive;
+		}
+	}
+};
+
+const installDepLabel = (dep: DepKey): InstallableDependency => dep;
+
+const DependencyCard = ({
+	dep,
+	dependencies,
+	optional,
+	ideHost,
+	gatomiaCliReady,
+	onInstallDependency,
+}: DependencyCardProps) => {
+	const meta = CARD_META[dep];
+	const installed = isDepInstalled(dep, dependencies);
+	const version = getDepVersion(dep, dependencies);
+	const active =
+		dep === "copilot-chat" ? dependencies.copilotChat.active : undefined;
 
 	return (
-		<div className="welcome-card-grid">
-			<div className="welcome-card">
-				<div className="welcome-card-header">
-					<i
-						aria-hidden="true"
-						className="codicon codicon-terminal-bash welcome-card-icon"
-					/>
-					<h3 className="welcome-card-title">GitHub Copilot CLI</h3>
-					<StatusBadge
-						installed={copilotCliReady}
-						version={dependencies.copilotCli.version}
-					/>
-				</div>
-				<p className="welcome-card-description">
-					Required to configure GatomIA CLI with Copilot as the default
-					provider.
-				</p>
-				{!copilotCliReady && (
-					<button
-						className="welcome-button welcome-button-primary"
-						onClick={() => onInstallDependency("copilot-cli")}
-						style={{ marginTop: "12px" }}
-						type="button"
-					>
-						Copy Install Command
-					</button>
-				)}
-				{copilotCliReady && dependencies.copilotCli.version && (
-					<div
-						className="welcome-card-description"
-						style={{ marginTop: "8px", fontSize: "11px" }}
-					>
-						Version: {dependencies.copilotCli.version}
-					</div>
-				)}
-			</div>
-
-			<div className="welcome-card">
-				<div className="welcome-card-header">
-					<i
-						aria-hidden="true"
-						className="codicon codicon-comment-discussion welcome-card-icon"
-					/>
-					<h3 className="welcome-card-title">GitHub Copilot Chat</h3>
-					<StatusBadge
-						active={dependencies.copilotChat.active}
-						installed={copilotReady}
-						version={dependencies.copilotChat.version}
-					/>
-				</div>
-				<p className="welcome-card-description">
-					Required for AI-powered specification assistance and interactive
-					prompts.
-				</p>
-				{!copilotReady && (
-					<button
-						className="welcome-button welcome-button-primary"
-						onClick={() => onInstallDependency("copilot-chat")}
-						style={{ marginTop: "12px" }}
-						type="button"
-					>
-						Install from Marketplace
-					</button>
-				)}
-				{copilotReady && !dependencies.copilotChat.active && (
-					<div
-						className="status-badge warning"
-						style={{
-							marginTop: "12px",
-							fontSize: "11px",
-							display: "flex",
-							alignItems: "center",
-							gap: "4px",
-						}}
-					>
-						<i className="codicon codicon-warning" /> Installed but not active.
-						Please activate the extension.
-					</div>
-				)}
-			</div>
-
-			<div className="welcome-card">
-				<div className="welcome-card-header">
-					<i
-						aria-hidden="true"
-						className="codicon codicon-file-text welcome-card-icon"
-					/>
-					<h3 className="welcome-card-title">SpecKit CLI</h3>
-					<StatusBadge
-						installed={speckitReady}
-						version={dependencies.speckit.version}
-					/>
-				</div>
-				<p className="welcome-card-description">
-					GitHub's specification framework for structured spec management.
-				</p>
-				{!speckitReady && (
-					<button
-						className="welcome-button welcome-button-primary"
-						onClick={() => onInstallDependency("speckit")}
-						style={{ marginTop: "12px" }}
-						type="button"
-					>
-						Copy Install Command
-					</button>
-				)}
-				{speckitReady && dependencies.speckit.version && (
-					<div
-						className="welcome-card-description"
-						style={{ marginTop: "8px", fontSize: "11px" }}
-					>
-						Version: {dependencies.speckit.version}
-					</div>
-				)}
-			</div>
-
-			<div className="welcome-card">
-				<div className="welcome-card-header">
-					<i
-						aria-hidden="true"
-						className="codicon codicon-tools welcome-card-icon"
-					/>
-					<h3 className="welcome-card-title">OpenSpec CLI</h3>
-					<StatusBadge
-						installed={openspecReady}
-						version={dependencies.openspec.version}
-					/>
-				</div>
-				<p className="welcome-card-description">
-					Open specification standard for flexible spec workflows.
-				</p>
-				{!openspecReady && (
-					<button
-						className="welcome-button welcome-button-primary"
-						onClick={() => onInstallDependency("openspec")}
-						style={{ marginTop: "12px" }}
-						type="button"
-					>
-						Copy Install Command
-					</button>
-				)}
-				{openspecReady && dependencies.openspec.version && (
-					<div
-						className="welcome-card-description"
-						style={{ marginTop: "8px", fontSize: "11px" }}
-					>
-						Version: {dependencies.openspec.version}
-					</div>
-				)}
-			</div>
-
-			<div className="welcome-card">
-				<div className="welcome-card-header">
-					<i
-						aria-hidden="true"
-						className="codicon codicon-package welcome-card-icon"
-					/>
-					<h3 className="welcome-card-title">GatomIA CLI</h3>
-					<StatusBadge
-						installed={gatomiaCliReady}
-						version={dependencies.gatomiaCli.version}
-					/>
-				</div>
-				<p className="welcome-card-description">
-					Install with uv after all prerequisites are ready.
-				</p>
-				{!gatomiaCliReady && (
-					<button
-						className="welcome-button welcome-button-primary"
-						disabled={!gatomiaPrerequisitesMet}
-						onClick={() => onInstallDependency("gatomia-cli")}
-						style={{ marginTop: "12px" }}
-						type="button"
-					>
-						{gatomiaPrerequisitesMet
-							? "Copy Install Command"
-							: "Complete Prerequisites First"}
-					</button>
-				)}
-				{!(gatomiaCliReady || gatomiaPrerequisitesMet) && (
-					<div
-						className="welcome-card-description"
-						style={{ marginTop: "8px", fontSize: "11px" }}
-					>
-						Requires Copilot Chat, Copilot CLI, and SpecKit or OpenSpec.
-					</div>
-				)}
-				{gatomiaCliReady && (
-					<div style={{ marginTop: "8px" }}>
-						<div
-							className="welcome-card-description"
-							style={{ fontSize: "11px", marginBottom: "6px" }}
-						>
-							Configure Copilot provider:
-						</div>
-						<code
+		<div className="welcome-card">
+			<div className="welcome-card-header">
+				<i
+					aria-hidden="true"
+					className={`codicon ${meta.icon} welcome-card-icon`}
+				/>
+				<h3 className="welcome-card-title">
+					{meta.title}
+					{optional && (
+						<span
 							style={{
-								display: "block",
+								marginLeft: "8px",
 								fontSize: "11px",
-								padding: "8px",
-								borderRadius: "4px",
-								backgroundColor: "var(--vscode-textCodeBlock-background)",
+								fontWeight: 400,
+								color: "var(--vscode-descriptionForeground)",
 							}}
 						>
-							{GATOMIA_COPILOT_CONFIG_COMMAND}
-						</code>
-					</div>
-				)}
+							(Optional)
+						</span>
+					)}
+				</h3>
+				<StatusBadge active={active} installed={installed} version={version} />
 			</div>
+			<p className="welcome-card-description">{meta.description}</p>
+			{!installed && (
+				<button
+					className="welcome-button welcome-button-primary"
+					onClick={() => onInstallDependency(installDepLabel(dep))}
+					style={{ marginTop: "12px" }}
+					type="button"
+				>
+					{meta.installLabel}
+				</button>
+			)}
+			{installed && version && (
+				<div
+					className="welcome-card-description"
+					style={{ marginTop: "8px", fontSize: "11px" }}
+				>
+					Version: {version}
+				</div>
+			)}
+			{dep === "copilot-chat" && installed && active === false && (
+				<div
+					className="status-badge warning"
+					style={{
+						marginTop: "12px",
+						fontSize: "11px",
+						display: "flex",
+						alignItems: "center",
+						gap: "4px",
+					}}
+				>
+					<i className="codicon codicon-warning" /> Installed but not active.
+					Please activate the extension.
+				</div>
+			)}
+			{dep === "gatomia-cli" && gatomiaCliReady && (
+				<GatomiaCliConfigHint ideHost={ideHost} />
+			)}
+		</div>
+	);
+};
+
+const GatomiaCliConfigHint = ({ ideHost }: { ideHost: IdeHost }) => {
+	const isAcpHost = ideHost === "windsurf" || ideHost === "antigravity";
+	if (isAcpHost) {
+		return (
+			<div style={{ marginTop: "8px" }}>
+				<div
+					className="welcome-card-description"
+					style={{ fontSize: "11px", marginBottom: "6px" }}
+				>
+					Configure the GatomIA CLI provider via{" "}
+					<a href={GATOMIA_CLI_DOCS_URL} rel="noreferrer" target="_blank">
+						project docs
+					</a>
+					.
+				</div>
+			</div>
+		);
+	}
+	return (
+		<div style={{ marginTop: "8px" }}>
+			<div
+				className="welcome-card-description"
+				style={{ fontSize: "11px", marginBottom: "6px" }}
+			>
+				Configure Copilot provider:
+			</div>
+			<code
+				style={{
+					display: "block",
+					fontSize: "11px",
+					padding: "8px",
+					borderRadius: "4px",
+					backgroundColor: "var(--vscode-textCodeBlock-background)",
+				}}
+			>
+				{GATOMIA_COPILOT_CONFIG_COMMAND}
+			</code>
 		</div>
 	);
 };

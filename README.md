@@ -5,9 +5,13 @@
 [![GitHub stars](https://img.shields.io/github/stars/eitatech/gatomia-vscode.svg?style=flat-square)](https://github.com/eitatech/gatomia-vscode/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/eitatech/gatomia-vscode.svg?style=flat-square)](https://github.com/eitatech/gatomia-vscode/issues)
 
-GatomIA is a VS Code extension that brings Agentic Spec-Driven Development  to your workflow, leveraging **SpecKit**, **OpenSpec**, and **GitHub Copilot**.
+GatomIA is a VS Code extension for agentic, spec-driven development with
+first-class support for **SpecKit**, **OpenSpec**, **GitHub Copilot**, ACP
+providers, workflow automation, and repository documentation.
 
-It allows you to visually manage Specs, Steering documents (Constitution/AGENTS.md), and custom prompts, seamlessly integrating with GitHub Copilot Chat to generate high-quality documentation and code.
+It gives you a single workspace for authoring specs, reviewing changes,
+previewing and refining documents, managing prompts/agents/skills, automating
+work with hooks, and delegating implementation to local or cloud agents.
 
 ---
 
@@ -29,89 +33,182 @@ You can follow our progress, open issues, or contribute directly through our off
 
 ## Features
 
-### Copilot Agents Integration
+### Views at a glance
 
-* **Agent Discovery**: Automatically discover and register agents from `resources/agents/` directory as Copilot Chat participants
-* **Ask Agents**: Interact with agents directly in GitHub Copilot Chat with intelligent command suggestions and autocomplete
-* **Tool Execution**: Execute agent-defined tools with comprehensive error handling and real-time progress feedback
-* **Resource Management**: Automatic loading and caching of agent resources (prompts, skills, instructions)
-  - **Prompts**: Template prompts available to agents for consistent responses
-  - **Skills**: Domain knowledge packages that agents can reference
-  - **Instructions**: Behavior guidelines that shape agent responses
-* **Hot-Reload**: Real-time resource updates without extension reload (configurable, enabled by default)
-* **Configuration**: Customize agent behavior through extension settings
-  - **resourcesPath**: Directory containing agents and resources (default: `resources`)
-  - **enableHotReload**: Auto-reload resources on file changes (default: true)
-  - **logLevel**: Logging verbosity for debugging (default: info)
-* **Example Implementation**: Built-in example agent and tool handlers demonstrating best practices
-* **Comprehensive Help**: Built-in `/help` command for all agents with full documentation
+| View | Purpose |
+| --- | --- |
+| **Specs** | Create specs, inspect review state, open documents in preview, and run tasks locally or on cloud agents. |
+| **Actions** | Manage prompts, agents, skills, scripts, templates, and bundled SpecKit resources from one tree. |
+| **Steering** | Maintain project/user instruction rules, constitutions, and global resource access policies. |
+| **Hooks** | Create automations that react to SpecKit/OpenSpec operations and external tool events. |
+| **Repo Wiki** | Browse and synchronize `docs/` content directly from the sidebar. |
+| **Cloud Agents** | Track provider-backed sessions, task progress, external links, and pull requests. |
+| **Running Agents** | Manage live ACP/Agent Chat sessions, recent runs, and orphaned worktrees. |
+| **Quick Access** | Jump to spec system selection, settings, MCP config, dependency setup, and help. |
 
-### Spec Management
+### Spec authoring, execution, and review
 
-* **Create Specs**: Run `GatomIA: Create New Spec` (`gatomia.spec.create`) to open the creation dialog. Define your summary, product context, and constraints.
-* **Support for Multiple Systems**: Choose between **SpecKit** (Recommended) or **OpenSpec** for your Spec-Driven Development workflow.
-* **Generate with Copilot**: The extension compiles your input into an optimized prompt and sends it to **GitHub Copilot Chat** to generate the full specification.
-* **Manage Specs**: Browse generated specs in the **Specs** view.
-* **Execute Tasks**: Open `tasks.md` and use the "Start Task" CodeLens to send task context to GitHub Copilot Chat for implementation.
+- **Multi-system support**: Work with **SpecKit** or **OpenSpec**, or let the
+  extension auto-detect the active system.
+- **Spec creation**: Run `GatomIA: Create New Spec` to capture summary, product
+  context, and constraints, then open a ready-to-send prompt in chat.
+- **Task execution**: Run individual tasks, task groups, or an entire spec from
+  the **Specs** tree.
+- **Cloud delegation**: Dispatch a task group or full spec to a configured
+  cloud provider.
+- **Review lifecycle**: Specs move through `current -> review -> reopened ->
+  archived`, with unarchive support for previously completed work.
+- **Change requests**: Track reviewer feedback, archival blockers, linked tasks,
+  and pending review work directly inside the spec explorer.
+- **Review metadata**: The extension tracks pending tasks/checklist items so
+  review state stays synchronized with the underlying documents.
 
-### Prompt Management
+### Document preview and refinement
 
-* **Custom Prompts**: Manage Markdown prompts under `.github/prompts` (configurable) alongside instructions and agents to keep all project guidance in one place.
-* **Project Instructions & Agents**: The Prompts explorer shows `Project Instructions` and `Project Agents` groups, surfacing `.github/instructions` and `.github/agents` files.
-* **Run Prompts**: Execute prompts directly from the tree view, passing the context to GitHub Copilot Chat.
-* **Rename or Delete**: Use the item context menu to rename or delete prompts.
+- **Rich preview panel**: Open spec, plan, task, research, checklist, and code
+  files in a read-only preview webview.
+- **Markdown and code support**: Markdown documents are parsed into sections and
+  metadata; non-markdown files are rendered with syntax-aware code previews.
+- **Frontmatter-powered forms**: Preview documents can surface structured forms
+  and persist their submissions.
+- **Outdated document detection**: Dependency changes can mark a document as
+  stale so you know when downstream docs need attention.
+- **In-place refinement requests**: Send review findings from the preview panel
+  to the right workflow command (`/speckit.specify`, `/speckit.plan`,
+  `/speckit.tasks`, `/speckit.research`, `/speckit.checklist`, or
+  `/speckit.clarify`).
+- **Editor handoff**: Jump from preview back to the source document when you
+  want to edit the file directly.
 
-### Steering
+### Actions, prompts, agents, and resources
 
-* **Instruction Rules**: Create and manage instruction rules for GitHub Copilot at both project (`.github/instructions/*.instructions.md`) and user (`$HOME/.github/instructions/*.instructions.md`) levels.
-  - **Project Rules**: Standardize team guidelines within the repository
-  - **User Rules**: Define personal reusable guidance without committing to the repo
-  - **Constitution**: Request Constitution document generation via `Create Constitution` button with AI-assisted drafting
-* **Constitution / Agents**: Manage your project's "Constitution" (SpecKit) or "AGENTS.md" (OpenSpec) to steer Copilot's behavior.
-* **Global Instructions**: Configure global instructions for Copilot across all your projects.
+- **Unified Actions explorer**: Browse project prompts, agents, skills,
+  scripts, templates, and the repository's SpecKit assets in one place.
+- **Create built-in resources**: Create agents, skills, and Copilot prompts
+  directly from the tree view.
+- **Run and maintain prompts**: Execute runnable prompts from the explorer, then
+  rename or delete them from context menus.
+- **Copilot agent integration**: Discover agent resources from the configured
+  resource path, hot-reload updates, and expose built-in help for agent
+  commands.
+- **Configurable resource loading**: Set the resource root, enable/disable
+  hot-reload, and tune agent log verbosity.
+
+### Steering and governance
+
+- **Project and user rules**: Manage `.github/instructions/*.instructions.md`
+  and `$HOME/.github/instructions/*.instructions.md` guidance from the
+  **Steering** view.
+- **Constitution support**: Generate and maintain SpecKit constitutions or
+  OpenSpec-style steering documents.
+- **Global resource access control**: Decide whether workspace sessions can read
+  global Copilot resources from your home directory.
+- **Custom instruction injection**: Append reusable instructions globally or for
+  create-spec, task-start, and run-prompt flows.
+
+### Hooks and workflow automation
+
+- **Before/after triggers**: Fire hooks before or after SpecKit/OpenSpec
+  operations, with optional blocking before-execution behavior.
+- **Supported operations**: Automate around research, data model, design,
+  specify, clarify, plan, tasks, tasks-to-issues, analyze, checklist,
+  constitution, implementation, unit-test, and integration-test flows.
+- **Multiple action types**: Hooks can trigger agent, git, GitHub, MCP, custom,
+  or ACP actions.
+- **Output-aware templates**: Use `$agentOutput`, `$clipboardContent`, and
+  `$outputPath` in action arguments and message templates.
+- **ACP-aware setup**: Discover local ACP agents, known-agent integrations, and
+  available models from the Hooks UI.
+- **Operational tooling**: Add, edit, enable, disable, delete, export, import,
+  and inspect hook logs from the sidebar.
+
+### Chat providers, running agents, and cloud sessions
+
+- **Provider routing**: `gatomia.chat.provider` can route extension prompts
+  through GitHub Copilot Chat, Devin, Gemini, or auto-select based on host.
+- **ACP session modes**: Choose workspace-scoped, per-spec, or per-prompt ACP
+  sessions depending on how much context sharing you want.
+- **Permission policy**: Control the default answer for ACP tool permission
+  prompts and optionally enable verbose ACP logging.
+- **Running Agents view**: Start new agent chat sessions, reopen active/recent
+  sessions, inspect lifecycle state, and clean up orphaned worktrees.
+- **Cloud Agents view**: Select a provider, monitor task and PR progress, open
+  provider URLs, cancel active sessions, and remove old entries from the list.
+- **Provider discovery**: Re-probe ACP providers, switch providers, and open
+  the ACP output channel from commands or context menus.
+
+### Host-aware routing
+
+- **Supported hosts**: GatomIA detects VS Code, VS Code Insiders, Cursor,
+  Windsurf, Antigravity, VSCodium, and Positron.
+- **Smart defaults**: In `auto` mode, prompt routing adapts to the current host:
+  Windsurf prefers Devin CLI via ACP, Antigravity prefers Gemini CLI via ACP,
+  and the other supported editors default to GitHub Copilot Chat.
+- **Remote-aware ACP behavior**: ACP-only routing is disabled in remote
+  environments where the extension host cannot spawn the required local CLI
+  subprocesses.
+
+### Devin integration
+
+- **Task delegation**: Run a single task or all incomplete tasks with Devin.
+- **Progress tracking**: Open the dedicated Devin progress view/panel and cancel
+  active sessions when needed.
+- **Credential management**: Configure Devin API credentials from within VS
+  Code.
+- **Git-aware launch**: Task submission validates branch/repository state before
+  starting a remote implementation run.
+- **Cloud compatibility**: Devin is also available as a selectable cloud-agent
+  provider for broader session tracking workflows.
+
+### Repo Wiki and documentation sync
+
+- **`docs/` explorer**: Browse markdown documents in `docs/` with folder-aware
+  grouping and titles inferred from frontmatter, headings, or filenames.
+- **Document operations**: Open documents, refresh the tree, show the table of
+  contents, update individual docs, or synchronize the full wiki.
+- **Status feedback**: Bulk synchronization surfaces progress, completion, and
+  failure counts in the sidebar.
+
+### Welcome screen and onboarding
+
+- **Guided setup**: A first-run welcome screen introduces the extension and can
+  be reopened anytime with `GatomIA: Show Welcome Screen`.
+- **Dependency detection**: Checks GitHub Copilot Chat, Copilot CLI, SpecKit,
+  OpenSpec, and related prerequisites.
+- **Install assistance**: Provides install steps, prerequisite hints, and quick
+  actions for missing tools.
+- **Configuration editing**: Update core spec-system settings directly from the
+  welcome experience.
+- **Learning resources**: Surface documentation, examples, tutorials, and
+  curated links inside the extension, organized into **Getting Started**,
+  **Advanced Features**, and **Troubleshooting** categories.
+- **Diagnostics**: Show recent setup and runtime issues in a single onboarding
+  surface.
 
 ### Migration
 
-* **Migrate to SpecKit**: Easily migrate existing OpenSpec projects to the modern SpecKit structure using the `GatomIA: Migrate to SpecKit` command.
-
-### Hooks & Automation
-
-* **MCP Hooks Integration**: Automate workflows by creating hooks that trigger MCP (Model Context Protocol) actions when agent operations complete.
-* **Browse MCP Servers**: Discover available MCP servers and tools configured in your GitHub Copilot setup.
-* **Configure Actions**: Set up hooks to execute MCP tools automatically (e.g., create GitHub issues, send Slack notifications) after operations like spec generation or task completion.
-* **Timing Control**: Choose when hooks execute - before or after agent operations complete.
-  - **Before Execution**: Run hooks before agent starts (with optional blocking to wait for completion)
-  - **After Execution**: Run hooks after agent completes (default behavior)
-* **Output Capture**: Access agent-generated content in hook templates using special variables:
-  - **$agentOutput**: File content generated by the triggering agent
-  - **$clipboardContent**: Current clipboard content at time of execution
-  - **$outputPath**: Path to the file generated by the agent
-* **Template Variables**: Use dynamic variables in hook actions for context-aware automation.
-* **Execution Tracking**: View execution logs and monitor hook performance in real-time.
-* **Error Handling**: Graceful degradation when MCP servers are unavailable, with automatic retry logic for transient failures.
-
-### Welcome Screen
-
-- **First-Time Setup**: Interactive welcome screen appears on first activation to guide you through extension setup.
-- **Dependency Detection**: Automatically checks for GitHub Copilot Chat, SpecKit CLI, and OpenSpec CLI installations.
-- **Quick Installation**: One-click install buttons copy installation commands to your clipboard.
-- **Configuration Management**: Edit key settings directly from the welcome screen with inline validation.
-- **Learning Resources**: Browse documentation, examples, and tutorials organized by category.
-- **Feature Discovery**: Explore all extension features with quick-access command buttons.
-- **System Health**: Monitor extension status with real-time diagnostics and health indicators.
-- **Persistent Access**: Re-open welcome screen anytime via `GatomIA: Show Welcome Screen` command.
+- **Migrate to SpecKit**: Move OpenSpec-style repositories to SpecKit with the
+  built-in migration command.
+- **Guideline import**: Generate a constitution from existing guidance and
+  create a backup during migration flows.
 
 ## Installation
 
 ### Prerequisites
 
-* Visual Studio Code 1.84.0 or newer.
-* **[GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat)** extension must be installed.
+* Visual Studio Code 1.84.0 or newer
+* **[GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat)**
+  for the default prompt-routing and spec-generation experience
 * GitHub Copilot CLI:
 
   ```shell
   npm install -g @github/copilot
   ```
+
+* Optional ACP providers if you want local agent routing beyond Copilot Chat:
+  Devin CLI and/or Gemini CLI
+* Optional cloud-agent credentials if you want remote execution with Devin or
+  other configured providers
 
 ### [SpecKit](https://github.com/github/spec-kit)
 
@@ -146,7 +243,7 @@ If you prefer OpenSpec:
 
 ### [GatomIA CLI](https://github.com/eitatech/gatomia-cli)
 
-After all prerequisites are installed, install GatomIA CLI:
+After the prerequisites are installed, install GatomIA CLI:
 
 ```shell
 uv tool install gatomia --from git+https://github.com/eitatech/gatomia-cli.git
@@ -171,127 +268,184 @@ Search for "GatomIA" in the VS Code Marketplace and install the extension.
 
 ## Usage
 
-### 1. Create a Spec
+### 1. Set up the workspace
+
+1. Open **GatomIA: Show Welcome Screen** on first launch or from the command
+   palette.
+2. Install or verify prerequisites from the welcome screen.
+3. Choose the active spec system from **Quick Access** or Settings.
+4. Configure optional chat/cloud providers if you want ACP or remote execution.
+
+### 2. Create and manage specs
 
 1. Open the **Specs** view in the Activity Bar.
 2. Click **Create New Spec**.
-3. Fill in the details (Product Context is required).
-4. Click **Create Spec**. This will open GitHub Copilot Chat with a generated prompt.
-5. Follow the chat instructions to generate the spec files.
+3. Provide the summary, product context, and constraints.
+4. GatomIA opens a generated prompt in chat to create the spec files.
+5. Browse the generated documents in the **Specs** tree.
 
-### 2. Implement Tasks
+### 3. Execute work locally or on cloud agents
 
-1. Open a generated `tasks.md` file.
-2. Click **Start All Tasks** above a checklist item.
-3. GitHub Copilot Chat will open with the task context. Interact with it to implement the code.
+1. Use inline actions in **Specs** to run a task, task group, or full spec.
+2. Use **Run on Cloud** / **Run Full Spec on Cloud** to delegate execution to a
+   configured provider.
+3. Track remote sessions in **Cloud Agents** and ACP/local chat sessions in
+   **Running Agents**.
 
-### 3. Manage Instruction Rules
+### 4. Review, reopen, and archive specs
 
-1. Open the **Steering** view in the Activity Bar.
-2. **Create Project Rule**:
-   - Click **Create Project Rule** button
-   - Enter a name (e.g., "TypeScript Rules")
-   - Edit the generated `.github/instructions/<name>.instructions.md` file
-3. **Create User Rule**:
-   - Click **Create User Rule** button
-   - Enter a name for personal guidance
-   - Edit the generated `$HOME/.github/instructions/<name>.instructions.md` file
-4. **Create Constitution**:
-   - Click **Create Constitution** button
-   - Enter a brief description (e.g., "Python project with FastAPI")
-   - Copilot Chat opens with `/speckit.constitution` prompt
-   - The agent generates your `constitution.md`
+1. Move a spec to **Review** with **Send to Review**.
+2. Track change requests and linked tasks from the spec tree.
+3. Reopen work with **Reopen (Back to Current)**.
+4. Archive completed work with **Send to Archived**, then restore with
+   **Unarchive** if needed.
 
-### 4. Use Copilot Agents
+### 5. Preview and refine documents
 
-GatomIA auto-discovers agents defined in `resources/agents/` and registers them with GitHub Copilot Chat. You can interact with them directly in the chat interface.
+1. Open a supported document from **Specs** or **Repo Wiki**.
+2. Use the preview panel to inspect sections, metadata, forms, and dependency
+   status.
+3. Submit a refinement request from the preview when something is missing or
+   outdated.
+4. Open the source file in the editor for direct edits when needed.
 
-**Using Agents**:
+### 6. Manage project resources and steering
 
-1. Open GitHub Copilot Chat (Ctrl+Shift+I / Cmd+Shift+I)
-2. Type `@` to see available agents (e.g., `@example-agent`, `@speckit`, `@task-planner`)
-3. Type a command after the agent name (e.g., `@example-agent /hello`)
-4. Press Enter to execute the agent command
-5. The agent executes its tool handler and returns results as markdown
+1. Use **Actions** to browse prompts, agents, skills, scripts, templates, and
+   SpecKit assets.
+2. Use **Steering** to create project/user rules and constitutions.
+3. Adjust global resource access settings if your workflow relies on shared
+   home-directory Copilot resources.
 
-**Available Commands**:
+### 7. Automate workflows with hooks
 
-* `@agent /help` - Show all available commands for the agent
-* `@agent /help <command>` - Show detailed documentation for a specific command
-* Agent-specific commands as defined in `resources/agents/<agent>.agent.md`
+1. Open the **Hooks** view and create a new hook.
+2. Pick an agent system, operation, timing, and action type.
+3. Use template variables such as `$agentOutput` or `$outputPath` to pass
+   dynamic context.
+4. Enable the hook and inspect logs from the same view.
 
-**Creating Custom Agents**:
+### 8. Browse and synchronize repository docs
 
-1. Create a file at `resources/agents/my-agent.agent.md`:
+1. Open **Repo Wiki** to browse the `docs/` tree.
+2. Open a document, refresh the tree, or show the table of contents.
+3. Update one document or run **Synchronize All Documents** from the view title.
 
-   ```markdown
-   ---
-   id: my-agent
-   name: My Agent
-   fullName: My Custom Agent Implementation
-   description: Describes what this agent does
-   commands:
-     - name: analyze
-       description: Analyze project structure
-       tool: my.analyze
-   resources:
-     prompts: [analysis.prompt.md]
-     skills: [expertise.skill.md]
-   ---
-   
-   # My Agent
-   
-   Documentation about the agent...
-   ```
+### Command highlights
 
-2. Create tool handlers in `src/features/agents/tools/` (reference [example-tool-handler.ts](src/features/agents/tools/example-tool-handler.ts))
-3. Register tools in the tool registry during extension initialization
-4. Agents are auto-discovered and registered when the extension activates
+| Command | Purpose |
+| --- | --- |
+| `GatomIA: Show Welcome Screen` | Reopen onboarding, dependency checks, and learning resources. |
+| `GatomIA: GatomIA Settings` | Open the extension settings page. |
+| `GatomIA: Open MCP Config (mcp.json)` | Jump directly to the MCP configuration file. |
+| `GatomIA: Select Spec System` | Switch between auto-detect, SpecKit, and OpenSpec. |
+| `GatomIA: Create New Spec` | Start a new spec-generation flow. |
+| `GatomIA: Select Cloud Agent Provider` / `Change Cloud Agent Provider` | Choose or switch the active remote provider. |
+| `GatomIA: Configure Provider Credentials` | Configure credentials for the active cloud provider. |
+| `GatomIA: Refresh Cloud Agent Sessions` | Refresh remote session status and task progress. |
+| `GatomIA: Configure Devin Credentials` | Store Devin credentials for direct task delegation. |
 
-**Configuration**:
+### Built-in SpecKit commands
 
-Access agent settings in VS Code: Settings → GatomIA → Agents
+The command palette also exposes a built-in SpecKit workflow surface for common
+operations:
 
-| Setting | Type | Default | Purpose |
-| --- | --- | --- | --- |
-| `gatomia.agents.resourcesPath` | string | `resources` | Directory containing agents and resources. |
-| `gatomia.agents.enableHotReload` | boolean | `true` | Auto-reload resources when files change. |
-| `gatomia.agents.logLevel` | string | `info` | Logging verbosity (debug, info, warn, error). |
-
-For more details, see [src/features/agents/README.md](src/features/agents/README.md).
-
-### 5. Automate with Hooks
-
-1. Open the **Hooks** view in the Activity Bar.
-2. Click **Create New Hook**.
-3. Configure the trigger (e.g., after "plan" operation in "speckit" agent).
-4. Select an action type (MCP, Agent, Git, GitHub, or Custom).
-5. For MCP actions:
-   * Browse available MCP servers and tools
-   * Map parameters using context variables or literal values
-   * Save and enable the hook
-6. Execute operations that match your trigger.
-7. View execution logs in the Hooks view to monitor automation.
+- `gatomia.speckit.constitution`
+- `gatomia.speckit.specify`
+- `gatomia.speckit.plan`
+- `gatomia.speckit.research`
+- `gatomia.speckit.datamodel`
+- `gatomia.speckit.design`
+- `gatomia.speckit.clarify`
+- `gatomia.speckit.analyze`
+- `gatomia.speckit.checklist`
+- `gatomia.speckit.tasks`
+- `gatomia.speckit.taskstoissues`
+- `gatomia.speckit.unit-test`
+- `gatomia.speckit.integration-test`
+- `gatomia.speckit.implementation`
 
 ## Configuration
 
 All settings live under the `gatomia` namespace.
 
-| Setting | Type | Default | Purpose |
-| --- | --- | --- | --- |
-| `gatomia.chatLanguage` | string | `English` | The language GitHub Copilot should use for responses. |
-| `gatomia.specSystem` | string | `auto` | The Spec System to use (`auto`, `speckit`, `openspec`). |
-| `gatomia.speckit.specsPath` | string | `specs` | Path for SpecKit specs. |
-| `gatomia.speckit.memoryPath` | string | `.specify/memory` | Path for SpecKit memory. |
-| `gatomia.speckit.templatesPath` | string | `.specify/templates` | Path for SpecKit templates. |
-| `gatomia.copilot.specsPath` | string | `openspec` | Path for OpenSpec specs. |
-| `gatomia.copilot.promptsPath` | string | `.github/prompts` | Path for Markdown prompts. |
-| `gatomia.views.specs.visible` | boolean | `true` | Show or hide the Specs explorer. |
-| `gatomia.views.prompts.visible` | boolean | `true` | Toggle the Prompts explorer. |
-| `gatomia.views.steering.visible` | boolean | `true` | Toggle the Steering explorer. |
-| `gatomia.views.settings.visible` | boolean | `true` | Toggle the Settings overview. |
+### Core workflow
 
-## Workspace Layout
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `gatomia.specSystem` | `auto` | Active spec system: auto-detect, SpecKit, or OpenSpec. |
+| `gatomia.chat.provider` | `auto` | Route prompts through Copilot Chat, Devin, Gemini, or auto-select. |
+| `gatomia.chatLanguage` | `English` | Preferred response language for prompt-based flows. |
+| `gatomia.copilot.specsPath` | `speckit` | Path where Copilot specification files are stored. |
+| `gatomia.copilot.promptsPath` | `.github/prompts` | Path for markdown prompt files. |
+| `gatomia.speckit.specsPath` | `specs` | SpecKit specs directory. |
+| `gatomia.speckit.memoryPath` | `.specify/memory` | SpecKit memory directory. |
+| `gatomia.speckit.templatesPath` | `.specify/templates` | SpecKit templates directory. |
+| `gatomia.speckit.scriptsPath` | `.specify/scripts` | SpecKit scripts directory. |
+
+### Custom instructions
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `gatomia.customInstructions.global` | `""` | Instructions appended to all prompts. |
+| `gatomia.customInstructions.createSpec` | `""` | Extra guidance appended during spec creation. |
+| `gatomia.customInstructions.startAllTask` | `""` | Extra guidance appended when starting all tasks. |
+| `gatomia.customInstructions.runPrompt` | `""` | Extra guidance appended when running prompts. |
+
+### Views
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `gatomia.views.specs.visible` | `true` | Show or hide the **Specs** view. |
+| `gatomia.views.actions.visible` | `true` | Show or hide the **Actions** view. |
+| `gatomia.views.steering.visible` | `true` | Show or hide the **Steering** view. |
+| `gatomia.views.hooks.visible` | `true` | Show or hide the **Hooks** view. |
+| `gatomia.views.quickAccess.visible` | `true` | Show or hide the **Quick Access** view. |
+| `gatomia.views.wiki.visible` | `true` | Show or hide the **Repo Wiki** view. |
+
+### Steering and resource access
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `gatomia.steering.globalResourceAccessDefault` | `ask` | Default policy for reading global Copilot resources from your home directory. |
+| `gatomia.steering.workspaceGlobalResourceAccess` | `inherit` | Workspace-level override for global resource access. |
+| `gatomia.agents.resourcesPath` | `resources` | Root folder for prompts, agents, skills, and instructions. |
+| `gatomia.agents.enableHotReload` | `true` | Reload resource changes automatically. |
+| `gatomia.agents.logLevel` | `info` | Agent integration log verbosity. |
+
+### ACP and agent chat
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `gatomia.agentChat.maxConcurrentAcpSessions` | `5` | Maximum concurrent ACP agent chat sessions. |
+| `gatomia.acp.sessionMode` | `workspace` | Reuse one ACP session per workspace, per spec, or per prompt. |
+| `gatomia.acp.permissionDefault` | `ask` | Default response to ACP permission requests. |
+| `gatomia.acp.verboseLogging` | `false` | Write ACP protocol/tool-call details to the ACP output channel. |
+| `gatomia.acp.registryRemoteFetch` | `true` | Query the public ACP registry for additional providers. |
+
+### Devin
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `gatomia.devin.pollingInterval` | `5` | Polling interval, in seconds, for Devin session updates. |
+| `gatomia.devin.maxRetries` | `3` | Retry limit for failed Devin API calls. |
+| `gatomia.devin.verboseLogging` | `false` | Enable verbose Devin logging in the output channel. |
+
+## Workspace layout
+
+### Common project locations
+
+| Path | Purpose |
+| --- | --- |
+| `.github/prompts/` | Project prompts surfaced in **Actions**. |
+| `.github/instructions/` | Project instruction rules surfaced in **Steering** and **Actions**. |
+| `.github/agents/` | Custom Copilot agents. |
+| `.github/skills/` | Custom skills used by agents and automation. |
+| `resources/` | Configurable resource root for agent assets. |
+| `docs/` | Repository documentation shown in **Repo Wiki**. |
+| `specs/` | Default SpecKit specs directory. |
+| `.specify/` | SpecKit memory, templates, and scripts. |
+| `openspec/` | OpenSpec workspace files. |
 
 ### SpecKit Structure
 
@@ -325,7 +479,10 @@ openspec/
    * `npm run install:all`
 2. Build:
    * `npm run build`
-3. Launch:
+3. Run quality checks:
+   * `npm run check`
+   * `npm test`
+4. Launch:
    * Press `F5` inside VS Code.
 
 ## License

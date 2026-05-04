@@ -284,6 +284,27 @@ describe("KnownAgentDetector", () => {
 			expect(mockExecFile).not.toHaveBeenCalled();
 		});
 
+		it("clearCache() forces the next call to re-spawn the detection subprocess", async () => {
+			resolveWith("/usr/local/bin/opencode\n");
+			const strategies: InstallCheckStrategy[] = [
+				{ strategy: "path", target: "opencode" },
+			];
+
+			const first = await detector.isInstalledAny(strategies);
+			expect(first).toBe(true);
+			expect(mockExecFile).toHaveBeenCalledTimes(1);
+
+			vi.clearAllMocks();
+			detector.clearCache();
+
+			// After clearCache, a second call must re-probe even though
+			// the strategies are identical.
+			resolveWith("/usr/local/bin/opencode\n");
+			const second = await detector.isInstalledAny(strategies);
+			expect(second).toBe(true);
+			expect(mockExecFile).toHaveBeenCalledTimes(1);
+		});
+
 		it("uses the first strategy target as cache key so different targets get separate cache entries", async () => {
 			resolveWith("/usr/local/bin/opencode\n");
 			await detector.isInstalledAny([{ strategy: "path", target: "opencode" }]);

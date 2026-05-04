@@ -1267,4 +1267,322 @@ describe("WelcomeScreenProvider", () => {
 			);
 		});
 	});
+
+	describe("IDE-aware state (ideHost)", () => {
+		it("should include ideHost in welcome state", async () => {
+			const state = await provider.getWelcomeState();
+
+			expect(state).toHaveProperty("ideHost");
+			expect(typeof state.ideHost).toBe("string");
+		});
+
+		it("should default to 'vscode' when running under 'Visual Studio Code'", async () => {
+			// The vscode mock exports env.appName = "Visual Studio Code".
+			const state = await provider.getWelcomeState();
+			expect(state.ideHost).toBe("vscode");
+		});
+	});
+
+	describe("installDependency() - ACP provider CLIs", () => {
+		let mockPanel: any;
+
+		beforeEach(() => {
+			mockPanel = {
+				postMessage: vi.fn(),
+			};
+			vi.mocked(vscode.env.clipboard.writeText).mockClear();
+		});
+
+		it("should copy the Devin CLI install command to clipboard", async () => {
+			await provider.installDependency("devin-cli", mockPanel);
+
+			expect(vscode.env.clipboard.writeText).toHaveBeenCalledWith(
+				"curl -fsSL https://install.devin.ai/install.sh | sh"
+			);
+		});
+
+		it("should copy the Gemini CLI install command to clipboard", async () => {
+			await provider.installDependency("gemini-cli", mockPanel);
+
+			expect(vscode.env.clipboard.writeText).toHaveBeenCalledWith(
+				"npm install -g @google/gemini-cli"
+			);
+		});
+	});
+
+	describe("installMissingDependencies()", () => {
+		let mockPanel: any;
+		let mockTerminal: any;
+
+		beforeEach(() => {
+			mockPanel = {
+				postMessage: vi.fn().mockResolvedValue(undefined),
+			};
+			mockTerminal = {
+				show: vi.fn(),
+				sendText: vi.fn(),
+				exitStatus: undefined,
+				dispose: vi.fn(),
+			};
+			vi.mocked(vscode.window.createTerminal).mockReset();
+			vi.mocked(vscode.window.createTerminal).mockReturnValue(mockTerminal);
+			vi.mocked(vscode.commands.executeCommand).mockReset();
+			vi.mocked(vscode.commands.executeCommand).mockResolvedValue(undefined);
+			vi.mocked(vscode.env.openExternal).mockReset();
+			vi.mocked(vscode.env.openExternal).mockResolvedValue(true);
+		});
+
+		it("should return early without posting messages when list is empty", async () => {
+			await provider.installMissingDependencies([], mockPanel);
+
+			expect(mockPanel.postMessage).not.toHaveBeenCalled();
+			expect(vscode.window.createTerminal).not.toHaveBeenCalled();
+		});
+
+		it("should emit install-progress start/finish messages for each step", async () => {
+			await provider.installMissingDependencies(["copilot-chat"], mockPanel);
+
+			const progressCalls = mockPanel.postMessage.mock.calls
+				.map((call: any) => call[0])
+				.filter((msg: any) => msg?.type === "welcome/install-progress");
+
+			expect(progressCalls.length).toBeGreaterThanOrEqual(2);
+			expect(progressCalls[0]).toMatchObject({
+				stepId: "copilot-chat",
+				status: "started",
+			});
+			expect(progressCalls.at(-1)).toMatchObject({
+				stepId: "copilot-chat",
+				status: "finished",
+			});
+		});
+
+		it("should emit a welcome/install-all-finished message after all steps", async () => {
+			await provider.installMissingDependencies(["copilot-chat"], mockPanel);
+
+			expect(mockPanel.postMessage).toHaveBeenCalledWith(
+				expect.objectContaining({
+					type: "welcome/install-all-finished",
+					errored: false,
+				})
+			);
+		});
+
+		it("should route vscode-command steps via commands.executeCommand", async () => {
+			await provider.installMissingDependencies(["copilot-chat"], mockPanel);
+
+			expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+				"workbench.extensions.installExtension",
+				"github.copilot-chat"
+			);
+		});
+
+		it("should route terminal steps to the GatomIA - Setup terminal", async () => {
+			await provider.installMissingDependencies(["copilot-cli"], mockPanel);
+
+			expect(vscode.window.createTerminal).toHaveBeenCalledWith(
+				expect.objectContaining({ name: "GatomIA - Setup" })
+			);
+			expect(mockTerminal.show).toHaveBeenCalled();
+			expect(mockTerminal.sendText).toHaveBeenCalledWith(
+				expect.stringContaining("npm install -g @github/copilot"),
+				true
+			);
+		});
+
+		it("should reuse the same terminal across multiple install steps", async () => {
+			await provider.installMissingDependencies(
+				["copilot-cli", "openspec"],
+				mockPanel
+			);
+
+			// Both deps need a terminal (node prereq + the actual install),
+			// and they must all share a single terminal instance.
+			expect(vscode.window.createTerminal).toHaveBeenCalledTimes(1);
+		});
+
+		it("should mark errored=true when a step throws", async () => {
+			vi.mocked(vscode.commands.executeCommand).mockRejectedValueOnce(
+				new Error("extension install failed")
+			);
+
+			await provider.installMissingDependencies(["copilot-chat"], mockPanel);
+
+			expect(mockPanel.postMessage).toHaveBeenCalledWith(
+				expect.objectContaining({
+					type: "welcome/install-progress",
+					stepId: "copilot-chat",
+					status: "error",
+				})
+			);
+			expect(mockPanel.postMessage).toHaveBeenCalledWith(
+				expect.objectContaining({
+					type: "welcome/install-all-finished",
+					errored: true,
+				})
+			);
+		});
+
+		it("should continue with remaining steps after a single step fails", async () => {
+			// First executeCommand call (Copilot Chat) fails, subsequent ones ok.
+			vi.mocked(vscode.commands.executeCommand)
+				.mockRejectedValueOnce(new Error("chat failed"))
+				.mockResolvedValue(undefined);
+
+			await provider.installMissingDependencies(
+				["copilot-chat", "copilot-cli"],
+				mockPanel
+			);
+
+			// copilot-cli still ran on the terminal.
+			expect(mockTerminal.sendText).toHaveBeenCalledWith(
+				expect.stringContaining("@github/copilot"),
+				true
+			);
+			expect(mockPanel.postMessage).toHaveBeenCalledWith(
+				expect.objectContaining({
+					type: "welcome/install-all-finished",
+					errored: true,
+				})
+			);
+		});
+	});
+
+	describe("installPrerequisite()", () => {
+		let mockPanel: any;
+		let mockTerminal: any;
+
+		beforeEach(() => {
+			mockPanel = {
+				postMessage: vi.fn().mockResolvedValue(undefined),
+			};
+			mockTerminal = {
+				show: vi.fn(),
+				sendText: vi.fn(),
+				exitStatus: undefined,
+				dispose: vi.fn(),
+			};
+			vi.mocked(vscode.window.createTerminal).mockReset();
+			vi.mocked(vscode.window.createTerminal).mockReturnValue(mockTerminal);
+			vi.mocked(vscode.commands.executeCommand).mockReset();
+			vi.mocked(vscode.commands.executeCommand).mockResolvedValue(undefined);
+		});
+
+		it("should dispatch a node install to the setup terminal", async () => {
+			await provider.installPrerequisite("node", mockPanel);
+
+			expect(vscode.window.createTerminal).toHaveBeenCalledWith(
+				expect.objectContaining({ name: "GatomIA - Setup" })
+			);
+			expect(mockTerminal.show).toHaveBeenCalled();
+			expect(mockTerminal.sendText).toHaveBeenCalledTimes(1);
+		});
+
+		it("should emit install-progress start+finish for a python install", async () => {
+			await provider.installPrerequisite("python", mockPanel);
+
+			const progressCalls = mockPanel.postMessage.mock.calls
+				.map((call: any) => call[0])
+				.filter((msg: any) => msg?.type === "welcome/install-progress");
+
+			expect(progressCalls[0]).toMatchObject({
+				stepId: "python",
+				status: "started",
+			});
+			expect(progressCalls.at(-1)).toMatchObject({
+				stepId: "python",
+				status: "finished",
+			});
+		});
+
+		it("should emit welcome/install-all-finished after a uv install", async () => {
+			await provider.installPrerequisite("uv", mockPanel);
+
+			expect(mockPanel.postMessage).toHaveBeenCalledWith(
+				expect.objectContaining({
+					type: "welcome/install-all-finished",
+					errored: false,
+				})
+			);
+		});
+	});
+
+	describe("onInstallPrerequisite callback", () => {
+		let mockPanel: any;
+		let mockTerminal: any;
+
+		beforeEach(() => {
+			mockPanel = { postMessage: vi.fn().mockResolvedValue(undefined) };
+			mockTerminal = {
+				show: vi.fn(),
+				sendText: vi.fn(),
+				exitStatus: undefined,
+				dispose: vi.fn(),
+			};
+			vi.mocked(vscode.window.createTerminal).mockReset();
+			vi.mocked(vscode.window.createTerminal).mockReturnValue(mockTerminal);
+			vi.mocked(vscode.commands.executeCommand).mockReset();
+			vi.mocked(vscode.commands.executeCommand).mockResolvedValue(undefined);
+		});
+
+		it("should be exposed by getCallbacks()", () => {
+			const callbacks = provider.getCallbacks();
+			expect(typeof callbacks.onInstallPrerequisite).toBe("function");
+		});
+
+		it("should forward the prereq install via the panel", async () => {
+			const callbacks = provider.getCallbacks();
+			callbacks.setPanel?.(mockPanel);
+
+			await callbacks.onInstallPrerequisite?.("node");
+
+			expect(mockTerminal.sendText).toHaveBeenCalledTimes(1);
+			expect(mockPanel.postMessage).toHaveBeenCalledWith(
+				expect.objectContaining({
+					type: "welcome/install-all-finished",
+				})
+			);
+		});
+	});
+
+	describe("onInstallMissingDependencies callback", () => {
+		let mockPanel: any;
+		let mockTerminal: any;
+
+		beforeEach(() => {
+			mockPanel = { postMessage: vi.fn().mockResolvedValue(undefined) };
+			mockTerminal = {
+				show: vi.fn(),
+				sendText: vi.fn(),
+				exitStatus: undefined,
+				dispose: vi.fn(),
+			};
+			vi.mocked(vscode.window.createTerminal).mockReset();
+			vi.mocked(vscode.window.createTerminal).mockReturnValue(mockTerminal);
+			vi.mocked(vscode.commands.executeCommand).mockReset();
+			vi.mocked(vscode.commands.executeCommand).mockResolvedValue(undefined);
+		});
+
+		it("should be exposed by getCallbacks()", () => {
+			const callbacks = provider.getCallbacks();
+			expect(typeof callbacks.onInstallMissingDependencies).toBe("function");
+		});
+
+		it("should forward deps to installMissingDependencies via the panel", async () => {
+			const callbacks = provider.getCallbacks();
+			callbacks.setPanel?.(mockPanel);
+
+			await callbacks.onInstallMissingDependencies(["copilot-chat"]);
+
+			expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+				"workbench.extensions.installExtension",
+				"github.copilot-chat"
+			);
+			expect(mockPanel.postMessage).toHaveBeenCalledWith(
+				expect.objectContaining({
+					type: "welcome/install-all-finished",
+				})
+			);
+		});
+	});
 });

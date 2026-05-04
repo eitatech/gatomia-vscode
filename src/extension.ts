@@ -6,6 +6,7 @@ import {
 	ConfigurationTarget,
 	type DocumentSelector,
 	env,
+	EventEmitter,
 	type ExtensionContext,
 	languages,
 	type OutputChannel,
@@ -30,8 +31,19 @@ import { SpecExplorerProvider } from "./providers/spec-explorer-provider";
 import { SpecTaskCodeLensProvider } from "./providers/spec-task-code-lens-provider";
 import { SteeringExplorerProvider } from "./providers/steering-explorer-provider";
 import { WikiExplorerProvider } from "./providers/wiki-explorer-provider";
+import type { AgentChatRegistry as AgentChatRegistryType } from "./features/agent-chat/agent-chat-registry";
+import type { AgentChatSessionStore as AgentChatSessionStoreType } from "./features/agent-chat/agent-chat-session-store";
+import {
+	createDefaultEntryPointsHost,
+	registerAgentChatEntryPoints,
+} from "./features/agent-chat/agent-chat-entry-points";
 import { AcpProviderRegistry } from "./services/acp/acp-provider-registry";
 import { AcpSessionManager } from "./services/acp/acp-session-manager";
+import {
+	createDescriptorFromKnownAgent,
+	createDescriptorFromRemoteEntry,
+	detectHostPlatform,
+} from "./services/acp/provider-bridge";
 import { BUILT_IN_PROVIDERS } from "./services/acp/providers/descriptors";
 import { ChatDispatcher } from "./services/chat-dispatcher";
 import { ChatRouter } from "./services/chat-router";
@@ -60,7 +72,6 @@ import { KnownAgentPreferencesService } from "./features/hooks/services/known-ag
 import { KNOWN_AGENTS } from "./features/hooks/services/known-agent-catalog";
 import { HookViewProvider } from "./providers/hook-view-provider";
 import { HooksExplorerProvider } from "./providers/hooks-explorer-provider";
-import { DependenciesViewProvider } from "./providers/dependencies-view-provider";
 import { DocumentPreviewPanel } from "./panels/document-preview-panel";
 import { DocumentPreviewService } from "./services/document-preview-service";
 import { RefinementGateway } from "./services/refinement-gateway";
@@ -113,7 +124,6 @@ let commandCompletionDetector: CommandCompletionDetector;
 let mcpDiscoveryService: MCPDiscoveryService;
 let agentRegistry: AgentRegistry;
 let hookViewProvider: HookViewProvider;
-let dependenciesViewProvider: DependenciesViewProvider;
 let documentPreviewPanel: DocumentPreviewPanel;
 let documentPreviewService: DocumentPreviewService;
 let refinementGateway: RefinementGateway;
@@ -129,7 +139,15 @@ export let outputChannel: OutputChannel;
 let acpOutputChannel: OutputChannel | null = null;
 let acpSessionManager: AcpSessionManager | null = null;
 let acpProviderRegistry: AcpProviderRegistry | null = null;
+let acpKnownAgentDetector: KnownAgentDetector | null = null;
 let chatRouter: ChatRouter | null = null;
+
+// --- Agent Chat Panel (spec 018) singletons for deactivation flush ---------
+let agentChatStore: AgentChatSessionStoreType | null = null;
+let agentChatRegistry: AgentChatRegistryType | null = null;
+let agentChatSidebar:
+	| import("./providers/agent-chat-view-provider").AgentChatViewController
+	| null = null;
 
 export async function activate(context: ExtensionContext) {
 	// Create output channel for debugging
@@ -223,8 +241,12 @@ export async function activate(context: ExtensionContext) {
 	const modelCacheService = new ModelCacheService();
 	outputChannel.appendLine("ModelCacheService initialized");
 
-	// Initialize AcpAgentDiscoveryService for ACP agent hooks (Phase 6)
-	const knownAgentDetector = new KnownAgentDetector();
+	// Initialize AcpAgentDiscoveryService for ACP agent hooks (Phase 6).
+	// We reuse the detector instance bootstrapped by `bootstrapAcpRouter`
+	// so the in-memory cache is shared across both code paths — that way
+	// `gatomia.acp.reprobeAll` (which calls `clearCache()`) refreshes the
+	// hooks panel and the chat router in a single shot.
+	const knownAgentDetector = sharedKnownAgentDetector();
 	const knownAgentPreferencesService = new KnownAgentPreferencesService(
 		context
 	);
@@ -292,12 +314,6 @@ export async function activate(context: ExtensionContext) {
 		knownAgentDetector,
 	});
 	hookViewProvider.initialize();
-
-	// Initialize Dependencies View Provider
-	dependenciesViewProvider = new DependenciesViewProvider(
-		context,
-		outputChannel
-	);
 
 	documentPreviewService = new DocumentPreviewService(outputChannel, context);
 	refinementGateway = new RefinementGateway(outputChannel);
@@ -545,8 +561,7 @@ Tasks:
 		{ dispose: () => modelCacheService.dispose() },
 		{ dispose: () => hookViewProvider.dispose() },
 		{ dispose: () => hooksExplorer.dispose() },
-		{ dispose: () => quickAccessExplorer.dispose() },
-		{ dispose: () => dependenciesViewProvider.dispose() }
+		{ dispose: () => quickAccessExplorer.dispose() }
 	);
 
 	// Register commands
@@ -696,6 +711,11 @@ Tasks:
 	// ACP Commands + Status Bar
 	// ========================================================================
 	registerAcpCommands(context);
+
+	// ========================================================================
+	// Agent Chat Panel (spec 018) — T038/T039 bootstrap
+	// ========================================================================
+	await bootstrapAgentChat(context, modelCacheService);
 
 	// Set up file watchers
 	setupFileWatchers(context, specExplorer, steeringExplorer, actionsExplorer);
@@ -1683,9 +1703,33 @@ function registerCommands({
 			env.openExternal(Uri.parse(installUrl));
 		}),
 
-		commands.registerCommand("gatomia.dependencies.check", async () => {
-			outputChannel.appendLine("Opening dependencies checker...");
-			await dependenciesViewProvider.show();
+		commands.registerCommand("gatomia.dependencies.check", () => {
+			outputChannel.appendLine(
+				"Opening Welcome Screen (Setup) via Install Dependencies command..."
+			);
+			try {
+				const welcomeProvider = new WelcomeScreenProvider(
+					context,
+					outputChannel
+				);
+				const callbacks = welcomeProvider.getCallbacks();
+				const panel = WelcomeScreenPanel.show(
+					context,
+					outputChannel,
+					callbacks
+				);
+				if (callbacks.setPanel) {
+					callbacks.setPanel(panel);
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				outputChannel.appendLine(
+					`[Welcome] Failed to open from gatomia.dependencies.check: ${message}`
+				);
+				window.showErrorMessage(
+					`Failed to open Install Dependencies: ${message}`
+				);
+			}
 		}),
 
 		commands.registerCommand("gatomia.showWelcome", () => {
@@ -2041,6 +2085,17 @@ function readPermissionDefault(): "ask" | "allow" | "deny" {
 	return "ask";
 }
 
+/**
+ * Reads the `gatomia.agentChat.bufferFileWrites` setting. When true,
+ * every `writeTextFile` from an ACP agent is queued in the
+ * pending-writes store and only persisted to disk after the user
+ * accepts it through the chat UI (Phase 4 buffer-then-apply flow).
+ */
+function readBufferFileWritesFlag(): boolean {
+	const config = workspace.getConfiguration("gatomia");
+	return config.get<boolean>("agentChat.bufferFileWrites", true) === true;
+}
+
 function createAcpPermissionPrompter(
 	output: OutputChannel
 ): (request: {
@@ -2074,23 +2129,51 @@ function createAcpPermissionPrompter(
 	};
 }
 
+/**
+ * Returns the singleton {@link KnownAgentDetector}, lazily creating one
+ * when `bootstrapAcpRouter` has not yet captured it (defensive — every
+ * activation path runs `bootstrapAcpRouter` first).
+ */
+function sharedKnownAgentDetector(): KnownAgentDetector {
+	if (!acpKnownAgentDetector) {
+		acpKnownAgentDetector = new KnownAgentDetector();
+	}
+	return acpKnownAgentDetector;
+}
+
 function bootstrapAcpRouter(context: ExtensionContext): void {
 	try {
 		const registry = new AcpProviderRegistry();
+
+		// Source 1 (highest priority): built-in descriptors. These ship with
+		// hand-crafted probes (devin, gemini-cli) and never get replaced by
+		// catalog/remote entries.
 		for (const descriptor of BUILT_IN_PROVIDERS) {
 			registry.register(descriptor);
 		}
+
+		// Source 2: known-agent catalog. Each entry becomes a runnable
+		// descriptor whose probe delegates to KnownAgentDetector.
+		const detector = new KnownAgentDetector();
+		for (const entry of KNOWN_AGENTS) {
+			if (registry.get(entry.id)) {
+				continue; // Built-in already wins.
+			}
+			try {
+				registry.register(createDescriptorFromKnownAgent(entry, detector));
+			} catch (err) {
+				outputChannel.appendLine(
+					`[ACP] Failed to bridge known agent '${entry.id}': ${err instanceof Error ? err.message : String(err)}`
+				);
+			}
+		}
+
 		acpProviderRegistry = registry;
+		acpKnownAgentDetector = detector;
 
 		const config = workspace.getConfiguration("gatomia");
 		if (config.get<boolean>("acp.registryRemoteFetch", true)) {
-			registry
-				.loadRemoteRegistry({ globalState: context.globalState })
-				.catch((err: unknown) => {
-					outputChannel.appendLine(
-						`[ACP] Remote registry fetch failed: ${err instanceof Error ? err.message : String(err)}`
-					);
-				});
+			scheduleRemoteRegistryMerge(registry, context);
 		}
 
 		const onboarding = new OnboardingService(context.globalState);
@@ -2100,15 +2183,22 @@ function bootstrapAcpRouter(context: ExtensionContext): void {
 		const workspaceRoot =
 			workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
 		const permissionDefault = readPermissionDefault();
+		const bufferFileWrites = readBufferFileWritesFlag();
+		// `beforeSpawn` is intentionally omitted: spawning an ACP agent via
+		// `npx -y <package>` no longer triggers a confirmation modal. The
+		// user already opted in by selecting the agent in the picker, and
+		// re-prompting on every launch was disruptive without adding real
+		// safety (npm itself prints what it is about to download).
 		acpSessionManager = new AcpSessionManager({
 			registry,
 			output,
 			cwd: workspaceRoot,
 			permissionDefault,
 			promptForPermission: createAcpPermissionPrompter(output),
+			bufferFileWrites,
 		});
 		output.appendLine(
-			`[ACP] Session manager ready (permissionDefault=${permissionDefault})`
+			`[ACP] Session manager ready (permissionDefault=${permissionDefault}, bufferFileWrites=${bufferFileWrites})`
 		);
 
 		const dispatcher = new ChatDispatcher({
@@ -2134,6 +2224,60 @@ function bootstrapAcpRouter(context: ExtensionContext): void {
 			`[ACP] Failed to initialise router: ${error instanceof Error ? error.message : String(error)}`
 		);
 	}
+}
+
+function scheduleRemoteRegistryMerge(
+	registry: AcpProviderRegistry,
+	context: ExtensionContext
+): void {
+	const hostPlatform = detectHostPlatform();
+	registry
+		.loadRemoteRegistry({ globalState: context.globalState })
+		.then((entries) => mergeRemoteEntries(registry, entries, hostPlatform))
+		.catch((err: unknown) => {
+			outputChannel.appendLine(
+				`[ACP] Remote registry fetch failed: ${err instanceof Error ? err.message : String(err)}`
+			);
+		});
+}
+
+function mergeRemoteEntries(
+	registry: AcpProviderRegistry,
+	entries: readonly { id: string }[],
+	hostPlatform: ReturnType<typeof detectHostPlatform>
+): void {
+	if (!hostPlatform) {
+		return;
+	}
+	for (const entry of entries) {
+		const existing = registry.get(entry.id);
+		// Never overwrite a built-in (Devin, Gemini) or a local known-agent
+		// descriptor: those carry hand-written probes that actually inspect
+		// the host system. Replacing them with a remote descriptor — which
+		// always probes as `installed: false` — would falsely flag locally
+		// installed CLIs (opencode, junie, copilot, …) as missing.
+		if (
+			existing &&
+			(existing.source === "built-in" || existing.source === "local")
+		) {
+			continue;
+		}
+		try {
+			registry.register(
+				createDescriptorFromRemoteEntry(
+					entry as Parameters<typeof createDescriptorFromRemoteEntry>[0],
+					{ platform: hostPlatform }
+				)
+			);
+		} catch (err) {
+			outputChannel.appendLine(
+				`[ACP] Failed to bridge remote entry '${entry.id}': ${err instanceof Error ? err.message : String(err)}`
+			);
+		}
+	}
+	outputChannel.appendLine(
+		`[ACP] Remote registry merged: now ${registry.list().length} provider(s)`
+	);
 }
 
 function registerAcpCommands(context: ExtensionContext): void {
@@ -2173,6 +2317,10 @@ function registerAcpCommands(context: ExtensionContext): void {
 			acpOutputChannel?.show();
 		}),
 		commands.registerCommand("gatomia.acp.reprobeAll", async () => {
+			// Clearing the detector cache forces every known-agent probe
+			// to re-run on the next router decision, picking up newly
+			// installed CLIs without requiring a window reload.
+			acpKnownAgentDetector?.clearCache();
 			chatRouter?.invalidateCache();
 			await refreshStatusBar();
 			window.showInformationMessage("GatomIA: ACP providers re-probed.");
@@ -2188,9 +2336,9 @@ function registerAcpCommands(context: ExtensionContext): void {
 				);
 				return;
 			}
-			await acpSessionManager.cancel(decision.target.providerId, {
-				mode: "workspace",
-			});
+			// cancelAll covers every tracked session key regardless of the
+			// configured session mode (workspace / per-spec / per-prompt).
+			await acpSessionManager.cancelAll(decision.target.providerId);
 			window.showInformationMessage(
 				`GatomIA: cancelled active ${decision.target.providerId} session.`
 			);
@@ -2244,11 +2392,49 @@ function registerAcpCommands(context: ExtensionContext): void {
 					// Status refresh failures are non-fatal.
 				});
 			}
+			if (event.affectsConfiguration("gatomia.acp.permissionDefault")) {
+				// Hot-reload the permission strategy across every cached
+				// AcpClient so the chat picker / chip can mutate behaviour
+				// without forcing the user to reload the window.
+				acpSessionManager?.setPermissionDefault(readPermissionDefault());
+			}
 		})
 	);
 }
 
-export function deactivate(): void {
+export async function deactivate(): Promise<void> {
+	// Clear the ACP chat router (T037) so any in-flight executor falls back to
+	// the legacy path during shutdown.
+	try {
+		const { setAcpActionChatRouter } = await import(
+			"./features/hooks/actions/acp-action"
+		);
+		setAcpActionChatRouter(undefined);
+	} catch {
+		// Best-effort; continue with the rest of deactivation.
+	}
+
+	// T040: flush the Agent Chat Panel session store BEFORE tearing down the
+	// underlying AcpSessionManager so `ended-by-shutdown` stamping and
+	// persistence happen while the ACP subprocesses are still reachable.
+	if (agentChatStore) {
+		try {
+			await agentChatStore.flushForDeactivation();
+		} catch {
+			// best-effort
+		}
+		agentChatStore = null;
+	}
+
+	if (agentChatRegistry) {
+		try {
+			agentChatRegistry.dispose();
+		} catch {
+			// best-effort
+		}
+		agentChatRegistry = null;
+	}
+
 	if (acpSessionManager) {
 		try {
 			acpSessionManager.dispose();
@@ -2526,4 +2712,466 @@ async function bootstrapCloudAgents(context: ExtensionContext): Promise<void> {
 	} catch (error) {
 		outputChannel.appendLine(`[CloudAgents] Failed to bootstrap: ${error}`);
 	}
+}
+
+// ============================================================================
+// Agent Chat Panel bootstrap (spec 018, T038-T040)
+// ============================================================================
+
+/**
+ * Initialise the Agent Chat Panel runtime:
+ *   - Construct the session store (with a VS Code-backed archive writer).
+ *   - Run the restart-restore pass (T039) so any ACP sessions orphaned by a
+ *     previous shutdown are stamped `ended-by-shutdown` idempotently.
+ *   - Wire the in-memory registry.
+ *   - Register the three T038 commands (`startNew`, `openForSession`, `cancel`).
+ *
+ * The T037 `ACPActionChatRouter` is NOT wired here yet — the setter remains
+ * empty so hook executions continue to run the legacy inline path. A later
+ * phase will attach a real router once the provider-id bridge between
+ * `ACPActionParams.agentCommand` and `AcpProviderRegistry` is designed.
+ */
+async function bootstrapAgentChat(
+	context: ExtensionContext,
+	modelCacheService: ModelCacheService
+): Promise<void> {
+	try {
+		const { AgentChatSessionStore } = await import(
+			"./features/agent-chat/agent-chat-session-store"
+		);
+		const { AgentChatRegistry } = await import(
+			"./features/agent-chat/agent-chat-registry"
+		);
+		const { createVscodeArchiveWriter } = await import(
+			"./features/agent-chat/vscode-archive-writer"
+		);
+		const { createDefaultAgentChatPanelHost, AgentChatPanel } = await import(
+			"./panels/agent-chat-panel"
+		);
+		const { registerAgentChatCommands } = await import(
+			"./commands/agent-chat-commands"
+		);
+		const { promptForCapWarning } = await import(
+			"./features/agent-chat/cap-warning-prompt"
+		);
+		const { AgentChatViewProvider, AGENT_CHAT_PRIMARY_VIEW_TYPE } =
+			await import("./providers/agent-chat-view-provider");
+		const { detectIdeHost } = await import("./utils/ide-host-detector");
+		const { shouldUseAuxiliaryBar } = await import(
+			"./features/agent-chat/agent-chat-entry-points"
+		);
+
+		const archive = createVscodeArchiveWriter(context.globalStorageUri);
+		const store = new AgentChatSessionStore({
+			workspaceState: context.workspaceState,
+			archive,
+		});
+		await store.initialize(); // T039 restart-restore
+
+		const registry = new AgentChatRegistry();
+		const panelHost = createDefaultAgentChatPanelHost(context);
+
+		agentChatStore = store;
+		agentChatRegistry = registry;
+		context.subscriptions.push({ dispose: () => registry.dispose() });
+
+		// Per-provider model discovery (Copilot LM cache + ACP probe +
+		// catalog fallback). Wired into both the view provider (so the
+		// catalog rebroadcast carries dynamic model lists) and the
+		// command deps (so `handleChangeModel` can call
+		// `session/set_model`). Lazily picks up the ACP manager when
+		// available — the bootstrap order spawns ACP before Agent Chat,
+		// so this is safe by the time the chat surface activates.
+		const { ModelDiscoveryService } = await import(
+			"./features/agent-chat/model-discovery-service"
+		);
+		const modelDiscovery = new ModelDiscoveryService({
+			modelCache: modelCacheService,
+			acpSessionManager: {
+				probeProviderModels: (providerId, cwd) => {
+					if (!acpSessionManager) {
+						return Promise.resolve(undefined);
+					}
+					return acpSessionManager.probeProviderModels(providerId, cwd);
+				},
+			},
+			resolveCwd: () =>
+				workspace.workspaceFolders?.[0]?.uri.fsPath ?? undefined,
+			log: (message) => outputChannel.appendLine(message),
+		});
+		context.subscriptions.push({ dispose: () => modelDiscovery.dispose() });
+
+		// Sidebar webview view (canonical chat surface, spec follow-up to 018).
+		// Plumb the ACP registry's onDidUpdate so the picker rebroadcasts when
+		// the remote registry merge lands; the workspace `AgentRegistry`
+		// (hooks) feeds the agent-file picker.
+		const sidebarController = new AgentChatViewProvider({
+			context,
+			store,
+			registry,
+			catalogSources: {
+				get acpProviderRegistry() {
+					return acpProviderRegistry;
+				},
+				get agentRegistry() {
+					return agentRegistry ?? null;
+				},
+			},
+			modelDiscovery,
+			onCatalogChanged: (cb) => {
+				const sub = acpProviderRegistry?.onDidUpdate(() => cb());
+				return {
+					dispose: () => sub?.dispose(),
+				};
+			},
+			outputChannel,
+		});
+		// Tell VS Code which of the two declared chat-view ids should be
+		// active for this host. Hosts that reserve the auxiliary side bar
+		// for their own AI chat (Windsurf, Antigravity) render the chat
+		// inside the primary `gatomia` container; everything else uses
+		// the auxiliary `gatomia-chat` container. The `when` clauses in
+		// `package.json#contributes.views` consume this context key.
+		const ideHost = detectIdeHost();
+		const chatInPrimary = !shouldUseAuxiliaryBar(ideHost);
+		try {
+			await commands.executeCommand(
+				"setContext",
+				"gatomia.host.chatInPrimary",
+				chatInPrimary
+			);
+		} catch (error) {
+			outputChannel.appendLine(
+				`[AgentChat] setContext gatomia.host.chatInPrimary failed: ${
+					error instanceof Error ? error.message : String(error)
+				}`
+			);
+		}
+
+		// Register the same controller against both view ids — only one
+		// is visible at a time (gated by the context key set above) so
+		// the inactive registration is a cheap no-op.
+		context.subscriptions.push(
+			window.registerWebviewViewProvider(
+				AgentChatViewProvider.viewType,
+				sidebarController,
+				{ webviewOptions: { retainContextWhenHidden: true } }
+			),
+			window.registerWebviewViewProvider(
+				AGENT_CHAT_PRIMARY_VIEW_TYPE,
+				sidebarController,
+				{ webviewOptions: { retainContextWhenHidden: true } }
+			),
+			{ dispose: () => sidebarController.dispose() }
+		);
+		agentChatSidebar = sidebarController;
+
+		// T073/T073a/T076: read the concurrency cap from settings and bridge
+		// the prompt helper + telemetry sink into the command deps.
+		const readConcurrentCap = () => {
+			const raw = workspace
+				.getConfiguration("gatomia.agentChat")
+				.get<number>("maxConcurrentAcpSessions");
+			return typeof raw === "number" && raw > 0 ? raw : 5;
+		};
+
+		const commandDisposables = registerAgentChatCommands({
+			registry,
+			store,
+			// Bridge to the (lazy) ACP manager so `handleChangeModel`
+			// can hot-swap the agent-side model via `session/set_model`.
+			// Falls back to `recordModelChange` when the manager is not
+			// yet bootstrapped or the provider rejects with
+			// `ACP_NOT_SUPPORTED`.
+			acpSessionManager: {
+				setSessionModel: (providerId, cwd, sessionId, modelId) => {
+					if (!acpSessionManager) {
+						return Promise.reject(
+							new Error("ACP_NOT_SUPPORTED: manager not initialised")
+						);
+					}
+					return acpSessionManager.setSessionModel(
+						providerId,
+						cwd,
+						sessionId,
+						modelId
+					);
+				},
+			},
+			createPanel: (session) => {
+				// The sidebar webview is the canonical chat surface — every
+				// session binds to the singleton `AgentChatViewProvider`
+				// instead of spawning a per-session editor panel. The
+				// returned wrapper satisfies both `ChatPanelLike` (used by
+				// the command handlers) and `AgentChatPanelLike` (the
+				// registry). `reveal()` brings the sidebar forward and
+				// re-binds it to this session; `dispose()` is a no-op
+				// because the underlying view outlives any single session.
+				const onDidDisposeEmitter = new EventEmitter<void>();
+				let revealed = false;
+				return {
+					sessionId: session.id,
+					viewType: AgentChatPanel.viewType,
+					reveal: () => {
+						revealed = true;
+						sidebarController.focusSession(session.id).catch((err) => {
+							outputChannel.appendLine(
+								`[AgentChat] sidebar focusSession failed: ${err instanceof Error ? err.message : String(err)}`
+							);
+						});
+					},
+					dispose: () => {
+						// The view is shared; we only fire onDidDispose so the
+						// registry releases its `panelsBySessionId` slot and
+						// the next openForSession can rebind cleanly.
+						if (revealed) {
+							onDidDisposeEmitter.fire();
+						}
+						onDidDisposeEmitter.dispose();
+					},
+					onDidDispose: (cb: () => void) => {
+						const sub = onDidDisposeEmitter.event(cb);
+						return { dispose: () => sub.dispose() };
+					},
+				};
+			},
+			startAcpSession: async (params) => {
+				const sessionManager = acpSessionManager;
+				if (!sessionManager) {
+					throw new Error(
+						"agent-chat: ACP session manager not initialised yet — try again after activation completes"
+					);
+				}
+
+				const workspaceRoot =
+					workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+				const cwd = params.cwd ?? workspaceRoot;
+				const workspaceUri =
+					workspace.workspaceFolders?.[0]?.uri.toString() ?? "";
+
+				const session = await store.createSession({
+					source: "acp",
+					agentId: params.agentId,
+					agentDisplayName: params.agentDisplayName,
+					capabilities: { source: "none" },
+					selectedModeId: params.mode,
+					executionTarget: { kind: "local" },
+					trigger: { kind: "user" },
+					worktree: null,
+					cloud: null,
+					workspaceUri,
+				});
+
+				const { AcpChatRunner, deriveAcpSessionId } = await import(
+					"./features/agent-chat/acp-chat-runner"
+				);
+				const acpSessionId = deriveAcpSessionId(session);
+				const runner = new AcpChatRunner({
+					session,
+					store,
+					registry,
+					manager: {
+						sendPrompt: (providerId, runnerCwd, sessionId, prompt) =>
+							sessionManager.sendPromptDirect(
+								providerId,
+								runnerCwd ?? cwd,
+								sessionId,
+								prompt
+							),
+						cancel: (providerId, runnerCwd, sessionId) =>
+							sessionManager.cancelDirect(
+								providerId,
+								runnerCwd ?? cwd,
+								sessionId
+							),
+						subscribe: (providerId, runnerCwd, sessionId, listener) =>
+							sessionManager.subscribe(
+								providerId,
+								runnerCwd ?? cwd,
+								sessionId,
+								listener
+							),
+						// Phase 4 — pending file-write buffer plumbing.
+						subscribePendingWrites: (providerId, runnerCwd, listener) =>
+							sessionManager.subscribePendingWrites(
+								providerId,
+								runnerCwd ?? cwd,
+								listener
+							),
+						flushPendingWrites: (providerId, runnerCwd, action) => {
+							sessionManager.flushPendingWrites(
+								providerId,
+								runnerCwd ?? cwd,
+								action
+							);
+						},
+					},
+					acpSessionId,
+				});
+
+				if (params.taskInstruction) {
+					// Fire-and-forget: the runner persists its own state and
+					// surfaces failures via transcript error messages, so we
+					// don't await here to keep the command responsive.
+					runner.start(params.taskInstruction).catch((err: unknown) => {
+						outputChannel.appendLine(
+							`[AgentChat] runner.start failed: ${err instanceof Error ? err.message : String(err)}`
+						);
+					});
+				}
+
+				return { session, runner };
+			},
+			get concurrentCap() {
+				return readConcurrentCap();
+			},
+			promptForCap: (opts) =>
+				promptForCapWarning({
+					...opts,
+					window: {
+						showQuickPick: window.showQuickPick.bind(window) as never,
+						showWarningMessage: window.showWarningMessage.bind(window) as never,
+					},
+				}),
+			emitTelemetry: (event, payload) => {
+				outputChannel.appendLine(
+					`[AgentChat][telemetry] ${event} ${JSON.stringify(payload)}`
+				);
+			},
+		});
+		context.subscriptions.push(...commandDisposables);
+
+		// T046: Running Agents tree view. Subscribes to the same store/registry
+		// singletons so clicks dispatch `gatomia.agentChat.openForSession`
+		// (registered above) and the restart-restore pass in T039 is visible.
+		const { RunningAgentsTreeProvider } = await import(
+			"./providers/running-agents-tree-provider"
+		);
+		const runningAgentsProvider = new RunningAgentsTreeProvider({
+			store,
+			registry,
+			storeChangeEvent: store.onDidChangeManifest,
+		});
+		context.subscriptions.push(
+			window.createTreeView(RunningAgentsTreeProvider.viewId, {
+				treeDataProvider: runningAgentsProvider,
+				showCollapseAll: true,
+			}),
+			{ dispose: () => runningAgentsProvider.dispose() }
+		);
+
+		// T048: reveal the ACP `OutputChannel` from the tree's context menu so
+		// users retain a one-click path to raw logs (FR-022).
+		context.subscriptions.push(
+			commands.registerCommand("gatomia.agentChat.openLogChannel", () => {
+				acpOutputChannel?.show(true);
+			})
+		);
+
+		// Sidebar-first new-session and panel commands. The legacy QuickPick
+		// (`agent-chat-new-session.ts`) and the editor-area `NewSessionPanel`
+		// remain available as fallbacks but the canonical UX is now the
+		// dedicated activity-bar container — `newSession` simply reveals it
+		// in the empty/new-session state. The picker dropdowns inside the
+		// webview let the user choose provider, model, and agent file
+		// before submitting the initial prompt.
+		context.subscriptions.push(
+			commands.registerCommand("gatomia.agentChat.newSession", async () => {
+				try {
+					await sidebarController.startNewSessionFlow();
+				} catch (err) {
+					outputChannel.appendLine(
+						`[AgentChat] newSession failed: ${err instanceof Error ? err.message : String(err)}`
+					);
+				}
+			})
+		);
+
+		context.subscriptions.push(
+			commands.registerCommand("gatomia.agentChat.openPanel", async () => {
+				try {
+					await sidebarController.reveal();
+				} catch (err) {
+					outputChannel.appendLine(
+						`[AgentChat] openPanel failed: ${err instanceof Error ? err.message : String(err)}`
+					);
+				}
+			})
+		);
+
+		context.subscriptions.push(
+			commands.registerCommand("gatomia.agentChat.focusSidebar", async () => {
+				await sidebarController.reveal();
+			})
+		);
+
+		context.subscriptions.push(
+			commands.registerCommand("gatomia.agentChat.toggleHistory", async () => {
+				await sidebarController.reveal();
+				sidebarController.pushSessionList();
+			})
+		);
+
+		// Surface the chat from the keyboard (Cmd+L) and the status bar
+		// without forcing the user to hunt for the view in the activity
+		// bar. Also runs a one-time migration that moves the chat
+		// container into the secondary side bar (right-hand) so it lines
+		// up with the workflow most users expect from chat-style tools.
+		const entryPointDisposables = registerAgentChatEntryPoints(
+			createDefaultEntryPointsHost(context),
+			outputChannel
+		);
+		for (const disposable of entryPointDisposables) {
+			context.subscriptions.push(disposable);
+		}
+
+		outputChannel.appendLine(
+			"[AgentChat] Session store + sidebar webview + running-agents tree initialised; commands registered"
+		);
+	} catch (error) {
+		outputChannel.appendLine(
+			`[AgentChat] Failed to bootstrap: ${error instanceof Error ? error.message : String(error)}`
+		);
+	}
+}
+
+/**
+ * Snapshot the current ACP provider registry into the shape the New Session
+ * QuickPick / panel expects. We classify each descriptor into one of three
+ * tiers using its `spawnCommand` and built-in `source`:
+ *   - `installed`        — built-in or local descriptor (probe will confirm).
+ *   - `available-via-npx` — remote descriptor whose spawn is `npx -y …`.
+ *   - `install-required`  — remote descriptor with neither npx nor a probed
+ *                           binary; surfaces the install URL.
+ */
+function buildNewSessionProviderItems(
+	registry: AcpProviderRegistry | null | undefined
+): import("./commands/agent-chat-new-session").NewSessionProviderItem[] {
+	if (!registry) {
+		return [];
+	}
+	return registry.list().map((descriptor) => {
+		const source = descriptor.source ?? "built-in";
+		let availability: "installed" | "available-via-npx" | "install-required";
+		if (source === "built-in" || source === "local") {
+			availability = "installed";
+		} else if (descriptor.spawnCommand === "npx") {
+			availability = "available-via-npx";
+		} else {
+			availability = "install-required";
+		}
+		const npxPackage =
+			descriptor.spawnCommand === "npx" && descriptor.spawnArgs[0] === "-y"
+				? descriptor.spawnArgs[1]
+				: undefined;
+		return {
+			id: descriptor.id,
+			displayName: descriptor.displayName,
+			description: descriptor.description,
+			source,
+			availability,
+			npxPackage,
+			installUrl: descriptor.installUrl || undefined,
+		};
+	});
 }

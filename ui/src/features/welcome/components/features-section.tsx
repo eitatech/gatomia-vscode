@@ -1,20 +1,63 @@
 /**
  * Features Section Component
- * Quick access to GatomIA feature commands and actions
+ *
+ * Renders the "Features & Quick Actions" tab of the Welcome Screen as a set
+ * of grouped cards. Groups are rendered in a stable order defined by
+ * {@link FEATURE_AREA_ORDER} and only areas that actually contain actions are
+ * shown, so IDE-specific groups (e.g. `Chat Provider` on Windsurf /
+ * Antigravity) appear automatically when the extension host populates them.
+ *
+ * @see `src/providers/welcome-screen-provider.ts#getFeatureActions` for the
+ *      authoritative action catalogue.
  */
 
-import type { FeatureAction } from "../types";
+import type { FeatureArea, FeatureAction } from "../types";
 
 interface FeaturesSectionProps {
 	featureActions: FeatureAction[];
 	onExecuteCommand: (commandId: string, args?: unknown[]) => void;
 }
 
+/**
+ * Ordered presentation of feature areas. This list covers every known
+ * `FeatureArea` variant — unknown areas are appended at the end alphabetically
+ * so the UI degrades gracefully if the extension introduces a new group
+ * without updating the webview bundle.
+ */
+const FEATURE_AREA_ORDER: readonly FeatureArea[] = [
+	"Specs",
+	"SpecKit Workflow",
+	"Actions",
+	"Hooks",
+	"Steering",
+	"Cloud Agents",
+	"Chat Provider",
+	"Documentation",
+	"Configuration",
+] as const;
+
+/**
+ * Short human-readable tagline rendered under each area heading. Helps users
+ * scan the Features tab without having to read every card description.
+ */
+const FEATURE_AREA_SUBTITLES: Record<FeatureArea, string> = {
+	Specs: "Spec lifecycle entrypoints.",
+	"SpecKit Workflow":
+		"Canonical Spec-Driven Development pipeline, from constitution to tests.",
+	Actions: "Manage custom prompts, agents, and skills.",
+	Hooks: "Automate workflows with triggers and actions.",
+	Steering: "Project and user rules that guide agents.",
+	"Cloud Agents": "Dispatch work to remote execution providers.",
+	"Chat Provider":
+		"Route prompts through the Agent Client Protocol (Windsurf / Antigravity).",
+	Documentation: "Repository wiki and in-editor help.",
+	Configuration: "Settings, dependencies, and environment.",
+};
+
 export const FeaturesSection = ({
 	featureActions,
 	onExecuteCommand,
 }: FeaturesSectionProps) => {
-	// Group actions by feature area
 	const actionsByArea = featureActions.reduce(
 		(acc, action) => {
 			if (!acc[action.featureArea]) {
@@ -26,7 +69,13 @@ export const FeaturesSection = ({
 		{} as Record<string, FeatureAction[]>
 	);
 
-	const featureAreas = ["Specs", "Actions", "Hooks", "Steering"] as const;
+	const knownAreas = FEATURE_AREA_ORDER.filter(
+		(area) => (actionsByArea[area] || []).length > 0
+	);
+	const unknownAreas = Object.keys(actionsByArea)
+		.filter((area) => !(FEATURE_AREA_ORDER as readonly string[]).includes(area))
+		.sort();
+	const areasToRender: string[] = [...knownAreas, ...unknownAreas];
 
 	return (
 		<div className="welcome-section">
@@ -35,15 +84,15 @@ export const FeaturesSection = ({
 			</div>
 
 			<p className="welcome-section-description">
-				Quickly access GatomIA features and execute common tasks. Each card
-				represents a key action you can perform.
+				Quickly access every GatomIA feature. Cards are grouped by capability
+				area and mirror the commands contributed by the extension; some groups
+				only appear on compatible IDE hosts.
 			</p>
 
-			{featureAreas.map((area) => {
+			{areasToRender.map((area) => {
 				const actions = actionsByArea[area] || [];
-				if (actions.length === 0) {
-					return null;
-				}
+				const subtitle =
+					FEATURE_AREA_SUBTITLES[area as FeatureArea] ?? undefined;
 
 				return (
 					<div
@@ -56,11 +105,22 @@ export const FeaturesSection = ({
 							className="welcome-section-title"
 							style={{
 								fontSize: "16px",
-								marginBottom: "16px",
+								marginBottom: subtitle ? "4px" : "16px",
 							}}
 						>
 							<i className={`codicon ${getAreaIconClass(area)}`} /> {area}
 						</h3>
+						{subtitle && (
+							<p
+								style={{
+									fontSize: "12px",
+									color: "var(--vscode-descriptionForeground)",
+									margin: "0 0 12px 0",
+								}}
+							>
+								{subtitle}
+							</p>
+						)}
 
 						<div className="welcome-card-grid">
 							{actions.map((action) => (
@@ -156,18 +216,29 @@ const FeatureActionCard = ({ action, onExecute }: FeatureActionCardProps) => {
 };
 
 /**
- * Get icon class for feature area
+ * Get codicon class name for a feature area heading. Falls back to a generic
+ * lightning-bolt icon for unknown areas emitted by future extension versions.
  */
 function getAreaIconClass(area: string): string {
 	switch (area) {
 		case "Specs":
 			return "codicon-file-text";
+		case "SpecKit Workflow":
+			return "codicon-run-all";
 		case "Actions":
 			return "codicon-comment-discussion";
 		case "Hooks":
-			return "codicon-extensions";
+			return "codicon-plug";
 		case "Steering":
 			return "codicon-target";
+		case "Cloud Agents":
+			return "codicon-cloud";
+		case "Chat Provider":
+			return "codicon-hubot";
+		case "Documentation":
+			return "codicon-book";
+		case "Configuration":
+			return "codicon-settings-gear";
 		default:
 			return "codicon-zap";
 	}

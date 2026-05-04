@@ -115,7 +115,10 @@ export class ChatRouter {
 		const probe = await descriptor.probe();
 
 		if (!probe.installed) {
-			await safePrompt(() => this.onboarding.promptInstall(descriptor));
+			schedulePrompt(
+				() => this.onboarding.promptInstall(descriptor),
+				this.output
+			);
 			return {
 				target: { kind: "copilot-chat" },
 				reason: `${reasonPrefix}: ${descriptor.displayName} not installed`,
@@ -132,7 +135,7 @@ export class ChatRouter {
 		}
 
 		if (!probe.authenticated) {
-			await safePrompt(() => this.onboarding.promptAuth(descriptor));
+			schedulePrompt(() => this.onboarding.promptAuth(descriptor), this.output);
 			return {
 				target: { kind: "copilot-chat" },
 				reason: `${reasonPrefix}: ${descriptor.displayName} not authenticated`,
@@ -155,10 +158,20 @@ export class ChatRouter {
 
 const isRemoteWorkspace = (): boolean => Boolean(env.remoteName);
 
-const safePrompt = async (fn: () => Promise<void>): Promise<void> => {
-	try {
-		await fn();
-	} catch {
-		// Onboarding is best-effort; never let it block routing.
-	}
+/**
+ * Fires an onboarding notification without blocking the router. The router
+ * must stay responsive so chat dispatch is never gated on the user reacting
+ * to a modal-ish info message.
+ */
+const schedulePrompt = (
+	fn: () => Promise<void>,
+	output: OutputChannel
+): void => {
+	Promise.resolve()
+		.then(fn)
+		.catch((error: unknown) => {
+			output.appendLine(
+				`[ChatRouter] onboarding prompt failed: ${error instanceof Error ? error.message : String(error)}`
+			);
+		});
 };
