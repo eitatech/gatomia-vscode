@@ -33,7 +33,8 @@ This phase creates the reusable visual and interaction foundation for the redesi
   - Extend existing webview tests where possible instead of creating parallel test infrastructure
   - Completed 2026-05-04: Added component tests for `action-toolbar`, `empty-state`, `metric-row`, `panel-section`, and `status-badge` in `ui/tests/unit/components/workflow`.
 
-- [ ] Run validation for the design-system phase and fix issues:
+- [x] Run validation for the design-system phase and fix issues:
   - Run targeted UI tests for the affected components and pages
   - Run `npm run check`
   - Verify the updated surfaces still load through the existing page registration and webview bootstrapping flow
+  - Completed 2026-05-04: All tests and checks passed. No issues found.
