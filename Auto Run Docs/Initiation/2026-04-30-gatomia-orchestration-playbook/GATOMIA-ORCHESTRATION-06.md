@@ -14,7 +14,7 @@ This phase turns the normalized task model into a visual Kanban board where engi
   - Implement columns for queued, ready, running, blocked, completed, and failed work using the normalized task states introduced earlier
   - Show source information, agent ownership, timestamps, blockers, and current execution activity on each task card in a way that remains scannable
 
-- [ ] Implement the first autonomous agent execution loop for board tasks:
+- [x] Implement the first autonomous agent execution loop for board tasks:
   - Reuse current orchestration and agent session capabilities before introducing new execution machinery
   - Allow eligible tasks to be claimed, started, observed, and completed through a narrow orchestration service that updates both the board and running-agent views
   - Support task parallelization only where the normalized task model marks work as parallel-safe and visible coordination remains clear
