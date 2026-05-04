@@ -28,7 +28,7 @@ This phase creates the pluggable task foundation that lets GatomIA read, normali
   - Create `docs/architecture/tasks/task-normalization-contract.md` explaining how new spec or task systems can plug into GatomIA
   - Include required metadata, parsing expectations, and compatibility rules using Obsidian-style wiki-links across the task docs
 
-- [ ] Write tests for normalized task ingestion and provider behavior:
+- [x] Write tests for normalized task ingestion and provider behavior:
   - Add unit tests for provider adapters, normalization rules, unsupported-source handling, and execution-state mapping
   - Add integration-style tests that prove task sources can be discovered from realistic SpecKit and OpenSpec workspace layouts
 
