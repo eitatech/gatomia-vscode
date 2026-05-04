@@ -28,7 +28,7 @@ This phase turns the normalized task model into a visual Kanban board where engi
   - Create `docs/architecture/board/task-card-design.md` with YAML front matter and wiki-links to `[[Kanban-Board-Model]]` and `[[Autonomous-Agent-Loop]]`
   - Describe how engineers interpret agent ownership, progress, blockers, retries, and completion in the board interface
 
-- [ ] Write tests for the board and autonomous execution loop:
+- [x] Write tests for the board and autonomous execution loop:
   - Add UI tests for column grouping, task-card rendering, status transitions, and blocked or failed-state behavior
   - Add service-level tests for claiming tasks, parallel-eligibility decisions, and orchestration updates shared with the running-agent view
 
