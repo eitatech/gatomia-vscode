@@ -265,11 +265,48 @@ export interface ActionConfig {
 	parameters: ActionParameters;
 }
 
+export type EventSourceType =
+	| "agent-operation"
+	| "execution-flow"
+	| "repository"
+	| "file-change"
+	| "manual";
+
+export interface EventSource {
+	type: EventSourceType;
+	// agent-operation parameters
+	agent?: AgentType;
+	operation?: OperationType;
+	timing?: TriggerTiming;
+	waitForCompletion?: boolean; // Only for "before" timing
+	// execution-flow parameters
+	hookId?: string;
+	flowEvent?: "success" | "failure" | "timeout";
+	// repository/file-change parameters
+	pattern?: string;
+}
+
+export interface Condition {
+	type: "branch" | "file-exists" | "custom";
+	pattern?: string;
+	filePath?: string;
+	expression?: string;
+}
+
+export interface Schedule {
+	type: "immediate" | "delayed" | "cron";
+	delayMs?: number;
+	cronExpression?: string;
+}
+
 export interface Hook {
 	id: string;
 	name: string;
 	enabled: boolean;
-	trigger: TriggerCondition;
+	trigger?: TriggerCondition; // Legacy support
+	events?: EventSource[];
+	conditions?: Condition[];
+	schedule?: Schedule;
 	action: ActionConfig;
 	createdAt: number;
 	modifiedAt: number;

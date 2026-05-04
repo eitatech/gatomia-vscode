@@ -10,6 +10,10 @@ import type {
 	GitHubActionParams,
 	Hook,
 	TriggerCondition,
+	EventSource,
+	Condition,
+	Schedule,
+	MCPActionParams,
 } from "../types";
 import { TriggerActionSelector } from "./trigger-action-selector";
 
@@ -23,6 +27,16 @@ interface HookFormProps {
 		>
 	) => void;
 	onCancel: () => void;
+}
+
+interface FormData {
+	name: string;
+	enabled: boolean;
+	trigger: TriggerCondition;
+	events: EventSource[];
+	conditions: Condition[];
+	schedule: Schedule;
+	action: ActionConfig;
 }
 
 interface FormData {
@@ -48,7 +62,14 @@ export const HookForm = ({
 			return {
 				name: initialData.name,
 				enabled: initialData.enabled,
-				trigger: initialData.trigger,
+				trigger: initialData.trigger || {
+					agent: "speckit",
+					operation: "specify",
+					timing: "after",
+				},
+				events: initialData.events || [],
+				conditions: initialData.conditions || [],
+				schedule: initialData.schedule || { type: "immediate" },
 				action: initialData.action,
 			};
 		}
@@ -61,6 +82,16 @@ export const HookForm = ({
 				operation: "specify",
 				timing: "after",
 			},
+			events: [
+				{
+					type: "agent-operation",
+					agent: "speckit",
+					operation: "specify",
+					timing: "after",
+				},
+			],
+			conditions: [],
+			schedule: { type: "immediate" },
 			action: {
 				type: "agent",
 				parameters: {
@@ -200,6 +231,18 @@ export const HookForm = ({
 		setFormData((prev) => ({ ...prev, trigger: nextTrigger }));
 	}, []);
 
+	const handleEventsChange = useCallback((events: EventSource[]) => {
+		setFormData((prev) => ({ ...prev, events }));
+	}, []);
+
+	const handleConditionsChange = useCallback((conditions: Condition[]) => {
+		setFormData((prev) => ({ ...prev, conditions }));
+	}, []);
+
+	const handleScheduleChange = useCallback((schedule: Schedule) => {
+		setFormData((prev) => ({ ...prev, schedule }));
+	}, []);
+
 	const handleActionChange = useCallback((nextAction: ActionConfig) => {
 		setFormData((prev) => ({ ...prev, action: nextAction }));
 		setFieldErrors((prev) => ({ ...prev, action: undefined }));
@@ -263,10 +306,16 @@ export const HookForm = ({
 				<TriggerActionSelector
 					action={formData.action}
 					actionError={fieldErrors.action}
+					conditions={formData.conditions}
 					disabled={isSubmitting}
+					events={formData.events}
 					onActionChange={handleActionChange}
 					onClearActionError={clearActionError}
+					onConditionsChange={handleConditionsChange}
+					onEventsChange={handleEventsChange}
+					onScheduleChange={handleScheduleChange}
 					onTriggerChange={handleTriggerChange}
+					schedule={formData.schedule}
 					trigger={formData.trigger}
 				/>
 			</div>

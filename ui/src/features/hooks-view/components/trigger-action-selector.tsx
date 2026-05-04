@@ -20,7 +20,9 @@ import type {
 	MCPActionParams,
 	OperationType,
 	SelectedMCPTool,
-	TriggerCondition,
+	EventSource,
+	Condition,
+	Schedule,
 } from "../types";
 import type { ChangeEvent } from "react";
 import { useMCPServers } from "../hooks/use-mcp-servers";
@@ -31,10 +33,15 @@ import { ArgumentTemplateEditor } from "./argument-template-editor";
 import { CopilotCliOptionsPanel } from "./cli-options/copilot-cli-options-panel";
 
 interface TriggerActionSelectorProps {
-	trigger: TriggerCondition;
+	events?: EventSource[];
+	conditions?: Condition[];
+	schedule?: Schedule;
+	trigger?: TriggerCondition; // legacy fallback
 	action: ActionConfig;
 	disabled?: boolean;
 	actionError?: string;
+	onEventsChange: (events: EventSource[]) => void;
+	onScheduleChange: (schedule: Schedule) => void;
 	onTriggerChange: (trigger: TriggerCondition) => void;
 	onActionChange: (action: ActionConfig) => void;
 	onClearActionError?: () => void;
@@ -161,14 +168,38 @@ const AcpActionContent = ({
 );
 
 export const TriggerActionSelector = ({
+	events,
+	schedule,
 	trigger,
 	action,
 	disabled,
 	actionError,
+	onEventsChange,
+	onScheduleChange,
 	onTriggerChange,
 	onActionChange,
 	onClearActionError,
 }: TriggerActionSelectorProps) => {
+	// legacy trigger fallback for safety
+	const safeTrigger =
+		trigger ||
+		({
+			agent: "speckit",
+			operation: "specify",
+			timing: "after",
+		} as TriggerCondition);
+
+	// event mapping
+	const firstEvent =
+		events?.[0] ||
+		({
+			type: "agent-operation",
+			agent: safeTrigger.agent,
+			operation: safeTrigger.operation,
+			timing: safeTrigger.timing,
+			waitForCompletion: safeTrigger.waitForCompletion,
+		} as EventSource);
+	const safeSchedule = schedule || ({ type: "immediate" } as Schedule);
 	// MCP servers state
 	const { servers, loading: mcpLoading, error: mcpError } = useMCPServers();
 	// ACP workspace-discovered agents
@@ -177,35 +208,47 @@ export const TriggerActionSelector = ({
 	const { agents: knownAgents, toggle: toggleKnownAgent } = useKnownAcpAgents();
 
 	const handleTriggerAgentChange = (event: ChangeEvent<HTMLSelectElement>) => {
-		onTriggerChange({
-			...trigger,
-			agent: event.target.value as AgentType,
-		});
+		const newAgent = event.target.value as AgentType;
+		onTriggerChange({ ...safeTrigger, agent: newAgent });
+		onEventsChange([
+			{ ...firstEvent, type: "agent-operation", agent: newAgent },
+		]);
 	};
 
 	const handleTriggerOperationChange = (
 		event: ChangeEvent<HTMLSelectElement>
 	) => {
-		onTriggerChange({
-			...trigger,
-			operation: event.target.value as OperationType,
-		});
+		const newOp = event.target.value as OperationType;
+		onTriggerChange({ ...safeTrigger, operation: newOp });
+		onEventsChange([
+			{ ...firstEvent, type: "agent-operation", operation: newOp },
+		]);
 	};
 
 	const handleTriggerTimingChange = (event: ChangeEvent<HTMLSelectElement>) => {
-		onTriggerChange({
-			...trigger,
-			timing: event.target.value as "before" | "after",
-		});
+		const newTiming = event.target.value as "before" | "after";
+		onTriggerChange({ ...safeTrigger, timing: newTiming });
+		onEventsChange([
+			{ ...firstEvent, type: "agent-operation", timing: newTiming },
+		]);
 	};
 
 	const handleWaitForCompletionChange = (
 		event: ChangeEvent<HTMLInputElement>
 	) => {
-		onTriggerChange({
-			...trigger,
-			waitForCompletion: event.target.checked,
-		});
+		const wait = event.target.checked;
+		onTriggerChange({ ...safeTrigger, waitForCompletion: wait });
+		onEventsChange([
+			{ ...firstEvent, type: "agent-operation", waitForCompletion: wait },
+		]);
+	};
+
+	const handleEventTypeChange = (event: ChangeEvent<HTMLSelectElement>) => {
+		onEventsChange([{ ...firstEvent, type: event.target.value as any }]);
+	};
+
+	const handleScheduleTypeChange = (event: ChangeEvent<HTMLSelectElement>) => {
+		onScheduleChange({ ...safeSchedule, type: event.target.value as any });
 	};
 
 	const handleActionTypeChange = (event: ChangeEvent<HTMLSelectElement>) => {
@@ -307,7 +350,7 @@ export const TriggerActionSelector = ({
 								onClearActionError?.();
 							}}
 							placeholder="/speckit.clarify --spec $specId"
-							triggerType={trigger.operation}
+							triggerType={safeTrigger.operation}
 							value={params.command || ""}
 						/>
 					</div>
@@ -415,7 +458,7 @@ export const TriggerActionSelector = ({
 									onClearActionError?.();
 								}}
 								placeholder="--mode=auto --feature=$feature --spec=$specId"
-								triggerType={trigger.operation}
+								triggerType={safeTrigger.operation}
 								value={params.arguments || ""}
 							/>
 						</div>
@@ -570,65 +613,111 @@ export const TriggerActionSelector = ({
 		<div className="flex flex-col gap-4">
 			<fieldset className="flex flex-col gap-3 rounded border border-[color:var(--vscode-panel-border)] p-3">
 				<legend className="px-2 font-medium text-[color:var(--vscode-foreground)] text-sm">
-					Trigger
+					Event Source
 				</legend>
 				<div className="flex gap-3">
 					<div className="flex-1">
 						<VSCodeSelect
 							disabled={disabled}
-							id="trigger-agent"
-							label="Agent"
-							onChange={handleTriggerAgentChange}
+							id="event-type"
+							label="Event Type"
+							onChange={handleEventTypeChange}
 							size="sm"
-							value={trigger.agent}
+							value={firstEvent.type}
 						>
-							<option value="speckit">SpecKit</option>
-							<option value="openspec">OpenSpec</option>
-						</VSCodeSelect>
-					</div>
-					<div className="flex-1">
-						<VSCodeSelect
-							disabled={disabled}
-							id="trigger-operation"
-							label="Operation"
-							onChange={handleTriggerOperationChange}
-							size="sm"
-							value={trigger.operation}
-						>
-							{SPECKIT_OPERATIONS.map((operation) => (
-								<option key={operation.value} value={operation.value}>
-									{operation.label}
-								</option>
-							))}
+							<option value="agent-operation">Agent Operation</option>
+							<option value="execution-flow">Execution Flow</option>
+							<option value="repository">Repository Event</option>
+							<option value="file-change">File Change</option>
+							<option value="manual">Manual Trigger</option>
 						</VSCodeSelect>
 					</div>
 				</div>
-				<div className="flex gap-3">
-					<div className="flex-1">
-						<VSCodeSelect
-							disabled={disabled}
-							id="trigger-timing"
-							label="When to Execute"
-							onChange={handleTriggerTimingChange}
-							size="sm"
-							value={trigger.timing}
-						>
-							<option value="before">Before Operation</option>
-							<option value="after">After Operation</option>
-						</VSCodeSelect>
-					</div>
-				</div>
-				{trigger.timing === "before" && (
-					<div className="flex items-start gap-2">
-						<VSCodeCheckbox
-							checked={trigger.waitForCompletion ?? false}
-							disabled={disabled}
-							onChange={handleWaitForCompletionChange}
-						>
-							Wait for hook to complete before executing operation
-						</VSCodeCheckbox>
-					</div>
+
+				{firstEvent.type === "agent-operation" && (
+					<>
+						<div className="flex gap-3">
+							<div className="flex-1">
+								<VSCodeSelect
+									disabled={disabled}
+									id="trigger-agent"
+									label="Agent"
+									onChange={handleTriggerAgentChange}
+									size="sm"
+									value={firstEvent.agent || safeTrigger.agent}
+								>
+									<option value="speckit">SpecKit</option>
+									<option value="openspec">OpenSpec</option>
+								</VSCodeSelect>
+							</div>
+							<div className="flex-1">
+								<VSCodeSelect
+									disabled={disabled}
+									id="trigger-operation"
+									label="Operation"
+									onChange={handleTriggerOperationChange}
+									size="sm"
+									value={firstEvent.operation || safeTrigger.operation}
+								>
+									{SPECKIT_OPERATIONS.map((operation) => (
+										<option key={operation.value} value={operation.value}>
+											{operation.label}
+										</option>
+									))}
+								</VSCodeSelect>
+							</div>
+						</div>
+						<div className="flex gap-3">
+							<div className="flex-1">
+								<VSCodeSelect
+									disabled={disabled}
+									id="trigger-timing"
+									label="Timing"
+									onChange={handleTriggerTimingChange}
+									size="sm"
+									value={firstEvent.timing || safeTrigger.timing}
+								>
+									<option value="before">Before Operation</option>
+									<option value="after">After Operation</option>
+								</VSCodeSelect>
+							</div>
+						</div>
+						{(firstEvent.timing === "before" ||
+							(!firstEvent.timing && safeTrigger.timing === "before")) && (
+							<div className="flex items-start gap-2">
+								<VSCodeCheckbox
+									checked={
+										firstEvent.waitForCompletion ??
+										safeTrigger.waitForCompletion ??
+										false
+									}
+									disabled={disabled}
+									onChange={handleWaitForCompletionChange}
+								>
+									Wait for hook to complete before executing operation
+								</VSCodeCheckbox>
+							</div>
+						)}
+					</>
 				)}
+			</fieldset>
+
+			<fieldset className="flex flex-col gap-3 rounded border border-[color:var(--vscode-panel-border)] p-3">
+				<legend className="px-2 font-medium text-[color:var(--vscode-foreground)] text-sm">
+					Schedule
+				</legend>
+				<VSCodeSelect
+					disabled={disabled}
+					id="schedule-type"
+					label="Timing"
+					onChange={handleScheduleTypeChange}
+					size="sm"
+					value={safeSchedule.type}
+				>
+					<option value="immediate">Immediate</option>
+					<option value="delayed">Delayed</option>
+					<option value="cron">Cron Schedule</option>
+				</VSCodeSelect>
 			</fieldset>
 
 			<fieldset className="flex flex-col gap-3 rounded border border-[color:var(--vscode-panel-border)] p-3">

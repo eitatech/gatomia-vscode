@@ -17,6 +17,16 @@ describe("HookForm", () => {
 		id: "test-hook-1",
 		name: "Test Hook",
 		enabled: true,
+		events: [
+			{
+				type: "agent-operation",
+				agent: "speckit",
+				operation: "specify",
+				timing: "after",
+			},
+		],
+		conditions: [],
+		schedule: { type: "immediate" },
 		trigger: {
 			agent: "speckit",
 			operation: "specify",
@@ -129,6 +139,16 @@ describe("HookForm", () => {
 				expect(mockOnSubmit).toHaveBeenCalledWith({
 					name: "Auto-clarify after specify",
 					enabled: true,
+					events: [
+						{
+							type: "agent-operation",
+							agent: "speckit",
+							operation: "specify",
+							timing: "after",
+						},
+					],
+					conditions: [],
+					schedule: { type: "immediate" },
 					trigger: {
 						agent: "speckit",
 						operation: "specify",
@@ -413,6 +433,16 @@ describe("HookForm", () => {
 				expect(mockOnSubmit).toHaveBeenCalledWith({
 					name: "Auto-commit",
 					enabled: true,
+					events: [
+						{
+							type: "agent-operation",
+							agent: "speckit",
+							operation: "specify",
+							timing: "after",
+						},
+					],
+					conditions: [],
+					schedule: { type: "immediate" },
 					trigger: {
 						agent: "speckit",
 						operation: "specify",
@@ -611,6 +641,16 @@ describe("HookForm", () => {
 				expect(mockOnSubmit).toHaveBeenCalledWith({
 					name: "Auto-create-issue",
 					enabled: true,
+					events: [
+						{
+							type: "agent-operation",
+							agent: "speckit",
+							operation: "specify",
+							timing: "after",
+						},
+					],
+					conditions: [],
+					schedule: { type: "immediate" },
 					trigger: {
 						agent: "speckit",
 						operation: "specify",
