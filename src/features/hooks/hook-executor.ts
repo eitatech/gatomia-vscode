@@ -418,6 +418,20 @@ export class HookExecutor {
 				);
 			}
 
+			// Evaluate conditions before proceeding
+			const conditionsMet = await this.evaluateConditions(hook, execContext);
+			if (!conditionsMet) {
+				this.outputChannel.appendLine(
+					`[HookExecutor] Conditions not met, skipping hook: ${hook.name} (${hook.id})`
+				);
+				return {
+					hookId: hook.id,
+					hookName: hook.name,
+					status: "skipped",
+					duration: Date.now() - startTime,
+				};
+			}
+
 			// Add hook to executed set
 			execContext.executedHooks.add(hook.id);
 			execContext.chainDepth += 1;
@@ -431,6 +445,31 @@ export class HookExecutor {
 				undefined,
 				triggerEvent
 			);
+
+			// Handle scheduling before execution
+			if (hook.schedule && hook.schedule.type !== "immediate") {
+				// Stub: future phases will hand off to a real scheduler service
+				this.outputChannel.appendLine(
+					`[HookExecutor] Hook ${hook.name} scheduled for ${hook.schedule.type} execution. (Scheduler stub)`
+				);
+
+				// For now, if delayed, we wait
+				if (hook.schedule.type === "delayed" && hook.schedule.delayMs) {
+					this.outputChannel.appendLine(
+						`[HookExecutor] Delaying execution by ${hook.schedule.delayMs}ms`
+					);
+					await new Promise((resolve) =>
+						setTimeout(resolve, hook.schedule.delayMs)
+					);
+				} else {
+					return {
+						hookId: hook.id,
+						hookName: hook.name,
+						status: "skipped",
+						duration: Date.now() - startTime,
+					};
+				}
+			}
 
 			// Emit execution started event
 			this._onExecutionStarted.fire({
@@ -887,6 +926,38 @@ export class HookExecutor {
 	 */
 	isMaxDepthExceeded(context: ExecutionContext): boolean {
 		return context.chainDepth >= MAX_CHAIN_DEPTH;
+	}
+
+	/**
+	 * Evaluate conditions for a hook
+	 */
+	async evaluateConditions(
+		hook: Hook,
+		context: ExecutionContext
+	): Promise<boolean> {
+		if (!hook.conditions || hook.conditions.length === 0) {
+			return true;
+		}
+
+		for (const condition of hook.conditions) {
+			// Stub implementation for future condition evaluators
+			this.outputChannel.appendLine(
+				`[HookExecutor] Evaluating condition: ${condition.type}`
+			);
+
+			// If we need strict checking, we could implement basic types here
+			if (
+				condition.type === "branch" ||
+				condition.type === "file-exists" ||
+				condition.type === "custom"
+			) {
+				// To be implemented completely in a later phase.
+				// Currently returns true so we don't break existing flows.
+				await Promise.resolve();
+			}
+		}
+
+		return true;
 	}
 
 	/**

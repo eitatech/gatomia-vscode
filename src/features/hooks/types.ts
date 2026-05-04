@@ -629,6 +629,12 @@ export function isValidHook(obj: unknown): obj is Hook {
 		hook.name.length <= MAX_HOOK_NAME_LENGTH &&
 		typeof hook.enabled === "boolean" &&
 		(hook.trigger === undefined || isValidTrigger(hook.trigger)) &&
+		(hook.events === undefined ||
+			(Array.isArray(hook.events) && hook.events.every(isValidEventSource))) &&
+		(hook.conditions === undefined ||
+			(Array.isArray(hook.conditions) &&
+				hook.conditions.every(isValidCondition))) &&
+		(hook.schedule === undefined || isValidSchedule(hook.schedule)) &&
 		isValidAction(hook.action) &&
 		typeof hook.createdAt === "number" &&
 		typeof hook.modifiedAt === "number" &&
@@ -658,6 +664,51 @@ export function isValidTrigger(obj: unknown): obj is TriggerCondition {
 		(trigger.waitForCompletion === undefined ||
 			typeof trigger.waitForCompletion === "boolean")
 	);
+}
+
+/**
+ * Validate event source
+ */
+export function isValidEventSource(obj: unknown): obj is EventSource {
+	if (typeof obj !== "object" || obj === null) {
+		return false;
+	}
+	const event = obj as EventSource;
+	const validTypes: EventSourceType[] = [
+		"agent-operation",
+		"execution-flow",
+		"repository",
+		"file-change",
+		"manual",
+	];
+	if (!validTypes.includes(event.type)) {
+		return false;
+	}
+	return true;
+}
+
+/**
+ * Validate condition
+ */
+export function isValidCondition(obj: unknown): obj is Condition {
+	if (typeof obj !== "object" || obj === null) {
+		return false;
+	}
+	const condition = obj as Condition;
+	const validTypes = ["branch", "file-exists", "custom"];
+	return validTypes.includes(condition.type);
+}
+
+/**
+ * Validate schedule
+ */
+export function isValidSchedule(obj: unknown): obj is Schedule {
+	if (typeof obj !== "object" || obj === null) {
+		return false;
+	}
+	const schedule = obj as Schedule;
+	const validTypes = ["immediate", "delayed", "cron"];
+	return validTypes.includes(schedule.type);
 }
 
 /**

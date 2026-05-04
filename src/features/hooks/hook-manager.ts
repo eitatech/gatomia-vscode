@@ -535,6 +535,9 @@ export class HookManager {
 		const errors: ValidationError[] = [];
 		errors.push(...this.validateHookId(hook));
 		errors.push(...this.validateHookTrigger(hook));
+		errors.push(...this.validateHookEvents(hook));
+		errors.push(...this.validateHookConditions(hook));
+		errors.push(...this.validateHookSchedule(hook));
 		errors.push(...this.validateHookAction(hook));
 
 		return errors;
@@ -567,6 +570,51 @@ export class HookManager {
 				{
 					field: "trigger",
 					message: "Trigger configuration is invalid",
+				},
+			];
+		}
+		return [];
+	}
+
+	/**
+	 * Validate hook events configuration
+	 */
+	private validateHookEvents(hook: Hook): ValidationError[] {
+		if (hook.events !== undefined && !Array.isArray(hook.events)) {
+			return [
+				{
+					field: "events",
+					message: "Events configuration must be an array",
+				},
+			];
+		}
+		return [];
+	}
+
+	/**
+	 * Validate hook conditions configuration
+	 */
+	private validateHookConditions(hook: Hook): ValidationError[] {
+		if (hook.conditions !== undefined && !Array.isArray(hook.conditions)) {
+			return [
+				{
+					field: "conditions",
+					message: "Conditions configuration must be an array",
+				},
+			];
+		}
+		return [];
+	}
+
+	/**
+	 * Validate hook schedule configuration
+	 */
+	private validateHookSchedule(hook: Hook): ValidationError[] {
+		if (hook.schedule !== undefined && typeof hook.schedule !== "object") {
+			return [
+				{
+					field: "schedule",
+					message: "Schedule configuration is invalid",
 				},
 			];
 		}
