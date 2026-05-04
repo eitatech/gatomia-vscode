@@ -43,6 +43,11 @@ const OrchestrationFeature = lazy(() =>
 		default: m.OrchestrationFeature,
 	}))
 );
+const WorkflowComposerFeature = lazy(() =>
+	import("./features/workflow-composer").then((m) => ({
+		default: m.WorkflowComposerFeature,
+	}))
+);
 
 export type SupportedPage =
 	| "simple"
@@ -53,7 +58,8 @@ export type SupportedPage =
 	| "document-preview"
 	| "welcome-screen"
 	| "agent-chat"
-	| "orchestration";
+	| "orchestration"
+	| "workflow-composer";
 
 function LoadingFallback() {
 	return (
@@ -95,6 +101,7 @@ const pageRenderers = {
 	),
 	"agent-chat": () => withSuspense(AgentChatFeature),
 	orchestration: () => withSuspense(OrchestrationFeature),
+	"workflow-composer": () => withSuspense(WorkflowComposerFeature),
 } satisfies Record<SupportedPage, () => JSX.Element>;
 
 export const getPageRenderer = (pageName: string) => {

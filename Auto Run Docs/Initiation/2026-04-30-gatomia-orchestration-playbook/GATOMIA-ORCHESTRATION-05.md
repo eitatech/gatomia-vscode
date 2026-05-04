@@ -9,7 +9,7 @@ This phase introduces the visual workflow composer that lets engineers model hoo
   - Confirm the smallest graph vocabulary needed now: source node, condition node, schedule node, action node, and execution edge
   - Capture the contract in `docs/architecture/workflows/workflow-composer-contract.md` with YAML front matter and wiki-links to `[[Workflow-Node-Types]]` and `[[Workflow-Inspector-Patterns]]`
 
-- [ ] Add React Flow and create the first reusable workflow graph foundations:
+- [x] Add React Flow and create the first reusable workflow graph foundations:
   - Integrate React Flow using the existing webview build and page patterns instead of creating a standalone app shell
   - Build minimal reusable node and edge renderers that reflect the design-system tokens and status semantics created earlier
   - Keep the first version focused on readability, selection, and persistence mapping rather than advanced animation or speculative features
