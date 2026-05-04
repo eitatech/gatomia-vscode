@@ -4,7 +4,7 @@ This phase turns the normalized task model into a visual Kanban board where engi
 
 ## Tasks
 
-- [ ] Define the Kanban board contract from the normalized task model before building the board UI:
+- [x] Define the Kanban board contract from the normalized task model before building the board UI:
   - Audit the orchestration prototype, pluggable task model, and design-system patterns first so the board reuses existing status semantics and interaction patterns
   - Define the smallest useful board states and card metadata needed to support autonomous execution visibility without overloading the first board release
   - Capture the contract in `docs/architecture/board/kanban-board-model.md` with YAML front matter and wiki-links to `[[Autonomous-Agent-Loop]]` and `[[Task-Card-Design]]`
