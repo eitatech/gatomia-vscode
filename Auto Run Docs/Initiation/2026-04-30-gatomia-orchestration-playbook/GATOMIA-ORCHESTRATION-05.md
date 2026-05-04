@@ -4,7 +4,7 @@ This phase introduces the visual workflow composer that lets engineers model hoo
 
 ## Tasks
 
-- [ ] Define the workflow-composer interaction contract before implementing the graph UI:
+- [x] Define the workflow-composer interaction contract before implementing the graph UI:
   - Audit existing hooks UI, orchestration prototype UI, and the refactored hook model before adding React Flow-specific structures
   - Confirm the smallest graph vocabulary needed now: source node, condition node, schedule node, action node, and execution edge
   - Capture the contract in `docs/architecture/workflows/workflow-composer-contract.md` with YAML front matter and wiki-links to `[[Workflow-Node-Types]]` and `[[Workflow-Inspector-Patterns]]`
