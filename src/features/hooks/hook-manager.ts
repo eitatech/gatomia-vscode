@@ -285,9 +285,20 @@ export class HookManager {
 	 * Get hooks by trigger condition
 	 */
 	getHooksByTrigger(agent: string, operation: string): Hook[] {
-		return this.hooks.filter(
-			(h) => h.trigger.agent === agent && h.trigger.operation === operation
-		);
+		return this.hooks.filter((h) => {
+			if (h.trigger) {
+				return h.trigger.agent === agent && h.trigger.operation === operation;
+			}
+			if (h.events) {
+				return h.events.some(
+					(e) =>
+						e.type === "agent-operation" &&
+						e.agent === agent &&
+						e.operation === operation
+				);
+			}
+			return false;
+		});
 	}
 
 	/**
@@ -351,25 +362,8 @@ export class HookManager {
 			// Validate all loaded hooks and migrate old hooks
 			const validHooks: Hook[] = [];
 			for (const hook of stored) {
-				// Migration: Add default timing "after" for hooks created before timing feature
-				if (!hook.trigger.timing) {
-					hook.trigger.timing = "after";
-					this.outputChannel.appendLine(
-						`[HookManager] Migration: Set default timing "after" for hook: ${hook.name}`
-					);
-				}
+				this.migrateHook(hook);
 
-				// Migration: Rename agentId to modelId in MCP actions
-				if (hook.action.type === "mcp") {
-					const mcpParams = hook.action.parameters as any;
-					if (mcpParams.agentId && !mcpParams.modelId) {
-						mcpParams.modelId = mcpParams.agentId;
-						mcpParams.agentId = undefined;
-						this.outputChannel.appendLine(
-							`[HookManager] Migration: Renamed agentId to modelId for MCP hook: ${hook.name}`
-						);
-					}
-				}
 				if (isValidHook(hook)) {
 					validHooks.push(hook);
 				} else {
@@ -389,6 +383,44 @@ export class HookManager {
 				`[HookManager] Error loading hooks: ${err.message}`
 			);
 			this.hooks = [];
+		}
+	}
+
+	private migrateHook(hook: Hook): void {
+		// Migration: Add default timing "after" for hooks created before timing feature
+		if (hook.trigger && !hook.trigger.timing) {
+			hook.trigger.timing = "after";
+			this.outputChannel.appendLine(
+				`[HookManager] Migration: Set default timing "after" for hook: ${hook.name}`
+			);
+		}
+
+		// Migration: Map legacy trigger to Normalized Domain Model (events, schedule)
+		if (hook.trigger && !hook.events) {
+			hook.events = [
+				{
+					type: "agent-operation",
+					agent: hook.trigger.agent,
+					operation: hook.trigger.operation,
+					timing: hook.trigger.timing,
+				},
+			];
+			hook.schedule = hook.schedule || { type: "immediate" };
+			this.outputChannel.appendLine(
+				`[HookManager] Migration: Normalized hook model mapped for hook: ${hook.name}`
+			);
+		}
+
+		// Migration: Rename agentId to modelId in MCP actions
+		if (hook.action.type === "mcp") {
+			const mcpParams = hook.action.parameters as any;
+			if (mcpParams.agentId && !mcpParams.modelId) {
+				mcpParams.modelId = mcpParams.agentId;
+				mcpParams.agentId = undefined;
+				this.outputChannel.appendLine(
+					`[HookManager] Migration: Renamed agentId to modelId for MCP hook: ${hook.name}`
+				);
+			}
 		}
 	}
 
@@ -522,7 +554,15 @@ export class HookManager {
 	 * Validate hook trigger configuration
 	 */
 	private validateHookTrigger(hook: Hook): ValidationError[] {
-		if (!hook.trigger || typeof hook.trigger !== "object") {
+		if (!hook.trigger && (!hook.events || hook.events.length === 0)) {
+			return [
+				{
+					field: "trigger/events",
+					message: "Trigger or events configuration is required",
+				},
+			];
+		}
+		if (hook.trigger && typeof hook.trigger !== "object") {
 			return [
 				{
 					field: "trigger",

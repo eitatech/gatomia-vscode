@@ -20,7 +20,14 @@ export interface Hook {
 
 	// Configuration
 	enabled: boolean; // Active state (default: true)
-	trigger: TriggerCondition; // When to execute
+	// Legacy support (kept for migration and backward compatibility)
+	trigger?: TriggerCondition; // When to execute
+
+	// Normalized Domain Model
+	events?: EventSource[]; // Sources that trigger this hook
+	conditions?: Condition[]; // Prerequisites that must be met
+	schedule?: Schedule; // When the action should actually run
+
 	action: ActionConfig; // What to execute
 
 	// Metadata
@@ -38,6 +45,44 @@ export interface TriggerCondition {
 	operation: OperationType; // Which operation
 	timing: TriggerTiming; // When to trigger
 	waitForCompletion?: boolean; // Only for "before" timing: block operation until hook completes
+}
+
+// ============================================================================
+// Normalized Domain Model
+// ============================================================================
+
+export type EventSourceType =
+	| "agent-operation"
+	| "execution-flow"
+	| "repository"
+	| "file-change"
+	| "manual";
+
+export interface EventSource {
+	type: EventSourceType;
+	// agent-operation parameters
+	agent?: AgentType;
+	operation?: OperationType;
+	timing?: TriggerTiming;
+	waitForCompletion?: boolean; // Only for "before" timing
+	// execution-flow parameters
+	hookId?: string;
+	flowEvent?: "success" | "failure" | "timeout";
+	// repository/file-change parameters
+	pattern?: string;
+}
+
+export interface Condition {
+	type: "branch" | "file-exists" | "custom";
+	pattern?: string;
+	filePath?: string;
+	expression?: string;
+}
+
+export interface Schedule {
+	type: "immediate" | "delayed" | "cron";
+	delayMs?: number;
+	cronExpression?: string;
 }
 
 /**
@@ -583,7 +628,7 @@ export function isValidHook(obj: unknown): obj is Hook {
 		hook.name.length > 0 &&
 		hook.name.length <= MAX_HOOK_NAME_LENGTH &&
 		typeof hook.enabled === "boolean" &&
-		isValidTrigger(hook.trigger) &&
+		(hook.trigger === undefined || isValidTrigger(hook.trigger)) &&
 		isValidAction(hook.action) &&
 		typeof hook.createdAt === "number" &&
 		typeof hook.modifiedAt === "number" &&

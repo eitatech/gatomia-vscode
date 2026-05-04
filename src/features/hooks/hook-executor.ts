@@ -424,8 +424,10 @@ export class HookExecutor {
 
 			// Build template context
 			// Extract trigger type from hook's trigger configuration
+			const triggerOperation =
+				hook.trigger?.operation || triggerEvent?.operation || "unknown";
 			const templateContext = await this.buildTemplateContext(
-				hook.trigger.operation,
+				triggerOperation,
 				undefined,
 				triggerEvent
 			);
@@ -611,7 +613,7 @@ export class HookExecutor {
 					`[HookExecutor] Hook: ${hook.name} (${hook.id})`
 				);
 				this.outputChannel.appendLine(
-					`[HookExecutor] Trigger: ${hook.trigger.agent}.${hook.trigger.operation} (${hook.trigger.timing})`
+					`[HookExecutor] Trigger: ${hook.trigger ? `${hook.trigger.agent}.${hook.trigger.operation} (${hook.trigger.timing})` : hook.events?.map((e) => e.type).join(", ")}`
 				);
 				this.outputChannel.appendLine(
 					`[HookExecutor] Action Type: ${hook.action.type}`
@@ -693,7 +695,7 @@ export class HookExecutor {
 				`[HookExecutor] Hook: ${hook.name} (${hook.id})`
 			);
 			this.outputChannel.appendLine(
-				`[HookExecutor] Trigger: ${hook.trigger.agent}.${hook.trigger.operation} (${hook.trigger.timing})`
+				`[HookExecutor] Trigger: ${hook.trigger ? `${hook.trigger.agent}.${hook.trigger.operation} (${hook.trigger.timing})` : hook.events?.map((e) => e.type).join(", ")}`
 			);
 			this.outputChannel.appendLine(
 				`[HookExecutor] Action Type: ${hook.action.type}`
@@ -792,13 +794,28 @@ export class HookExecutor {
 		// Get all enabled hooks matching trigger and timing
 		const allHooks = await this.hookManager.getAllHooks();
 		const matchingHooks = allHooks
-			.filter(
-				(h) =>
-					h.enabled &&
-					h.trigger.agent === agent &&
-					h.trigger.operation === operation &&
-					h.trigger.timing === timing
-			)
+			.filter((h) => {
+				if (!h.enabled) {
+					return false;
+				}
+				if (h.trigger) {
+					return (
+						h.trigger.agent === agent &&
+						h.trigger.operation === operation &&
+						h.trigger.timing === timing
+					);
+				}
+				if (h.events) {
+					return h.events.some(
+						(e) =>
+							e.type === "agent-operation" &&
+							e.agent === agent &&
+							e.operation === operation &&
+							e.timing === timing
+					);
+				}
+				return false;
+			})
 			.sort((a, b) => a.createdAt - b.createdAt); // Deterministic order
 
 		if (matchingHooks.length === 0) {
@@ -814,7 +831,18 @@ export class HookExecutor {
 		// Execute hooks based on waitForCompletion setting
 		const results: ExecutionResult[] = [];
 		for (const hook of matchingHooks) {
-			if (timing === "before" && hook.trigger.waitForCompletion) {
+			const isBlocking =
+				timing === "before" &&
+				(hook.trigger?.waitForCompletion ||
+					hook.events?.some(
+						(e) =>
+							e.type === "agent-operation" &&
+							e.agent === agent &&
+							e.operation === operation &&
+							e.waitForCompletion
+					));
+
+			if (isBlocking) {
 				// Blocking execution: wait for hook to complete
 				this.outputChannel.appendLine(
 					`[HookExecutor] Executing blocking before hook: ${hook.name}`
