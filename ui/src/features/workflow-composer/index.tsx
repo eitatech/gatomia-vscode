@@ -2,70 +2,107 @@ import { Button } from "@/components/ui/button";
 import { ActionToolbar, PanelSection } from "@/components/workflow";
 import { WorkflowGraph } from "@/components/workflow-graph";
 import {
-	addEdge,
 	applyEdgeChanges,
 	applyNodeChanges,
-	type Connection,
 	type Edge,
 	type EdgeChange,
 	type Node,
 	type NodeChange,
 } from "@xyflow/react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { vscode } from "../../bridge/vscode";
-
-const INITIAL_NODES: Node[] = [
-	{
-		id: "source-1",
-		type: "source",
-		position: { x: 250, y: 50 },
-		data: {
-			label: "Github Webhook",
-			status: "active",
-			description: "Listens for push events",
-		},
-	},
-	{
-		id: "condition-1",
-		type: "condition",
-		position: { x: 250, y: 200 },
-		data: { label: "Branch is main", description: "Only run on main branch" },
-	},
-	{
-		id: "action-1",
-		type: "action",
-		position: { x: 250, y: 350 },
-		data: {
-			label: "Run Build",
-			status: "success",
-			description: "Executes npm run build",
-		},
-	},
-];
-
-const INITIAL_EDGES: Edge[] = [
-	{ id: "e1-2", source: "source-1", target: "condition-1" },
-	{ id: "e2-3", source: "condition-1", target: "action-1" },
-];
+import type {
+	Hook,
+	HooksExtensionMessage,
+	HooksWebviewMessage,
+} from "../hooks-view/types";
+import { mapHooksToGraph } from "./utils/mapper";
+import { HookForm } from "../hooks-view/components/hook-form";
 
 export function WorkflowComposerFeature(): JSX.Element {
-	const [nodes, setNodes] = useState<Node[]>(INITIAL_NODES);
-	const [edges, setEdges] = useState<Edge[]>(INITIAL_EDGES);
+	const [hooks, setHooks] = useState<Hook[]>([]);
+	const [nodes, setNodes] = useState<Node[]>([]);
+	const [edges, setEdges] = useState<Edge[]>([]);
 
-	const onNodesChange = useCallback(
-		(changes: NodeChange[]) =>
-			setNodes((nds) => applyNodeChanges(changes, nds)),
-		[]
+	const [selectedHookId, setSelectedHookId] = useState<string | undefined>();
+	const selectedHook = hooks.find((h) => h.id === selectedHookId);
+
+	const sendMessage = useCallback((message: HooksWebviewMessage) => {
+		const command =
+			message.command ?? (message.type?.replace(/\//g, ".") as string);
+		vscode.postMessage({ ...message, command });
+	}, []);
+
+	useEffect(() => {
+		const handleMessage = (event: MessageEvent<HooksExtensionMessage>) => {
+			const payload = event.data;
+			if (!payload || typeof payload !== "object") {
+				return;
+			}
+			const messageType = payload.type ?? payload.command;
+			const body = (payload as any).payload ?? (payload as any).data;
+
+			if (messageType === "hooks/sync" || messageType === "hooks.sync") {
+				const syncedHooks = Array.isArray(body?.hooks) ? body.hooks : [];
+				setHooks(syncedHooks);
+				const graph = mapHooksToGraph(syncedHooks);
+				setNodes(graph.nodes);
+				setEdges(graph.edges);
+			}
+		};
+
+		window.addEventListener("message", handleMessage);
+		sendMessage({ type: "hooks/ready" });
+		sendMessage({ type: "hooks/list" });
+		return () => window.removeEventListener("message", handleMessage);
+	}, [sendMessage]);
+
+	const onNodesChange = useCallback((changes: NodeChange[]) => {
+		setNodes((nds) => applyNodeChanges(changes, nds));
+	}, []);
+
+	const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+		setEdges((eds) => applyEdgeChanges(changes, eds));
+	}, []);
+
+	const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+		const hookId = node.data?.hookId as string;
+		if (hookId) {
+			setSelectedHookId(hookId);
+		}
+	}, []);
+
+	const handleFormSubmit = useCallback(
+		(
+			hookData: Omit<
+				Hook,
+				"id" | "createdAt" | "modifiedAt" | "executionCount" | "lastExecutedAt"
+			>
+		) => {
+			if (selectedHookId) {
+				sendMessage({
+					type: "hooks/update",
+					payload: { id: selectedHookId, updates: hookData },
+				});
+				// We don't automatically close, maybe we can if desired, but hooks/sync will refresh the graph
+			} else {
+				sendMessage({
+					type: "hooks/create",
+					payload: hookData,
+				});
+				setSelectedHookId(undefined);
+			}
+		},
+		[selectedHookId, sendMessage]
 	);
-	const onEdgesChange = useCallback(
-		(changes: EdgeChange[]) =>
-			setEdges((eds) => applyEdgeChanges(changes, eds)),
-		[]
-	);
-	const onConnect = useCallback(
-		(params: Connection) => setEdges((eds) => addEdge(params, eds)),
-		[]
-	);
+
+	const handleFormCancel = useCallback(() => {
+		setSelectedHookId(undefined);
+	}, []);
+
+	const handleCreateNew = useCallback(() => {
+		setSelectedHookId("new");
+	}, []);
 
 	return (
 		<div className="flex h-screen flex-col bg-[var(--vscode-editor-background)] text-[var(--vscode-foreground)]">
@@ -83,27 +120,34 @@ export function WorkflowComposerFeature(): JSX.Element {
 						</p>
 					</div>
 					<ActionToolbar align="end">
-						<Button
-							onClick={() =>
-								vscode.postMessage({ type: "workflow-composer/save" })
-							}
-							size="sm"
-							type="button"
-						>
-							Save Workflow
+						<Button onClick={handleCreateNew} size="sm" type="button">
+							New Hook
 						</Button>
 					</ActionToolbar>
 				</div>
 			</PanelSection>
 
-			<div className="flex-1 p-4">
-				<WorkflowGraph
-					edges={edges}
-					nodes={nodes}
-					onConnect={onConnect}
-					onEdgesChange={onEdgesChange}
-					onNodesChange={onNodesChange}
-				/>
+			<div className="flex flex-1 overflow-hidden">
+				<div className="flex-1 p-4">
+					<WorkflowGraph
+						edges={edges}
+						nodes={nodes}
+						onEdgesChange={onEdgesChange}
+						onNodeClick={onNodeClick}
+						onNodesChange={onNodesChange}
+					/>
+				</div>
+
+				{selectedHookId && (
+					<div className="w-[400px] overflow-y-auto border-[color:var(--workflow-panel-border-color)] border-l bg-[color:var(--workflow-panel-background)] p-4">
+						<HookForm
+							initialData={selectedHook}
+							mode={selectedHook ? "edit" : "create"}
+							onCancel={handleFormCancel}
+							onSubmit={handleFormSubmit}
+						/>
+					</div>
+				)}
 			</div>
 		</div>
 	);
