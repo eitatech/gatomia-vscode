@@ -4,7 +4,7 @@ This phase creates the pluggable task foundation that lets GatomIA read, normali
 
 ## Tasks
 
-- [ ] Audit existing task parsing and spec-system integration before building a new task layer:
+- [x] Audit existing task parsing and spec-system integration before building a new task layer:
   - Inspect `src/utils/task-parser.ts`, `src/utils/spec-kit-adapter.ts`, spec review-flow task dispatch code, prompt targets, and any current task-oriented UI or commands
   - Reuse the existing spec adapter and parser seams where possible so the new task source layer plugs into real project structures instead of duplicating discovery logic
   - Capture the design in `docs/architecture/tasks/pluggable-task-source-model.md` with YAML front matter and wiki-links to `[[Task-Normalization-Contract]]` and `[[Autonomous-Execution-States]]`
