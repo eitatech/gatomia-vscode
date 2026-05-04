@@ -9,7 +9,7 @@ This phase turns the normalized task model into a visual Kanban board where engi
   - Define the smallest useful board states and card metadata needed to support autonomous execution visibility without overloading the first board release
   - Capture the contract in `docs/architecture/board/kanban-board-model.md` with YAML front matter and wiki-links to `[[Autonomous-Agent-Loop]]` and `[[Task-Card-Design]]`
 
-- [ ] Build the Kanban board UI on top of the pluggable task source layer:
+- [x] Build the Kanban board UI on top of the pluggable task source layer:
   - Reuse the existing webview architecture and shared design-system primitives before creating one-off board-specific styling
   - Implement columns for queued, ready, running, blocked, completed, and failed work using the normalized task states introduced earlier
   - Show source information, agent ownership, timestamps, blockers, and current execution activity on each task card in a way that remains scannable

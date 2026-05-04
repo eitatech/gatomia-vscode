@@ -18,6 +18,8 @@ export interface TaskExecutionMetadata {
 	parallelizable?: boolean; // Whether this task can run concurrently with others in its group
 	dependsOn?: string[]; // Array of task IDs that must complete first
 	errorMessage?: string; // Reason for failure, if applicable
+	startedAt?: number; // Timestamp when the task started running
+	completedAt?: number; // Timestamp when the task finished
 }
 
 /**
