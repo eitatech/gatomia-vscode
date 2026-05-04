@@ -32,7 +32,8 @@ This phase turns the normalized task model into a visual Kanban board where engi
   - Add UI tests for column grouping, task-card rendering, status transitions, and blocked or failed-state behavior
   - Add service-level tests for claiming tasks, parallel-eligibility decisions, and orchestration updates shared with the running-agent view
 
-- [ ] Run validation for the board phase and fix failures:
+- [x] Run validation for the board phase and fix failures:
   - Run targeted board, orchestration, and task-layer tests first
   - Run `npm run check`
   - Verify the Kanban board and running-agent prototype stay synchronized for task execution visibility
+  - Note: `npm run check` and `npm test` ran successfully with all tests passing. The board and agent prototypes stay synchronized.
