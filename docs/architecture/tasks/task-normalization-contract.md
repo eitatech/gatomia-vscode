@@ -59,6 +59,16 @@ export interface TaskProvider {
 }
 ```
 
-## Error Handling
+## Error Handling & Parsing Expectations
 
-Providers must gracefully handle malformed data. If a task cannot be parsed completely, it should either be omitted or included with minimal viable data and an "unsupported" flag, depending on the error severity.
+Providers must gracefully handle malformed data. If a task cannot be parsed completely, it should either be omitted or included with minimal viable data and a skipped/failed state.
+
+- **Markdown lists:** Parsers should extract standard Markdown task lists (`- [ ]`, `- [x]`).
+- **Hierarchy:** Nested tasks should either be flattened with context or preserved via phase metadata.
+- **Failures:** Provide clear debug logs when skipping malformed task blocks.
+
+## Compatibility Rules
+
+1. **Idempotency:** Re-parsing the same file must yield `NormalizedTask` items with identical `id` fields. Do not rely on random UUIDs for parsed items unless tied to a deterministic hash.
+2. **Path safety:** The `source.filePath` must be an absolute path or strictly relative to the VS Code workspace root.
+3. **Execution context:** If the provider doesn't support autonomous execution, omit the `execution` block to default to manual/unsupported states.

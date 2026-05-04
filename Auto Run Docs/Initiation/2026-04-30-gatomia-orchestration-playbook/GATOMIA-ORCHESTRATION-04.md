@@ -24,7 +24,7 @@ This phase creates the pluggable task foundation that lets GatomIA read, normali
   - Ensure the model can represent queued, ready, running, blocked, completed, failed, and skipped states consistently across providers
   - Document these states in `docs/architecture/tasks/autonomous-execution-states.md` with YAML front matter and wiki-links to `[[Pluggable-Task-Source-Model]]`
 
-- [ ] Document provider integration for future extensibility:
+- [x] Document provider integration for future extensibility:
   - Create `docs/architecture/tasks/task-normalization-contract.md` explaining how new spec or task systems can plug into GatomIA
   - Include required metadata, parsing expectations, and compatibility rules using Obsidian-style wiki-links across the task docs
 

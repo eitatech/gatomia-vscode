@@ -10,6 +10,9 @@ export class SpecKitTaskProvider implements TaskProvider {
 	readonly name = SPEC_SYSTEM_MODE.SPECKIT;
 
 	canHandle(filePath: string): boolean {
+		if (filePath.includes("openspec/")) {
+			return false;
+		}
 		return filePath.includes(".specify") || filePath.includes("specs/");
 	}
 
