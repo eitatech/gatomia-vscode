@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "059c46747b87",
+  "strategy": "manual-commit",
+  "branch": "018-agent-chat-panel",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-05.md",
+    "docs/architecture/workflows/workflow-composer-contract.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/05/9c46747b87/0/metadata.json",
+      "transcript": "/05/9c46747b87/0/full.jsonl",
+      "content_hash": "/05/9c46747b87/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 85366,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 63613,
+    "output_tokens": 532,
+    "api_call_count": 5
+  }
+}
