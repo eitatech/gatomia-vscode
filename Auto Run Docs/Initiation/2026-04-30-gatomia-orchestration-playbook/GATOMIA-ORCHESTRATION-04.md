@@ -32,7 +32,7 @@ This phase creates the pluggable task foundation that lets GatomIA read, normali
   - Add unit tests for provider adapters, normalization rules, unsupported-source handling, and execution-state mapping
   - Add integration-style tests that prove task sources can be discovered from realistic SpecKit and OpenSpec workspace layouts
 
-- [ ] Run task-layer validation and fix failures:
+- [x] Run task-layer validation and fix failures:
   - Run targeted task and adapter tests first
   - Run `npm run check`
   - Verify the new task source layer does not break current spec browsing or existing task-related commands
