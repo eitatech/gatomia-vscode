@@ -8,9 +8,9 @@
     "title": "Maestro agent Dori Playbook task workflow",
     "version": "1.14.30",
     "summary": {
-      "additions": 289,
-      "deletions": 74,
-      "files": 4
+      "additions": 287,
+      "deletions": 71,
+      "files": 5
     },
     "permission": [
       {
@@ -31,7 +31,7 @@
     ],
     "time": {
       "created": 1777909072884,
-      "updated": 1777909431534
+      "updated": 1777909497064
     }
   },
   "messages": [
@@ -49,10 +49,17 @@
         "summary": {
           "diffs": [
             {
+              "file": "Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md",
+              "patch": "Index: Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n===================================================================\n--- Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\t\n+++ Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\t\n@@ -1,40 +1,41 @@\n # Phase 03: Hook and Trigger Engine Refactor\n \n This phase simplifies the current hooks architecture into a clearer execution-flow engine that can model hooks, triggers, and schedules without duplicated concepts or fragmented UI rules. It matters because the existing hooks system already has useful behavior and persistence, but the project now needs a flexible foundation that can react to execution flows, code changes, and future scheduling rules without piling on more ad hoc configuration paths.\n \n ## Tasks\n \n - [x] Audit and model the current hook system before refactoring it:\n   - Inspect `src/features/hooks/`, the hook providers, and the hooks webview components to identify overlap between trigger configuration, action configuration, validation, execution, and logging\n   - Reuse existing persistence and type definitions when viable; only introduce new abstractions if they eliminate concrete duplication or ambiguity\n   - Capture the target architecture in `docs/architecture/hooks/hook-execution-model.md` with YAML front matter and wiki-links to `[[Trigger-Model]]`, `[[Schedule-Model]]`, and `[[Hook-Composer-UX]]`\n \n - [x] Refactor the backend hook model into a clearer execution-flow contract:\n   - Introduce a normalized domain model that separates event sources, conditions, schedules, and actions while preserving migration from the current stored hook shape\n   - Extend trigger support so future phases can react to execution-flow events, repository or file-code changes, and explicit manual triggers without rewriting the executor again\n   - Preserve backward compatibility for existing stored hooks only where necessary for current workspace state migration\n   - Add telemetry and output-channel logging for evaluation, execution, skip reasons, and failure reasons\n \n - [x] Refactor hook execution and validation around the new model:\n   - Reuse `HookManager`, `HookExecutor`, `TriggerRegistry`, and related services where possible before creating replacement files\n   - Consolidate validation so trigger, schedule, and action errors are surfaced consistently in one place\n   - Make room for schedule stubs or interfaces even if full scheduler execution lands in a later phase, so the model is ready now without overbuilding\n \n-- [ ] Redesign the hooks configuration UI around the simplified model:\n+- [x] Redesign the hooks configuration UI around the simplified model:\n   - Reuse current hooks-view patterns, selector components, and argument-template editing where they still fit\n   - Replace confusing or redundant configuration paths with a clearer composition flow for event source, conditions, timing, and actions\n   - Ensure the UI language matches the new execution-flow model and remains understandable to engineers who are not already familiar with the current internal terminology\n+  - **Notes**: Added the new `EventSource`, `Condition`, and `Schedule` models to `ui/src/features/hooks-view/types.ts`. Rebuilt `TriggerActionSelector` inside the UI form to support specifying an event source mapping, schedule options, and fallback mechanisms for the legacy `TriggerCondition` field.\n \n - [ ] Create structured documentation for the new hook system:\n   - Write `docs/architecture/hooks/trigger-model.md` and `docs/architecture/hooks/schedule-model.md` with YAML front matter and wiki-links back to `[[Hook-Execution-Model]]`\n   - Write `docs/architecture/hooks/hook-composer-ux.md` describing how users create and reason about hooks, triggers, and schedules in the redesigned UI\n \n - [ ] Write tests for the refactored hook engine and UI:\n   - Add or update unit tests for migrations, validation, trigger evaluation, and execution logging\n   - Add UI tests that cover the simplified configuration flow and key validation/error states\n   - Prefer extending current hook provider and component test suites before introducing new fixtures\n \n - [ ] Run the hook-system quality gates and fix failures:\n   - Run targeted hook-related tests first\n   - Run `npm run check`\n   - Verify existing hook import, export, enable, disable, and execution-log workflows still function after the refactor\n",
+              "additions": 2,
+              "deletions": 1,
+              "status": "modified"
+            },
+            {
               "file": "tests/unit/webview/hooks-view/hook-form.test.tsx",
-              "patch": "Index: tests/unit/webview/hooks-view/hook-form.test.tsx\n===================================================================\n--- tests/unit/webview/hooks-view/hook-form.test.tsx\t\n+++ tests/unit/webview/hooks-view/hook-form.test.tsx\t\n@@ -1,724 +1,764 @@\n import { fireEvent, render, screen, waitFor } from \"@testing-library/react\";\n import userEvent from \"@testing-library/user-event\";\n import { beforeEach, describe, expect, it, vi } from \"vitest\";\n import { HookForm } from \"../../../../ui/src/features/hooks-view/components/hook-form\";\n import type { Hook } from \"../../../../ui/src/features/hooks-view/types\";\n \n const CREATE_HOOK_BUTTON = /Create Hook/i;\n const SAVE_CHANGES_BUTTON = /Save Changes/i;\n const CANCEL_BUTTON = /Cancel/i;\n const COMMAND_PLACEHOLDER = \"/speckit.clarify --spec $specId\";\n \n describe(\"HookForm\", () => {\n \tconst mockOnSubmit = vi.fn();\n \tconst mockOnCancel = vi.fn();\n \n \tconst mockHook: Hook = {\n \t\tid: \"test-hook-1\",\n \t\tname: \"Test Hook\",\n \t\tenabled: true,\n-\t\ttrigger: {\n+\t\tevents: [\n+        {\n+          type: \"agent-operation\",\n+          agent: \"speckit\",\n+          operation: \"specify\",\n+          timing: \"after\",\n+        }\n+      ],\n+      conditions: [],\n+      schedule: { type: \"immediate\" },\n+      trigger: {\n \t\t\tagent: \"speckit\",\n \t\t\toperation: \"specify\",\n \t\t\ttiming: \"after\",\n \t\t},\n \t\taction: {\n \t\t\ttype: \"agent\",\n \t\t\tparameters: {\n \t\t\t\tcommand: \"/speckit.clarify\",\n \t\t\t},\n \t\t},\n \t\tcreatedAt: new Date().toISOString(),\n \t\tmodifiedAt: new Date().toISOString(),\n \t\texecutionCount: 0,\n \t};\n \n \tbeforeEach(() => {\n \t\tmockOnSubmit.mockClear();\n \t\tmockOnCancel.mockClear();\n \t});\n \n \tdescribe(\"Create Mode\", () => {\n \t\tit(\"renders create form with default values\", () => {\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\texpect(screen.getByText(\"Create Hook\")).toBeInTheDocument();\n \t\t\texpect(screen.getByLabelText(\"Name\")).toHaveValue(\"\");\n \t\t\texpect(screen.getByLabelText(\"Enabled\")).toBeChecked();\n \t\t\texpect(screen.getByLabelText(\"Agent\")).toHaveValue(\"speckit\");\n \t\t\tconst [triggerOperationSelect] = screen.getAllByLabelText(\"Operation\");\n \t\t\texpect(triggerOperationSelect).toHaveValue(\"specify\");\n \t\t\texpect(screen.getByLabelText(\"Type\")).toHaveValue(\"agent\");\n \t\t});\n \n \t\tit(\"validates required name field\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(screen.getByText(\"Hook name is required\")).toBeInTheDocument();\n \t\t\t});\n \t\t\texpect(mockOnSubmit).not.toHaveBeenCalled();\n \t\t}, 15_000);\n \n \t\tit(\"validates name length (max 100 characters)\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"a\".repeat(101));\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByText(\"Hook name must be 100 characters or less\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t\texpect(mockOnSubmit).not.toHaveBeenCalled();\n \t\t}, 30_000);\n \n \t\tit(\"creates hook with valid data\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"Auto-clarify after specify\");\n \n \t\t\tconst commandInput = screen.getByPlaceholderText(COMMAND_PLACEHOLDER);\n \t\t\tawait user.type(commandInput, \"/speckit.clarify\");\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(mockOnSubmit).toHaveBeenCalledWith({\n \t\t\t\t\tname: \"Auto-clarify after specify\",\n \t\t\t\t\tenabled: true,\n-\t\t\t\t\ttrigger: {\n+\t\t\t\t\tevents: [\n+        {\n+          type: \"agent-operation\",\n+          agent: \"speckit\",\n+          operation: \"specify\",\n+          timing: \"after\",\n+        }\n+      ],\n+      conditions: [],\n+      schedule: { type: \"immediate\" },\n+      trigger: {\n \t\t\t\t\t\tagent: \"speckit\",\n \t\t\t\t\t\toperation: \"specify\",\n \t\t\t\t\t\ttiming: \"after\",\n \t\t\t\t\t},\n \t\t\t\t\taction: {\n \t\t\t\t\t\ttype: \"agent\",\n \t\t\t\t\t\tparameters: {\n \t\t\t\t\t\t\tcommand: \"/speckit.clarify\",\n \t\t\t\t\t\t},\n \t\t\t\t\t},\n \t\t\t\t});\n \t\t\t});\n \t\t}, 30_000);\n \n \t\tit(\"calls onCancel when cancel button is clicked\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst cancelButton = screen.getByRole(\"button\", { name: CANCEL_BUTTON });\n \t\t\tawait user.click(cancelButton);\n \n \t\t\texpect(mockOnCancel).toHaveBeenCalled();\n \t\t});\n \t});\n \n \tdescribe(\"Edit Mode\", () => {\n \t\tit(\"renders edit form with initial data\", () => {\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tinitialData={mockHook}\n \t\t\t\t\tmode=\"edit\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\texpect(screen.getByText(\"Edit Hook\")).toBeInTheDocument();\n \t\t\texpect(screen.getByLabelText(\"Name\")).toHaveValue(\"Test Hook\");\n \t\t\texpect(screen.getByLabelText(\"Enabled\")).toBeChecked();\n \t\t\texpect(screen.getByLabelText(\"Agent\")).toHaveValue(\"speckit\");\n \t\t\tconst [triggerOperationSelect] = screen.getAllByLabelText(\"Operation\");\n \t\t\texpect(triggerOperationSelect).toHaveValue(\"specify\");\n \t\t\texpect(screen.getByLabelText(\"Type\")).toHaveValue(\"agent\");\n \t\t});\n \n \t\tit(\"updates hook with modified data\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tinitialData={mockHook}\n \t\t\t\t\tmode=\"edit\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.clear(nameInput);\n \t\t\tawait user.type(nameInput, \"Updated Hook Name\");\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: SAVE_CHANGES_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(mockOnSubmit).toHaveBeenCalledWith(\n \t\t\t\t\texpect.objectContaining({\n \t\t\t\t\t\tname: \"Updated Hook Name\",\n \t\t\t\t\t})\n \t\t\t\t);\n \t\t\t});\n \t\t});\n \t});\n \n \tdescribe(\"Agent Action Type\", () => {\n \t\tit(\"validates command is required\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tfireEvent.change(nameInput, { target: { value: \"Test Hook\" } });\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\tconst errorMessages = screen.getAllByText(\"Command is required\");\n \t\t\t\texpect(errorMessages.length).toBeGreaterThan(0);\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates command format (must start with /speckit. or /openspec.)\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tfireEvent.change(nameInput, { target: { value: \"Test Hook\" } });\n \n \t\t\tconst commandInput = screen.getByPlaceholderText(COMMAND_PLACEHOLDER);\n \t\t\tawait user.type(commandInput, \"/invalid.command\");\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\tconst errorMessages = screen.getAllByText(\n \t\t\t\t\t\"Command must start with /speckit. or /openspec.\"\n \t\t\t\t);\n \t\t\t\texpect(errorMessages.length).toBeGreaterThan(0);\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates command length (max 200 characters)\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tfireEvent.change(nameInput, { target: { value: \"Test Hook\" } });\n \n \t\t\tconst commandInput = screen.getByPlaceholderText(COMMAND_PLACEHOLDER);\n \t\t\tawait user.type(commandInput, `/speckit.${\"a\".repeat(200)}`);\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\tconst errorMessages = screen.getAllByText(\n \t\t\t\t\t\"Command must be 200 characters or less\"\n \t\t\t\t);\n \t\t\t\texpect(errorMessages.length).toBeGreaterThan(0);\n \t\t\t});\n \t\t}, 15_000);\n \t});\n \n \tdescribe(\"Git Action Type\", () => {\n \t\tit(\"renders git action fields when type is changed to git\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"git\");\n \n \t\t\tawait waitFor(() => {\n \t\t\t\tconst [, actionOperationSelect] = screen.getAllByLabelText(\"Operation\");\n \t\t\t\texpect(actionOperationSelect).toBeInTheDocument();\n \t\t\t\texpect(screen.getByLabelText(\"Message Template\")).toBeInTheDocument();\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByLabelText(\"Push to remote after commit\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates message template is required for git action\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tfireEvent.change(nameInput, { target: { value: \"Test Hook\" } });\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"git\");\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByText(\"Commit message template is required\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates message template length (max 500 characters)\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tfireEvent.change(nameInput, { target: { value: \"Test Hook\" } });\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"git\");\n \n \t\t\tconst messageTemplateInput = screen.getByLabelText(\"Message Template\");\n \t\t\tfireEvent.change(messageTemplateInput, {\n \t\t\t\ttarget: { value: \"a\".repeat(501) },\n \t\t\t});\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByText(\"Message template must be 500 characters or less\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"creates hook with git action\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"Auto-commit\");\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"git\");\n \n \t\t\tconst messageTemplateInput = screen.getByLabelText(\"Message Template\");\n \t\t\tfireEvent.change(messageTemplateInput, {\n \t\t\t\ttarget: { value: \"feat({feature}): automated update\" },\n \t\t\t});\n \n \t\t\tconst pushCheckbox = screen.getByLabelText(\"Push to remote after commit\");\n \t\t\tawait user.click(pushCheckbox);\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(mockOnSubmit).toHaveBeenCalledWith({\n \t\t\t\t\tname: \"Auto-commit\",\n \t\t\t\t\tenabled: true,\n-\t\t\t\t\ttrigger: {\n+\t\t\t\t\tevents: [\n+        {\n+          type: \"agent-operation\",\n+          agent: \"speckit\",\n+          operation: \"specify\",\n+          timing: \"after\",\n+        }\n+      ],\n+      conditions: [],\n+      schedule: { type: \"immediate\" },\n+      trigger: {\n \t\t\t\t\t\tagent: \"speckit\",\n \t\t\t\t\t\toperation: \"specify\",\n \t\t\t\t\t\ttiming: \"after\",\n \t\t\t\t\t},\n \t\t\t\t\taction: {\n \t\t\t\t\t\ttype: \"git\",\n \t\t\t\t\t\tparameters: {\n \t\t\t\t\t\t\toperation: \"commit\",\n \t\t\t\t\t\t\tmessageTemplate: \"feat({feature}): automated update\",\n \t\t\t\t\t\t\tpushToRemote: true,\n \t\t\t\t\t\t},\n \t\t\t\t\t},\n \t\t\t\t});\n \t\t\t});\n \t\t});\n \t});\n \n \tdescribe(\"GitHub Action Type\", () => {\n \t\tit(\"renders github action fields when type is changed to github\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"github\");\n \n \t\t\tawait waitFor(() => {\n \t\t\t\tconst [, actionOperationSelect] = screen.getAllByLabelText(\"Operation\");\n \t\t\t\texpect(actionOperationSelect).toBeInTheDocument();\n \t\t\t\texpect(screen.getByLabelText(\"Repository\")).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates title is required for open-issue operation\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"Test Hook\");\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"github\");\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByText(\"Title is required for this operation\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates issue number is required for close-issue operation\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"Test Hook\");\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"github\");\n \n \t\t\tconst [, operationSelect] = screen.getAllByLabelText(\"Operation\");\n \t\t\tawait user.selectOptions(operationSelect, \"close-issue\");\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByText(\"Issue number is required for this operation\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates title length (max 200 characters)\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"Test Hook\");\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"github\");\n \n \t\t\tconst titleInput = screen.getByLabelText(\"Title\");\n \t\t\tfireEvent.change(titleInput, { target: { value: \"a\".repeat(201) } });\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByText(\"Title must be 200 characters or less\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates body length (max 5000 characters)\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tfireEvent.change(nameInput, { target: { value: \"Test Hook\" } });\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"github\");\n \n \t\t\tconst titleInput = screen.getByLabelText(\"Title\");\n \t\t\tfireEvent.change(titleInput, { target: { value: \"Valid title\" } });\n \n \t\t\tconst bodyInput = screen.getByLabelText(\"Body\");\n \t\t\tfireEvent.change(bodyInput, { target: { value: \"a\".repeat(5001) } });\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByText(\"Body must be 5000 characters or less\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"creates hook with github open-issue action\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tfireEvent.change(nameInput, { target: { value: \"Auto-create-issue\" } });\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"github\");\n \n \t\t\tconst titleInput = screen.getByLabelText(\"Title\");\n \t\t\tfireEvent.change(titleInput, {\n \t\t\t\ttarget: { value: \"Spec created for {feature}\" },\n \t\t\t});\n \n \t\t\tconst bodyInput = screen.getByLabelText(\"Body\");\n \t\t\tfireEvent.change(bodyInput, {\n \t\t\t\ttarget: { value: \"Created at {timestamp}\" },\n \t\t\t});\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(mockOnSubmit).toHaveBeenCalledWith({\n \t\t\t\t\tname: \"Auto-create-issue\",\n \t\t\t\t\tenabled: true,\n-\t\t\t\t\ttrigger: {\n+\t\t\t\t\tevents: [\n+        {\n+          type: \"agent-operation\",\n+          agent: \"speckit\",\n+          operation: \"specify\",\n+          timing: \"after\",\n+        }\n+      ],\n+      conditions: [],\n+      schedule: { type: \"immediate\" },\n+      trigger: {\n \t\t\t\t\t\tagent: \"speckit\",\n \t\t\t\t\t\toperation: \"specify\",\n \t\t\t\t\t\ttiming: \"after\",\n \t\t\t\t\t},\n \t\t\t\t\taction: {\n \t\t\t\t\t\ttype: \"github\",\n \t\t\t\t\t\tparameters: {\n \t\t\t\t\t\t\toperation: \"open-issue\",\n \t\t\t\t\t\t\ttitleTemplate: \"Spec created for {feature}\",\n \t\t\t\t\t\t\tbodyTemplate: \"Created at {timestamp}\",\n \t\t\t\t\t\t},\n \t\t\t\t\t},\n \t\t\t\t});\n \t\t\t});\n \t\t});\n \t});\n \n \t// Custom Action Type tests removed - UI changed from text input to agent dropdown\n \t// Tests were validating \"Agent Name\" text field which no longer exists\n \t// New UI uses AgentDropdown component with AgentRegistry integration\n \n \tdescribe(\"Error Handling\", () => {\n \t\t// Error display removed from HookForm - errors are now shown only in parent component (HooksView)\n \t\t// This prevents duplicate error messages from appearing to the user\n \n \t\tit(\"clears field errors when input is corrected\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(screen.getByText(\"Hook name is required\")).toBeInTheDocument();\n \t\t\t});\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"Valid name\");\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.queryByText(\"Hook name is required\")\n \t\t\t\t).not.toBeInTheDocument();\n \t\t\t});\n \t\t});\n \t});\n \n \tdescribe(\"Form State\", () => {\n \t\tit(\"disables form inputs while submitting\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\tconst slowOnSubmit = vi.fn(\n \t\t\t\t() => new Promise((resolve) => setTimeout(resolve, 100))\n \t\t\t);\n \n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={slowOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"Test Hook\");\n \n \t\t\tconst commandInput = screen.getByPlaceholderText(COMMAND_PLACEHOLDER);\n \t\t\tawait user.type(commandInput, \"/speckit.clarify\");\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(screen.getByLabelText(\"Name\")).toBeDisabled();\n \t\t\t\texpect(screen.getByLabelText(\"Enabled\")).toBeDisabled();\n \t\t\t\texpect(submitButton).toBeDisabled();\n \t\t\t\texpect(submitButton).toHaveTextContent(\"Saving...\");\n \t\t\t});\n \t\t});\n \n \t\tit(\"toggles enabled checkbox\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst enabledCheckbox = screen.getByLabelText(\"Enabled\");\n \t\t\texpect(enabledCheckbox).toBeChecked();\n \n \t\t\tawait user.click(enabledCheckbox);\n \t\t\texpect(enabledCheckbox).not.toBeChecked();\n \n \t\t\tawait user.click(enabledCheckbox);\n \t\t\texpect(enabledCheckbox).toBeChecked();\n \t\t});\n \t});\n });\n",
-              "additions": 44,
-              "deletions": 4,
+              "patch": "Index: tests/unit/webview/hooks-view/hook-form.test.tsx\n===================================================================\n--- tests/unit/webview/hooks-view/hook-form.test.tsx\t\n+++ tests/unit/webview/hooks-view/hook-form.test.tsx\t\n@@ -1,724 +1,764 @@\n import { fireEvent, render, screen, waitFor } from \"@testing-library/react\";\n import userEvent from \"@testing-library/user-event\";\n import { beforeEach, describe, expect, it, vi } from \"vitest\";\n import { HookForm } from \"../../../../ui/src/features/hooks-view/components/hook-form\";\n import type { Hook } from \"../../../../ui/src/features/hooks-view/types\";\n \n const CREATE_HOOK_BUTTON = /Create Hook/i;\n const SAVE_CHANGES_BUTTON = /Save Changes/i;\n const CANCEL_BUTTON = /Cancel/i;\n const COMMAND_PLACEHOLDER = \"/speckit.clarify --spec $specId\";\n \n describe(\"HookForm\", () => {\n \tconst mockOnSubmit = vi.fn();\n \tconst mockOnCancel = vi.fn();\n \n \tconst mockHook: Hook = {\n \t\tid: \"test-hook-1\",\n \t\tname: \"Test Hook\",\n \t\tenabled: true,\n+\t\tevents: [\n+\t\t\t{\n+\t\t\t\ttype: \"agent-operation\",\n+\t\t\t\tagent: \"speckit\",\n+\t\t\t\toperation: \"specify\",\n+\t\t\t\ttiming: \"after\",\n+\t\t\t},\n+\t\t],\n+\t\tconditions: [],\n+\t\tschedule: { type: \"immediate\" },\n \t\ttrigger: {\n \t\t\tagent: \"speckit\",\n \t\t\toperation: \"specify\",\n \t\t\ttiming: \"after\",\n \t\t},\n \t\taction: {\n \t\t\ttype: \"agent\",\n \t\t\tparameters: {\n \t\t\t\tcommand: \"/speckit.clarify\",\n \t\t\t},\n \t\t},\n \t\tcreatedAt: new Date().toISOString(),\n \t\tmodifiedAt: new Date().toISOString(),\n \t\texecutionCount: 0,\n \t};\n \n \tbeforeEach(() => {\n \t\tmockOnSubmit.mockClear();\n \t\tmockOnCancel.mockClear();\n \t});\n \n \tdescribe(\"Create Mode\", () => {\n \t\tit(\"renders create form with default values\", () => {\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\texpect(screen.getByText(\"Create Hook\")).toBeInTheDocument();\n \t\t\texpect(screen.getByLabelText(\"Name\")).toHaveValue(\"\");\n \t\t\texpect(screen.getByLabelText(\"Enabled\")).toBeChecked();\n \t\t\texpect(screen.getByLabelText(\"Agent\")).toHaveValue(\"speckit\");\n \t\t\tconst [triggerOperationSelect] = screen.getAllByLabelText(\"Operation\");\n \t\t\texpect(triggerOperationSelect).toHaveValue(\"specify\");\n \t\t\texpect(screen.getByLabelText(\"Type\")).toHaveValue(\"agent\");\n \t\t});\n \n \t\tit(\"validates required name field\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(screen.getByText(\"Hook name is required\")).toBeInTheDocument();\n \t\t\t});\n \t\t\texpect(mockOnSubmit).not.toHaveBeenCalled();\n \t\t}, 15_000);\n \n \t\tit(\"validates name length (max 100 characters)\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"a\".repeat(101));\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByText(\"Hook name must be 100 characters or less\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t\texpect(mockOnSubmit).not.toHaveBeenCalled();\n \t\t}, 30_000);\n \n \t\tit(\"creates hook with valid data\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"Auto-clarify after specify\");\n \n \t\t\tconst commandInput = screen.getByPlaceholderText(COMMAND_PLACEHOLDER);\n \t\t\tawait user.type(commandInput, \"/speckit.clarify\");\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(mockOnSubmit).toHaveBeenCalledWith({\n \t\t\t\t\tname: \"Auto-clarify after specify\",\n \t\t\t\t\tenabled: true,\n+\t\t\t\t\tevents: [\n+\t\t\t\t\t\t{\n+\t\t\t\t\t\t\ttype: \"agent-operation\",\n+\t\t\t\t\t\t\tagent: \"speckit\",\n+\t\t\t\t\t\t\toperation: \"specify\",\n+\t\t\t\t\t\t\ttiming: \"after\",\n+\t\t\t\t\t\t},\n+\t\t\t\t\t],\n+\t\t\t\t\tconditions: [],\n+\t\t\t\t\tschedule: { type: \"immediate\" },\n \t\t\t\t\ttrigger: {\n \t\t\t\t\t\tagent: \"speckit\",\n \t\t\t\t\t\toperation: \"specify\",\n \t\t\t\t\t\ttiming: \"after\",\n \t\t\t\t\t},\n \t\t\t\t\taction: {\n \t\t\t\t\t\ttype: \"agent\",\n \t\t\t\t\t\tparameters: {\n \t\t\t\t\t\t\tcommand: \"/speckit.clarify\",\n \t\t\t\t\t\t},\n \t\t\t\t\t},\n \t\t\t\t});\n \t\t\t});\n \t\t}, 30_000);\n \n \t\tit(\"calls onCancel when cancel button is clicked\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst cancelButton = screen.getByRole(\"button\", { name: CANCEL_BUTTON });\n \t\t\tawait user.click(cancelButton);\n \n \t\t\texpect(mockOnCancel).toHaveBeenCalled();\n \t\t});\n \t});\n \n \tdescribe(\"Edit Mode\", () => {\n \t\tit(\"renders edit form with initial data\", () => {\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tinitialData={mockHook}\n \t\t\t\t\tmode=\"edit\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\texpect(screen.getByText(\"Edit Hook\")).toBeInTheDocument();\n \t\t\texpect(screen.getByLabelText(\"Name\")).toHaveValue(\"Test Hook\");\n \t\t\texpect(screen.getByLabelText(\"Enabled\")).toBeChecked();\n \t\t\texpect(screen.getByLabelText(\"Agent\")).toHaveValue(\"speckit\");\n \t\t\tconst [triggerOperationSelect] = screen.getAllByLabelText(\"Operation\");\n \t\t\texpect(triggerOperationSelect).toHaveValue(\"specify\");\n \t\t\texpect(screen.getByLabelText(\"Type\")).toHaveValue(\"agent\");\n \t\t});\n \n \t\tit(\"updates hook with modified data\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tinitialData={mockHook}\n \t\t\t\t\tmode=\"edit\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.clear(nameInput);\n \t\t\tawait user.type(nameInput, \"Updated Hook Name\");\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: SAVE_CHANGES_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(mockOnSubmit).toHaveBeenCalledWith(\n \t\t\t\t\texpect.objectContaining({\n \t\t\t\t\t\tname: \"Updated Hook Name\",\n \t\t\t\t\t})\n \t\t\t\t);\n \t\t\t});\n \t\t});\n \t});\n \n \tdescribe(\"Agent Action Type\", () => {\n \t\tit(\"validates command is required\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tfireEvent.change(nameInput, { target: { value: \"Test Hook\" } });\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\tconst errorMessages = screen.getAllByText(\"Command is required\");\n \t\t\t\texpect(errorMessages.length).toBeGreaterThan(0);\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates command format (must start with /speckit. or /openspec.)\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tfireEvent.change(nameInput, { target: { value: \"Test Hook\" } });\n \n \t\t\tconst commandInput = screen.getByPlaceholderText(COMMAND_PLACEHOLDER);\n \t\t\tawait user.type(commandInput, \"/invalid.command\");\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\tconst errorMessages = screen.getAllByText(\n \t\t\t\t\t\"Command must start with /speckit. or /openspec.\"\n \t\t\t\t);\n \t\t\t\texpect(errorMessages.length).toBeGreaterThan(0);\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates command length (max 200 characters)\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tfireEvent.change(nameInput, { target: { value: \"Test Hook\" } });\n \n \t\t\tconst commandInput = screen.getByPlaceholderText(COMMAND_PLACEHOLDER);\n \t\t\tawait user.type(commandInput, `/speckit.${\"a\".repeat(200)}`);\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\tconst errorMessages = screen.getAllByText(\n \t\t\t\t\t\"Command must be 200 characters or less\"\n \t\t\t\t);\n \t\t\t\texpect(errorMessages.length).toBeGreaterThan(0);\n \t\t\t});\n \t\t}, 15_000);\n \t});\n \n \tdescribe(\"Git Action Type\", () => {\n \t\tit(\"renders git action fields when type is changed to git\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"git\");\n \n \t\t\tawait waitFor(() => {\n \t\t\t\tconst [, actionOperationSelect] = screen.getAllByLabelText(\"Operation\");\n \t\t\t\texpect(actionOperationSelect).toBeInTheDocument();\n \t\t\t\texpect(screen.getByLabelText(\"Message Template\")).toBeInTheDocument();\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByLabelText(\"Push to remote after commit\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates message template is required for git action\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tfireEvent.change(nameInput, { target: { value: \"Test Hook\" } });\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"git\");\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByText(\"Commit message template is required\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates message template length (max 500 characters)\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tfireEvent.change(nameInput, { target: { value: \"Test Hook\" } });\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"git\");\n \n \t\t\tconst messageTemplateInput = screen.getByLabelText(\"Message Template\");\n \t\t\tfireEvent.change(messageTemplateInput, {\n \t\t\t\ttarget: { value: \"a\".repeat(501) },\n \t\t\t});\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByText(\"Message template must be 500 characters or less\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"creates hook with git action\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"Auto-commit\");\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"git\");\n \n \t\t\tconst messageTemplateInput = screen.getByLabelText(\"Message Template\");\n \t\t\tfireEvent.change(messageTemplateInput, {\n \t\t\t\ttarget: { value: \"feat({feature}): automated update\" },\n \t\t\t});\n \n \t\t\tconst pushCheckbox = screen.getByLabelText(\"Push to remote after commit\");\n \t\t\tawait user.click(pushCheckbox);\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(mockOnSubmit).toHaveBeenCalledWith({\n \t\t\t\t\tname: \"Auto-commit\",\n \t\t\t\t\tenabled: true,\n+\t\t\t\t\tevents: [\n+\t\t\t\t\t\t{\n+\t\t\t\t\t\t\ttype: \"agent-operation\",\n+\t\t\t\t\t\t\tagent: \"speckit\",\n+\t\t\t\t\t\t\toperation: \"specify\",\n+\t\t\t\t\t\t\ttiming: \"after\",\n+\t\t\t\t\t\t},\n+\t\t\t\t\t],\n+\t\t\t\t\tconditions: [],\n+\t\t\t\t\tschedule: { type: \"immediate\" },\n \t\t\t\t\ttrigger: {\n \t\t\t\t\t\tagent: \"speckit\",\n \t\t\t\t\t\toperation: \"specify\",\n \t\t\t\t\t\ttiming: \"after\",\n \t\t\t\t\t},\n \t\t\t\t\taction: {\n \t\t\t\t\t\ttype: \"git\",\n \t\t\t\t\t\tparameters: {\n \t\t\t\t\t\t\toperation: \"commit\",\n \t\t\t\t\t\t\tmessageTemplate: \"feat({feature}): automated update\",\n \t\t\t\t\t\t\tpushToRemote: true,\n \t\t\t\t\t\t},\n \t\t\t\t\t},\n \t\t\t\t});\n \t\t\t});\n \t\t});\n \t});\n \n \tdescribe(\"GitHub Action Type\", () => {\n \t\tit(\"renders github action fields when type is changed to github\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"github\");\n \n \t\t\tawait waitFor(() => {\n \t\t\t\tconst [, actionOperationSelect] = screen.getAllByLabelText(\"Operation\");\n \t\t\t\texpect(actionOperationSelect).toBeInTheDocument();\n \t\t\t\texpect(screen.getByLabelText(\"Repository\")).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates title is required for open-issue operation\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"Test Hook\");\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"github\");\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByText(\"Title is required for this operation\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates issue number is required for close-issue operation\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"Test Hook\");\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"github\");\n \n \t\t\tconst [, operationSelect] = screen.getAllByLabelText(\"Operation\");\n \t\t\tawait user.selectOptions(operationSelect, \"close-issue\");\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByText(\"Issue number is required for this operation\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates title length (max 200 characters)\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"Test Hook\");\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"github\");\n \n \t\t\tconst titleInput = screen.getByLabelText(\"Title\");\n \t\t\tfireEvent.change(titleInput, { target: { value: \"a\".repeat(201) } });\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByText(\"Title must be 200 characters or less\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"validates body length (max 5000 characters)\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tfireEvent.change(nameInput, { target: { value: \"Test Hook\" } });\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"github\");\n \n \t\t\tconst titleInput = screen.getByLabelText(\"Title\");\n \t\t\tfireEvent.change(titleInput, { target: { value: \"Valid title\" } });\n \n \t\t\tconst bodyInput = screen.getByLabelText(\"Body\");\n \t\t\tfireEvent.change(bodyInput, { target: { value: \"a\".repeat(5001) } });\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.getByText(\"Body must be 5000 characters or less\")\n \t\t\t\t).toBeInTheDocument();\n \t\t\t});\n \t\t});\n \n \t\tit(\"creates hook with github open-issue action\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tfireEvent.change(nameInput, { target: { value: \"Auto-create-issue\" } });\n \n \t\t\tconst actionTypeSelect = screen.getByLabelText(\"Type\");\n \t\t\tawait user.selectOptions(actionTypeSelect, \"github\");\n \n \t\t\tconst titleInput = screen.getByLabelText(\"Title\");\n \t\t\tfireEvent.change(titleInput, {\n \t\t\t\ttarget: { value: \"Spec created for {feature}\" },\n \t\t\t});\n \n \t\t\tconst bodyInput = screen.getByLabelText(\"Body\");\n \t\t\tfireEvent.change(bodyInput, {\n \t\t\t\ttarget: { value: \"Created at {timestamp}\" },\n \t\t\t});\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(mockOnSubmit).toHaveBeenCalledWith({\n \t\t\t\t\tname: \"Auto-create-issue\",\n \t\t\t\t\tenabled: true,\n+\t\t\t\t\tevents: [\n+\t\t\t\t\t\t{\n+\t\t\t\t\t\t\ttype: \"agent-operation\",\n+\t\t\t\t\t\t\tagent: \"speckit\",\n+\t\t\t\t\t\t\toperation: \"specify\",\n+\t\t\t\t\t\t\ttiming: \"after\",\n+\t\t\t\t\t\t},\n+\t\t\t\t\t],\n+\t\t\t\t\tconditions: [],\n+\t\t\t\t\tschedule: { type: \"immediate\" },\n \t\t\t\t\ttrigger: {\n \t\t\t\t\t\tagent: \"speckit\",\n \t\t\t\t\t\toperation: \"specify\",\n \t\t\t\t\t\ttiming: \"after\",\n \t\t\t\t\t},\n \t\t\t\t\taction: {\n \t\t\t\t\t\ttype: \"github\",\n \t\t\t\t\t\tparameters: {\n \t\t\t\t\t\t\toperation: \"open-issue\",\n \t\t\t\t\t\t\ttitleTemplate: \"Spec created for {feature}\",\n \t\t\t\t\t\t\tbodyTemplate: \"Created at {timestamp}\",\n \t\t\t\t\t\t},\n \t\t\t\t\t},\n \t\t\t\t});\n \t\t\t});\n \t\t});\n \t});\n \n \t// Custom Action Type tests removed - UI changed from text input to agent dropdown\n \t// Tests were validating \"Agent Name\" text field which no longer exists\n \t// New UI uses AgentDropdown component with AgentRegistry integration\n \n \tdescribe(\"Error Handling\", () => {\n \t\t// Error display removed from HookForm - errors are now shown only in parent component (HooksView)\n \t\t// This prevents duplicate error messages from appearing to the user\n \n \t\tit(\"clears field errors when input is corrected\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(screen.getByText(\"Hook name is required\")).toBeInTheDocument();\n \t\t\t});\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"Valid name\");\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(\n \t\t\t\t\tscreen.queryByText(\"Hook name is required\")\n \t\t\t\t).not.toBeInTheDocument();\n \t\t\t});\n \t\t});\n \t});\n \n \tdescribe(\"Form State\", () => {\n \t\tit(\"disables form inputs while submitting\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\tconst slowOnSubmit = vi.fn(\n \t\t\t\t() => new Promise((resolve) => setTimeout(resolve, 100))\n \t\t\t);\n \n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={slowOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst nameInput = screen.getByLabelText(\"Name\");\n \t\t\tawait user.type(nameInput, \"Test Hook\");\n \n \t\t\tconst commandInput = screen.getByPlaceholderText(COMMAND_PLACEHOLDER);\n \t\t\tawait user.type(commandInput, \"/speckit.clarify\");\n \n \t\t\tconst submitButton = screen.getByRole(\"button\", {\n \t\t\t\tname: CREATE_HOOK_BUTTON,\n \t\t\t});\n \t\t\tawait user.click(submitButton);\n \n \t\t\tawait waitFor(() => {\n \t\t\t\texpect(screen.getByLabelText(\"Name\")).toBeDisabled();\n \t\t\t\texpect(screen.getByLabelText(\"Enabled\")).toBeDisabled();\n \t\t\t\texpect(submitButton).toBeDisabled();\n \t\t\t\texpect(submitButton).toHaveTextContent(\"Saving...\");\n \t\t\t});\n \t\t});\n \n \t\tit(\"toggles enabled checkbox\", async () => {\n \t\t\tconst user = userEvent.setup();\n \t\t\trender(\n \t\t\t\t<HookForm\n \t\t\t\t\tmode=\"create\"\n \t\t\t\t\tonCancel={mockOnCancel}\n \t\t\t\t\tonSubmit={mockOnSubmit}\n \t\t\t\t/>\n \t\t\t);\n \n \t\t\tconst enabledCheckbox = screen.getByLabelText(\"Enabled\");\n \t\t\texpect(enabledCheckbox).toBeChecked();\n \n \t\t\tawait user.click(enabledCheckbox);\n \t\t\texpect(enabledCheckbox).not.toBeChecked();\n \n \t\t\tawait user.click(enabledCheckbox);\n \t\t\texpect(enabledCheckbox).toBeChecked();\n \t\t});\n \t});\n });\n",
+              "additions": 40,
+              "deletions": 0,
               "status": "modified"
             },
             {
@@ -4873,19 +4880,22 @@
         },
         "cost": 0,
         "tokens": {
-          "input": 0,
-          "output": 0,
+          "total": 103255,
+          "input": 2738,
+          "output": 146,
           "reasoning": 0,
           "cache": {
-            "read": 0,
-            "write": 0
+            "write": 0,
+            "read": 100371
           }
         },
         "modelID": "gemini-3.1-pro-preview",
         "providerID": "github-copilot",
         "time": {
-          "created": 1777909431196
+          "created": 1777909431196,
+          "completed": 1777909443855
         },
+        "finish": "tool-calls",
         "id": "msg_df3a8fb9c001FFqLg6uaMwvBVc",
         "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37"
       },
@@ -4918,17 +4928,22 @@
           "tool": "bash",
           "callID": "call_MHxkT1hvRGZjMGNocE1HQWdubGs",
           "state": {
-            "metadata": {
-              "output": "Checked 4 files in 363ms. Fixed 1 file.\n",
-              "description": "Commit changes"
-            },
-            "status": "running",
+            "status": "completed",
             "input": {
               "command": "git add ui/src/features/hooks-view/types.ts ui/src/features/hooks-view/components/hook-form.tsx ui/src/features/hooks-view/components/trigger-action-selector.tsx tests/unit/webview/hooks-view/hook-form.test.tsx && git commit -m \"MAESTRO: Redesign hooks configuration UI around simplified model\n\n- Add EventSource, Condition, and Schedule fields to Hook UI types\n- Update TriggerActionSelector to render new event sources, conditions, and schedules\n- Provide backward compatibility with legacy TriggerCondition\n- Add initial structure for more complex trigger composition\"",
               "description": "Commit changes"
             },
+            "output": "Checked 4 files in 363ms. Fixed 1 file.\n[018-agent-chat-panel 704e271] MAESTRO: Redesign hooks configuration UI around simplified model\n 4 files changed, 285 insertions(+), 70 deletions(-)\n",
+            "metadata": {
+              "output": "Checked 4 files in 363ms. Fixed 1 file.\n[018-agent-chat-panel 704e271] MAESTRO: Redesign hooks configuration UI around simplified model\n 4 files changed, 285 insertions(+), 70 deletions(-)\n",
+              "exit": 0,
+              "description": "Commit changes",
+              "truncated": false
+            },
+            "title": "Commit changes",
             "time": {
-              "start": 1777909438080
+              "start": 1777909443379,
+              "end": 1777909443381
             }
           },
           "metadata": {
@@ -4939,6 +4954,583 @@
           "id": "prt_df3a91289001FtahX1v4MFc9t5",
           "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
           "messageID": "msg_df3a8fb9c001FFqLg6uaMwvBVc"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "d5133652d0005ca52cf908b16d4b04b9016ee148",
+          "type": "step-finish",
+          "tokens": {
+            "total": 103255,
+            "input": 2738,
+            "output": 146,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 100371
+            }
+          },
+          "cost": 0,
+          "id": "prt_df3a92b35002ly8rivjl3hJDmD",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a8fb9c001FFqLg6uaMwvBVc"
+        },
+        {
+          "type": "patch",
+          "hash": "af6c0afdac5a546fba30b358e3987f3c9e17c14e",
+          "files": [
+            "/Users/t798157/Projects/lab/gatomia-vscode/tests/unit/webview/hooks-view/hook-form.test.tsx"
+          ],
+          "id": "prt_df3a92d0e001JLmV6MbapY1Ouf",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a8fb9c001FFqLg6uaMwvBVc"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_df3a384d0001vl0w4BNuUvJLYJ",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/Users/t798157/Projects/lab/gatomia-vscode",
+          "root": "/Users/t798157/Projects/lab/gatomia-vscode"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 103333,
+          "input": 3014,
+          "output": 11,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 100308
+          }
+        },
+        "modelID": "gemini-3.1-pro-preview",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1777909443858,
+          "completed": 1777909465334
+        },
+        "finish": "tool-calls",
+        "id": "msg_df3a92d12001xh2B3eHPAMnOb3",
+        "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37"
+      },
+      "parts": [
+        {
+          "snapshot": "d5133652d0005ca52cf908b16d4b04b9016ee148",
+          "type": "step-start",
+          "id": "prt_df3a9495a0014d4CarEZjFn5rv",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a92d12001xh2B3eHPAMnOb3"
+        },
+        {
+          "type": "reasoning",
+          "text": "**Committing Biome Changes**\n\nI've successfully addressed the Biome pre-commit hook, which only required a minor adjustment to one file. Now that this is resolved, I'm ready to proceed with pushing these changes.\n\n",
+          "time": {
+            "start": 1777909451103,
+            "end": 1777909451108
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "REDACTED/+o+A/REDACTED/REDACTED/REDACTED"
+            }
+          },
+          "id": "prt_df3a9495f001wz77CKgKGprMt8",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a92d12001xh2B3eHPAMnOb3"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_MHxmbkdMMUx5SVpHSXNHZmU3VUs",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git push",
+              "description": "Push changes"
+            },
+            "output": "[entire] Pushing entire/checkpoints/v1 to origin........ done\nremote: \nremote: GitHub found 2 vulnerabilities on eitatech/gatomia-vscode's default branch (2 moderate). To find out more, visit:        \nremote:      https://github.com/eitatech/gatomia-vscode/security/dependabot        \nremote: \nTo github.com:eitatech/gatomia-vscode.git\n   e825715..704e271  018-agent-chat-panel -> 018-agent-chat-panel\n",
+            "metadata": {
+              "output": "[entire] Pushing entire/checkpoints/v1 to origin........ done\nremote: \nremote: GitHub found 2 vulnerabilities on eitatech/gatomia-vscode's default branch (2 moderate). To find out more, visit:        \nremote:      https://github.com/eitatech/gatomia-vscode/security/dependabot        \nremote: \nTo github.com:eitatech/gatomia-vscode.git\n   e825715..704e271  018-agent-chat-panel -> 018-agent-chat-panel\n",
+              "exit": 0,
+              "description": "Push changes",
+              "truncated": false
+            },
+            "title": "Push changes",
+            "time": {
+              "start": 1777909464860,
+              "end": 1777909464868
+            }
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "REDACTED/+o+A/REDACTED/REDACTED/REDACTED"
+            }
+          },
+          "id": "prt_df3a94965001NJPISPp9pQjm43",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a92d12001xh2B3eHPAMnOb3"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "d5133652d0005ca52cf908b16d4b04b9016ee148",
+          "type": "step-finish",
+          "tokens": {
+            "total": 103333,
+            "input": 3014,
+            "output": 11,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 100308
+            }
+          },
+          "cost": 0,
+          "id": "prt_df3a97f26001cQ1LXP0WF4rTlZ",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a92d12001xh2B3eHPAMnOb3"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_df3a384d0001vl0w4BNuUvJLYJ",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/Users/t798157/Projects/lab/gatomia-vscode",
+          "root": "/Users/t798157/Projects/lab/gatomia-vscode"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 103576,
+          "input": 3209,
+          "output": 104,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 100263
+          }
+        },
+        "modelID": "gemini-3.1-pro-preview",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1777909465337,
+          "completed": 1777909471025
+        },
+        "finish": "tool-calls",
+        "id": "msg_df3a980f9001UrfRz0WVTLQMkb",
+        "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37"
+      },
+      "parts": [
+        {
+          "snapshot": "d5133652d0005ca52cf908b16d4b04b9016ee148",
+          "type": "step-start",
+          "id": "prt_df3a9955e001ydp7VHMI6xu4dk",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a980f9001UrfRz0WVTLQMkb"
+        },
+        {
+          "type": "reasoning",
+          "text": "**Checking Off**\n\nI've completed the task outlined in the playbook and have marked it as done.\n\n",
+          "time": {
+            "start": 1777909470561,
+            "end": 1777909470564
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "REDACTED/2Udz0bN/0X2zkAt45kP/REDACTED//REDACTED/REDACTED/REDACTED/REDACTED/REDACTED"
+            }
+          },
+          "id": "prt_df3a99561001adZXjyZh8CALNn",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a980f9001UrfRz0WVTLQMkb"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "call_MHw0eXFJQnhaMTlNTHRPeXE1OEs",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md",
+              "newString": "- [x] Redesign the hooks configuration UI around the simplified model:",
+              "oldString": "- [ ] Redesign the hooks configuration UI around the simplified model:",
+              "replaceAll": false
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n===================================================================\n--- /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n+++ /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n@@ -19,9 +19,9 @@\n   - Reuse `HookManager`, `HookExecutor`, `TriggerRegistry`, and related services where possible before creating replacement files\n   - Consolidate validation so trigger, schedule, and action errors are surfaced consistently in one place\n   - Make room for schedule stubs or interfaces even if full scheduler execution lands in a later phase, so the model is ready now without overbuilding\n \n-- [ ] Redesign the hooks configuration UI around the simplified model:\n+- [x] Redesign the hooks configuration UI around the simplified model:\n   - Reuse current hooks-view patterns, selector components, and argument-template editing where they still fit\n   - Replace confusing or redundant configuration paths with a clearer composition flow for event source, conditions, timing, and actions\n   - Ensure the UI language matches the new execution-flow model and remains understandable to engineers who are not already familiar with the current internal terminology\n \n",
+              "filediff": {
+                "file": "/Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md",
+                "patch": "Index: /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n===================================================================\n--- /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n+++ /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n@@ -19,9 +19,9 @@\n   - Reuse `HookManager`, `HookExecutor`, `TriggerRegistry`, and related services where possible before creating replacement files\n   - Consolidate validation so trigger, schedule, and action errors are surfaced consistently in one place\n   - Make room for schedule stubs or interfaces even if full scheduler execution lands in a later phase, so the model is ready now without overbuilding\n \n-- [ ] Redesign the hooks configuration UI around the simplified model:\n+- [x] Redesign the hooks configuration UI around the simplified model:\n   - Reuse current hooks-view patterns, selector components, and argument-template editing where they still fit\n   - Replace confusing or redundant configuration paths with a clearer composition flow for event source, conditions, timing, and actions\n   - Ensure the UI language matches the new execution-flow model and remains understandable to engineers who are not already familiar with the current internal terminology\n \n",
+                "additions": 1,
+                "deletions": 1
+              },
+              "truncated": false
+            },
+            "title": "Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md",
+            "time": {
+              "start": 1777909470580,
+              "end": 1777909470582
+            }
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "REDACTED/2Udz0bN/0X2zkAt45kP/REDACTED//REDACTED/REDACTED/REDACTED/REDACTED/REDACTED"
+            }
+          },
+          "id": "prt_df3a99567001dcucGbcT8lH4FS",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a980f9001UrfRz0WVTLQMkb"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "82e007452eebb01ac9d69f2a7da57a999496d3c6",
+          "type": "step-finish",
+          "tokens": {
+            "total": 103576,
+            "input": 3209,
+            "output": 104,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 100263
+            }
+          },
+          "cost": 0,
+          "id": "prt_df3a99577001YnbDl4hqn42wGi",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a980f9001UrfRz0WVTLQMkb"
+        },
+        {
+          "type": "patch",
+          "hash": "d5133652d0005ca52cf908b16d4b04b9016ee148",
+          "files": [
+            "/Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md"
+          ],
+          "id": "prt_df3a99730001YeL4sbRRofZpaH",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a980f9001UrfRz0WVTLQMkb"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_df3a384d0001vl0w4BNuUvJLYJ",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/Users/t798157/Projects/lab/gatomia-vscode",
+          "root": "/Users/t798157/Projects/lab/gatomia-vscode"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 103906,
+          "input": 3360,
+          "output": 326,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 100220
+          }
+        },
+        "modelID": "gemini-3.1-pro-preview",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1777909471028,
+          "completed": 1777909478605
+        },
+        "finish": "tool-calls",
+        "id": "msg_df3a99734001dGgDmwlb6MwqlL",
+        "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37"
+      },
+      "parts": [
+        {
+          "snapshot": "82e007452eebb01ac9d69f2a7da57a999496d3c6",
+          "type": "step-start",
+          "id": "prt_df3a9b309001S0ayI7jfY4c3bX",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a99734001dGgDmwlb6MwqlL"
+        },
+        {
+          "type": "reasoning",
+          "text": "**Clarifying Task Completion**\n\nI'm realizing the best place for task-related notes is directly beneath the checkbox, not in a separate section. This keeps everything contextual and immediately accessible.\n\n",
+          "time": {
+            "start": 1777909478156,
+            "end": 1777909478159
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "REDACTED/REDACTED/REDACTED/pu0F642CZ5BuW/eoktn9y/REDACTED/REDACTED/REDACTED/fC2coW3Nph+zjLhCyGuK/92usFHaPRqEYYaMsSG/REDACTED/REDACTED/REDACTED/Uvaoq9CCGtjCY1XoO+aD9zyvuHtuy19u/mT/ORukrQd/I2BaBqN/REDACTED/Yed+aIxLcaKxaU9Y34Iy/Mn1c0Q2Mzg8i/REDACTED"
+            }
+          },
+          "id": "prt_df3a9b30c001pVd0DBsESqCrsx",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a99734001dGgDmwlb6MwqlL"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "call_MHxnVU1qQVRCSUpMY3VqU3p0ZEo",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md",
+              "newString": "- [x] Redesign the hooks configuration UI around the simplified model:\n  - Reuse current hooks-view patterns, selector components, and argument-template editing where they still fit\n  - Replace confusing or redundant configuration paths with a clearer composition flow for event source, conditions, timing, and actions\n  - Ensure the UI language matches the new execution-flow model and remains understandable to engineers who are not already familiar with the current internal terminology\n  - **Notes**: Added the new `EventSource`, `Condition`, and `Schedule` models to `ui/src/features/hooks-view/types.ts`. Rebuilt `TriggerActionSelector` inside the UI form to support specifying an event source mapping, schedule options, and fallback mechanisms for the legacy `TriggerCondition` field.",
+              "oldString": "- [x] Redesign the hooks configuration UI around the simplified model:\n  - Reuse current hooks-view patterns, selector components, and argument-template editing where they still fit\n  - Replace confusing or redundant configuration paths with a clearer composition flow for event source, conditions, timing, and actions\n  - Ensure the UI language matches the new execution-flow model and remains understandable to engineers who are not already familiar with the current internal terminology",
+              "replaceAll": false
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n===================================================================\n--- /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n+++ /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n@@ -23,8 +23,9 @@\n - [x] Redesign the hooks configuration UI around the simplified model:\n   - Reuse current hooks-view patterns, selector components, and argument-template editing where they still fit\n   - Replace confusing or redundant configuration paths with a clearer composition flow for event source, conditions, timing, and actions\n   - Ensure the UI language matches the new execution-flow model and remains understandable to engineers who are not already familiar with the current internal terminology\n+  - **Notes**: Added the new `EventSource`, `Condition`, and `Schedule` models to `ui/src/features/hooks-view/types.ts`. Rebuilt `TriggerActionSelector` inside the UI form to support specifying an event source mapping, schedule options, and fallback mechanisms for the legacy `TriggerCondition` field.\n \n - [ ] Create structured documentation for the new hook system:\n   - Write `docs/architecture/hooks/trigger-model.md` and `docs/architecture/hooks/schedule-model.md` with YAML front matter and wiki-links back to `[[Hook-Execution-Model]]`\n   - Write `docs/architecture/hooks/hook-composer-ux.md` describing how users create and reason about hooks, triggers, and schedules in the redesigned UI\n",
+              "filediff": {
+                "file": "/Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md",
+                "patch": "Index: /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n===================================================================\n--- /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n+++ /Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\n@@ -23,8 +23,9 @@\n - [x] Redesign the hooks configuration UI around the simplified model:\n   - Reuse current hooks-view patterns, selector components, and argument-template editing where they still fit\n   - Replace confusing or redundant configuration paths with a clearer composition flow for event source, conditions, timing, and actions\n   - Ensure the UI language matches the new execution-flow model and remains understandable to engineers who are not already familiar with the current internal terminology\n+  - **Notes**: Added the new `EventSource`, `Condition`, and `Schedule` models to `ui/src/features/hooks-view/types.ts`. Rebuilt `TriggerActionSelector` inside the UI form to support specifying an event source mapping, schedule options, and fallback mechanisms for the legacy `TriggerCondition` field.\n \n - [ ] Create structured documentation for the new hook system:\n   - Write `docs/architecture/hooks/trigger-model.md` and `docs/architecture/hooks/schedule-model.md` with YAML front matter and wiki-links back to `[[Hook-Execution-Model]]`\n   - Write `docs/architecture/hooks/hook-composer-ux.md` describing how users create and reason about hooks, triggers, and schedules in the redesigned UI\n",
+                "additions": 1,
+                "deletions": 0
+              },
+              "truncated": false
+            },
+            "title": "Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md",
+            "time": {
+              "start": 1777909478171,
+              "end": 1777909478174
+            }
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "REDACTED/REDACTED/REDACTED/pu0F642CZ5BuW/eoktn9y/REDACTED/REDACTED/REDACTED/fC2coW3Nph+zjLhCyGuK/92usFHaPRqEYYaMsSG/REDACTED/REDACTED/REDACTED/Uvaoq9CCGtjCY1XoO+aD9zyvuHtuy19u/mT/ORukrQd/I2BaBqN/REDACTED/Yed+aIxLcaKxaU9Y34Iy/Mn1c0Q2Mzg8i/REDACTED"
+            }
+          },
+          "id": "prt_df3a9b311001Vizq6SBN72Qjpd",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a99734001dGgDmwlb6MwqlL"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "dafb503c55c0b01ad9c6efebc8962b30ae04d03c",
+          "type": "step-finish",
+          "tokens": {
+            "total": 103906,
+            "input": 3360,
+            "output": 326,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 100220
+            }
+          },
+          "cost": 0,
+          "id": "prt_df3a9b320001Yu6hWjU8haXxbj",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a99734001dGgDmwlb6MwqlL"
+        },
+        {
+          "type": "patch",
+          "hash": "82e007452eebb01ac9d69f2a7da57a999496d3c6",
+          "files": [
+            "/Users/t798157/Projects/lab/gatomia-vscode/Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md"
+          ],
+          "id": "prt_df3a9b4cc001oxftlKMXAANZwH",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a99734001dGgDmwlb6MwqlL"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_df3a384d0001vl0w4BNuUvJLYJ",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/Users/t798157/Projects/lab/gatomia-vscode",
+          "root": "/Users/t798157/Projects/lab/gatomia-vscode"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 103988,
+          "input": 3737,
+          "output": 78,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 100173
+          }
+        },
+        "modelID": "gemini-3.1-pro-preview",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1777909478607,
+          "completed": 1777909496706
+        },
+        "finish": "tool-calls",
+        "id": "msg_df3a9b4cf001wWH8WcYPG448ON",
+        "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37"
+      },
+      "parts": [
+        {
+          "snapshot": "dafb503c55c0b01ad9c6efebc8962b30ae04d03c",
+          "type": "step-start",
+          "id": "prt_df3a9c7fa001bMMwxsATZkcgOD",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a9b4cf001wWH8WcYPG448ON"
+        },
+        {
+          "type": "reasoning",
+          "text": "**Committing Changes**\n\nI'm focusing on ensuring all necessary files, including this playbook, are committed. This step is crucial for the integrity of our version control.\n\n",
+          "time": {
+            "start": 1777909483516,
+            "end": 1777909483518
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "a71Bjr130Vr1iJv/REDACTED/REDACTED/mQE34cU/REDACTED/M1O7dwp/M6cOLruHRcPHS8dwwj0oc/REDACTED/REDACTED/c7Yub5joiKG/REDACTED/REDACTED/ibDYwN+3uqDtTTW/REDACTED"
+            }
+          },
+          "id": "prt_df3a9c7fc001VWWs51my4zVoyk",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a9b4cf001wWH8WcYPG448ON"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_MHx6eGlIYVBQZGNBVm5kanRPZUI",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git add \"Auto Run Docs/Initiation/2026-04-30-gatomia-orchestration-playbook/GATOMIA-ORCHESTRATION-03.md\" && git commit -m \"MAESTRO: Mark redesign hooks configuration UI task complete\" && git push",
+              "description": "Commit and push playbook"
+            },
+            "output": "Checked 0 files in 440ms. No fixes applied.\n[018-agent-chat-panel f3898e3] MAESTRO: Mark redesign hooks configuration UI task complete\n 1 file changed, 2 insertions(+), 1 deletion(-)\n[entire] Pushing entire/checkpoints/v1 to origin...... done\nremote: \nremote: GitHub found 2 vulnerabilities on eitatech/gatomia-vscode's default branch (2 moderate). To find out more, visit:        \nremote:      https://github.com/eitatech/gatomia-vscode/security/dependabot        \nremote: \nTo github.com:eitatech/gatomia-vscode.git\n   704e271..f3898e3  018-agent-chat-panel -> 018-agent-chat-panel\n",
+            "metadata": {
+              "output": "Checked 0 files in 440ms. No fixes applied.\n[018-agent-chat-panel f3898e3] MAESTRO: Mark redesign hooks configuration UI task complete\n 1 file changed, 2 insertions(+), 1 deletion(-)\n[entire] Pushing entire/checkpoints/v1 to origin...... done\nremote: \nremote: GitHub found 2 vulnerabilities on eitatech/gatomia-vscode's default branch (2 moderate). To find out more, visit:        \nremote:      https://github.com/eitatech/gatomia-vscode/security/dependabot        \nremote: \nTo github.com:eitatech/gatomia-vscode.git\n   704e271..f3898e3  018-agent-chat-panel -> 018-agent-chat-panel\n",
+              "exit": 0,
+              "description": "Commit and push playbook",
+              "truncated": false
+            },
+            "title": "Commit and push playbook",
+            "time": {
+              "start": 1777909496264,
+              "end": 1777909496272
+            }
+          },
+          "metadata": {
+            "copilot": {
+              "reasoningOpaque": "a71Bjr130Vr1iJv/REDACTED/REDACTED/mQE34cU/REDACTED/M1O7dwp/M6cOLruHRcPHS8dwwj0oc/REDACTED/REDACTED/c7Yub5joiKG/REDACTED/REDACTED/ibDYwN+3uqDtTTW/REDACTED"
+            }
+          },
+          "id": "prt_df3a9c7ff0018w2Mp2g13vjojb",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a9b4cf001wWH8WcYPG448ON"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "dafb503c55c0b01ad9c6efebc8962b30ae04d03c",
+          "type": "step-finish",
+          "tokens": {
+            "total": 103988,
+            "input": 3737,
+            "output": 78,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 100173
+            }
+          },
+          "cost": 0,
+          "id": "prt_df3a9f9d20010YkQGvevqjmrAK",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a9b4cf001wWH8WcYPG448ON"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_df3a384d0001vl0w4BNuUvJLYJ",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/Users/t798157/Projects/lab/gatomia-vscode",
+          "root": "/Users/t798157/Projects/lab/gatomia-vscode"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 104482,
+          "input": 4041,
+          "output": 294,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 100147
+          }
+        },
+        "modelID": "gemini-3.1-pro-preview",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1777909496709,
+          "completed": 1777909504957
+        },
+        "finish": "stop",
+        "id": "msg_df3a9fb85001yi5h1a4Q5tqQtV",
+        "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37"
+      },
+      "parts": [
+        {
+          "snapshot": "dafb503c55c0b01ad9c6efebc8962b30ae04d03c",
+          "type": "step-start",
+          "id": "prt_df3aa19f30011YGUJQpCUytMsF",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a9fb85001yi5h1a4Q5tqQtV"
+        },
+        {
+          "type": "reasoning",
+          "text": "**Completing and exiting**\n\nMy focus has shifted to finalizing the current task, which involves completing the hooks configuration redesign. Once this is done, I will exit, ensuring no other outstanding tasks remain to be addressed.\n\n**Finalizing and Exiting**\n\nI've completed the redesign of the hooks configuration, ensuring alignment with the execution-flow model and incorporating support for event sources, conditions, and schedules, all while maintaining legacy trigger compatibility. My next step is to exit.\n\n",
+          "time": {
+            "start": 1777909504500,
+            "end": 1777909504503
+          },
+          "id": "prt_df3aa19f40012cXZ5RBgsEoz9k",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a9fb85001yi5h1a4Q5tqQtV"
+        },
+        {
+          "type": "text",
+          "text": "Redesigned the hooks configuration UI to align with the new execution-flow model, introducing support for event sources, conditions, and schedules while preserving legacy trigger compatibility.\n\n### Details of Work:\n1. **Model Updates**: Propagated the `EventSource`, `Condition`, and `Schedule` interfaces from the backend configuration model into `ui/src/features/hooks-view/types.ts`.\n2. **UI Simplification**: Completely refactored `TriggerActionSelector` to represent \"Event Source\" and \"Schedule\" instead of the old singular `Trigger` panel.\n3. **Backward Compatibility**: Integrated fallback states in `HookForm` and `TriggerActionSelector` to gracefully handle and map the legacy `TriggerCondition` field over to the new normalized arrays.\n4. **Validation and QA**: Updated the existing hook form UI tests (`hook-form.test.tsx`) to mock the new normalized structure properly, and confirmed that both `npm run check` and `npm test` passed safely with the new changes. \n\nThe task \"- [ ] Redesign the hooks configuration UI around the simplified model\" has been marked as complete in the orchestration playbook (`GATOMIA-ORCHESTRATION-03.md`). \n\n*(Note: I analyzed 0 images while preparing for and resolving this task.)*\n\nExiting immediately as per the protocol. No additional tasks will be started in this session.",
+          "time": {
+            "start": 1777909504504,
+            "end": 1777909504508
+          },
+          "id": "prt_df3aa19f8001sJJe9sIuAqbSEp",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a9fb85001yi5h1a4Q5tqQtV"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "dafb503c55c0b01ad9c6efebc8962b30ae04d03c",
+          "type": "step-finish",
+          "tokens": {
+            "total": 104482,
+            "input": 4041,
+            "output": 294,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 100147
+            }
+          },
+          "cost": 0,
+          "id": "prt_df3aa19fe001gbf9XOInnqwtPT",
+          "sessionID": "ses_20c5c7c0bffeGSJRKLJk75EG37",
+          "messageID": "msg_df3a9fb85001yi5h1a4Q5tqQtV"
         }
       ]
     }
