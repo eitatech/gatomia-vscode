@@ -3,6 +3,7 @@ import type { NormalizedTask } from "../tasks/task-model";
 import type { AgentChatRegistry } from "../agent-chat/agent-chat-registry";
 import { randomUUID } from "node:crypto";
 import type { AgentChatSession } from "../agent-chat/types";
+import type { TriggerRegistry } from "../hooks/trigger-registry";
 
 /**
  * Service to manage the autonomous execution of tasks.
@@ -16,9 +17,14 @@ export class AutonomousAgentLoopService {
 	private readonly sessionToTaskMap = new Map<string, string>(); // sessionId -> taskId
 
 	private readonly chatRegistry: AgentChatRegistry;
+	private readonly triggerRegistry?: TriggerRegistry;
 
-	constructor(chatRegistry: AgentChatRegistry) {
+	constructor(
+		chatRegistry: AgentChatRegistry,
+		triggerRegistry?: TriggerRegistry
+	) {
 		this.chatRegistry = chatRegistry;
+		this.triggerRegistry = triggerRegistry;
 		// Observe registry changes to complete/fail tasks based on agent session completion
 		this.chatRegistry.onDidChange(() => this.handleRegistryChange());
 	}
@@ -107,6 +113,7 @@ export class AutonomousAgentLoopService {
 		}
 
 		this.activeTasks.set(taskId, task);
+		this.fireHookTrigger(task);
 		this._onDidChange.fire();
 	}
 
@@ -115,6 +122,19 @@ export class AutonomousAgentLoopService {
 	 */
 	getTrackedTasks(): NormalizedTask[] {
 		return Array.from(this.activeTasks.values());
+	}
+
+	private fireHookTrigger(task: NormalizedTask): void {
+		if (!(this.triggerRegistry && task.execution)) {
+			return;
+		}
+
+		const operation =
+			task.execution.state === "completed" ? "task-completed" : "task-failed";
+
+		this.triggerRegistry.fireTrigger("orchestration", operation, "after", {
+			outputContent: JSON.stringify(task),
+		});
 	}
 
 	private handleRegistryChange() {
@@ -133,6 +153,7 @@ export class AutonomousAgentLoopService {
 					task.execution.state = isSuccess ? "completed" : "failed";
 					task.execution.completedAt = session.endedAt || Date.now();
 
+					this.fireHookTrigger(task);
 					changed = true;
 				}
 			}

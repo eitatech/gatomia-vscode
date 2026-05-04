@@ -88,7 +88,7 @@ export interface Schedule {
 /**
  * AgentType - Supported SDD agent systems
  */
-export type AgentType = "speckit" | "openspec";
+export type AgentType = "speckit" | "openspec" | "orchestration";
 
 /**
  * OperationType - Supported agent operations
@@ -107,7 +107,9 @@ export type OperationType =
 	| "constitution" // Constitution updated
 	| "implementation" // Implementation guidance completed
 	| "unit-test" // Unit test generation completed
-	| "integration-test"; // Integration test generation completed
+	| "integration-test" // Integration test generation completed
+	| "task-completed" // Kanban task completed successfully
+	| "task-failed"; // Kanban task failed
 
 export const SUPPORTED_SPECKIT_OPERATIONS: OperationType[] = [
 	"research",
@@ -651,14 +653,20 @@ export function isValidTrigger(obj: unknown): obj is TriggerCondition {
 	}
 	const trigger = obj as TriggerCondition;
 
-	const validAgents: AgentType[] = ["speckit", "openspec"];
+	const validAgents: AgentType[] = ["speckit", "openspec", "orchestration"];
 	const validTimings: TriggerTiming[] = ["before", "after"];
+
+	const validOperations = [
+		...SUPPORTED_SPECKIT_OPERATIONS,
+		"task-completed",
+		"task-failed",
+	];
 
 	return (
 		typeof trigger.agent === "string" &&
 		validAgents.includes(trigger.agent) &&
 		typeof trigger.operation === "string" &&
-		SUPPORTED_SPECKIT_OPERATIONS.includes(trigger.operation) &&
+		validOperations.includes(trigger.operation as OperationType) &&
 		typeof trigger.timing === "string" &&
 		validTimings.includes(trigger.timing) &&
 		(trigger.waitForCompletion === undefined ||
@@ -942,13 +950,18 @@ export function isValidTriggerEvent(obj: unknown): obj is TriggerEvent {
 	}
 	const event = obj as TriggerEvent;
 
-	const validAgents: string[] = ["speckit", "openspec"];
+	const validAgents: string[] = ["speckit", "openspec", "orchestration"];
+	const validOperations = [
+		...SUPPORTED_SPECKIT_OPERATIONS,
+		"task-completed",
+		"task-failed",
+	];
 
 	return (
 		typeof event.agent === "string" &&
 		validAgents.includes(event.agent) &&
 		typeof event.operation === "string" &&
-		SUPPORTED_SPECKIT_OPERATIONS.includes(event.operation as OperationType) &&
+		validOperations.includes(event.operation as OperationType) &&
 		typeof event.timestamp === "number" &&
 		event.timestamp > 0
 	);

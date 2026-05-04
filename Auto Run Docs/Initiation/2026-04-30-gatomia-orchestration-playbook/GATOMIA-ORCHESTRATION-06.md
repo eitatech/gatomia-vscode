@@ -19,7 +19,7 @@ This phase turns the normalized task model into a visual Kanban board where engi
   - Allow eligible tasks to be claimed, started, observed, and completed through a narrow orchestration service that updates both the board and running-agent views
   - Support task parallelization only where the normalized task model marks work as parallel-safe and visible coordination remains clear
 
-- [ ] Add autonomous bug-detection and remediation hooks into the task loop:
+- [x] Add autonomous bug-detection and remediation hooks into the task loop:
   - Integrate the refactored trigger and execution-flow system so code-change events, task failures, or verification failures can create follow-up work or re-run corrective flows
   - Keep the first version explicit and observable: every autonomous action should produce visible task-state changes and traceable logs rather than hidden background behavior
   - Document the behavior in `docs/architecture/board/autonomous-agent-loop.md` with YAML front matter and wiki-links to `[[Kanban-Board-Model]]`
