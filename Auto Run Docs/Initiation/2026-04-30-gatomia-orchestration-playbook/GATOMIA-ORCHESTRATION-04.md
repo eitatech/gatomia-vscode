@@ -19,7 +19,7 @@ This phase creates the pluggable task foundation that lets GatomIA read, normali
   - Add a task aggregation service that can expose normalized task collections to orchestration and future board UIs
   - Include explicit handling for unsupported or partially parsed task sources so the system degrades clearly instead of silently failing
 
-- [ ] Add autonomous execution metadata for downstream agent orchestration:
+- [x] Add autonomous execution metadata for downstream agent orchestration:
   - Extend the normalized task model with execution intent, suggested agent role, parallelization eligibility, and observable lifecycle states without yet building the full board UI
   - Ensure the model can represent queued, ready, running, blocked, completed, failed, and skipped states consistently across providers
   - Document these states in `docs/architecture/tasks/autonomous-execution-states.md` with YAML front matter and wiki-links to `[[Pluggable-Task-Source-Model]]`
