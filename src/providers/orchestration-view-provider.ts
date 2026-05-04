@@ -124,11 +124,11 @@ export class OrchestrationViewProvider implements WebviewViewProvider {
 				await this.focusTreeView("gatomia.views.cloudAgents").catch(() => {
 					// best-effort
 				});
-				await commands
-					.executeCommand("gatomia.refreshCloudAgents")
-					.catch(() => {
-						// best-effort
-					});
+				try {
+					await commands.executeCommand("gatomia.refreshCloudAgents");
+				} catch {
+					// best-effort
+				}
 				await this.pushSnapshot();
 				return;
 			case "orchestration/open-session": {

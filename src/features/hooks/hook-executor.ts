@@ -346,7 +346,7 @@ export class HookExecutor {
 							`[HookExecutor] Agent ID: ${agentId}, Reason: ${availability.reason}`
 						);
 						this.outputChannel.appendLine(
-							`[HookExecutor] Trigger: ${hook.trigger.agent}.${hook.trigger.operation} (${hook.trigger.timing})`
+							`[HookExecutor] Trigger: ${hook.trigger?.agent}.${hook.trigger?.operation} (${hook.trigger?.timing})`
 						);
 
 						// Emit execution failed event
@@ -459,7 +459,7 @@ export class HookExecutor {
 						`[HookExecutor] Delaying execution by ${hook.schedule.delayMs}ms`
 					);
 					await new Promise((resolve) =>
-						setTimeout(resolve, hook.schedule.delayMs)
+						setTimeout(resolve, hook.schedule?.delayMs || 0)
 					);
 				} else {
 					return {

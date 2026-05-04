@@ -14,7 +14,7 @@ This phase creates the pluggable task foundation that lets GatomIA read, normali
   - Normalize task identity, grouping, status, source metadata, blocking relationships, execution hints, and file references using the smallest useful model
   - Preserve a clear separation between source-specific parsing and normalized task consumption
 
-- [ ] Build the first provider implementations and read services:
+- [x] Build the first provider implementations and read services:
   - Implement provider adapters for existing SpecKit and OpenSpec task sources by reusing current adapter and parser behavior where possible
   - Add a task aggregation service that can expose normalized task collections to orchestration and future board UIs
   - Include explicit handling for unsupported or partially parsed task sources so the system degrades clearly instead of silently failing

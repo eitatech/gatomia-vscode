@@ -26,7 +26,7 @@ export class TaskService {
 
 		const tasksFilePath = files.tasks;
 		if (!tasksFilePath) {
-			return [];
+			return Promise.resolve([]);
 		}
 
 		return this.getTasksFromFile(specId, tasksFilePath);
@@ -43,7 +43,7 @@ export class TaskService {
 
 		if (!provider) {
 			// Fallback degrading gracefully
-			return [
+			return Promise.resolve([
 				{
 					id: `unsupported-${Date.now()}`,
 					title: `No task provider handles file: ${filePath}`,
@@ -55,7 +55,7 @@ export class TaskService {
 					},
 					metadata: {},
 				},
-			];
+			]);
 		}
 
 		return provider.getTasks(specId, filePath);

@@ -247,7 +247,7 @@ export class HookTreeItem extends TreeItem {
 	}
 
 	private static formatDescription(hook: Hook): string {
-		const trigger = `${hook.trigger.agent}.${hook.trigger.operation}`;
+		const trigger = `${hook.trigger?.agent}.${hook.trigger?.operation}`;
 		const actionSummary = HookTreeItem.describeAction(hook);
 		const status = hook.enabled ? "Active" : "Paused";
 		return `${trigger} → ${actionSummary} • ${status}`;
@@ -285,7 +285,7 @@ export class HookTreeItem extends TreeItem {
 
 	private static buildTooltip(hook: Hook): string {
 		const parts = [
-			`Trigger: ${hook.trigger.agent}.${hook.trigger.operation}`,
+			`Trigger: ${hook.trigger?.agent}.${hook.trigger?.operation}`,
 			`Action: ${HookTreeItem.describeAction(hook)}`,
 		];
 		if (hook.action.type === "git") {

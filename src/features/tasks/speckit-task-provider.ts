@@ -17,13 +17,13 @@ export class SpecKitTaskProvider implements TaskProvider {
 		try {
 			const groups = parseTasksFromFile(filePath);
 			if (!groups || groups.length === 0) {
-				return [];
+				return Promise.resolve([]);
 			}
 
-			return this.normalizeGroups(specId, filePath, groups);
+			return Promise.resolve(this.normalizeGroups(specId, filePath, groups));
 		} catch (error) {
 			// Degrade clearly for unsupported/unparseable files
-			return [
+			return Promise.resolve([
 				{
 					id: `unsupported-${Date.now()}`,
 					title: "Failed to parse tasks.md",
@@ -35,7 +35,7 @@ export class SpecKitTaskProvider implements TaskProvider {
 					},
 					metadata: {},
 				},
-			];
+			]);
 		}
 	}
 

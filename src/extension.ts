@@ -2768,10 +2768,10 @@ async function bootstrapOrchestrationPrototype(
 		cloudProviderRegistry: cloudAgentsRuntime?.registry,
 		agentChatStoreChangeEvent: agentChatStore.onDidChangeManifest,
 		onCloudSessionsChanged: cloudAgentsRuntime
-			? (listener) => cloudAgentsRuntime.onSessionsChanged(listener)
+			? (listener) => cloudAgentsRuntime!.onSessionsChanged(listener)
 			: undefined,
 		onCloudProviderChanged: cloudAgentsRuntime
-			? (listener) => cloudAgentsRuntime.onProviderChanged(listener)
+			? (listener) => cloudAgentsRuntime!.onProviderChanged(listener)
 			: undefined,
 	});
 
