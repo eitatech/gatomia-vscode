@@ -9,7 +9,7 @@ This phase creates the pluggable task foundation that lets GatomIA read, normali
   - Reuse the existing spec adapter and parser seams where possible so the new task source layer plugs into real project structures instead of duplicating discovery logic
   - Capture the design in `docs/architecture/tasks/pluggable-task-source-model.md` with YAML front matter and wiki-links to `[[Task-Normalization-Contract]]` and `[[Autonomous-Execution-States]]`
 
-- [ ] Implement a normalized task domain model and provider interface:
+- [x] Implement a normalized task domain model and provider interface:
   - Create a small provider contract that can ingest tasks from SpecKit, OpenSpec, and future task providers without changing downstream board or orchestration code
   - Normalize task identity, grouping, status, source metadata, blocking relationships, execution hints, and file references using the smallest useful model
   - Preserve a clear separation between source-specific parsing and normalized task consumption
