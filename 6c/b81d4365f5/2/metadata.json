@@ -1,0 +1,41 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "6cb81d4365f5",
+  "session_id": "ses_20c67c805ffez5760ap0ETph7x",
+  "strategy": "manual-commit",
+  "created_at": "2026-05-04T15:37:09.93122Z",
+  "branch": "018-agent-chat-panel",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/features/hooks/hook-executor.ts",
+    "src/features/hooks/hook-manager.ts",
+    "src/features/hooks/types.ts"
+  ],
+  "agent": "OpenCode",
+  "model": "gemini-3.1-pro-preview",
+  "turn_id": "fd1ab2d0956d",
+  "checkpoint_transcript_start": 46,
+  "transcript_lines_at_start": 46,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-05-04T15:37:09.918411Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 170,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 170,
+    "total_lines_changed": 170,
+    "agent_percentage": 0,
+    "metric_version": 2
+  }
+}
