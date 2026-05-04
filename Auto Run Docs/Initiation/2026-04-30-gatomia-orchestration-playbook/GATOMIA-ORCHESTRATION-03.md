@@ -9,7 +9,7 @@ This phase simplifies the current hooks architecture into a clearer execution-fl
   - Reuse existing persistence and type definitions when viable; only introduce new abstractions if they eliminate concrete duplication or ambiguity
   - Capture the target architecture in `docs/architecture/hooks/hook-execution-model.md` with YAML front matter and wiki-links to `[[Trigger-Model]]`, `[[Schedule-Model]]`, and `[[Hook-Composer-UX]]`
 
-- [ ] Refactor the backend hook model into a clearer execution-flow contract:
+- [x] Refactor the backend hook model into a clearer execution-flow contract:
   - Introduce a normalized domain model that separates event sources, conditions, schedules, and actions while preserving migration from the current stored hook shape
   - Extend trigger support so future phases can react to execution-flow events, repository or file-code changes, and explicit manual triggers without rewriting the executor again
   - Preserve backward compatibility for existing stored hooks only where necessary for current workspace state migration
