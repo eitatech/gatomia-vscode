@@ -1,6 +1,55 @@
-# Changelog
+# 📦 Changelog
 
-Notable published releases for GatomIA.
+---
+
+## v0.38.0 2026-05-04
+
+### Added
+
+- replace auxiliary-bar migration with dual-view declarative placement
+- add thought/plan message support and auxiliary bar placement
+- add thinking-level and agent-role chip support with catalog integration
+- add dynamic model discovery with session/set_model RPC support
+- add permission default hot-reload and multi-attempt sidebar migration
+- add pending file-write review bar with per-file accept/reject UI
+- add Phase 4 pending file-write buffer with accept/reject UI
+- update GitHub Copilot agent detection for unified CLI binary
+- migrate to sidebar webview as canonical chat surface
+- add specsmd agent definitions and speckit.analyze command
+- Phase 5 complete — US4 concurrent-cap enforcement and orphan cleanup (T070-T076)
+- Phase 4 complete — US2 Running Agents tree view (T042-T048)
+- Phase 3 complete — US1 chat panel fully functional (T018-T041)
+- Phase 2 foundational layer (T005-T017)
+- add feature artifacts and complete Phase 1 setup
+- add tinyspec extension with before_specify hook for task complexity classification
+
+### Fixed
+
+- npm run check violations
+- remove overflow-y from chip overflow popover to prevent submenu clipping
+- coerce tree-item argument in cancel command for Running Agents inline button
+- improve ACP session cancellation and add timeout handling for initialization
+
+### Changed
+
+- Atualizar o package-lock.json
+- chore(beads): close changelog task
+- docs(changelog): rebuild release history
+- add .half to biome ignore list
+- chore: add Haft, Entire, Ralph, and OpenCode integration configs
+- test(acp-client): add per-AcpClient memo for allow_always/reject_always tool permission decisions
+- chore(changelog): deduplicate v0.0.25 entries and normalize capitalization
+- chore: update spec-kit extension catalog cache and add agent-assign hook
+- refactor: remove DependenciesViewProvider and redirect install dependencies command to welcome screen
+- chore: update .vscodeignore and remove caveman-compress skill files
+
+### Release Info
+
+- **Source Branch**: `develop`
+- **Release Type**: minor
+
+---
+
 
 This file tracks tagged versions only and focuses on user-facing changes.
 Versions earlier than `v0.26.0` predate this changelog format.
